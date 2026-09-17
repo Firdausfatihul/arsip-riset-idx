@@ -29,6 +29,7 @@ SRC = ROOT / "needtobeindexed"
 OUT = ROOT / "site"
 BASE_URL = os.environ.get("BASE_URL", "").rstrip("/")
 SITE_NAME = "Arsip Riset IDX"
+BUILD_ID = datetime.now().strftime("%Y%m%d%H%M%S")
 
 # Urutan di sini = urutan tampil. Konvensi nama: stockbit_YYYYMMDD.md dan ki_YYYYMMDD.md.
 # "prefixes" dicocokkan dengan kata pertama nama berkas, "keywords" dengan bagian mana pun.
@@ -690,6 +691,20 @@ a.chip:hover{outline:1px solid var(--c)}
 APP_JS = r"""
 (function(){
   var data = JSON.parse(document.getElementById('arsip-data').textContent);
+
+  var BUILD_VERSION = data.version || '';
+
+  fetch('version.json?t=' + Date.now(), {cache: 'no-store'})
+    .then(function(r){ return r.json(); })
+    .then(function(v){
+      if (v.version && BUILD_VERSION && v.version !== BUILD_VERSION) {
+        var url = new URL(location.href);
+        url.searchParams.set('v', v.version);
+        location.replace(url.toString());
+      }
+    })
+    .catch(function(){});
+
   var docs = data.docs, byPath = {};
   docs.forEach(function(d){
     byPath[d.path] = d;
@@ -701,7 +716,9 @@ APP_JS = r"""
   function loadDoc(d){
     if (d.content != null) return Promise.resolve(d);
     if (!d.loading){
-      d.loading = fetch(d.path).then(function(r){
+      d.loading = fetch(d.path + '?v=' + encodeURIComponent(BUILD_VERSION), { 
+      cache: 'no-store'
+      }).then(function(r){
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.text();
       }).then(function(t){
@@ -1143,7 +1160,9 @@ APP_JS = r"""
   function loadOwn(){
     if (ownData) return Promise.resolve(ownData);
     if (!ownLoading){
-      ownLoading = fetch(own.path).then(function(r){
+      ownLoading = fetch(own.path + '?v=' + encodeURIComponent(BUILD_VERSION), {
+        cache: 'no-store'
+      }).then(function(r){
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       }).then(function(d){
@@ -1788,7 +1807,11 @@ def build_page(docs, by_cat, own=None):
             del entry["content"]
             entry["lazy"] = True
         entries.append(entry)
-    payload = {"docs": entries, "own": own and {k: own[k] for k in ("path", "months", "count", "tickers")}}
+    payload = {
+    "version": BUILD_ID,
+    "docs": entries,
+    "own": own and {k: own[k] for k in ("path", "months", "count", "tickers")}
+    }
     data_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
     desc = ("Arsip riset pasar modal: laporan Stockbit, keterbukaan informasi, dan digest per emiten, dikelompokkan per sumber "
             "dan tanggal, plus grafik kepemilikan saham KSEI per emiten.")
@@ -1889,6 +1912,10 @@ def main():
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
+    (out / "version.json").write_text(
+      json.dumps({"version": BUILD_ID}),
+      encoding="utf-8"
+    )
     for doc, src in zip(docs, files):
         target = out / doc["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
