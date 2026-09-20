@@ -1,6 +1,6 @@
 # Arsip Riset IDX
 
-Viewer Markdown statis untuk arsip riset pasar modal (Stockbit, Keterbukaan Informasi emiten BEI dan Australia, serta data IDX Signal Desk).
+Viewer Markdown statis untuk arsip riset pasar modal (Stockbit, Keterbukaan Informasi emiten BEI, Australia, dan Singapura, serta data IDX Signal Desk).
 File di `needtobeindexed/` **tidak dikonversi**: file disalin apa adanya lalu dirender di browser.
 `build.py` hanya membuat halaman daftar dan pencarian, karena static host tidak bisa membaca isi folder.
 
@@ -50,6 +50,7 @@ archivescrapingweb/
 | `ki_YYYYMMDD.md` | Keterbukaan Informasi |
 | `digest_YYYY-MM-DD_YYYY-MM-DD[_HHMM-HHMM].md` | Digest Emiten (dibuat `tools/sync_idx.py`) |
 | `asx_YYYYMMDD.md` | Keterbukaan Informasi Australia (tanggal potret riset) |
+| `sgx_YYYYMMDD.md` / `sgx_january-20september2026.md` | Keterbukaan Informasi Singapura (SGX); file kedua memakai 20 September 2026 sebagai tanggal penyusunan |
 | `idx-signal-desk/kepemilikan.json` | bukan dokumen: data tab **Kepemilikan Saham** (dibuat `tools/sync_idx.py`) |
 | lainnya | dicocokkan dengan kata kunci (lihat di bawah), kalau tidak cocok masuk **Lainnya** |
 
@@ -62,6 +63,7 @@ Tanggal dibaca dari nama file, dengan urutan percobaan:
 1. `YYYY-MM-DD_YYYY-MM-DD` → `stockbit_ki_review_2026-09-05_2026-09-10` = 5–10 Sep 2026 (dipakai apa adanya, tidak ditafsir ulang dari isi)
 2. `YYYY-MM-DD`, opsional rentang hari `_DD` → `stockbit_review_2026-09-13_14` = 13–14 Sep 2026
 3. `DD[-DD]_NamaBulan_YYYY` (Indonesia/Inggris, penuh/3 huruf) → `..._14_September_2026`, `Analisis_Stockbit_25-31_Agustus_2026`
+   - Tanggal tanpa pemisah di akhir nama juga didukung: `...20september2026` → 20 September 2026. Untuk `sgx_january-20september2026.md`, ini tanggal penyusunan; pembuka dokumen menyebut potret arsip sampai 19 September 2026.
 4. `NamaBulan[_NamaBulan]_YYYY` (hanya bulan) → rentang tanggal persis dicari di ±5.000 karakter awal isi dokumen
    (mis. "1 Agustus–5 September 2026"). Kalau tidak ketemu, label jadi "Agustus–September 2026".
 5. 8 digit: `YYYYMMDD` → `ki_20260915`, atau `DDMMYYYY` → `stockbit_01092026` (dikenali dari posisi "20xx")
@@ -95,7 +97,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   Kalau CDN gagal dimuat, dokumen tetap tampil sebagai teks mentah (`<pre>`).
 - Font dari Google Fonts: IBM Plex Sans / Sans Condensed / Mono. Kalau gagal, pakai font sistem.
 - Tab di atas: **Dokumen** (daftar dan pembaca) dan **Kepemilikan Saham** (hanya muncul kalau `kepemilikan.json` ada).
-- Beranda: **Stockbit → Keterbukaan Informasi → Keterbukaan Informasi Australia** sejajar dalam tiga kolom saat area konten cukup lebar (≥840 px); Digest Emiten sesudahnya. Pada area lebih sempit, tautan kategori tampil di atas judul beranda agar semua sumber langsung terlihat dan bisa dituju tanpa mencari ke bawah.
+- Beranda: **Stockbit → Keterbukaan Informasi → Keterbukaan Informasi Australia → Keterbukaan Informasi Singapura (SGX)** sejajar dalam empat kolom saat area konten cukup lebar (≥1160 px); Digest Emiten sesudahnya. Area konten ≥840 px memakai tiga kolom, ≥760 px dua kolom, dan selebihnya satu kolom. Saat belum cukup untuk empat kolom, tautan kategori tampil di atas judul beranda agar semua sumber langsung terlihat dan bisa dituju tanpa mencari ke bawah.
 - Routing lewat hash: `#doc=files/<kategori>/<tanggal>/<file>.md` dan opsional `&s=<id-bagian>`.
   Contoh: `#doc=files/keterbukaan-informasi/2026-09-14/pemeriksaan_55_emiten_14_September_2026.md&s=foru`
   Tab kepemilikan: `#kepemilikan=<KODE>&dari=<YYYY-MM>&sampai=<YYYY-MM>` (kode kosong = daftar semua emiten;

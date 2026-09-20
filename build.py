@@ -52,6 +52,12 @@ CATEGORIES = {
         "prefixes": ("asx",),
         "keywords": (),
     },
+    "keterbukaan-singapura": {
+        "name": "Keterbukaan Informasi Singapura (SGX)",
+        "blurb": "Kronologi dan kesimpulan riset dari pengumuman emiten Bursa Singapura (SGX).",
+        "prefixes": ("sgx",),
+        "keywords": (),
+    },
     # Diisi otomatis oleh tools/sync_idx.py dari IDX Signal Desk (kepemilikan saham punya tab sendiri, bukan kategori).
     "digest-emiten": {
         "name": "Digest Emiten",
@@ -178,6 +184,13 @@ def parse_dates(stem):
         start, end = _date(m[4], month, m[1]), _date(m[4], month, m[2] or m[1])
         if start and end:
             return start, max(start, end), "day"
+    # Tanggal rapat di akhir nama, mis. sgx_january-20september2026:
+    # 20 September adalah tanggal penyusunan, bukan rentang cakupan arsip.
+    m = re.search(rf"(?<!\d)(\d{{1,2}})({MONTH_RE})(\d{{4}})$", stem, re.I)
+    if m:
+        d = _date(m[3], MONTHS[m[2].lower()], m[1])
+        if d:
+            return d, d, "day"
     m = re.search(rf"(?<![A-Za-z])({MONTH_RE})[_\- ]+(?:({MONTH_RE})[_\- ]+)?(\d{{4}})", stem, re.I)
     if m:
         year, first = int(m[3]), MONTHS[m[1].lower()]
@@ -395,6 +408,7 @@ CSS = """
   --line:#d7dfdb;--line-strong:#b5c1bb;--focus:#1f5fcc;--mark:#ffe27a;--mark-ink:#15201c;--live:#138a52;
   --sb:#08744f;--sb-soft:#e0f0e8;--kip:#a3372a;--kip-soft:#f6e5e1;--etc:#56645e;--etc-soft:#e6ebe8;
   --dg:#1f5a96;--dg-soft:#e1ebf6;--asx:#6849a3;--asx-soft:#eee8f8;--own:#7a4f0d;--own-soft:#f5ead8;--up:#12804c;--down:#b3321f;
+  --sgx:#096b7a;--sgx-soft:#e0f0f3;
   --tabs-h:50px;
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -405,12 +419,14 @@ CSS = """
   --line:#243029;--line-strong:#3a4842;--focus:#86adff;--mark:#6b5715;--mark-ink:#fff6d6;--live:#46d18a;
   --sb:#4cc496;--sb-soft:#132a20;--kip:#ee8b7d;--kip-soft:#301b17;--etc:#9eaca6;--etc-soft:#1d2622;
   --dg:#7fb2ec;--dg-soft:#16222f;--asx:#c7a9f5;--asx-soft:#2a2139;--own:#e0b25c;--own-soft:#2c2213;--up:#4fd394;--down:#f08a7a;
+  --sgx:#6dcbdc;--sgx-soft:#142b30;
 }}
 :root[data-theme="dark"]{
   --ground:#0d1311;--surface:#131a17;--ink:#e1e8e4;--muted:#9eaca6;--faint:#75837d;
   --line:#243029;--line-strong:#3a4842;--focus:#86adff;--mark:#6b5715;--mark-ink:#fff6d6;--live:#46d18a;
   --sb:#4cc496;--sb-soft:#132a20;--kip:#ee8b7d;--kip-soft:#301b17;--etc:#9eaca6;--etc-soft:#1d2622;
   --dg:#7fb2ec;--dg-soft:#16222f;--asx:#c7a9f5;--asx-soft:#2a2139;--own:#e0b25c;--own-soft:#2c2213;--up:#4fd394;--down:#f08a7a;
+  --sgx:#6dcbdc;--sgx-soft:#142b30;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -422,6 +438,7 @@ mark{background:var(--mark);color:var(--mark-ink);border-radius:2px;padding:0 1p
 [data-cat="keterbukaan-informasi"]{--c:var(--kip);--c-soft:var(--kip-soft)}
 [data-cat="digest-emiten"]{--c:var(--dg);--c-soft:var(--dg-soft)}
 [data-cat="keterbukaan-australia"]{--c:var(--asx);--c-soft:var(--asx-soft)}
+[data-cat="keterbukaan-singapura"]{--c:var(--sgx);--c-soft:var(--sgx-soft)}
 [data-cat="kepemilikan"]{--c:var(--own);--c-soft:var(--own-soft)}
 .doc-loading{color:var(--muted);font:500 14px/1.5 var(--mono)}
 [data-cat="lainnya"]{--c:var(--etc);--c-soft:var(--etc-soft)}
@@ -476,7 +493,7 @@ a.chip:hover{outline:1px solid var(--c)}
 .lede{margin:0;max-width:62ch;color:var(--muted)}
 .masthead .tally{display:flex;flex-wrap:wrap;gap:4px 20px;margin:0;font:13px/1.5 var(--mono);color:var(--muted)}
 .masthead .tally b{font-weight:600;color:var(--ink)}
-/* Tiga sumber utama sejajar; layar kecil punya pintasan kategori di atas. */
+/* Empat sumber utama sejajar; layar kecil punya pintasan kategori di atas. */
 #overview{container-type:inline-size}
 .category-nav{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:20px}
 .category-nav a{display:flex;align-items:center;gap:7px;max-width:100%;padding:8px 10px;
@@ -489,6 +506,9 @@ a.chip:hover{outline:1px solid var(--c)}
 }
 @container (min-width:840px){
   .cats{grid-template-columns:repeat(3,minmax(0,1fr));column-gap:24px}
+}
+@container (min-width:1160px){
+  .cats{grid-template-columns:repeat(4,minmax(0,1fr))}
   .category-nav{display:none}
 }
 .cat{min-width:0;padding-top:40px;container-type:inline-size;scroll-margin-top:calc(env(safe-area-inset-top,0px) + var(--tabs-h))}
@@ -1834,7 +1854,7 @@ def build_page(docs, by_cat, own=None):
     "own": own and {k: own[k] for k in ("path", "months", "count", "tickers")}
     }
     data_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
-    desc = ("Arsip riset pasar modal: laporan Stockbit, keterbukaan informasi Indonesia dan Australia, serta digest per emiten, dikelompokkan per sumber "
+    desc = ("Arsip riset pasar modal: laporan Stockbit, keterbukaan informasi Indonesia, Australia, dan Singapura, serta digest per emiten, dikelompokkan per sumber "
             "dan tanggal, plus grafik kepemilikan saham KSEI per emiten.")
     canonical = f'<link rel="canonical" href="{esc(BASE_URL)}/">' if BASE_URL else ""
 
@@ -1875,7 +1895,7 @@ def build_page(docs, by_cat, own=None):
             f'<nav class="category-nav" aria-label="Sumber dokumen">{"".join(category_links)}</nav>'
             '<header class="masthead">'
             "<h1>Laporan riset pasar modal, per sumber dan tanggal</h1>"
-            '<p class="lede">Penelusuran Stockbit, pemeriksaan keterbukaan informasi Indonesia dan Australia, serta digest per emiten BEI. '
+            '<p class="lede">Penelusuran Stockbit, pemeriksaan keterbukaan informasi Indonesia, Australia, dan Singapura, serta digest per emiten BEI. '
             "Dokumen Markdown dibaca langsung di halaman ini; pencarian ikut membaca isi teksnya."
             + (" Grafik pemegang saham per emiten ada di tab Kepemilikan Saham." if own else "") + "</p>"
             f'<p class="tally"><span><b>{len(docs)}</b> dokumen</span><span><b>{len(by_cat)}</b> sumber</span>'
