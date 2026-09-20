@@ -1,6 +1,12 @@
 import {DurableObject} from 'cloudflare:workers';
 import {Archive, CacheStore, hash, ChatError, OpenRouter, MODEL, LIMITS, validate, readLimited, converse} from './core.mjs';
 
+// Invalid configuration falls back to a finite limit, never unlimited admission.
+const limit = (env, key, fallback) => {
+  const value = Number(env[key]);
+  return Number.isSafeInteger(value) && value > 0 ? value : fallback;
+};
+
 const allowed = (request, env) => !request.headers.get('Origin') ||
   (env.CHAT_ALLOWED_ORIGINS || '').split(',').includes(request.headers.get('Origin'));
 function headers(request, type) {
@@ -39,7 +45,7 @@ export class ArchiveChat extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.archive = new Archive(env.ASSETS);
-    this.active = new Set(); this.receiving = 0;
+    this.active = new Map(); this.receiving = 0;
     const sql = ctx.storage.sql;
     sql.exec('CREATE TABLE IF NOT EXISTS requests (stamp INTEGER, client TEXT)');
     sql.exec('CREATE INDEX IF NOT EXISTS request_time ON requests(stamp)');
@@ -65,7 +71,7 @@ export class ArchiveChat extends DurableObject {
       sql.exec('DELETE FROM requests WHERE stamp < ?', Math.min(day, now - 3600));
       const total = sql.exec('SELECT COUNT(*) AS n FROM requests WHERE stamp >= ?', day).one().n;
       const own = sql.exec('SELECT COUNT(*) AS n FROM requests WHERE stamp >= ? AND client = ?', now - 3600, client).one().n;
-      if (total >= Number(this.env.CHAT_DAILY_REQUESTS || 100) || own >= Number(this.env.CHAT_HOURLY_PER_IP || 10))
+      if (total >= limit(this.env, 'CHAT_DAILY_REQUESTS', 3000) || own >= limit(this.env, 'CHAT_HOURLY_PER_IP', 120))
         throw new ChatError('Batas percakapan sementara sudah tercapai. Silakan coba lagi nanti.');
       sql.exec('INSERT INTO requests VALUES (?, ?)', now, client);
     });
@@ -130,14 +136,18 @@ export class ArchiveChat extends DurableObject {
       if(body)this.cache.finishQuestion(analysisId,'invalid_context');
       return json(request, {error:error instanceof ChatError ? error.message : 'Pertanyaan tidak valid atau terlalu panjang.'}, 400);
     } finally { this.receiving--; }
-    if (this.active.size >= 2 || this.active.has(client)) {
+    const ownActive = [...this.active.values()].filter(value => value === client).length;
+    const ipBusy = ownActive >= limit(this.env, 'CHAT_CONCURRENT_PER_IP', 5);
+    if (this.active.size >= limit(this.env, 'CHAT_CONCURRENT_REQUESTS', 10) || ipBusy) {
       this.cache.finishQuestion(analysisId,'busy');
-      return json(request, {error:'Asisten sedang melayani pertanyaan lain. Coba beberapa saat lagi.'}, 429);
+      return json(request, {error:ipBusy
+        ? 'Terlalu banyak analisis berjalan dari jaringan yang sama. Tunggu salah satu selesai.'
+        : 'Semua slot analisis sedang terpakai. Coba beberapa saat lagi.'}, 429);
     }
     try { this.reserve(client); }
     catch (error) { this.cache.finishQuestion(analysisId,'quota');return json(request, {error:error instanceof ChatError ? error.message : 'Batas pemakaian belum dapat diperiksa.'}, 429); }
     this.cache.finishQuestion(analysisId,'running');
-    this.active.add(client);
+    this.active.set(analysisId, client);
     const controller = new AbortController(), stream = new TransformStream(), writer = stream.writable.getWriter();
     const encoder = new TextEncoder();
     // A client that never reads cannot hold a slot or accumulate unbounded output.
@@ -165,7 +175,14 @@ export class ArchiveChat extends DurableObject {
           usage:model.usage(),cache_hit:!!result.cache_hit,clarification:!!result.clarification});
         outcome = result.clarification ? 'clarification' : 'complete';
       } catch (error) {
-        if (!(error instanceof ChatError)) console.error('Chat failure:', error.name);
+        retrieval.error_name = error.name;
+        const message = String(error.message || '');
+        retrieval.error_kind = /too many.*(?:subrequests|api requests)/i.test(message) ? 'subrequest_limit'
+          : /(?:SQLITE|database|SQL)/i.test(message) ? 'storage_error'
+          : /(?:CPU|memory limit)/i.test(message) ? 'runtime_limit'
+          : /(?:network|fetch|connection)/i.test(message) ? 'network_error'
+          : error instanceof ChatError ? 'handled' : 'unexpected';
+        if (!(error instanceof ChatError)) console.error('Chat failure:', retrieval.error_name, retrieval.error_kind, retrieval.stage);
         const text = error instanceof ChatError ? error.message : 'Koneksi atau proses analisis terhenti. Silakan coba lagi.';
         try { await write({type:'error', text}); } catch {}
       } finally {
@@ -173,7 +190,7 @@ export class ArchiveChat extends DurableObject {
         if(outcome==='error'&&controller.signal.aborted)outcome='cancelled';
         try { this.cache.record(analysisId,outcome,{usage:model.usage(),calls:model.receipts,retrieval}); }
         catch (error) { console.error('Usage storage failed:',error.name); }
-        clearTimeout(timer); controller.abort(); this.active.delete(client);
+        clearTimeout(timer); controller.abort(); this.active.delete(analysisId);
         writer.close().catch(() => {});
       }
     };

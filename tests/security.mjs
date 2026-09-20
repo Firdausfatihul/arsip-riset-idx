@@ -85,6 +85,7 @@ test('invalid request floods use ingress quota, bounded even for distinct IPs', 
 });
 test('hourly, daily and model expenditure limits survive object restart', () => {
   const {object,env,ctx,db}=fixture();
+  env.CHAT_DAILY_REQUESTS='100';env.CHAT_HOURLY_PER_IP='10';
   for(let i=0;i<10;i++) object.reserve('same');
   assert.throws(()=>new ArchiveChat(ctx,env).reserve('same'),ChatError);
   for(let i=0;i<90;i++) object.reserve('other-'+i);
@@ -107,7 +108,7 @@ test('opaque history token: forged, expired, other client; SQL injection stays d
 test('active analysis slots and upload slots prevent extra requests', async () => {
   const {object,db}=fixture();object.receiving=4;
   assert.equal((await object.fetch(request({question:'SOCI'}))).status,429);object.receiving=0;
-  object.active.add('a');object.active.add('b');
+  for(let i=0;i<10;i++) object.active.set('request-'+i,'client-'+i);
   assert.equal((await object.fetch(request({question:'SOCI'}))).status,429);db.close();
 });
 test('broad document retrieval rejected before paid reading; five tickers rejected', async () => {
@@ -157,4 +158,42 @@ test('document injection is data and cannot choose tools, endpoints, or expose s
   assert.equal(captured.tools,undefined);assert.equal(captured.max_tokens,1800);
   assert.ok(!JSON.stringify(captured).includes('OFFLINE-CANARY-KEY'));
   // This asserts capability isolation, not that a language model can never obey malicious prose.
+});
+
+// Hold retrieval locally so admission and cleanup are exercised without paid model calls.
+test('ten concurrent requests allow five on shared Wi-Fi and release individual slots', async () => {
+  const {object,db}=fixture();
+  let release;
+  const gate=new Promise(resolve=>{release=resolve;});
+  object.archive.manifest=async()=>{await gate;return {retrieval_version:'test'};};
+  const pending=[];
+  try {
+    for(let i=0;i<5;i++) {
+      const response=await object.fetch(request({question:'SOCI tanggal 17'}));
+      assert.equal(response.status,200);pending.push(response.text());
+    }
+    assert.equal(object.active.size,5);
+    const ipBlocked=await object.fetch(request({question:'SOCI tanggal 17'}));
+    assert.equal(ipBlocked.status,429);assert.match((await ipBlocked.json()).error,/jaringan yang sama/);
+    for(let i=0;i<5;i++) {
+      const response=await object.fetch(request({question:'SOCI tanggal 17'},'192.0.2.'+(i+10)));
+      assert.equal(response.status,200);pending.push(response.text());
+    }
+    assert.equal(object.active.size,10);
+    const globalBlocked=await object.fetch(request({question:'SOCI tanggal 17'},'192.0.2.99'));
+    assert.equal(globalBlocked.status,429);assert.match((await globalBlocked.json()).error,/Semua slot/);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM requests').get().n,10);
+    release();
+    for(const text of await Promise.all(pending)) assert.match(text,/"type":"done"/);
+    assert.equal(object.active.size,0);
+    const again=await object.fetch(request({question:'SOCI tanggal 17'}));
+    assert.equal(again.status,200);await again.text();assert.equal(object.active.size,0);
+  } finally {release();await Promise.allSettled(pending);db.close();}
+});
+test('generous defaults persist hourly and daily quotas after restart', () => {
+  const {object,env,ctx,db}=fixture();
+  for(let i=0;i<120;i++) object.reserve('same');
+  assert.throws(()=>new ArchiveChat(ctx,env).reserve('same'),ChatError);
+  for(let i=120;i<3000;i++) object.reserve('other-'+i);
+  assert.throws(()=>new ArchiveChat(ctx,env).reserve('new'),ChatError);db.close();
 });

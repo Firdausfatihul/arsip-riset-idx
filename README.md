@@ -294,8 +294,8 @@ Batas backend tetap berlaku walaupun JavaScript browser diubah:
 | Keluaran per panggilan | Catatan 1.800 token, retry sekali 3.600; jawaban akhir 5.000 |
 | Anggaran global/hari UTC | 80 MB pesan model dan alokasi keluaran 500.000 token, dicadangkan sebelum setiap panggilan |
 | Permintaan masuk termasuk invalid | 12/IP/menit dan 120 global/menit |
-| Analisis diterima | 10/IP/jam, 100 global/hari |
-| Koneksi | 4 unggahan, 2 analisis, batas keseluruhan 8 menit, pembaca lambat diputus setelah 10 detik |
+| Analisis diterima | 120/IP/jam, 3.000 global/hari |
+| Koneksi | 4 unggahan, 10 analisis (maksimal 5/IP), batas keseluruhan 8 menit, pembaca lambat diputus setelah 10 detik |
 
 Alokasi keluaran memakai batas maksimum, bukan tagihan aktual. Model, endpoint, dan
 parameter tidak bisa dipilih pengguna. Pemeriksaan ulang sumber hanya memakai ID dokumen yang ditemukan server. Tidak ada tools/function calling, eksekusi shell,
@@ -337,9 +337,9 @@ ditentukan `worker/wrangler.jsonc`. Model tetap OpenRouter `qwen/qwen3.7-flash`.
   build. Seluruh sumber dan indeks bagian emiten dibundel sebagai Assets; tidak ada pemotongan
   top-k. Data sumber lengkap tetap tersedia untuk fallback; Worker tidak membolehkan URL sumber
   arbitrer dari pengguna. Berkas hasilnya ada di `worker/.assets/`, diabaikan Git.
-- Kuota 100 pertanyaan/hari UTC dan 10/alamat IP/jam disimpan dalam SQLite Durable
+- Kuota 3.000 pertanyaan/hari UTC dan 120/alamat IP/jam disimpan dalam SQLite Durable
   Object dan tetap ada setelah restart/deploy. Alamat koneksi Cloudflare di-hash.
-  Maksimal 2 analisis bersamaan, satu per IP, masing-masing 2 pembaca model. CORS
+  Maksimal 10 analisis bersamaan, lima per IP, masing-masing 2 pembaca model. CORS
   produksi hanya mengizinkan domain situs; lokal memerlukan override konfigurasi uji.
 - Tidak ada cron/keepalive atau server yang harus dinyalakan di Mac. Durable Object
   dapat dikeluarkan dari memori saat tidak aktif dan diinisialisasi saat dibutuhkan;
@@ -347,6 +347,15 @@ ditentukan `worker/wrangler.jsonc`. Model tetap OpenRouter `qwen/qwen3.7-flash`.
 - Free tier memiliki batas harian. Pemakaian OpenRouter tetap berbayar terpisah.
   Kuota pertanyaan bukan batas dolar; gunakan batas kredit pada key khusus OpenRouter.
   CORS bukan autentikasi, sehingga batas global juga diterapkan untuk klien non-browser.
+
+Batas produksi dikonfigurasi melalui `worker/wrangler.jsonc`: `CHAT_DAILY_REQUESTS`,
+`CHAT_HOURLY_PER_IP`, `CHAT_CONCURRENT_REQUESTS`, dan `CHAT_CONCURRENT_PER_IP`.
+Perubahan memerlukan deploy Worker; mengedit `.env.chat` saja tidak mengubah produksi.
+Slot aktif dihitung per permintaan, sehingga pengguna pada IP/Wi-Fi yang sama tidak
+menghapus slot pengguna lain saat selesai. Pesan slot global penuh dibedakan dari
+batas proses pada jaringan yang sama. Kuota pertanyaan tidak mengalahkan batas anggaran
+model harian: 500.000 token keluaran yang dicadangkan dapat habis sebelum 3.000
+pertanyaan baru; jawaban cache tidak membuat panggilan model baru.
 
 Alamat API tersimpan di `chat.config.json`, sehingga build/sinkron berikutnya tidak
 kembali ke `/api/chat` di GitHub Pages. `CHAT_API_URL` bisa mengalahkannya untuk uji lokal.

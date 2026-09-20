@@ -382,16 +382,19 @@ export async function converse(archive, model, question, history, emit, signal, 
   }
   const buildAnswer = async () => {
   await emit({type:'status',text:'Mencari bagian arsip yang sesuai…'});
+  stats.stage='search_terms';
   const terms = await searchTerms(question,history,index,model);
   stats.terms=terms;
   if (!terms.length) throw new ChatError('Sebutkan saham atau topik, misalnya “analisis SOCI”.');
   if (terms.length > LIMITS.terms) throw new ChatError('Maksimal empat kode saham atau topik per pertanyaan.');
+  stats.stage='search_documents';
   const selected = await archive.search(terms);
   if (!selected.length) throw new ChatError('Belum ditemukan dokumen untuk “' + terms.join(', ') + '”.');
   stats.documents_checked = selected.length;
   stats.baseline_source_bytes = selected.reduce((n,d)=>n+d.sizes.reduce((a,b)=>a+b,0),0);
   const units=[];
   for (const doc of selected) {
+    stats.stage='source_index'; stats.current_document=doc.source_id;
     signal?.throwIfAborted();
     const key = await hash([index.retrieval_version,doc.document_id,doc.document_hash,[...terms].sort()]);
     const hit = await cacheOnce(cache,'source',key,async () => {
@@ -411,6 +414,7 @@ export async function converse(archive, model, question, history, emit, signal, 
     stats.excluded_dated_records += filtered.excluded;
     units.push(...sourceUnits(doc,filtered.rows));
   }
+  stats.stage='source_limits';
   stats.selected_source_bytes = units.reduce((n,u)=>n+size(u.parts),0);
   if (stats.selected_source_bytes > LIMITS.archive) throw new ChatError('Topik terlalu luas untuk satu analisis. Pilih kode saham atau topik yang lebih spesifik.');
   const sources = selected.map(({source_id,title,path,label})=>({source_id,title,path,label}));

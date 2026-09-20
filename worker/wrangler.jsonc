@@ -9,8 +9,10 @@
   "migrations": [{"tag": "v1", "new_sqlite_classes": ["ArchiveChat"]}],
   "vars": {
     "CHAT_ALLOWED_ORIGINS": "https://arsip.seekingomega.capital",
-    "CHAT_DAILY_REQUESTS": "100",
-    "CHAT_HOURLY_PER_IP": "10"
+    "CHAT_DAILY_REQUESTS": "3000",
+    "CHAT_HOURLY_PER_IP": "120",
+    "CHAT_CONCURRENT_REQUESTS": "10",
+    "CHAT_CONCURRENT_PER_IP": "5"
   },
   "observability": {"enabled": false}
 }
