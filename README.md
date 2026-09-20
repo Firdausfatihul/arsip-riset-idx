@@ -1,6 +1,6 @@
 # Arsip Riset IDX
 
-Viewer Markdown statis untuk arsip riset pasar modal (Stockbit, Keterbukaan Informasi emiten BEI, dan data IDX Signal Desk).
+Viewer Markdown statis untuk arsip riset pasar modal (Stockbit, Keterbukaan Informasi emiten BEI dan Australia, serta data IDX Signal Desk).
 File di `needtobeindexed/` **tidak dikonversi**: file disalin apa adanya lalu dirender di browser.
 `build.py` hanya membuat halaman daftar dan pencarian, karena static host tidak bisa membaca isi folder.
 
@@ -49,6 +49,7 @@ archivescrapingweb/
 | `stockbit_YYYYMMDD.md` | Stockbit |
 | `ki_YYYYMMDD.md` | Keterbukaan Informasi |
 | `digest_YYYY-MM-DD_YYYY-MM-DD[_HHMM-HHMM].md` | Digest Emiten (dibuat `tools/sync_idx.py`) |
+| `asx_YYYYMMDD.md` | Keterbukaan Informasi Australia (tanggal potret riset) |
 | `idx-signal-desk/kepemilikan.json` | bukan dokumen: data tab **Kepemilikan Saham** (dibuat `tools/sync_idx.py`) |
 | lainnya | dicocokkan dengan kata kunci (lihat di bawah), kalau tidak cocok masuk **Lainnya** |
 

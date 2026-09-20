@@ -53,6 +53,12 @@ CATEGORIES = {
         "prefixes": ("digest",),
         "keywords": (),
     },
+    "keterbukaan-australia": {
+        "name": "Keterbukaan Informasi Australia",
+        "blurb": "Kronologi dan kesimpulan riset dari pengumuman emiten Bursa Efek Australia.",
+        "prefixes": ("asx",),
+        "keywords": (),
+    },
     "lainnya": {
         "name": "Lainnya",
         "blurb": "Berkas yang namanya belum cocok dengan sumber mana pun.",
@@ -388,7 +394,7 @@ CSS = """
   --ground:#f2f5f3;--surface:#ffffff;--ink:#15201c;--muted:#56645e;--faint:#7c8983;
   --line:#d7dfdb;--line-strong:#b5c1bb;--focus:#1f5fcc;--mark:#ffe27a;--mark-ink:#15201c;--live:#138a52;
   --sb:#08744f;--sb-soft:#e0f0e8;--kip:#a3372a;--kip-soft:#f6e5e1;--etc:#56645e;--etc-soft:#e6ebe8;
-  --dg:#1f5a96;--dg-soft:#e1ebf6;--own:#7a4f0d;--own-soft:#f5ead8;--up:#12804c;--down:#b3321f;
+  --dg:#1f5a96;--dg-soft:#e1ebf6;--asx:#6849a3;--asx-soft:#eee8f8;--own:#7a4f0d;--own-soft:#f5ead8;--up:#12804c;--down:#b3321f;
   --tabs-h:50px;
   --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -398,13 +404,13 @@ CSS = """
   --ground:#0d1311;--surface:#131a17;--ink:#e1e8e4;--muted:#9eaca6;--faint:#75837d;
   --line:#243029;--line-strong:#3a4842;--focus:#86adff;--mark:#6b5715;--mark-ink:#fff6d6;--live:#46d18a;
   --sb:#4cc496;--sb-soft:#132a20;--kip:#ee8b7d;--kip-soft:#301b17;--etc:#9eaca6;--etc-soft:#1d2622;
-  --dg:#7fb2ec;--dg-soft:#16222f;--own:#e0b25c;--own-soft:#2c2213;--up:#4fd394;--down:#f08a7a;
+  --dg:#7fb2ec;--dg-soft:#16222f;--asx:#c7a9f5;--asx-soft:#2a2139;--own:#e0b25c;--own-soft:#2c2213;--up:#4fd394;--down:#f08a7a;
 }}
 :root[data-theme="dark"]{
   --ground:#0d1311;--surface:#131a17;--ink:#e1e8e4;--muted:#9eaca6;--faint:#75837d;
   --line:#243029;--line-strong:#3a4842;--focus:#86adff;--mark:#6b5715;--mark-ink:#fff6d6;--live:#46d18a;
   --sb:#4cc496;--sb-soft:#132a20;--kip:#ee8b7d;--kip-soft:#301b17;--etc:#9eaca6;--etc-soft:#1d2622;
-  --dg:#7fb2ec;--dg-soft:#16222f;--own:#e0b25c;--own-soft:#2c2213;--up:#4fd394;--down:#f08a7a;
+  --dg:#7fb2ec;--dg-soft:#16222f;--asx:#c7a9f5;--asx-soft:#2a2139;--own:#e0b25c;--own-soft:#2c2213;--up:#4fd394;--down:#f08a7a;
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -415,6 +421,7 @@ mark{background:var(--mark);color:var(--mark-ink);border-radius:2px;padding:0 1p
 [data-cat="stockbit"]{--c:var(--sb);--c-soft:var(--sb-soft)}
 [data-cat="keterbukaan-informasi"]{--c:var(--kip);--c-soft:var(--kip-soft)}
 [data-cat="digest-emiten"]{--c:var(--dg);--c-soft:var(--dg-soft)}
+[data-cat="keterbukaan-australia"]{--c:var(--asx);--c-soft:var(--asx-soft)}
 [data-cat="kepemilikan"]{--c:var(--own);--c-soft:var(--own-soft)}
 .doc-loading{color:var(--muted);font:500 14px/1.5 var(--mono)}
 [data-cat="lainnya"]{--c:var(--etc);--c-soft:var(--etc-soft)}
@@ -716,7 +723,7 @@ APP_JS = r"""
   function loadDoc(d){
     if (d.content != null) return Promise.resolve(d);
     if (!d.loading){
-      d.loading = fetch(d.path + '?v=' + encodeURIComponent(BUILD_VERSION), { 
+      d.loading = fetch(d.path + '?v=' + encodeURIComponent(BUILD_VERSION), {
       cache: 'no-store'
       }).then(function(r){
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -1813,7 +1820,7 @@ def build_page(docs, by_cat, own=None):
     "own": own and {k: own[k] for k in ("path", "months", "count", "tickers")}
     }
     data_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
-    desc = ("Arsip riset pasar modal: laporan Stockbit, keterbukaan informasi, dan digest per emiten, dikelompokkan per sumber "
+    desc = ("Arsip riset pasar modal: laporan Stockbit, keterbukaan informasi Indonesia dan Australia, serta digest per emiten, dikelompokkan per sumber "
             "dan tanggal, plus grafik kepemilikan saham KSEI per emiten.")
     canonical = f'<link rel="canonical" href="{esc(BASE_URL)}/">' if BASE_URL else ""
 
@@ -1853,7 +1860,7 @@ def build_page(docs, by_cat, own=None):
             '<main class="stage"><div id="overview">'
             '<header class="masthead">'
             "<h1>Laporan riset pasar modal, per sumber dan tanggal</h1>"
-            '<p class="lede">Penelusuran Stockbit, pemeriksaan keterbukaan informasi, dan digest per emiten BEI. '
+            '<p class="lede">Penelusuran Stockbit, pemeriksaan keterbukaan informasi Indonesia dan Australia, serta digest per emiten BEI. '
             "Dokumen Markdown dibaca langsung di halaman ini; pencarian ikut membaca isi teksnya."
             + (" Grafik pemegang saham per emiten ada di tab Kepemilikan Saham." if own else "") + "</p>"
             f'<p class="tally"><span><b>{len(docs)}</b> dokumen</span><span><b>{len(by_cat)}</b> sumber</span>'
