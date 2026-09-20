@@ -40,4 +40,8 @@ Tidak membuktikan ketiadaan semua celah, ketahanan terhadap kompromi akun/mesin,
 
 ## Penerapan
 
-Status deploy dan verifikasi browser dicatat setelah penerapan. Perubahan chat/cache lain yang muncul selama audit dipertahankan di working tree dan tidak termasuk baseline audit ini.
+Diterapkan melalui commit `812f27e`; GitHub Pages berhasil pada run `35521050511`. Versi halaman `20260920225358`, HTML publik identik dengan `docs/index.html`. Worker versi `20e01b51-8676-491a-a8bc-4e2ec5560e42`; `/api/chat/config` mengembalikan 200 dan ready true.
+
+Verifikasi Chrome pada situs publik: halaman utama dan Markdown 19 September beserta daftar isi/ticker tampil; laporan HTML 13–14 September memiliki sandbox `allow-scripts allow-popups`, filter tabel menyusut dari 3.108 baris menjadi 11 untuk BESS, dan pencarian halaman utama berhasil memberi mark di child frame. Tautan tanggal 01 Agu membuka detail di laporan lama. Laporan dinamis 15–19 Agustus merender 62 catatan dan filter DOOH menghasilkan dua. Modul kepemilikan memuat data dan tabel. Tidak ada error/warning konsol pada alur yang diperiksa. Tombol salin diuji di jsdom; clipboard pengguna tidak diubah pada verifikasi publik. Tidak ada panggilan model berbayar tambahan pada audit lanjutan ini.
+
+Semua 52 hash sumber tetap sama setelah deploy. Perubahan chat/cache lain yang muncul selama audit dipertahankan di working tree dan tidak termasuk baseline audit ini.
