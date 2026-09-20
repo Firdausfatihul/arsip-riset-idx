@@ -95,6 +95,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   Kalau CDN gagal dimuat, dokumen tetap tampil sebagai teks mentah (`<pre>`).
 - Font dari Google Fonts: IBM Plex Sans / Sans Condensed / Mono. Kalau gagal, pakai font sistem.
 - Tab di atas: **Dokumen** (daftar dan pembaca) dan **Kepemilikan Saham** (hanya muncul kalau `kepemilikan.json` ada).
+- Beranda: **Stockbit → Keterbukaan Informasi → Keterbukaan Informasi Australia** sejajar dalam tiga kolom saat area konten cukup lebar (≥840 px); Digest Emiten sesudahnya. Pada area lebih sempit, tautan kategori tampil di atas judul beranda agar semua sumber langsung terlihat dan bisa dituju tanpa mencari ke bawah.
 - Routing lewat hash: `#doc=files/<kategori>/<tanggal>/<file>.md` dan opsional `&s=<id-bagian>`.
   Contoh: `#doc=files/keterbukaan-informasi/2026-09-14/pemeriksaan_55_emiten_14_September_2026.md&s=foru`
   Tab kepemilikan: `#kepemilikan=<KODE>&dari=<YYYY-MM>&sampai=<YYYY-MM>` (kode kosong = daftar semua emiten;

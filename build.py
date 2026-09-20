@@ -46,17 +46,17 @@ CATEGORIES = {
         "prefixes": ("ki", "idx"),
         "keywords": ("keterbukaan", "pemeriksaan", "emiten", "digest", "disclosure"),
     },
+    "keterbukaan-australia": {
+        "name": "Keterbukaan Informasi Australia",
+        "blurb": "Kronologi dan kesimpulan riset dari pengumuman emiten Bursa Efek Australia.",
+        "prefixes": ("asx",),
+        "keywords": (),
+    },
     # Diisi otomatis oleh tools/sync_idx.py dari IDX Signal Desk (kepemilikan saham punya tab sendiri, bukan kategori).
     "digest-emiten": {
         "name": "Digest Emiten",
         "blurb": "Ringkasan per emiten dari IDX Signal Desk, satu berkas per jendela tanggal yang tersimpan.",
         "prefixes": ("digest",),
-        "keywords": (),
-    },
-    "keterbukaan-australia": {
-        "name": "Keterbukaan Informasi Australia",
-        "blurb": "Kronologi dan kesimpulan riset dari pengumuman emiten Bursa Efek Australia.",
-        "prefixes": ("asx",),
         "keywords": (),
     },
     "lainnya": {
@@ -476,14 +476,22 @@ a.chip:hover{outline:1px solid var(--c)}
 .lede{margin:0;max-width:62ch;color:var(--muted)}
 .masthead .tally{display:flex;flex-wrap:wrap;gap:4px 20px;margin:0;font:13px/1.5 var(--mono);color:var(--muted)}
 .masthead .tally b{font-weight:600;color:var(--ink)}
-/* Sumber berdampingan: Stockbit kiri, Keterbukaan Informasi kanan (urutan CATEGORIES). */
+/* Tiga sumber utama sejajar; layar kecil punya pintasan kategori di atas. */
 #overview{container-type:inline-size}
+.category-nav{display:flex;flex-wrap:wrap;gap:8px;padding-bottom:20px}
+.category-nav a{display:flex;align-items:center;gap:7px;max-width:100%;padding:8px 10px;
+  border:1px solid var(--c);border-radius:3px;color:var(--c);background:var(--c-soft);font:500 14px/1.4 var(--sans);text-decoration:none}
+.category-nav a:hover{text-decoration:underline;text-underline-offset:3px}
 .cats{display:grid;grid-template-columns:minmax(0,1fr);gap:0 44px;align-items:start}
 @container (min-width:760px){
   .cats{grid-template-columns:repeat(2,minmax(0,1fr))}
   .cat-blurb{min-height:3.2em}
 }
-.cat{min-width:0;padding-top:40px;container-type:inline-size}
+@container (min-width:840px){
+  .cats{grid-template-columns:repeat(3,minmax(0,1fr));column-gap:24px}
+  .category-nav{display:none}
+}
+.cat{min-width:0;padding-top:40px;container-type:inline-size;scroll-margin-top:calc(env(safe-area-inset-top,0px) + var(--tabs-h))}
 .cat-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
 .cat-head h2{display:flex;align-items:center;gap:10px;margin:0;font:600 28px/1.2 var(--cond)}
 .cat-count{font:13px var(--mono);color:var(--faint)}
@@ -1022,7 +1030,9 @@ APP_JS = r"""
     app.hidden = false; setTab('docs');
     var doc = byPath[p.get('doc') || ''];
     if (doc) show(doc, p.get('s')); else showOverview();
-    if (fromOwn && !p.get('s')) window.scrollTo(0, 0);
+    var category = !doc && document.getElementById(location.hash.slice(1));
+    if (category && category.classList.contains('cat')) category.scrollIntoView({block: 'start'});
+    else if (fromOwn && !p.get('s')) window.scrollTo(0, 0);
   }
 
   // ---- pengunjung -------------------------------------------------------
@@ -1710,6 +1720,9 @@ APP_JS = r"""
     document.querySelectorAll('.cat,.day,.tree-cat,.tree-day').forEach(function(g){
       g.hidden = !g.querySelector('[data-id]:not([hidden])');
     });
+    document.querySelectorAll('.category-nav a').forEach(function(a){
+      a.hidden = document.getElementById(a.getAttribute('href').slice(1)).hidden;
+    });
     if (raw.length >= 2) loadForSearch();
     var waiting = 0, failed = 0;
     lazyDocs.forEach(function(d){ if (d.content == null){ if (d.failed) failed++; else waiting++; } });
@@ -1783,9 +1796,10 @@ def build_page(docs, by_cat, own=None):
     span = date_label(first, last) if docs else "belum ada dokumen"
     counts = f'<b>{len(docs)}</b> dokumen · {esc(span)}'
 
-    tree, sections = [], []
+    tree, sections, category_links = [], [], []
     for key, cdocs in by_cat.items():
         cat = CATEGORIES[key]
+        category_links.append(f'<a href="#{key}" data-cat="{key}"><span class="swatch" aria-hidden="true"></span>{esc(cat["name"])}</a>')
         days_tree, days_main = [], []
         for (start, end, precision), items in groups_by_day(cdocs):
             links = "".join(
@@ -1858,6 +1872,7 @@ def build_page(docs, by_cat, own=None):
             '<p class="search-note" id="cari-catatan" aria-live="polite"></p></div>'
             f'<nav class="tree" aria-label="Dokumen">{"".join(tree)}</nav></aside>'
             '<main class="stage"><div id="overview">'
+            f'<nav class="category-nav" aria-label="Sumber dokumen">{"".join(category_links)}</nav>'
             '<header class="masthead">'
             "<h1>Laporan riset pasar modal, per sumber dan tanggal</h1>"
             '<p class="lede">Penelusuran Stockbit, pemeriksaan keterbukaan informasi Indonesia dan Australia, serta digest per emiten BEI. '
