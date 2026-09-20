@@ -18,7 +18,7 @@ python3 -m http.server -d site 8000   # cek di http://localhost:8000
 ```
 
 Lalu upload **isi** folder `site/` ke host statis mana pun (lihat [Cara host ulang](#cara-host-ulang)).
-Sumber kebenaran hanya `needtobeindexed/` + `build.py`. Selama dua itu ada, site bisa dibuat ulang.
+Sumber build: `needtobeindexed/`, `build.py`, `chat.js`, dan `chat.config.json` (alamat API publik).
 
 ---
 
@@ -30,6 +30,12 @@ archivescrapingweb/
 │   └── idx-signal-desk/  # DISALIN OTOMATIS oleh tools/sync_idx.py (jangan isi manual; isinya ditimpa)
 │       └── kepemilikan.json  # data tab Kepemilikan Saham
 ├── build.py              # generator (Python 3.8+, stdlib saja)
+├── chat.js               # antarmuka percakapan; digabung ke index.html saat build
+├── chat.config.json      # alamat API publik; bukan secret
+├── worker/               # API Cloudflare Worker + Durable Object
+├── tools/build_worker.py # indeks pencarian dan bagian dokumen lengkap untuk Worker
+├── tools/publish_chat.py # build dan perbarui backend + docs/ (tidak git push)
+├── tools/chat_archive.py # pembaca arsip dan pemisah teks untuk build Worker (Python 3.9+, stdlib)
 ├── tools/sync_idx.py     # salin data dari IDX Signal Desk lokal (http://127.0.0.1:8787) lalu build
 ├── README.md             # file ini
 ├── AGENTS.md / CLAUDE.md # penunjuk ke README ini untuk agent
@@ -80,7 +86,7 @@ BASE_URL=https://arsip.contoh.com python3 build.py # + <link rel=canonical> dan 
 python3 build.py --fragment-index /tmp/artifact/index.html   # versi index tanpa <html>/<head>/<body>, khusus Claude Artifact
 ```
 
-Peringatan: folder `--out` **dihapus total** (`shutil.rmtree`) sebelum ditulis ulang. Jangan arahkan ke folder yang berisi file lain.
+Peringatan: folder `--out` **dihapus total** (`shutil.rmtree`) sebelum ditulis ulang. Jangan arahkan ke folder yang berisi file lain. File `CNAME` yang sudah ada dipertahankan agar domain GitHub Pages tidak hilang.
 
 Output terminal menampilkan satu baris per dokumen: `kategori | tanggal | file sumber -> path di site`.
 Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
@@ -113,7 +119,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   tanpa `dari`/`sampai` = bulan data pertama dan terakhir). Contoh: `#kepemilikan=BBRI&dari=2026-06`
 - Rapikan otomatis setelah render Markdown:
   - `## Judul` → id slug (`[^a-z0-9]+` → `-`), masuk daftar isi. Kalau dokumen membagi bagian dengan `#` (lebih dari satu H1), daftar isi memakai H1.
-  - `### 01. MNCN — Judul`, `### 1. FORU`, `### FORU`, atau bagian bernomor `# 2. DOOH` → badge ticker, masuk grid "Emiten".
+  - `### 01. MNCN — Judul`, `### 1. FORU`, `### 2.1 ESTA — Judul`, `### FORU`, atau bagian bernomor `# 2. DOOH` → badge ticker, masuk grid "Emiten" dan pintasan pada kartu daftar. Nomor subbab bertingkat dikenali oleh generator dan pembaca; tautan lama ke judul subbab tetap dapat dibuka.
     Di dokumen tanpa H1 bagian, `## KODE` (format digest Signal Desk) juga jadi emiten, tapi tidak ikut daftar isi.
     Link `&s=foru` dicocokkan ke bagian pertama kode itu.
   - Paragraf `Label: isi` di dalam bagian emiten, atau yang labelnya kode 4 huruf → tabel label/isi (`<dl class="facts">`).
@@ -155,6 +161,129 @@ Batas yang perlu diingat (per 15 Sep 2026: 41 dokumen + kepemilikan 963 emiten, 
 - Claude Artifact: halaman dan tiap berkas maks 16 MB, maks 255 berkas, **maks 64 MB per versi**. Digest bertambah ±2 MB per minggu,
   jadi batas 64 MB tercapai dalam beberapa bulan. Saat itu pindah ke host B/C, atau buang digest lama dari sumber.
 - Dokumen 2 MB butuh beberapa detik untuk dirender pertama kali (parse Markdown + DOM besar).
+
+## Percakapan arsip dengan Qwen3.7 Flash
+
+Kotak **Tanya arsip** berada langsung di bawah pencarian. Pertanyaan seperti “analisis SOCI”
+menemukan seluruh dokumen yang memuat kode tersebut, membaca isinya, lalu menjawab dengan
+rujukan `[D…]` yang bisa diklik. Daftar sumber tersedia di bawah jawaban. Pengguna bisa
+bertanya lanjutan, menghentikan proses, mencoba lagi, atau memulai percakapan baru.
+
+### Konfigurasi key dan percakapan
+
+Key khusus arsip disimpan lokal di `.env.chat` yang diabaikan Git dan diunggah
+sebagai secret `OPENROUTER_API_KEY` pada Cloudflare. Key tidak masuk hasil build.
+Browser mengirim pertanyaan dan riwayat; backend memilih dokumen dari indeksnya
+sendiri. Percakapan hanya disimpan dalam memori tab; refresh menghapusnya.
+Riwayat dibatasi 20 pertukaran untuk membatasi konteks.
+
+### Cara dokumen dipilih dan dibaca
+
+- Ticker yang dikenali dicocokkan sebagai kata utuh, tidak peka huruf besar/kecil:
+  `SOCI` cocok, `social` tidak. Untuk pertanyaan tanpa ticker, Qwen menerjemahkan
+  pertanyaan dan konteks percakapan menjadi istilah pencarian. Ini pencarian teks,
+  belum indeks semantik; sinonim atau kode yang tidak disebut dapat terlewat.
+- Semua dokumen yang cocok disertakan, tanpa batas top-3/top-5. Pencarian Markdown
+  memakai isi lengkap; HTML memakai indeks teks viewer. Model menerima Markdown
+  atau HTML lengkap, termasuk data riset yang tertanam dalam skrip HTML.
+- Konteks dibagi menjadi bagian maksimal 750.000 byte JSON. Pemisahan menjaga
+  seluruh karakter, lalu tiap bagian dibaca model sebelum catatan digabung untuk
+  jawaban akhir. Mode bertahap memakai catatan antara, bukan memasukkan semua
+  file sekaligus ke satu panggilan; model masih bisa melewatkan detail saat merangkum.
+- Jika pembacaan gagal atau keluaran model terpotong, UI tidak menyatakan analisis
+  selesai. Catatan antara yang terpotong dicoba ulang sekali dengan batas keluaran
+  dua kali lebih besar; percobaan tambahan ini juga memakai kredit OpenRouter.
+  Jawaban akhir parsial ditandai dan tidak ditambahkan ke riwayat model.
+- Jawaban mengutamakan tanggal, fakta sumber, rumor, pertentangan, dan ketidakpastian.
+  Rujukan yang dikenal ditautkan ke arsip; URL buatan model tidak dibuat bisa diklik.
+  Markdown jawaban disanitasi dengan DOMPurify. Ini membantu keterlacakan, bukan
+  jaminan setiap klaim model benar; periksa sumber untuk keputusan penting.
+- Saat tombol Hentikan ditekan, browser memutus koneksi. Server berhenti setelah
+  mendeteksi koneksi putus; panggilan model yang sudah terkirim bisa tetap dikenakan biaya.
+
+### Memasang di situs publik
+
+Frontend tetap **GitHub Pages**, domain `arsip.seekingomega.capital`, folder `docs/`.
+API publik memakai **Cloudflare Workers Free + SQLite Durable Object** di akun yang
+ditentukan `worker/wrangler.jsonc`. Model tetap OpenRouter `qwen/qwen3.7-flash`.
+
+- Worker luar hanya memeriksa origin dan meneruskan koneksi ke satu Durable Object.
+  Pembacaan arsip berjalan di Durable Object (batas CPU aktif 30 detik), sehingga
+  tidak bergantung pada batas CPU 10 ms Worker biasa. Waktu menunggu model tetap
+  membutuhkan waktu nyata dan dapat berlangsung beberapa menit.
+- `tools/build_worker.py` menyiapkan indeks kata dan potongan isi lengkap dari hasil
+  build. Semua 50 dokumen saat ini menghasilkan 184 bagian; tidak ada pemotongan
+  top-k. Data ini dibundel sebagai Assets; Worker tidak membolehkan URL sumber
+  arbitrer dari pengguna. Berkas hasilnya ada di `worker/.assets/`, diabaikan Git.
+- Kuota 100 pertanyaan/hari UTC dan 10/alamat IP/jam disimpan dalam SQLite Durable
+  Object dan tetap ada setelah restart/deploy. Alamat koneksi Cloudflare di-hash;
+  pertanyaan dan jawaban tidak disimpan ke database. Maksimal 2 analisis bersamaan.
+- Tidak ada cron/keepalive atau server yang harus dinyalakan di Mac. Durable Object
+  dapat dikeluarkan dari memori saat tidak aktif dan diinisialisasi saat dibutuhkan;
+  ini bukan jaminan latensi nol, tetapi tidak memakai jeda bangun satu menit Render.
+- Free tier memiliki batas harian. Pemakaian OpenRouter tetap berbayar terpisah.
+  Kuota pertanyaan bukan batas dolar; gunakan batas kredit pada key khusus OpenRouter.
+  CORS bukan autentikasi, sehingga batas global juga diterapkan untuk klien non-browser.
+
+Alamat API tersimpan di `chat.config.json`, sehingga build/sinkron berikutnya tidak
+kembali ke `/api/chat` di GitHub Pages. `CHAT_API_URL` bisa mengalahkannya untuk uji lokal.
+
+**Memperbarui arsip dan chat setelah menambah dokumen:**
+
+```bash
+python3 tools/publish_chat.py
+# Periksa perubahan dan output kategori/tanggal, lalu commit/push untuk GitHub Pages.
+```
+
+Skrip membangun `site/`, membuat Assets, men-deploy Worker, lalu membangun `docs/`.
+Jika deploy gagal, skrip berhenti sebelum memperbarui `docs/`. Skrip tidak melakukan
+commit/push. Worker dan GitHub Pages perlu diperbarui bersama supaya bahan chat dan
+tautan sumber mengikuti arsip yang sama. `build.py` biasa hanya memperbarui frontend.
+
+**Setup ulang Cloudflare / mengganti key:**
+
+```bash
+npx wrangler@4.135.0 login
+python3 build.py
+python3 tools/build_worker.py
+npx wrangler@4.135.0 deploy --config worker/wrangler.jsonc
+npx wrangler@4.135.0 secret put OPENROUTER_API_KEY --config worker/wrangler.jsonc
+```
+
+Masukkan key pada prompt secret; jangan menaruhnya dalam `wrangler.jsonc`,
+`chat.config.json`, atau command argument. Key tidak diunggah sebagai Assets.
+Jika memakai akun lain, sesuaikan `account_id` dan alamat API setelah deploy.
+
+**Uji Worker lokal tanpa key asli:**
+
+```bash
+python3 tools/build_worker.py
+node --test tests/worker.mjs
+npx wrangler@4.135.0 dev --config worker/wrangler.jsonc --local --port 8788
+```
+
+Key lokal dapat diisi di `worker/.dev.vars` sebagai `OPENROUTER_API_KEY=...`;
+file tersebut diabaikan Git. Tanpa key, API mengembalikan pesan belum diaktifkan.
+Runtime Worker tidak mempunyai dependency aplikasi npm; Wrangler hanya alat
+pengembangan/deployment. Untuk mencoba frontend lokal dengan Worker lokal,
+jalankan `CHAT_API_URL=http://127.0.0.1:8788/api/chat python3 build.py`, lalu
+`python3 -m http.server -d site 8017` dan buka `http://127.0.0.1:8017`.
+
+Pemeriksaan tanpa panggilan berbayar:
+
+```bash
+python3 tools/build_worker.py
+node --test tests/worker.mjs
+node --check chat.js
+```
+
+Uji DOM opsional memakai dependency pengujian saja, tidak dipakai server/build:
+
+```bash
+chat_test_deps=$(mktemp -d)
+npm install --prefix "$chat_test_deps" jsdom@26.1.0 marked@15.0.7 dompurify@3.2.4
+NODE_PATH="$chat_test_deps/node_modules" node tests/chat_ui.cjs
+```
 
 ## Sinkron dari IDX Signal Desk (`tools/sync_idx.py`)
 

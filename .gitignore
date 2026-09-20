@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.chat.example
+*.sqlite3
+*.sqlite3-*
+worker/.assets/
+worker/.dev.vars*
+worker/.wrangler/
+.wrangler/
+node_modules/
+__pycache__/

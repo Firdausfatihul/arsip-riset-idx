@@ -1,0 +1,16 @@
+{
+  "name": "arsip-riset-chat",
+  "account_id": "64f16f7855318064491fe38adeafab26",
+  "main": "index.mjs",
+  "compatibility_date": "2026-09-20",
+  "workers_dev": true,
+  "assets": {"directory": ".assets", "binding": "ASSETS", "run_worker_first": true},
+  "durable_objects": {"bindings": [{"name": "CHAT", "class_name": "ArchiveChat"}]},
+  "migrations": [{"tag": "v1", "new_sqlite_classes": ["ArchiveChat"]}],
+  "vars": {
+    "CHAT_ALLOWED_ORIGINS": "https://arsip.seekingomega.capital,http://127.0.0.1:8017,http://localhost:8017",
+    "CHAT_DAILY_REQUESTS": "100",
+    "CHAT_HOURLY_PER_IP": "10"
+  },
+  "observability": {"enabled": false}
+}

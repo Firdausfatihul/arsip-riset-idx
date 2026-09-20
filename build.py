@@ -28,6 +28,9 @@ ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "needtobeindexed"
 OUT = ROOT / "site"
 BASE_URL = os.environ.get("BASE_URL", "").rstrip("/")
+CHAT_CONFIG = ROOT / "chat.config.json"
+CHAT_API_URL = os.environ.get("CHAT_API_URL", json.loads(CHAT_CONFIG.read_text()).get("api_url", "/api/chat")
+                             if CHAT_CONFIG.is_file() else "/api/chat").rstrip("/")
 SITE_NAME = "Arsip Riset IDX"
 BUILD_ID = datetime.now().strftime("%Y%m%d%H%M%S")
 
@@ -88,7 +91,7 @@ for _i, _name in enumerate(["january", "february", "march", "april", "may", "jun
     MONTHS[_name] = MONTHS[_name[:3]] = _i + 1
 
 TICKER = re.compile(r"\b[A-Z]{4}\b")
-EMITEN_H3 = re.compile(r"^(?:(\d+)\.\s+)?([A-Z]{4})(?:\s+[—–-]\s+(.+))?$")
+EMITEN_H3 = re.compile(r"^(?:(\d+(?:\.\d+)*)\.?\s+)?([A-Z]{4})(?:\s+[—–-]\s+(.+))?$")
 FONTS = ("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600"
          "&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap")
 LIBS = ("https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js",
@@ -434,7 +437,7 @@ CSS = """
 body{margin:0;background:var(--ground);color:var(--ink);font:18px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 a{color:inherit}
-a:focus-visible,input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 mark{background:var(--mark);color:var(--mark-ink);border-radius:2px;padding:0 1px}
 [data-cat="stockbit"]{--c:var(--sb);--c-soft:var(--sb-soft)}
 [data-cat="keterbukaan-informasi"]{--c:var(--kip);--c-soft:var(--kip-soft)}
@@ -472,6 +475,35 @@ a.chip:hover{outline:1px solid var(--c)}
 .search input::placeholder{color:var(--faint)}
 .search-note{min-height:1.2em;margin:0;font:15px/1.5 var(--sans);color:var(--muted)}
 .search-note:empty{display:none}
+.chat{--c:var(--dg);--c-soft:var(--dg-soft);margin:0 0 28px;padding:18px;border:1px solid var(--line-strong);border-radius:6px;background:var(--surface);min-width:0}
+.chat-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.chat h2{margin:0;font:600 24px/1.2 var(--cond)}
+.chat-intro,.chat-status{margin:8px 0;font:16px/1.5 var(--sans);color:var(--muted)}
+.chat-status:empty{display:none}
+.chat-form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px;margin-top:12px}
+.chat textarea{display:block;resize:vertical;min-height:76px;max-height:260px;width:100%;min-width:0;padding:10px 12px;font:18px/1.5 var(--sans);color:var(--ink);background:var(--ground);border:1px solid var(--line-strong);border-radius:4px}
+.chat button{min-height:44px;padding:9px 14px;font:600 16px/1.4 var(--sans);border:1px solid var(--c);border-radius:4px;color:var(--c);background:var(--surface);cursor:pointer}
+.chat button[type="submit"]{background:var(--c);color:var(--surface)}
+.chat button:disabled{opacity:.55;cursor:default}
+.chat-actions{display:flex;flex-wrap:wrap;gap:8px}
+.chat-message{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:4px;min-width:0;overflow-wrap:anywhere}
+.chat-message.user{background:var(--ground)}
+.chat-message h3{margin:0 0 8px;font:600 16px/1.4 var(--sans)}
+.chat-message.user p{margin:0;white-space:pre-wrap}
+.chat-answer{max-width:74ch;white-space:pre-wrap}
+.chat-answer.rendered{white-space:normal}
+.chat-answer p{margin:0 0 12px}
+.chat-answer table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;font-size:16px}
+.chat-answer th,.chat-answer td{padding:8px;border:1px solid var(--line);text-align:left}
+.chat-answer pre{overflow-x:auto;white-space:pre-wrap}
+.chat-answer a,.chat-sources a{color:var(--c);text-underline-offset:3px}
+.chat-sources{margin-top:12px;font-size:16px}
+.chat-sources summary{min-height:44px;display:list-item;padding-block:10px;cursor:pointer;font-weight:600}
+.chat-sources ol{margin:0;padding-left:22px}
+.chat-sources li{margin-bottom:8px}
+.chat-sources a{display:inline-block;min-height:44px}
+.chat-error{color:var(--down);font-size:16px}
+@media (max-width:640px){.chat{padding:14px}.chat-form{grid-template-columns:minmax(0,1fr)}.chat-actions button{flex:1}}
 .hits{font:500 14px/1.4 var(--sans);color:var(--c)}
 .hits:empty{display:none}
 .stat{display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:0 6px;font:14px/1.5 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
@@ -784,7 +816,7 @@ APP_JS = r"""
   }
   wideReading.addEventListener('change', syncContents);
   var DATE = '\\d{1,2}(?: [A-Z][a-z]+)?(?: \\d{4})?(?:–\\d{1,2}(?: [A-Z][a-z]+)?(?: \\d{4})?)?';
-  var LABEL = /^([^:.<]{2,48}):\s+/, TICK = /^[A-Z]{4}$/, EMITEN = /^(?:(\d+)\.\s+)?([A-Z]{4})(?:\s+[—–-]\s+(.+))?$/;
+  var LABEL = /^([^:.<]{2,48}):\s+/, TICK = /^[A-Z]{4}$/, EMITEN = /^(?:(\d+(?:\.\d+)*)\.?\s+)?([A-Z]{4})(?:\s+[—–-]\s+(.+))?$/;
 
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function slug(s){ return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'bagian'; }
@@ -850,6 +882,8 @@ APP_JS = r"""
           section = document.createElement('section');
           section.className = 'emiten';
           section.id = uid(m[2].toLowerCase());
+          // Subbab bernomor sebelumnya memakai slug judul; pertahankan tujuan tautan lamanya.
+          if (m[1] && m[1].indexOf('.') !== -1) el.id = uid(slug(el.textContent));
           el.parentNode.insertBefore(section, el);
           el.innerHTML = (m[1] ? '<span class="emiten-no">' + esc(m[1]) + '</span>' : '') +
             '<span class="ticker">' + esc(m[2]) + '</span>' + (m[3] ? '<span>' + esc(m[3]) + '</span>' : '');
@@ -1847,6 +1881,7 @@ def groups_by_day(docs):
 
 
 def build_page(docs, by_cat, own=None):
+    chat_js = (ROOT / "chat.js").read_text(encoding="utf-8")
     first = min((d["_start"] for d in docs), default=None)
     last = max((d["_end"] for d in docs), default=None)
     span = date_label(first, last) if docs else "belum ada dokumen"
@@ -1876,6 +1911,7 @@ def build_page(docs, by_cat, own=None):
         entries.append(entry)
     payload = {
     "version": BUILD_ID,
+    "chatApi": CHAT_API_URL,
     "docs": entries,
     "own": own and {k: own[k] for k in ("path", "months", "count", "tickers")}
     }
@@ -1917,6 +1953,13 @@ def build_page(docs, by_cat, own=None):
             '<div class="search-controls"><input id="cari" type="search" autocomplete="off" placeholder="Kode saham, nama, kata, atau tanggal…" aria-describedby="cari-catatan">'
             '<button id="hapus-cari" type="button" hidden>Hapus pencarian</button></div>'
             '<p class="search-note" id="cari-catatan" aria-live="polite"></p></div>'
+            '<section class="chat" aria-labelledby="chat-title">'
+            '<header class="chat-head"><h2 id="chat-title">Tanya arsip</h2><button id="chat-new" type="button" hidden>Percakapan baru</button></header>'
+            '<p class="chat-intro">Tanyakan saham atau topik. Jawaban memakai dokumen dalam arsip dan menyertakan sumbernya.</p>'
+            '<div id="chat-history" role="log" aria-label="Percakapan tentang arsip" aria-live="polite"></div>'
+            '<form id="chat-form" class="chat-form"><textarea id="chat-question" rows="2" maxlength="4000" required aria-label="Pertanyaan tentang arsip" placeholder="Contoh: Analisis SOCI dari semua dokumen yang tersedia"></textarea>'
+            '<div class="chat-actions"><button id="chat-send" type="submit">Tanyakan</button><button id="chat-stop" type="button" hidden>Hentikan</button></div></form>'
+            '<p id="chat-status" class="chat-status" role="status"></p></section>'
             '<div id="overview">'
             '<header class="masthead">'
             "<h1>Arsip riset pasar modal</h1>"
@@ -1933,7 +1976,7 @@ def build_page(docs, by_cat, own=None):
             '<article id="reader" hidden></article></main></div>' + own_view +
             f'<script type="application/json" id="arsip-data">{data_json}</script>'
             + "".join(f'<script src="{src}"></script>' for src in LIBS)
-            + f"<script>{APP_JS}</script>")
+            + f"<script>{APP_JS}\n{chat_js}</script>")
     return head, body
 
 
@@ -1974,9 +2017,13 @@ def main():
     by_cat = {k: v for k, v in by_cat.items() if v}
 
     out = args.out
+    # GitHub Pages custom-domain settings live in the generated directory.
+    cname = (out / "CNAME").read_text(encoding="utf-8") if (out / "CNAME").is_file() else None
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
+    if cname is not None:
+        (out / "CNAME").write_text(cname, encoding="utf-8")
     (out / "version.json").write_text(
       json.dumps({"version": BUILD_ID}),
       encoding="utf-8"
