@@ -2,10 +2,10 @@
   "mode": "actual OpenRouter receipts",
   "model": "qwen/qwen3.7-flash",
   "archive_version": "4acc82e4706c949d",
-  "created_at": "2026-09-20T16:05:24.874Z",
-  "baseline_reused_from": null,
+  "created_at": "2026-09-20T16:15:35.688Z",
+  "baseline_reused_from": "2026-09-20T16:05:24.874Z",
   "max_usd": 1,
-  "conservative_reserved_usd": 0.8648267500000001,
+  "conservative_reserved_usd": 0.021872,
   "records": [
     {
       "case": "legacy",
@@ -142,7 +142,7 @@
     {
       "case": "indexed_first",
       "question": "di soci ada apa ya?",
-      "elapsed_ms": 18259,
+      "elapsed_ms": 20766,
       "result": "complete",
       "documents": 8,
       "retrieval": {
@@ -167,34 +167,34 @@
       },
       "usage": {
         "calls": 1,
-        "input_bytes": 29294,
+        "input_bytes": 29697,
         "output_token_budget": 5000,
-        "known_cost_usd": 0.00048264,
-        "prompt_tokens": 8886,
-        "completion_tokens": 1662,
+        "known_cost_usd": 0.00045715,
+        "prompt_tokens": 8955,
+        "completion_tokens": 1450,
         "cached_tokens": 0,
         "cache_write_tokens": 0,
         "missing_usage_calls": 0
       },
       "calls": [
         {
-          "input_bytes": 29294,
+          "input_bytes": 29697,
           "output_token_budget": 5000,
-          "cost": 0.00048264,
-          "prompt_tokens": 8886,
-          "completion_tokens": 1662,
+          "cost": 0.00045715,
+          "prompt_tokens": 8955,
+          "completion_tokens": 1450,
           "cached_tokens": 0,
           "cache_write_tokens": 0,
           "response_cache": "MISS",
-          "generation_id": "gen-1789920292-yGzYzWPWcU2iK9R6QRXh"
+          "generation_id": "gen-1789920915-qYuKgM8mtJgWDnLcygKr"
         }
       ],
-      "answer": "Berdasarkan arsip yang diberikan, berikut adalah rangkuman aktivitas dan kondisi PT Soechi Lines Tbk (SOCI) hingga September 2026.\n\n### 1. Aksi Korporasi Utama (Agustus 2026)\nPada periode 20–24 Agustus 2026, SOCI melakukan dua aksi korporasi signifikan:\n\n*   **Pendirian Entitas Anak Baru:** SOCI mendirikan *Sea Voyage International Ltd* (SVI) di Marshall Islands dengan kepemilikan 100% dan modal disetor AS$500.000 [D11], [D12]. Tujuan pendirian ini adalah untuk mendukung kegiatan usaha pelayaran. Emiten menyatakan tidak ada dampak material terhadap kondisi keuangan atau hukum [D11], [D12].\n*   **Transaksi Afiliasi (Jaminan Pinjaman):** SOCI memberikan jaminan perusahaan (*corporate guarantee*) dan jaminan kesanggupan kekurangan dana kas (*cash deficit guarantee*) kepada Bank Mandiri Singapore Branch. Jaminan ini mencakup seluruh kewajiban anak usaha, *Eternity Ocean Maritime Ltd* (EOM), atas fasilitas pinjaman berjangka (*term loan*) dengan pokok pinjaman hingga AS$54.900.000 [D12]. Transaksi ini meningkatkan eksposur kontinjensi SOCI meskipun tidak mengubah struktur modal langsung [D12].\n\n### 2. Laporan Keuangan & Kepemilikan (September 2026)\nPeriode 5–7 September 2026, SOCI menerbitkan pengumuman rutin tanpa aksi korporasi baru:\n\n*   **Laporan Keuangan:** Penyampaian Laporan Keuangan Interim Auditan per 30 Juni 2026 dan bukti iklan laporan tersebut [D23]. Namun, lampiran dokumen gagal diekstraksi, sehingga analisis fundamental detail tidak dapat dilakukan [D23].\n*   **Struktur Modal:** Jumlah saham beredar tetap 7.059.000.000 saham. Kepemilikan pengendali oleh PT Darma Pertiwi Raya dan PT Pilar Sukses Utama masing-masing 35,05% tidak berubah [D23].\n*   **Free Float:** Naik tipis dari 14,08% menjadi 14,09%, dengan jumlah saham free float meningkat 500.000 saham [D23].\n*   **Pemegang Saham:** Jumlah pemegang saham di KSEI menurun signifikan dari 14.588 menjadi 12.699 (berkurang 1.889) [D23]. Penurunan ini belum dijelaskan penyebab pastinya, bisa berupa konsolidasi atau pengurangan investor ritel, namun bukan bukti otomatis konsolidasi kepemilikan [D23].\n\n### 3. Sentimen Pasar & Spekulasi\nArsip Stockbit menunjukkan adanya diskusi mengenai ekspansi dan spekulasi harga:\n\n*   **Ekspansi Armada:** Ada pembahasan tentang penambahan tanker dan kapal pengangkut gas yang telah disewakan. Penulis menekankan pentingnya memisahkan pendapatan dari kapal baru dengan keuntungan tidak berulang [D47], [D2].\n*   **Sentimen Positif:** Beberapa postingan pada pertengahan September 2026 menampilkan sentimen *bullish* dengan tagar seperti `|BULL|`, `|WINS|`, dan `|NAIK|` terkait SOCI [D49].\n*   **Peringatan Analisis:** Diperlukan kehati-hatian dalam menilai laba SOCI karena pendapatan tambahan berasal dari armada baru dan \"pendapatan lain-lain\" yang mungkin bersifat tidak berulang [D47].\n\n### Ringkasan Data Kunci (Agustus-September 2026)\n\n| Item | Nilai / Keterangan | Sumber |\n| :--- | :--- | :--- |\n| **Modal Setor SVI** | AS$500.000 | [D12] |\n| **Nilai Jaminan EOM** | AS$54.900.000 | [D12] |\n| **Total Saham Beredar** | 7.059.000.000 | [D23] |\n| **Kepemilikan Pengendali** | 70,10% (PT Darma Pertiwi Raya & PT Pilar Sukses Utama) | [D23] |\n| **Free Float** | 14,09% (Agustus 2026) | [D23] |\n| **Jumlah Pemegang Saham** | 12.699 (Agustus 2026), turun dari 14.588 (Juli 2026) | [D23] |\n\n### Batas Bukti & Hal yang Belum Diketahui\n*   **Data Keuangan Terbatas:** Lampiran laporan keuangan interim auditan per 30 Juni 2026 tidak dapat diakses/diekstraksi, sehingga angka laba/rugi spesifik tidak tersedia dalam arsip ini [D23].\n*   **Penyebab Penurunan Pemegang Saham:** Tidak ada penjelasan resmi mengapa jumlah pemegang saham turun 1.889 orang [D23].\n*   **Kinerja EOM:** Kondisi keuangan entitas anak EOM yang menjadi objek jaminan pinjaman tidak diungkapkan secara rinci dalam pengumuman [D12]."
+      "answer": "Berdasarkan arsip yang tersedia, berikut adalah rangkuman aktivitas dan kondisi PT Soechi Lines Tbk (SOCI) hingga September 2026.\n\n### 1. Aksi Korporasi Utama (Agustus 2026)\nPada periode 20–24 Agustus 2026, SOCI melakukan dua aksi korporasi signifikan:\n\n*   **Pendirian Entitas Anak Baru:** SOCI mendirikan *Sea Voyage International Ltd* (SVI) di Marshall Islands dengan kepemilikan 100% dan modal disetor sebesar AS$500.000 [D11], [D12]. Emiten menyatakan tidak ada dampak material terhadap kondisi keuangan atau hukum dari pendirian ini [D11], [D12].\n*   **Transaksi Afiliasi (Jaminan Pinjaman):** SOCI memberikan jaminan perusahaan (*corporate guarantee*) dan jaminan kesanggupan kekurangan dana kas (*cash deficit guarantee*) kepada PT Bank Mandiri (Persero) Tbk, Singapore Branch. Jaminan ini untuk fasilitas pinjaman berjangka (*term loan*) milik anak usaha, Eternity Ocean Maritime Ltd (EOM), dengan jumlah pokok hingga AS$54.900.000 [D12]. Transaksi ini meningkatkan eksposur kontinjensi SOCI [D12].\n\n### 2. Laporan Keuangan dan Kepemilikan (September 2026)\nPeriode 5–7 September 2026, SOCI menerbitkan pengumuman rutin tanpa aksi korporasi baru:\n\n*   **Laporan Keuangan:** Penyampaian Laporan Keuangan Interim Auditan per 30 Juni 2026 serta bukti iklan laporan tersebut [D23]. Namun, lampiran laporan keuangan gagal diekstraksi dalam arsip, sehingga analisis fundamental detail tidak dapat dilakukan [D23].\n*   **Struktur Modal:** Jumlah saham beredar tetap 7.059.000.000 saham. Tidak ada perubahan pengendali; PT Darma Pertiwi Raya dan PT Pilar Sukses Utama masing-masing memegang 35,05% [D23].\n*   **Free Float:** Naik tipis dari 14,08% menjadi 14,09%, dengan jumlah saham free float meningkat 500.000 saham [D23].\n*   **Pemegang Saham:** Jumlah pemegang saham di KSEI menurun signifikan dari 14.588 menjadi 12.699 (berkurang 1.889) [D23]. Penurunan ini belum dijelaskan penyebab pastinya, bisa berupa konsolidasi atau pengurangan investor ritel [D23].\n\n### 3. Sentimen Pasar dan Spekulasi (Stockbit)\nArsip menunjukkan adanya diskusi spekulatif mengenai SOCI:\n\n*   **Ekspansi Armada:** Pembahasan tentang penambahan tanker dan kapal pengangkut gas yang telah disewakan. Diperlukan pemisahan antara pendapatan dari kapal baru dan keuntungan tidak berulang [D47], [D2].\n*   **Diskusi Online:** Terdapat beberapa postingan pada Agustus–September 2026 yang menandai SOCI dengan tag seperti `|BULL|`, `|BOAT|`, dan `|WINS|`, mencerminkan sentimen positif atau spekulasi kenaikan harga oleh sebagian pengguna [D49].\n\n### Batas Bukti dan Hal yang Belum Diketahui\n*   **Data Keuangan:** Angka laba/rugi, aset, dan liabilitas SOCI per 30 Juni 2026 tidak dapat diverifikasi karena dokumen lampiran gagal diekstraksi [D23].\n*   **Kinerja EOM:** Kondisi keuangan Eternity Ocean Maritime Ltd (EOM) dan kemampuannya memenuhi kewajiban pinjaman senilai AS$54,9 juta tidak tercantum dalam arsip [D12].\n*   **Penyebab Penurunan Pemegang Saham:** Tidak ada data transaksi pasar yang menjelaskan mengapa jumlah pemegang saham turun drastis pada Agustus 2026 [D23].\n\n**Kesimpulan:** SOCI sedang dalam fase ekspansi operasional melalui pendirian SVI dan penguatan likuiditas anak usaha via jaminan bank. Secara struktur modal stabil, namun ada kekhawatiran terkait eksposur kontinjensi sebesar AS$54,9 juta dan penurunan basis pemegang saham. Analisis fundamental tertunda hingga data laporan keuangan lengkap tersedia."
     },
     {
       "case": "indexed_other_question",
       "question": "SOCI tanggal 17 September 2026",
-      "elapsed_ms": 14335,
+      "elapsed_ms": 140,
       "result": "complete",
       "documents": 8,
       "retrieval": {
@@ -219,34 +219,34 @@
       },
       "usage": {
         "calls": 1,
-        "input_bytes": 25388,
+        "input_bytes": 25791,
         "output_token_budget": 5000,
-        "known_cost_usd": 0.00035625,
-        "prompt_tokens": 7182,
-        "completion_tokens": 1083,
+        "known_cost_usd": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
         "cached_tokens": 0,
         "cache_write_tokens": 0,
         "missing_usage_calls": 0
       },
       "calls": [
         {
-          "input_bytes": 25388,
+          "input_bytes": 25791,
           "output_token_budget": 5000,
-          "cost": 0.00035625,
-          "prompt_tokens": 7182,
-          "completion_tokens": 1083,
+          "cost": 0,
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
           "cached_tokens": 0,
           "cache_write_tokens": 0,
-          "response_cache": "MISS",
-          "generation_id": "gen-1789920310-YouOtLyc9Q6xQmFKlHU4"
+          "response_cache": "HIT",
+          "generation_id": "gen-1789920935-HHz23uFFjnOhSm9DmS1i"
         }
       ],
-      "answer": "Berdasarkan pemeriksaan arsip yang tersedia, **tidak ditemukan bukti atau informasi mengenai kejadian spesifik pada PT Soechi Lines Tbk (SOCI) pada tanggal 17 September 2026**.\n\nBerikut adalah rincian analisis berdasarkan batasan data:\n\n**1. Ketidaksesuaian Periode Data**\n*   Arsip terbaru yang mencakup SOCI adalah dokumen **D47** dengan tanggal **19 September 2026**, yang merujuk pada postingan di Stockbit [D47].\n*   Dokumen sebelumnya, **D23**, mencakup periode **5–7 September 2026** [D23].\n*   Tidak ada dokumen digest harian atau mingguan dalam arsip yang mencakup rentang waktu antara 8 September hingga 16 September 2026, sehingga tanggal 17 September 2026 berada di luar cakupan data resmi pengumuman emiten yang terverifikasi dalam bahan ini.\n\n**2. Status Informasi Terkini (Per 19 September 2026)**\nMeskipun tidak ada kejadian pada 17 September, arsip terbaru memberikan konteks kondisi SOCI pada akhir minggu tersebut:\n*   Pada 19 September 2026, terdapat diskusi di Stockbit mengenai penambahan tanker dan laba yang mengandung pendapatan lain-lain [D47].\n*   Postingan tersebut menekankan pentingnya memisahkan pendapatan dari kapal baru dengan keuntungan yang tidak berulang [D47].\n*   Tidak ada pengumuman resmi (seperti laporan keuangan, aksi korporasi, atau perubahan struktur modal) yang dicatat dalam arsip untuk tanggal 17 September 2026.\n\n**3. Batas Bukti dan Rekomendasi Pemeriksaan**\n*   **Fakta:** Tidak ada catatan kejadian pada 17 September 2026 dalam arsip yang diperiksa.\n*   **Rumor/Opini:** Diskusi pasar pada 19 September 2026 menyebutkan ekspansi armada, namun ini merupakan komentar pasca-peristiwa atau tren umum, bukan fakta kejadian pada 17 September [D47].\n*   **Yang Belum Ditemukan:** Pengumuman resmi BEI, laporan bulanan registrasi pemegang efek, atau berita korporasi spesifik yang diterbitkan pada 17 September 2026.\n\nUntuk memastikan apakah terjadi aktivitas pada 17 September 2026, diperlukan pemeriksaan langsung terhadap:\n1.  Situs resmi Bursa Efek Indonesia (BEI) untuk filter pengumuman tanggal 17 September 2026.\n2.  Arsip harian Stockbit atau platform media sosial lainnya untuk tanggal tersebut guna mengidentifikasi adanya spekulasi atau rumor yang mungkin memicu pergerakan harga, meskipun tidak disertai pengumuman fundamental."
+      "answer": "Berdasarkan arsip yang tersedia, **tidak ditemukan** informasi mengenai kejadian, pengumuman, atau aktivitas spesifik untuk PT Soechi Lines Tbk (SOCI) pada tanggal **17 September 2026**.\n\nBerikut adalah rincian fakta berdasarkan dokumen yang diperiksa:\n\n### 1. Status Data Tanggal 17 September 2026\n*   **Tidak Ada Dokumen:** Tidak ada entri dalam arsip D47, D49, D23, D2, D0, D12, atau D11 yang mencatat peristiwa pada tanggal 17 September 2026.\n*   **Jarak Waktu:** Tanggal tersebut berada di antara periode pelaporan terakhir (5–7 September 2026) dan posting terbaru (19 September 2026).\n\n### 2. Konteks Terdekat dari Arsip\nMeskipun tidak ada data spesifik untuk tanggal 17 September, arsip memberikan konteks berikut yang berlaku sebelum dan sesudah tanggal tersebut:\n\n**A. Periode Sebelumnya (5–7 September 2026)**\nPada minggu sebelumnya, SOCI hanya menerbitkan pengumuman rutin tanpa aksi korporasi [D23]:\n*   Penyampaian Laporan Keuangan Interim Auditan per 30 Juni 2026.\n*   Bukti iklan laporan keuangan.\n*   Laporan Bulanan Registrasi Pemegang Efek (LBRE) per 31 Agustus 2026.\n*   **Struktur Modal:** Tidak berubah. Free float naik tipis menjadi 14,09%. Jumlah pemegang saham KSEI menurun dari 14.588 menjadi 12.699 [D23].\n\n**B. Postingan Pasar (19 September 2026)**\nDua hari setelah tanggal yang ditanyakan, terdapat diskusi di Stockbit mengenai SOCI [D47]:\n*   Pembahasan mengenai penambahan tanker dan laba yang mengandung pendapatan lain-lain.\n*   Peringatan untuk memisahkan pendapatan kapal baru dari keuntungan yang tidak berulang.\n*   Ini merupakan opini pasar/spesulasi, bukan pengumuman resmi emiten pada tanggal 17 September.\n\n**C. Aksi Korporasi Terakhir (Agustus 2026)**\nAksi korporasi material terakhir tercatat pada Agustus 2026 [D12], yaitu:\n*   Pendirian entitas anak baru Sea Voyage International Ltd (SVI) dengan modal AS$500.000.\n*   Pemberian jaminan perusahaan hingga AS$54.9 juta untuk fasilitas pinjaman anak usaha EOM.\n\n### 3. Kesimpulan dan Batas Bukti\n*   **Fakta:** Tidak ada bukti dokumenter dalam arsip ini tentang aktivitas SOCI pada 17 September 2026.\n*   **Risiko/Kelemahan Data:** Penurunan jumlah pemegang saham yang signifikan pada akhir Agustus (catatan D23) belum disertai penjelasan penyebabnya, sehingga kondisi kepemilikan saham pada pertengahan September mungkin masih dipengaruhi oleh tren tersebut, namun hal ini bersifat hipotesis [D23].\n*   **Rekomendasi:** Untuk memastikan tidak ada pengumuman mendadak atau *trading volume* anomali pada 17 September 2026, diperlukan pemeriksaan langsung ke database pengumuman BEI (IDX) atau arsip harian Stockbit untuk rentang tanggal tersebut yang tidak tercakup dalam sampel arsip saat ini."
     },
     {
       "case": "indexed_same_question_other_user",
       "question": "di soci ada apa ya?",
-      "elapsed_ms": 1,
+      "elapsed_ms": 3,
       "result": "complete",
       "documents": 8,
       "retrieval": {
@@ -280,12 +280,12 @@
         "missing_usage_calls": 0
       },
       "calls": [],
-      "answer": "Berdasarkan arsip yang diberikan, berikut adalah rangkuman aktivitas dan kondisi PT Soechi Lines Tbk (SOCI) hingga September 2026.\n\n### 1. Aksi Korporasi Utama (Agustus 2026)\nPada periode 20–24 Agustus 2026, SOCI melakukan dua aksi korporasi signifikan:\n\n*   **Pendirian Entitas Anak Baru:** SOCI mendirikan *Sea Voyage International Ltd* (SVI) di Marshall Islands dengan kepemilikan 100% dan modal disetor AS$500.000 [D11], [D12]. Tujuan pendirian ini adalah untuk mendukung kegiatan usaha pelayaran. Emiten menyatakan tidak ada dampak material terhadap kondisi keuangan atau hukum [D11], [D12].\n*   **Transaksi Afiliasi (Jaminan Pinjaman):** SOCI memberikan jaminan perusahaan (*corporate guarantee*) dan jaminan kesanggupan kekurangan dana kas (*cash deficit guarantee*) kepada Bank Mandiri Singapore Branch. Jaminan ini mencakup seluruh kewajiban anak usaha, *Eternity Ocean Maritime Ltd* (EOM), atas fasilitas pinjaman berjangka (*term loan*) dengan pokok pinjaman hingga AS$54.900.000 [D12]. Transaksi ini meningkatkan eksposur kontinjensi SOCI meskipun tidak mengubah struktur modal langsung [D12].\n\n### 2. Laporan Keuangan & Kepemilikan (September 2026)\nPeriode 5–7 September 2026, SOCI menerbitkan pengumuman rutin tanpa aksi korporasi baru:\n\n*   **Laporan Keuangan:** Penyampaian Laporan Keuangan Interim Auditan per 30 Juni 2026 dan bukti iklan laporan tersebut [D23]. Namun, lampiran dokumen gagal diekstraksi, sehingga analisis fundamental detail tidak dapat dilakukan [D23].\n*   **Struktur Modal:** Jumlah saham beredar tetap 7.059.000.000 saham. Kepemilikan pengendali oleh PT Darma Pertiwi Raya dan PT Pilar Sukses Utama masing-masing 35,05% tidak berubah [D23].\n*   **Free Float:** Naik tipis dari 14,08% menjadi 14,09%, dengan jumlah saham free float meningkat 500.000 saham [D23].\n*   **Pemegang Saham:** Jumlah pemegang saham di KSEI menurun signifikan dari 14.588 menjadi 12.699 (berkurang 1.889) [D23]. Penurunan ini belum dijelaskan penyebab pastinya, bisa berupa konsolidasi atau pengurangan investor ritel, namun bukan bukti otomatis konsolidasi kepemilikan [D23].\n\n### 3. Sentimen Pasar & Spekulasi\nArsip Stockbit menunjukkan adanya diskusi mengenai ekspansi dan spekulasi harga:\n\n*   **Ekspansi Armada:** Ada pembahasan tentang penambahan tanker dan kapal pengangkut gas yang telah disewakan. Penulis menekankan pentingnya memisahkan pendapatan dari kapal baru dengan keuntungan tidak berulang [D47], [D2].\n*   **Sentimen Positif:** Beberapa postingan pada pertengahan September 2026 menampilkan sentimen *bullish* dengan tagar seperti `|BULL|`, `|WINS|`, dan `|NAIK|` terkait SOCI [D49].\n*   **Peringatan Analisis:** Diperlukan kehati-hatian dalam menilai laba SOCI karena pendapatan tambahan berasal dari armada baru dan \"pendapatan lain-lain\" yang mungkin bersifat tidak berulang [D47].\n\n### Ringkasan Data Kunci (Agustus-September 2026)\n\n| Item | Nilai / Keterangan | Sumber |\n| :--- | :--- | :--- |\n| **Modal Setor SVI** | AS$500.000 | [D12] |\n| **Nilai Jaminan EOM** | AS$54.900.000 | [D12] |\n| **Total Saham Beredar** | 7.059.000.000 | [D23] |\n| **Kepemilikan Pengendali** | 70,10% (PT Darma Pertiwi Raya & PT Pilar Sukses Utama) | [D23] |\n| **Free Float** | 14,09% (Agustus 2026) | [D23] |\n| **Jumlah Pemegang Saham** | 12.699 (Agustus 2026), turun dari 14.588 (Juli 2026) | [D23] |\n\n### Batas Bukti & Hal yang Belum Diketahui\n*   **Data Keuangan Terbatas:** Lampiran laporan keuangan interim auditan per 30 Juni 2026 tidak dapat diakses/diekstraksi, sehingga angka laba/rugi spesifik tidak tersedia dalam arsip ini [D23].\n*   **Penyebab Penurunan Pemegang Saham:** Tidak ada penjelasan resmi mengapa jumlah pemegang saham turun 1.889 orang [D23].\n*   **Kinerja EOM:** Kondisi keuangan entitas anak EOM yang menjadi objek jaminan pinjaman tidak diungkapkan secara rinci dalam pengumuman [D12]."
+      "answer": "Berdasarkan arsip yang tersedia, berikut adalah rangkuman aktivitas dan kondisi PT Soechi Lines Tbk (SOCI) hingga September 2026.\n\n### 1. Aksi Korporasi Utama (Agustus 2026)\nPada periode 20–24 Agustus 2026, SOCI melakukan dua aksi korporasi signifikan:\n\n*   **Pendirian Entitas Anak Baru:** SOCI mendirikan *Sea Voyage International Ltd* (SVI) di Marshall Islands dengan kepemilikan 100% dan modal disetor sebesar AS$500.000 [D11], [D12]. Emiten menyatakan tidak ada dampak material terhadap kondisi keuangan atau hukum dari pendirian ini [D11], [D12].\n*   **Transaksi Afiliasi (Jaminan Pinjaman):** SOCI memberikan jaminan perusahaan (*corporate guarantee*) dan jaminan kesanggupan kekurangan dana kas (*cash deficit guarantee*) kepada PT Bank Mandiri (Persero) Tbk, Singapore Branch. Jaminan ini untuk fasilitas pinjaman berjangka (*term loan*) milik anak usaha, Eternity Ocean Maritime Ltd (EOM), dengan jumlah pokok hingga AS$54.900.000 [D12]. Transaksi ini meningkatkan eksposur kontinjensi SOCI [D12].\n\n### 2. Laporan Keuangan dan Kepemilikan (September 2026)\nPeriode 5–7 September 2026, SOCI menerbitkan pengumuman rutin tanpa aksi korporasi baru:\n\n*   **Laporan Keuangan:** Penyampaian Laporan Keuangan Interim Auditan per 30 Juni 2026 serta bukti iklan laporan tersebut [D23]. Namun, lampiran laporan keuangan gagal diekstraksi dalam arsip, sehingga analisis fundamental detail tidak dapat dilakukan [D23].\n*   **Struktur Modal:** Jumlah saham beredar tetap 7.059.000.000 saham. Tidak ada perubahan pengendali; PT Darma Pertiwi Raya dan PT Pilar Sukses Utama masing-masing memegang 35,05% [D23].\n*   **Free Float:** Naik tipis dari 14,08% menjadi 14,09%, dengan jumlah saham free float meningkat 500.000 saham [D23].\n*   **Pemegang Saham:** Jumlah pemegang saham di KSEI menurun signifikan dari 14.588 menjadi 12.699 (berkurang 1.889) [D23]. Penurunan ini belum dijelaskan penyebab pastinya, bisa berupa konsolidasi atau pengurangan investor ritel [D23].\n\n### 3. Sentimen Pasar dan Spekulasi (Stockbit)\nArsip menunjukkan adanya diskusi spekulatif mengenai SOCI:\n\n*   **Ekspansi Armada:** Pembahasan tentang penambahan tanker dan kapal pengangkut gas yang telah disewakan. Diperlukan pemisahan antara pendapatan dari kapal baru dan keuntungan tidak berulang [D47], [D2].\n*   **Diskusi Online:** Terdapat beberapa postingan pada Agustus–September 2026 yang menandai SOCI dengan tag seperti `|BULL|`, `|BOAT|`, dan `|WINS|`, mencerminkan sentimen positif atau spekulasi kenaikan harga oleh sebagian pengguna [D49].\n\n### Batas Bukti dan Hal yang Belum Diketahui\n*   **Data Keuangan:** Angka laba/rugi, aset, dan liabilitas SOCI per 30 Juni 2026 tidak dapat diverifikasi karena dokumen lampiran gagal diekstraksi [D23].\n*   **Kinerja EOM:** Kondisi keuangan Eternity Ocean Maritime Ltd (EOM) dan kemampuannya memenuhi kewajiban pinjaman senilai AS$54,9 juta tidak tercantum dalam arsip [D12].\n*   **Penyebab Penurunan Pemegang Saham:** Tidak ada data transaksi pasar yang menjelaskan mengapa jumlah pemegang saham turun drastis pada Agustus 2026 [D23].\n\n**Kesimpulan:** SOCI sedang dalam fase ekspansi operasional melalui pendirian SVI dan penguatan likuiditas anak usaha via jaminan bank. Secara struktur modal stabil, namun ada kekhawatiran terkait eksposur kontinjensi sebesar AS$54,9 juta dan penurunan basis pemegang saham. Analisis fundamental tertunda hingga data laporan keuangan lengkap tersedia."
     },
     {
       "case": "ambiguous_date",
       "question": "coba cek soci tggl 17",
-      "elapsed_ms": 0,
+      "elapsed_ms": 1,
       "result": "complete",
       "documents": 0,
       "retrieval": {

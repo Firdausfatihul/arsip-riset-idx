@@ -44,6 +44,12 @@ sumber untuk klaim cakupan. Pemeriksaan ID rujukan bukan pemeriksaan kebenaran s
 Instruksi jawaban selanjutnya diperketat untuk tidak memperluas ticker tanpa nama
 dalam sumber, tidak menafsirkan tag bersama sebagai hubungan bisnis, dan tidak
 menggeneralisasi cakupan katalog. Perubahan instruksi otomatis membatalkan cache
-jawaban terkait. Pengujian tambahan setelah perubahan ini sebagian menerima HTTP 429
-dari provider; catatannya dipertahankan di `provider-limited-followup.*`. Permintaan
-yang gagal atau tidak memiliki usage lengkap tidak dilaporkan sebagai panggilan gratis.
+jawaban terkait. Pengujian tambahan sempat menerima HTTP 429 dari provider; catatannya dipertahankan
+di `provider-limited-followup.*`. Pengulangan terakhir berhasil dan tercatat di
+`live.*`: biaya pertanyaan umum SOCI turun dari US$0,0992252 menjadi US$0,00045715
+(sekitar 99,54%), dengan delapan dokumen cocok tetap ditelusuri. Waktu pengujian
+turun dari 96,49 detik menjadi 20,77 detik. Pertanyaan bertanggal pada pengulangan
+terakhir mendapat cache respons provider (HIT), sehingga biaya tercatat nol; ini
+bukan janji bahwa pertanyaan berbeda selalu gratis. Pertanyaan yang sama dari
+pengguna lain mendapat cache aplikasi tanpa panggilan model. Permintaan yang gagal
+atau tidak memiliki usage lengkap tidak dilaporkan sebagai panggilan gratis.

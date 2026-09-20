@@ -65,7 +65,7 @@ const lines=['# Perbandingan biaya chat arsip','',`Mode: ${live?'API nyata, berd
  '| Kasus | Status | Dokumen | Panggilan | Input token | Output token | Token cache provider | Biaya tercatat USD | Input pesan byte |',
  '|---|---|---:|---:|---:|---:|---:|---:|---:|',
  ...records.map(r=>`| ${r.case} | ${r.result} | ${r.documents??'—'} | ${r.usage.calls} | ${r.usage.prompt_tokens??'—'} | ${r.usage.completion_tokens??'—'} | ${r.usage.cached_tokens??'—'} | ${r.usage.known_cost_usd??'—'} | ${r.usage.input_bytes} |`),
- '', 'Cache aplikasi dimulai kosong; cache provider tidak dapat dipastikan kosong. Pertanyaan berbeda tetap menghasilkan jawaban baru. Baris pengulangan menggunakan cache aplikasi lintas pengguna. Angka biaya adalah biaya API model; bukan biaya hosting atau jaminan tarif pada masa depan. Jika missing_usage_calls > 0, biaya yang diketahui belum merupakan total lengkap.',
+ '', 'Cache aplikasi dimulai kosong; cache provider tidak dapat dipastikan kosong. Pertanyaan berbeda memakai permintaan tersendiri; provider masih dapat mengembalikan respons tersimpan jika permintaan identik pernah diproses sebelumnya. Lihat response_cache pada receipt JSON untuk membedakan HIT dan MISS. Baris pengulangan menggunakan cache aplikasi lintas pengguna. Angka biaya adalah biaya API model; bukan biaya hosting atau jaminan tarif pada masa depan. Jika missing_usage_calls > 0, biaya yang diketahui belum merupakan total lengkap.',
  '', 'Pengujian mempertahankan sumber asli. Pemeriksaan kualitas jawaban dilakukan terpisah dari penghitungan penghematan.'
 ];
 await writeFile(new URL((live?'live':'offline')+'.md',out),lines.join('\n')+'\n');db.close();
