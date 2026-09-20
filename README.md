@@ -91,13 +91,22 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   `<script type="application/json" id="arsip-data">`.
 - `.md` di atas 256 KB (digest besar; digest kecil tetap tertanam) **tidak ditanam**: viewer mengambil `files/…`
   dengan `fetch()` saat dokumen dibuka, dan mengambil semuanya (3 sekaligus) saat kotak cari pertama kali diisi ≥2 huruf.
-  Selama itu catatan cari menulis "memuat isi N dokumen besar…". Yang gagal dimuat dicoba lagi saat dibuka ulang, atau saat mencari ≥30 detik kemudian.
+  Selama itu catatan cari menulis "memuat isi N dokumen besar…". Yang gagal dimuat bisa dicoba lagi lewat tombol **Coba lagi**, saat dibuka ulang, atau saat mencari ≥30 detik kemudian.
   Ini jalan di server HTTP dan Claude Artifact. Dari `file://` (dobel klik) dokumen besar tidak bisa dibuka atau dicari; dokumen kecil tetap jalan.
 - Library dari CDN (versi dikunci): `marked@15.0.7` (parser Markdown) dan `dompurify@3.2.4` (sanitasi) dari `cdnjs.cloudflare.com`.
   Kalau CDN gagal dimuat, dokumen tetap tampil sebagai teks mentah (`<pre>`).
 - Font dari Google Fonts: IBM Plex Sans / Sans Condensed / Mono. Kalau gagal, pakai font sistem.
 - Tab di atas: **Dokumen** (daftar dan pembaca) dan **Kepemilikan Saham** (hanya muncul kalau `kepemilikan.json` ada).
-- Beranda: **Stockbit → Keterbukaan Informasi → Keterbukaan Informasi Australia → Keterbukaan Informasi Singapura (SGX)** sejajar dalam empat kolom saat area konten cukup lebar (≥1160 px); Digest Emiten sesudahnya. Area konten ≥840 px memakai tiga kolom, ≥760 px dua kolom, dan selebihnya satu kolom. Saat belum cukup untuk empat kolom, tautan kategori tampil di atas judul beranda agar semua sumber langsung terlihat dan bisa dituju tanpa mencari ke bawah.
+- Beranda memakai **tombol sumber + satu daftar**. Tombol selalu tersedia di atas daftar maupun pembaca:
+  Stockbit → Indonesia (BEI) → Australia (ASX) → Singapura (SGX) → Digest Emiten.
+  - Lebar layar ≥768 px: lima tombol satu baris. Di HP: dua kolom, Australia dan Singapura berdampingan di baris kedua; Digest memenuhi baris ketiga.
+  - Klik sumber membuka satu daftar sumber itu dan menghapus pencarian. Beranda awal memilih Stockbit. Tautan `#keterbukaan-singapura` langsung membuka SGX.
+  - Pencarian tetap **lintas semua sumber**. Saat ada kata pencarian, daftar menampilkan semua sumber yang cocok; tombol sumber tetap terlihat meski tidak ada hasil.
+  - Tombol **Hapus pencarian** mengembalikan daftar sumber yang terakhir dipilih. Saat membaca dokumen, kata ditandai dan tersedia tautan ke daftar hasil pencarian.
+  - Sidebar daftar ganda dihapus. Area aplikasi dibatasi 1200 px, teks laporan 68 karakter kira-kira per baris, ukuran teks utama 18 px.
+  - Daftar isi dapat dibuka/tutup; mula-mula tertutup di bawah 1440 px, terbuka di samping teks mulai 1440 px.
+  - Input dan tombol utama setidaknya 44 px tinggi; tombol sumber 52 px. Tabel lebar tetap dapat digeser secara lokal di HP.
+  - Warna mengikuti mode terang/gelap perangkat; pembesaran halaman tetap diizinkan. HTML arsip lama tetap memakai desain aslinya di dalam iframe.
 - Routing lewat hash: `#doc=files/<kategori>/<tanggal>/<file>.md` dan opsional `&s=<id-bagian>`.
   Contoh: `#doc=files/keterbukaan-informasi/2026-09-14/pemeriksaan_55_emiten_14_September_2026.md&s=foru`
   Tab kepemilikan: `#kepemilikan=<KODE>&dari=<YYYY-MM>&sampai=<YYYY-MM>` (kode kosong = daftar semua emiten;
@@ -126,7 +135,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   - Semua grafik SVG buatan sendiri di `APP_JS`, tanpa library.
   - Pencarian di tab Dokumen: kalau yang dicari persis kode emiten, catatan di bawah kotak cari memberi tautan ke kepemilikannya.
 - Pencarian mencocokkan judul, ringkasan, tanggal, nama file, kode saham, **dan isi teks** (tidak peka huruf besar-kecil).
-  Jumlah kemunculan tampil di sidebar, dan kata yang dicari ditandai `<mark>` di dokumen yang sedang dibuka.
+  Jumlah kemunculan tampil di kartu hasil pencarian, dan kata yang dicari ditandai `<mark>` di dokumen yang sedang dibuka.
   - File `.md`: yang dicari isi mentahnya (`content`).
   - File `.html`: yang dicari teks yang tampil (tanpa `<script>`/`<style>`) plus nilai string data JSON di `<script>`
     (mis. `const records=[{"summary": "..."}]`), disimpan sebagai `text` (lihat `html_text()` di `build.py`).
