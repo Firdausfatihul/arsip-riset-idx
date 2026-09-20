@@ -1,0 +1,79 @@
+{
+  "archive_version": "4acc82e4706c949d",
+  "production_index": {
+    "documents": 50,
+    "ready": 50,
+    "records": 13370
+  },
+  "current_worker_version": "8a609fce-44f8-4bef-8f63-ef4e7aa56ac3",
+  "tests": {
+    "node": 49,
+    "native_workerd_sqlite": "PASS",
+    "original_documents_modified": false
+  },
+  "records": [
+    {
+      "case": "first_two_stage_test",
+      "worker_version": "bc43e7ec-43a9-47c2-86d5-4af2d50d44d3",
+      "elapsed_seconds": 26.65,
+      "documents_searched": 29,
+      "evidence_batches": 6,
+      "cache_hit": false,
+      "usage": {
+        "calls": 2,
+        "input_bytes": 167024,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.00494642,
+        "prompt_tokens": 53480,
+        "completion_tokens": 1838,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      }
+    },
+    {
+      "case": "current_release_reusing_candidates",
+      "worker_version": "8a609fce-44f8-4bef-8f63-ef4e7aa56ac3",
+      "elapsed_seconds": 44.4,
+      "documents_searched": 29,
+      "evidence_batches": 6,
+      "cache_hit": false,
+      "usage": {
+        "calls": 1,
+        "input_bytes": 32113,
+        "output_token_budget": 5000,
+        "known_cost_usd": 0.00069638,
+        "prompt_tokens": 9788,
+        "completion_tokens": 3098,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      }
+    },
+    {
+      "case": "current_release_answer_cache",
+      "worker_version": "8a609fce-44f8-4bef-8f63-ef4e7aa56ac3",
+      "elapsed_seconds": 0.5,
+      "documents_searched": 29,
+      "evidence_batches": 0,
+      "cache_hit": true,
+      "usage": {
+        "calls": 0,
+        "input_bytes": 0,
+        "output_token_budget": 0,
+        "known_cost_usd": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      }
+    }
+  ],
+  "notes": [
+    "All usage numbers are provider receipts, not token estimates.",
+    "First two-stage measurement predates final answer-instruction and reasoning refinements.",
+    "Final release reused candidate selection; its first cold run was not recharged for measurement.",
+    "Semantic completeness and every model claim are not guaranteed by these pipeline checks."
+  ]
+}

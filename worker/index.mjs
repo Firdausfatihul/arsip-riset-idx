@@ -1,3 +1,4 @@
+import {SourceStore} from './source-store.mjs';
 import {DurableObject} from 'cloudflare:workers';
 import {Archive, CacheStore, hash, ChatError, OpenRouter, MODEL, LIMITS, validate, readLimited, converse} from './core.mjs';
 
@@ -23,9 +24,9 @@ export default {
   async fetch(request, env) {
     if (!allowed(request, env)) return new Response('Origin tidak diizinkan', {status:403});
     const path = new URL(request.url).pathname;
-    if (!['/api/chat', '/api/chat/config', '/api/chat/metrics'].includes(path)) return new Response('Not found', {status:404});
-    if (path === '/api/chat/metrics') {
-      if (request.method !== 'GET' || !env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + env.CHAT_METRICS_TOKEN)
+    if (!['/api/chat', '/api/chat/config', '/api/chat/metrics', '/api/chat/index'].includes(path)) return new Response('Not found', {status:404});
+    if (path === '/api/chat/metrics' || path === '/api/chat/index') {
+      if ((path === '/api/chat/metrics' ? request.method !== 'GET' : !['GET','POST'].includes(request.method)) || !env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + env.CHAT_METRICS_TOKEN)
         return json(request,{error:'Tidak diizinkan.'},403);
       return env.CHAT.get(env.CHAT.idFromName('archive-global-v1')).fetch(request);
     }
@@ -44,7 +45,8 @@ export default {
 export class ArchiveChat extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
-    this.archive = new Archive(env.ASSETS);
+    this.sources = new SourceStore(ctx);
+    this.archive = new Archive(env.ASSETS,this.sources);
     this.active = new Map(); this.receiving = 0;
     const sql = ctx.storage.sql;
     sql.exec('CREATE TABLE IF NOT EXISTS requests (stamp INTEGER, client TEXT)');
@@ -107,6 +109,19 @@ export class ArchiveChat extends DurableObject {
     return token;
   }
   async fetch(request) {
+    if (new URL(request.url).pathname === '/api/chat/index') {
+      if (!this.env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + this.env.CHAT_METRICS_TOKEN)
+        return json(request,{error:'Tidak diizinkan.'},403);
+      const index=await this.archive.manifest();
+      if(request.method==='GET')return json(request,this.sources.status(index));
+      if(request.method!=='POST')return json(request,{error:'Method not allowed'},405);
+      try {
+        const body=JSON.parse(await readLimited(request.body,4096,5000,request.signal));
+        const doc=index.docs.find(d=>d.document_id===body.document_id);
+        if(!doc || Object.keys(body).some(k=>k!=='document_id'))return json(request,{error:'Dokumen tidak dikenal.'},400);
+        return json(request,await this.sources.importDocument(index,doc,await this.archive.read(doc.evidence_asset)));
+      } catch { return json(request,{error:'Impor indeks gagal; dokumen belum diaktifkan.'},500); }
+    }
     if (new URL(request.url).pathname === '/api/chat/metrics') {
       if (!this.env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + this.env.CHAT_METRICS_TOKEN)
         return json(request,{error:'Tidak diizinkan.'},403);
@@ -183,7 +198,8 @@ export class ArchiveChat extends DurableObject {
           : /(?:network|fetch|connection)/i.test(message) ? 'network_error'
           : error instanceof ChatError ? 'handled' : 'unexpected';
         if (!(error instanceof ChatError)) console.error('Chat failure:', retrieval.error_name, retrieval.error_kind, retrieval.stage);
-        const text = error instanceof ChatError ? error.message : 'Koneksi atau proses analisis terhenti. Silakan coba lagi.';
+        const text = retrieval.error_kind === 'subrequest_limit' ? 'Pencarian melampaui kapasitas pembacaan arsip. Persempit topik atau coba lagi setelah indeks diperbarui.'
+          : error instanceof ChatError ? error.message : 'Koneksi atau proses analisis terhenti. Silakan coba lagi.';
         try { await write({type:'error', text}); } catch {}
       } finally {
         retrieval.elapsed_ms=Date.now()-started;

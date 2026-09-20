@@ -5,10 +5,12 @@ import {readFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {Archive, OpenRouter, ChatError, LIMITS, validate, readLimited, converse, size} from '../worker/core.mjs';
 
+const sourceStoreURL = new URL('../worker/source-store.mjs', import.meta.url).href;
 const coreURL = new URL('../worker/core.mjs', import.meta.url).href;
 const source = (await readFile(new URL('../worker/index.mjs', import.meta.url), 'utf8'))
   .replace("import {DurableObject} from 'cloudflare:workers';", 'class DurableObject { constructor(ctx,env) {this.ctx=ctx;this.env=env;} }')
-  .replace("'./core.mjs'", JSON.stringify(coreURL));
+  .replace("'./core.mjs'", JSON.stringify(coreURL))
+  .replace("'./source-store.mjs'", JSON.stringify(sourceStoreURL));
 const {ArchiveChat, default:router} = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const realFetch = globalThis.fetch;
 globalThis.fetch = () => { throw new Error('Network forbidden in attack harness'); };

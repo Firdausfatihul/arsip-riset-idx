@@ -192,10 +192,14 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
 
 - Pencarian menemukan **semua dokumen** yang cocok dengan ticker/kata utuh; tidak memakai top-3/top-5.
   Pertanyaan tanpa ticker memakai satu panggilan kecil untuk menentukan istilah dari konteks percakapan.
+  Pertanyaan hubungan Indonesia–ASX/SGX memakai variasi nama negara/bursa yang dikenali langsung, tanpa panggilan penentu istilah.
 - `tools/evidence_index.py` membagi sumber secara deterministik saat build, tanpa API berbayar.
   Heading emiten dipertahankan sebagai bagian utuh; baris tabel membawa header, artikel HTML tetap utuh,
   dan skrip/data HTML tetap menjadi bagian sumber. Gabungan `content` seluruh bagian harus sama persis
   dengan sumber asli. Setiap bagian mempunyai lokasi, ticker, tanggal, dan hash dokumen.
+- Worker mencari dan mengambil bagian terkait dari SQLite FTS5 jika seluruh versi arsip sudah diimpor.
+  `source_documents`, `source_passages`, dan `source_fts` menyimpan sumber lengkap serta indeksnya.
+  Jika indeks database belum lengkap, pencarian masih memakai Assets.
 - Worker mengambil bagian terkait dari setiap dokumen. Bagian prosa tetangga dan rujukan internal
   disertakan untuk menjaga konteks. Kalau indeks hilang, versinya salah, atau tidak menemukan bagian
   meskipun dokumen cocok, Worker kembali ke dokumen asal tersebut. Pencocokan tetap berbasis teks:
@@ -225,7 +229,7 @@ SQLite Durable Object menyimpan `evidence_cache` dengan tiga jenis: `source` (ba
 `notes` (catatan bukti sumber), dan `answer` (jawaban permintaan identik). View `issuer_evidence`
 menyediakan `document_id`, `document_hash`, `source_path`, `document_date`, `tickers`, `event_date`,
 `source_line`, dan `content` untuk memeriksa bagian sumber yang sudah diminta. Indeks lengkap yang
-belum pernah diminta tetap tersedia sebagai Assets, sehingga tidak perlu mengisi database lewat AI.
+belum pernah diminta juga diimpor ke tabel sumber persisten tanpa AI; Assets tetap tersedia sebagai cadangan.
 
 - Dokumen lama bersifat tetap; pembaruan normal hanya menambah dokumen. Cache sumber/catatan tidak
   kedaluwarsa berdasarkan waktu, dikenali berdasarkan identitas/hash dokumen, ticker/istilah,
@@ -243,6 +247,37 @@ belum pernah diminta tetap tersedia sebagai Assets, sehingga tidak perlu mengisi
   input otomatis provider. Tidak mengirim `cache_control` yang belum diverifikasi didukung endpoint.
   Header cache respons OpenRouter juga diaktifkan untuk permintaan identik dengan TTL 15 menit.
   Dukungan dan diskon provider tetap harus dibuktikan dari `usage`, bukan diasumsikan.
+
+### Indeks teks persisten dan pertanyaan lintas negara
+
+`python3 tools/sync_chat_index.py` mengimpor dokumen yang belum ada melalui endpoint privat
+`/api/chat/index`, memakai token pengelola yang sama dengan laporan statistik. Tidak memakai AI,
+embedding, layanan baru, cron, atau perubahan dokumen asli. `tools/publish_chat.py` menjalankan
+sinkronisasi ini sesudah deploy Worker. Jika terputus, jalankan lagi; dokumen yang selesai dilewati.
+
+Satu permintaan impor hanya membaca satu dokumen. Hash seluruh teks diverifikasi, lalu bagian dan
+indeks FTS5 ditulis dalam satu transaksi sebelum dokumen dinyatakan siap. Status indeks menyebutkan
+jumlah dokumen/bagian serta daftar dokumen yang belum diimpor. Perubahan hash/parser memakai versi
+baru. Pencarian membatasi hasil ke versi dokumen dalam manifest aktif; sumber versi lama tidak
+ikut hasil. Tabel sumber terpisah dari cache 16 MB sehingga cache yang dikeluarkan tidak menghapus
+sumber persisten.
+
+Untuk pertanyaan yang eksplisit menyebut Indonesia/BEI/IDX, hubungan/akuisisi/kepemilikan, dan
+ASX/Australia atau SGX/Singapura, pencarian memakai sinonim bursa/negara. Semua dokumen yang cocok
+diperiksa. Satu panggilan model menyeleksi semua cuplikan kandidat tanpa top-k; ID hasil harus ada dalam
+daftar kandidat. Seleksi disimpan per bahan/topik tanpa riwayat pengguna sehingga pertanyaan
+berbeda dapat memakainya lagi. Teks asli kandidat terpilih dan tetangganya kemudian diambil
+dari database. Bagian besar dipersempit ke paragraf yang menyebut istilah, paragraf tetangga,
+heading dan batas bukti eksplisit. Setiap cuplikan tetap mempunyai sumber dan nomor baris; ini pemilihan bahan,
+bukan bukti bahwa perusahaan mempunyai hubungan. Bahan panjang menggunakan catatan bersama yang
+sudah ada, maksimal dua pembaca bersamaan, kemudian satu sintesis jawaban. Untuk bahan yang muat, alurnya dua panggilan: seleksi dan jawaban; seleksi tersimpan mengurangi
+pengulangan menjadi satu panggilan. Jumlah nyata tetap bergantung ukuran bahan dan retry.
+
+Jawaban diminta membedakan emiten BEI/perusahaan privat, domisili Singapura/pencatatan SGX, dan
+rencana/penyelesaian transaksi. Pencarian teks dapat melewatkan hubungan implisit atau nama alias.
+Seleksi dari cuplikan juga dapat melewatkan kandidat; hitungan kandidat ditemukan/terpilih dan
+dokumen bukti dicatat pada statistik. Batas bahan/token tetap berlaku; aplikasi tidak mengklaim screening menyeluruh di luar bahan yang
+diperiksa. Fitur ini tidak menambah sistem pekerjaan latar belakang atau graph perusahaan.
 
 ### Biaya aktual dan perbandingan
 
@@ -314,7 +349,7 @@ akses provider. `tests/security.mjs` memblokir global fetch; `tests/worker_runti
 memakai workerd/SQLite dengan seluruh jaringan keluar diganti model simulasi.
 
 ```bash
-node --test tests/worker.mjs tests/security.mjs tests/cache.mjs   # Node 22+ untuk node:sqlite
+node --test tests/worker.mjs tests/security.mjs tests/cache.mjs tests/source-store.mjs   # Node 22+ untuk node:sqlite
 NODE_PATH=/path/to/test-deps/node_modules node tests/chat_ui.cjs
 NODE_PATH=/path/to/test-deps/node_modules node tests/worker_runtime.cjs
 ```
@@ -367,7 +402,7 @@ python3 tools/publish_chat.py
 # Periksa perubahan dan output kategori/tanggal, lalu commit/push untuk GitHub Pages.
 ```
 
-Skrip membangun `site/`, membuat Assets, men-deploy Worker, lalu membangun `docs/`.
+Skrip membangun `site/`, membuat Assets, men-deploy Worker, menyinkronkan indeks SQLite, lalu membangun `docs/`.
 Jika deploy gagal, skrip berhenti sebelum memperbarui `docs/`. Skrip tidak melakukan
 commit/push. Worker dan GitHub Pages perlu diperbarui bersama supaya bahan chat dan
 tautan sumber mengikuti arsip yang sama. `build.py` biasa hanya memperbarui frontend.

@@ -20,6 +20,7 @@ def main():
         [sys.executable, '-B', 'build.py'],
         [sys.executable, '-B', 'tools/build_worker.py'],
         ['npx', '--yes', 'wrangler@4.135.0', 'deploy', '--config', 'worker/wrangler.jsonc'],
+        [sys.executable, '-B', 'tools/sync_chat_index.py'],
         [sys.executable, '-B', 'build.py', '--out', 'docs'],
     ]
     for command in commands:

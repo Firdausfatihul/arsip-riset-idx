@@ -64,3 +64,33 @@ export function filterRecords(rows, scope) {
   const kept = rows.filter(r => !r.event_date || r.event_date === scope.date || r.dates_mentioned?.includes(scope.date));
   return {rows:kept, excluded:rows.length-kept.length};
 }
+
+// A small explicit vocabulary handles the current cross-market screening use case.
+// These are search candidates, never inferred ownership relationships.
+export function crossMarketQuery(question) {
+  if(!/\b(indonesia|bei|idx)\b/i.test(question) || !/\b(hubungan|berhubungan|terkait|kaitan|akuisisi|acquisition|kepemilikan|pengendali|investasi)\b/i.test(question))return null;
+  const terms=[];
+  if(/\b(asx|australia)\b/i.test(question))terms.push('ASX','Australia','Australian');
+  if(/\b(sgx|singapur[ae]?|singapore)\b/i.test(question))terms.push('SGX','Singapura','Singapore','Singapur');
+  return terms.length?{terms,version:'cross-market-v2'}:null;
+}
+
+export function thematicPassages(data, terms) {
+  const selected=selectRecords(data,terms), patterns=terms.map(pattern), output=[];
+  // Keep whole small records. Large issuer sections retain matching paragraphs, neighbors,
+  // headings and explicit caveats. Every retained character is original source text.
+  for(const row of selected) {
+    if(row.content.length<=5000) {output.push(row);continue;}
+    const chunks=[...row.content.matchAll(/[^\n]*(?:\n(?!\s*\n)[^\n]*)*(?:\n\s*\n|$)/g)].filter(m=>m[0]);
+    const chosen=new Set();
+    for(let i=0;i<chunks.length;i++) {
+      if(patterns.some(p=>p.test(chunks[i][0])))for(const j of [i-1,i,i+1])if(chunks[j])chosen.add(j);
+      if(/^\s*#{1,6}\s/m.test(chunks[i][0]) || /\b(belum terbukti|belum selesai|dibatalkan|tidak terbukti|batas bukti)\b/i.test(chunks[i][0]))chosen.add(i);
+    }
+    for(const i of [...chosen].sort((a,b)=>a-b)) {
+      const m=chunks[i];output.push({...row,section_id:row.section_id+':'+m.index,
+        line:row.line+(row.content.slice(0,m.index).match(/\n/g)||[]).length,content:m[0]});
+    }
+  }
+  return output;
+}
