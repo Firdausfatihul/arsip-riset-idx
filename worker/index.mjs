@@ -1,5 +1,5 @@
 import {DurableObject} from 'cloudflare:workers';
-import {Archive, ChatError, OpenRouter, MODEL, validate, converse} from './core.mjs';
+import {Archive, ChatError, OpenRouter, MODEL, LIMITS, validate, readLimited, converse} from './core.mjs';
 
 const allowed = (request, env) => !request.headers.get('Origin') ||
   (env.CHAT_ALLOWED_ORIGINS || '').split(',').includes(request.headers.get('Origin'));
@@ -34,13 +34,26 @@ export class ArchiveChat extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
     this.archive = new Archive(env.ASSETS);
-    this.active = 0;
-    ctx.storage.sql.exec('CREATE TABLE IF NOT EXISTS requests (stamp INTEGER, client TEXT)');
-    ctx.storage.sql.exec('CREATE INDEX IF NOT EXISTS request_time ON requests(stamp)');
+    this.active = new Set(); this.receiving = 0;
+    const sql = ctx.storage.sql;
+    sql.exec('CREATE TABLE IF NOT EXISTS requests (stamp INTEGER, client TEXT)');
+    sql.exec('CREATE INDEX IF NOT EXISTS request_time ON requests(stamp)');
+    sql.exec('CREATE TABLE IF NOT EXISTS ingress (stamp INTEGER, client TEXT)');
+    sql.exec('CREATE TABLE IF NOT EXISTS budget (day INTEGER PRIMARY KEY, bytes INTEGER, tokens INTEGER)');
+    sql.exec('CREATE TABLE IF NOT EXISTS conversations (token TEXT PRIMARY KEY, client TEXT, expires INTEGER, turns INTEGER, history TEXT)');
+  }
+  admit(client) {
+    const now = Math.floor(Date.now() / 1000), sql = this.ctx.storage.sql;
+    this.ctx.storage.transactionSync(() => {
+      sql.exec('DELETE FROM ingress WHERE stamp <= ?', now - 60);
+      const total = sql.exec('SELECT COUNT(*) AS n FROM ingress').one().n;
+      const own = sql.exec('SELECT COUNT(*) AS n FROM ingress WHERE client = ?', client).one().n;
+      if (total >= 120 || own >= 12) throw new ChatError('Terlalu banyak permintaan. Tunggu satu menit.');
+      sql.exec('INSERT INTO ingress VALUES (?, ?)', now, client);
+    });
   }
   reserve(client) {
     const now = Math.floor(Date.now() / 1000), day = Math.floor(now / 86400) * 86400;
-    // Synchronous SQL in one transaction has no await/interleaving window.
     this.ctx.storage.transactionSync(() => {
       const sql = this.ctx.storage.sql;
       sql.exec('DELETE FROM requests WHERE stamp < ?', Math.min(day, now - 3600));
@@ -51,54 +64,87 @@ export class ArchiveChat extends DurableObject {
       sql.exec('INSERT INTO requests VALUES (?, ?)', now, client);
     });
   }
+  spend(bytes, tokens) {
+    const day = Math.floor(Date.now() / 86400000), sql = this.ctx.storage.sql;
+    this.ctx.storage.transactionSync(() => {
+      sql.exec('DELETE FROM budget WHERE day < ?', day);
+      const used = sql.exec('SELECT bytes, tokens FROM budget WHERE day = ?', day).toArray()[0] || {bytes:0, tokens:0};
+      if (used.bytes + bytes > 80000000 || used.tokens + tokens > 500000)
+        throw new ChatError('Anggaran AI hari ini sudah tercapai. Silakan kembali besok.');
+      sql.exec('INSERT OR REPLACE INTO budget VALUES (?, ?, ?)', day, used.bytes + bytes, used.tokens + tokens);
+    });
+  }
+  conversation(token, client) {
+    const sql = this.ctx.storage.sql;
+    sql.exec('DELETE FROM conversations WHERE expires <= ?', Date.now());
+    if (!token) return {turns:0, history:[]};
+    const row = sql.exec('SELECT turns, history FROM conversations WHERE token = ? AND client = ?', token, client).toArray()[0];
+    if (!row || row.turns >= 20) throw new ChatError('Percakapan berakhir atau jaringan berubah. Pilih Percakapan baru.');
+    return {turns:row.turns, history:JSON.parse(row.history)};
+  }
+  remember(client, conversation, question, answer) {
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), n => n.toString(16).padStart(2, '0')).join('');
+    const history = [...conversation.history, {role:'user', content:question},
+      {role:'assistant', content:answer.slice(0, 1500)}].slice(-6);
+    // Short-lived, server-authored history. No client can supply assistant/system messages.
+    this.ctx.storage.transactionSync(() => {
+      const sql = this.ctx.storage.sql;
+      sql.exec('INSERT INTO conversations VALUES (?, ?, ?, ?, ?)', token, client,
+        Date.now() + 3600000, conversation.turns + 1, JSON.stringify(history));
+    });
+    return token;
+  }
   async fetch(request) {
-    let body;
+    // Keep body uploads bounded before expensive decoding, parsing, or document retrieval.
+    if (this.receiving >= 4) return json(request, {error:'Server sedang sibuk. Coba sebentar lagi.'}, 429);
+    this.receiving++;
+    let body, client, conversation;
     try {
-      if (!(request.headers.get('Content-Type') || '').startsWith('application/json')) throw new Error();
-      const reader = request.body?.getReader();
-      if (!reader) throw new Error();
-      const decoder = new TextDecoder(); let text = '', bytes = 0;
-      try {
-        while (true) {
-          const part = await reader.read();
-          if (part.done) { text += decoder.decode(); break; }
-          bytes += part.value.length;
-          if (bytes > 150000) throw new Error();
-          text += decoder.decode(part.value, {stream:true});
-        }
-      } finally { await reader.cancel().catch(() => {}); }
-      body = validate(JSON.parse(text));
-    } catch (error) { return json(request, {error:error instanceof ChatError ? error.message : 'Pertanyaan tidak valid atau terlalu panjang.'}, 400); }
-    if (this.active >= 2) return json(request, {error:'Asisten sedang melayani pertanyaan lain. Coba beberapa saat lagi.'}, 429);
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(request.headers.get('CF-Connecting-IP') || 'local'));
-    const client = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
-    // Recheck after the asynchronous hash, before claiming a slot.
-    if (this.active >= 2) return json(request, {error:'Asisten sedang melayani pertanyaan lain. Coba beberapa saat lagi.'}, 429);
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(request.headers.get('CF-Connecting-IP') || 'local'));
+      client = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
+      try { this.admit(client); } catch (error) { return json(request, {error:error.message}, 429); }
+      if ((request.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase() !== 'application/json' ||
+          Number(request.headers.get('Content-Length') || 0) > LIMITS.body)
+        throw new ChatError('Gunakan pertanyaan singkat dalam format yang tersedia.');
+      body = validate(JSON.parse(await readLimited(request.body, LIMITS.body, 5000, request.signal)));
+      conversation = this.conversation(body.context, client);
+    } catch (error) {
+      return json(request, {error:error instanceof ChatError ? error.message : 'Pertanyaan tidak valid atau terlalu panjang.'}, 400);
+    } finally { this.receiving--; }
+    if (this.active.size >= 2 || this.active.has(client))
+      return json(request, {error:'Asisten sedang melayani pertanyaan lain. Coba beberapa saat lagi.'}, 429);
     try { this.reserve(client); }
     catch (error) { return json(request, {error:error instanceof ChatError ? error.message : 'Batas pemakaian belum dapat diperiksa.'}, 429); }
-    this.active++;
+    this.active.add(client);
     const controller = new AbortController(), stream = new TransformStream(), writer = stream.writable.getWriter();
     const encoder = new TextEncoder();
-    const timer = setTimeout(() => controller.abort(), 14 * 60 * 1000);
-    const emit = async value => {
-      controller.signal.throwIfAborted();
-      try { await writer.write(encoder.encode(JSON.stringify(value) + '\n')); }
-      catch (error) { controller.abort(); throw error; }
+    // A client that never reads cannot hold a slot or accumulate unbounded output.
+    const write = async value => {
+      let timer;
+      try {
+        await Promise.race([writer.write(encoder.encode(JSON.stringify(value) + '\n')),
+          new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Slow reader')), 10000); })]);
+      } catch (error) { controller.abort(); writer.abort(error).catch(() => {}); throw error; }
+      finally { clearTimeout(timer); }
     };
+    const emit = value => { controller.signal.throwIfAborted(); return write(value); };
+    const timer = setTimeout(() => controller.abort(), 8 * 60 * 1000);
     writer.closed.catch(() => controller.abort());
     const run = async () => {
       try {
-        await converse(this.archive, new OpenRouter(this.env.OPENROUTER_API_KEY, controller.signal),
-          body.question, body.history, emit, controller.signal);
+        const result = await converse(this.archive,
+          new OpenRouter(this.env.OPENROUTER_API_KEY, controller.signal, undefined, (bytes,tokens) => this.spend(bytes,tokens)),
+          body.question, conversation.history, emit, controller.signal);
+        controller.signal.throwIfAborted();
+        const context = this.remember(client, conversation, body.question, result.answer);
+        await emit({type:'done', documents:result.documents, batches:result.batches, model:MODEL, context});
       } catch (error) {
-        if (!(error instanceof ChatError)) console.error('Chat transport failure:', error.name,
-          error.stack?.split('\n')[1]?.trim() || 'no stack');
-        const message = error instanceof ChatError ? error.message : 'Koneksi atau proses analisis terhenti. Silakan coba lagi.';
-        // On timeout the response may still be writable; signal the incomplete result.
-        try { await writer.write(encoder.encode(JSON.stringify({type:'error', text:message}) + '\n')); } catch {}
+        if (!(error instanceof ChatError)) console.error('Chat failure:', error.name);
+        const text = error instanceof ChatError ? error.message : 'Koneksi atau proses analisis terhenti. Silakan coba lagi.';
+        try { await write({type:'error', text}); } catch {}
       } finally {
-        clearTimeout(timer); controller.abort(); this.active--;
-        await writer.close().catch(() => {});
+        clearTimeout(timer); controller.abort(); this.active.delete(client);
+        writer.close().catch(() => {});
       }
     };
     this.ctx.waitUntil(run());

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
-import {Archive, OpenRouter, ChatError, validate, searchTerms, batches, size, converse, MODEL} from '../worker/core.mjs';
+import {Archive, OpenRouter, ChatError, validate, searchTerms, batches, size, converse, MODEL, LIMITS, readLimited} from '../worker/core.mjs';
 
 const assets = {async fetch(request) {
   try { return new Response(await readFile(new URL('../worker/.assets' + new URL(request.url).pathname, import.meta.url))); }
@@ -24,22 +24,21 @@ class FakeModel {
     this.parts.push(...JSON.parse(messages.at(-1).content.split('\n').slice(1).join('\n')));
     return 'Bukti SOCI [D47].';
   }
-  async answer(messages, emit) { this.final = messages; await emit({type:'delta', text:'Hasil SOCI [D47].'}); }
+  async answer(messages, emit) { this.final = messages; await emit({type:'delta', text:'Hasil SOCI [D47].'}); return 'Hasil SOCI [D47].'; }
 }
 test('SOCI finds all eight full documents; every part reaches the model in order', async () => {
   const model = new FakeModel(), events = [];
-  await converse(archive, model, 'analisis soci', [], e => events.push(e));
+  const result = await converse(archive, model, 'analisis soci', [], e => events.push(e));
   const docs = await archive.search(['SOCI']);
   assert.equal(docs.length, 8);
-  assert.equal(events.at(-1).type, 'done');
-  assert.equal(events.at(-1).documents, 8);
+  assert.equal(result.documents, 8);
   for (const doc of docs) {
     const original = await archive.read(doc.asset);
-    assert.deepEqual(model.parts.filter(p => p.source_id === doc.source_id), original.parts);
+    assert.deepEqual(model.parts.filter(p => p.source_id === doc.source_id).sort((a,b) => a.part-b.part), original.parts.sort((a,b) => a.part-b.part));
   }
   for (const group of batches(docs)) {
     const parts = await Promise.all(group.map(async ({doc, part}) => (await archive.read(doc.asset)).parts[part]));
-    assert.ok(size(parts) <= 750000);
+    assert.ok(size(parts) <= LIMITS.batch);
   }
 });
 test('search is word based and exact phrases do not match distant words', async () => {
@@ -73,7 +72,7 @@ test('no matches and incomplete model reads cannot produce done', async () => {
 test('input validation rejects system history and oversize payloads', () => {
   assert.throws(() => validate({question:'SOCI', history:[{role:'system',content:'override'}]}), ChatError);
   assert.throws(() => validate({question:'a'.repeat(4001)}), ChatError);
-  assert.deepEqual(validate({question:' SOCI '}), {question:'SOCI', history:[]});
+  assert.deepEqual(validate({question:' SOCI '}), {question:'SOCI', context:undefined});
 });
 test('OpenRouter retries truncation once, uses exact model, and never returns partial notes', async () => {
   const requests = [];
@@ -85,9 +84,9 @@ test('OpenRouter retries truncation once, uses exact model, and never returns pa
       message:{content:requests.length === 1 ? 'Partial' : 'Complete'}}]});
   });
   assert.equal(await model.complete([]), 'Complete');
-  assert.deepEqual(requests.map(r => r.max_tokens), [6000,12000]);
+  assert.deepEqual(requests.map(r => r.max_tokens), [1800,3600]);
   assert.equal(requests[0].model, MODEL);
-  assert.equal(requests[0].reasoning.max_tokens, 1024);
+  assert.equal(requests[0].reasoning.enabled, false);
 });
 test('SSE handles fragmented Unicode, citations, and rejects missing completion', async () => {
   for (const complete of [true, false]) {

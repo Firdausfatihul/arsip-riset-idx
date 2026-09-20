@@ -99,7 +99,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   dengan `fetch()` saat dokumen dibuka, dan mengambil semuanya (3 sekaligus) saat kotak cari pertama kali diisi ≥2 huruf.
   Selama itu catatan cari menulis "memuat isi N dokumen besar…". Yang gagal dimuat bisa dicoba lagi lewat tombol **Coba lagi**, saat dibuka ulang, atau saat mencari ≥30 detik kemudian.
   Ini jalan di server HTTP dan Claude Artifact. Dari `file://` (dobel klik) dokumen besar tidak bisa dibuka atau dicari; dokumen kecil tetap jalan.
-- Library dari CDN (versi dikunci): `marked@15.0.7` (parser Markdown) dan `dompurify@3.2.4` (sanitasi) dari `cdnjs.cloudflare.com`.
+- Library dari CDN (versi dikunci): `marked@15.0.7` (parser Markdown) dan `dompurify@3.4.15` (sanitasi) dari `cdnjs.cloudflare.com`.
   Kalau CDN gagal dimuat, dokumen tetap tampil sebagai teks mentah (`<pre>`).
 - Font dari Google Fonts: IBM Plex Sans / Sans Condensed / Mono. Kalau gagal, pakai font sistem.
 - Tab di atas: **Dokumen** (daftar dan pembaca) dan **Kepemilikan Saham** (hanya muncul kalau `kepemilikan.json` ada).
@@ -173,9 +173,13 @@ bertanya lanjutan, menghentikan proses, mencoba lagi, atau memulai percakapan ba
 
 Key khusus arsip disimpan lokal di `.env.chat` yang diabaikan Git dan diunggah
 sebagai secret `OPENROUTER_API_KEY` pada Cloudflare. Key tidak masuk hasil build.
-Browser mengirim pertanyaan dan riwayat; backend memilih dokumen dari indeksnya
-sendiri. Percakapan hanya disimpan dalam memori tab; refresh menghapusnya.
-Riwayat dibatasi 20 pertukaran untuk membatasi konteks.
+Browser hanya mengirim pertanyaan (maksimal 600 karakter) dan token konteks acak.
+Backend menolak riwayat, pilihan model, URL, dokumen, atau pengaturan token dari klien.
+Riwayat singkat disimpan di SQLite: tiga pertukaran terakhir, jawaban lama maksimal
+1.500 karakter. Token terikat hash IP, berlaku satu jam, maksimal 20 pertukaran.
+Token kedaluwarsa ditolak; barisnya dihapus saat permintaan berikutnya. Refresh atau
+Percakapan baru menghapus token dari memori tab. Perubahan jaringan/IP memerlukan
+Percakapan baru. Riwayat tidak dicatat ke log dan key tidak pernah masuk prompt.
 
 ### Cara dokumen dipilih dan dibaca
 
@@ -183,12 +187,15 @@ Riwayat dibatasi 20 pertukaran untuk membatasi konteks.
   `SOCI` cocok, `social` tidak. Untuk pertanyaan tanpa ticker, Qwen menerjemahkan
   pertanyaan dan konteks percakapan menjadi istilah pencarian. Ini pencarian teks,
   belum indeks semantik; sinonim atau kode yang tidak disebut dapat terlewat.
-- Semua dokumen yang cocok disertakan, tanpa batas top-3/top-5. Pencarian Markdown
+- Semua dokumen yang cocok disertakan, tanpa batas top-3/top-5, selama total bahan
+  tidak melampaui 4.000.000 byte JSON. Topik yang terlalu luas ditolak, bukan dipotong diam-diam. Pencarian Markdown
   memakai isi lengkap; HTML memakai indeks teks viewer. Model menerima Markdown
   atau HTML lengkap, termasuk data riset yang tertanam dalam skrip HTML.
-- Konteks dibagi menjadi bagian maksimal 750.000 byte JSON. Pemisahan menjaga
-  seluruh karakter, lalu tiap bagian dibaca model sebelum catatan digabung untuk
-  jawaban akhir. Mode bertahap memakai catatan antara, bukan memasukkan semua
+- Konteks dibagi menjadi bagian maksimal 384.000 byte JSON. Dua bagian dibaca
+  bersamaan, seluruh karakter dipertahankan, lalu catatan digabung sesuai urutan sumber.
+  Progress bar menghitung bagian yang benar-benar selesai; animasi mengetik dan waktu
+  tunggu tampil sejak pengiriman. Aktivitas pembacaan dikirim dari stream catatan model,
+  sedangkan teks jawaban akhir tampil bertahap. Tidak menampilkan reasoning internal. Mode bertahap memakai catatan antara, bukan memasukkan semua
   file sekaligus ke satu panggilan; model masih bisa melewatkan detail saat merangkum.
 - Jika pembacaan gagal atau keluaran model terpotong, UI tidak menyatakan analisis
   selesai. Catatan antara yang terpotong dicoba ulang sekali dengan batas keluaran
@@ -200,6 +207,51 @@ Riwayat dibatasi 20 pertukaran untuk membatasi konteks.
   jaminan setiap klaim model benar; periksa sumber untuk keputusan penting.
 - Saat tombol Hentikan ditekan, browser memutus koneksi. Server berhenti setelah
   mendeteksi koneksi putus; panggilan model yang sudah terkirim bisa tetap dikenakan biaya.
+
+
+### Batas keamanan dan biaya
+
+Batas backend tetap berlaku walaupun JavaScript browser diubah:
+
+| Lapisan | Batas |
+|---|---|
+| Pertanyaan | 600 karakter, normalisasi Unicode, hapus kontrol tak terlihat |
+| HTTP body | 4.096 byte, JSON saja, unggahan maksimal 5 detik |
+| Riwayat dari browser | Ditolak; hanya token konteks acak 256 bit |
+| Topik | Maksimal 4 ticker/istilah, 4 MB bahan, 14 kelompok |
+| Satu panggilan model | Maksimal 480.000 byte JSON pesan; tidak sama dengan jumlah token |
+| Satu analisis | 8 MB total pesan termasuk retry, 20 panggilan, alokasi keluaran 36.000 token |
+| Keluaran per panggilan | Catatan 1.800 token, retry sekali 3.600; jawaban akhir 5.000 |
+| Anggaran global/hari UTC | 80 MB pesan model dan alokasi keluaran 500.000 token, dicadangkan sebelum setiap panggilan |
+| Permintaan masuk termasuk invalid | 12/IP/menit dan 120 global/menit |
+| Analisis diterima | 10/IP/jam, 100 global/hari |
+| Koneksi | 4 unggahan, 2 analisis, batas keseluruhan 8 menit, pembaca lambat diputus setelah 10 detik |
+
+Alokasi keluaran memakai batas maksimum, bukan tagihan aktual. Model, endpoint, dan
+parameter tidak bisa dipilih pengguna. Tidak ada tools/function calling, eksekusi shell,
+atau pengambilan URL pengguna. HTML jawaban memakai allowlist tag sederhana; style,
+form, media, SVG, event handler, dan URL di luar sumber terverifikasi dibuang sebelum
+dipasang ke DOM. DOMPurify 3.4.15 dan marked memakai versi serta hash SRI terkunci.
+
+Prompt injection tetap dapat memengaruhi isi/judgment model; sanitasi bukan bukti bahwa
+model kebal instruksi jahat. Dokumen tetap utuh dan diperlakukan sebagai bahan data.
+Batas kode membatasi dampak pada kapabilitas dan biaya, bukan menjamin kebenaran jawaban.
+Endpoint publik tanpa login masih bisa menghabiskan kuota melalui banyak IP. Batas ini
+bukan batas dolar; batasi kredit key OpenRouter secara terpisah jika diperlukan.
+
+Uji serangan dijalankan di salinan terpisah tanpa `.env.chat`, tanpa key asli, dan tanpa
+akses provider. `tests/security.mjs` memblokir global fetch; `tests/worker_runtime.cjs`
+memakai workerd/SQLite dengan seluruh jaringan keluar diganti model simulasi.
+
+```bash
+node --test tests/worker.mjs tests/security.mjs   # Node 22+ untuk node:sqlite
+NODE_PATH=/path/to/test-deps/node_modules node tests/chat_ui.cjs
+NODE_PATH=/path/to/test-deps/node_modules node tests/worker_runtime.cjs
+```
+
+Runtime test memerlukan Miniflare 5 (adapter V4) dan esbuild dari alat Wrangler 4.135.0.
+Jangan menjalankan flood/attack test pada URL publik. Lihat `SECURITY_REVIEW.md` untuk
+cakupan, bukti, dan batas audit.
 
 ### Memasang di situs publik
 
@@ -216,8 +268,9 @@ ditentukan `worker/wrangler.jsonc`. Model tetap OpenRouter `qwen/qwen3.7-flash`.
   top-k. Data ini dibundel sebagai Assets; Worker tidak membolehkan URL sumber
   arbitrer dari pengguna. Berkas hasilnya ada di `worker/.assets/`, diabaikan Git.
 - Kuota 100 pertanyaan/hari UTC dan 10/alamat IP/jam disimpan dalam SQLite Durable
-  Object dan tetap ada setelah restart/deploy. Alamat koneksi Cloudflare di-hash;
-  pertanyaan dan jawaban tidak disimpan ke database. Maksimal 2 analisis bersamaan.
+  Object dan tetap ada setelah restart/deploy. Alamat koneksi Cloudflare di-hash.
+  Maksimal 2 analisis bersamaan, satu per IP, masing-masing 2 pembaca model. CORS
+  produksi hanya mengizinkan domain situs; lokal memerlukan override konfigurasi uji.
 - Tidak ada cron/keepalive atau server yang harus dinyalakan di Mac. Durable Object
   dapat dikeluarkan dari memori saat tidak aktif dan diinisialisasi saat dibutuhkan;
   ini bukan jaminan latensi nol, tetapi tidak memakai jeda bangun satu menit Render.
@@ -281,7 +334,7 @@ Uji DOM opsional memakai dependency pengujian saja, tidak dipakai server/build:
 
 ```bash
 chat_test_deps=$(mktemp -d)
-npm install --prefix "$chat_test_deps" jsdom@26.1.0 marked@15.0.7 dompurify@3.2.4
+npm install --prefix "$chat_test_deps" jsdom@26.1.0 marked@15.0.7 dompurify@3.4.15
 NODE_PATH="$chat_test_deps/node_modules" node tests/chat_ui.cjs
 ```
 

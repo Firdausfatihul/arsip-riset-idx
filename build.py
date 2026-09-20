@@ -94,8 +94,10 @@ TICKER = re.compile(r"\b[A-Z]{4}\b")
 EMITEN_H3 = re.compile(r"^(?:(\d+(?:\.\d+)*)\.?\s+)?([A-Z]{4})(?:\s+[—–-]\s+(.+))?$")
 FONTS = ("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600"
          "&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap")
-LIBS = ("https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js",
-        "https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.4/purify.min.js")
+LIBS = (
+    ("https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js", "sha384-H+hy9ULve6xfxRkWIh/YOtvDdpXgV2fmAGQkIDTxIgZwNoaoBal14Di2YTMR6MzR"),
+    ("https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.15/purify.min.js", "sha384-uUMu9JDY09vBzRf9SPcK2VgUj+W/70J6Soc+Dded5P474ElQ63iv9j5N3DE7Kp3N"),
+)
 # Markdown di atas batas ini tidak ditanam di index.html; viewer mengambilnya dari files/… saat dibuka atau dicari.
 EMBED_LIMIT = 256 * 1024
 EXPLICIT_RANGE = re.compile(r"\d{4}-\d{2}-\d{2}[_\-\s]+(?:to[_\-\s]+)?\d{4}-\d{2}-\d{2}")
@@ -502,6 +504,15 @@ a.chip:hover{outline:1px solid var(--c)}
 .chat-sources ol{margin:0;padding-left:22px}
 .chat-sources li{margin-bottom:8px}
 .chat-sources a{display:inline-block;min-height:44px}
+.chat-count{margin:6px 0;font:14px/1.5 var(--sans);color:var(--muted)}
+.chat-working{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font:16px/1.5 var(--sans);margin-top:12px}
+#chat-elapsed{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.chat-progress progress{display:block;width:100%;height:10px;margin-top:10px;accent-color:var(--c)}
+.chat-dots{display:inline-flex;gap:4px;padding:6px 2px}
+.chat-dots i{width:6px;height:6px;background:var(--c);border-radius:50%;animation:chat-pulse 1.2s infinite}
+.chat-dots i:nth-child(2){animation-delay:.2s}.chat-dots i:nth-child(3){animation-delay:.4s}
+@keyframes chat-pulse{0%,80%,100%{opacity:.35}40%{opacity:1}}
+@media(prefers-reduced-motion:reduce){.chat-dots i{animation:none;opacity:1}.chat-progress progress{appearance:none}}
 .chat-error{color:var(--down);font-size:16px}
 @media (max-width:640px){.chat{padding:14px}.chat-form{grid-template-columns:minmax(0,1fr)}.chat-actions button{flex:1}}
 .hits{font:500 14px/1.4 var(--sans);color:var(--c)}
@@ -1957,8 +1968,10 @@ def build_page(docs, by_cat, own=None):
             '<header class="chat-head"><h2 id="chat-title">Tanya arsip</h2><button id="chat-new" type="button" hidden>Percakapan baru</button></header>'
             '<p class="chat-intro">Tanyakan saham atau topik. Jawaban memakai dokumen dalam arsip dan menyertakan sumbernya.</p>'
             '<div id="chat-history" role="log" aria-label="Percakapan tentang arsip" aria-live="polite"></div>'
-            '<form id="chat-form" class="chat-form"><textarea id="chat-question" rows="2" maxlength="4000" required aria-label="Pertanyaan tentang arsip" placeholder="Contoh: Analisis SOCI dari semua dokumen yang tersedia"></textarea>'
+            '<form id="chat-form" class="chat-form"><textarea id="chat-question" rows="2" maxlength="600" aria-describedby="chat-count" required aria-label="Pertanyaan tentang arsip" placeholder="Contoh: Analisis SOCI dari semua dokumen yang tersedia"></textarea>'
             '<div class="chat-actions"><button id="chat-send" type="submit">Tanyakan</button><button id="chat-stop" type="button" hidden>Hentikan</button></div></form>'
+            '<p id="chat-count" class="chat-count">0 / 600 karakter</p>'
+            '<div id="chat-progress" class="chat-progress" hidden><div class="chat-working"><span class="chat-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="chat-activity">Asisten mulai bekerja…</span><span id="chat-elapsed"></span></div><progress id="chat-meter" aria-label="Progres pembacaan dokumen"></progress></div>'
             '<p id="chat-status" class="chat-status" role="status"></p></section>'
             '<div id="overview">'
             '<header class="masthead">'
@@ -1975,7 +1988,7 @@ def build_page(docs, by_cat, own=None):
             + (f"<span>data terbaru {esc(date_label(last, last))}</span>" if last else "") + "</footer></div>"
             '<article id="reader" hidden></article></main></div>' + own_view +
             f'<script type="application/json" id="arsip-data">{data_json}</script>'
-            + "".join(f'<script src="{src}"></script>' for src in LIBS)
+            + "".join(f'<script src="{src}" integrity="{integrity}" crossorigin="anonymous"></script>' for src, integrity in LIBS)
             + f"<script>{APP_JS}\n{chat_js}</script>")
     return head, body
 

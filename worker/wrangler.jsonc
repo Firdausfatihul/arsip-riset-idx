@@ -8,7 +8,7 @@
   "durable_objects": {"bindings": [{"name": "CHAT", "class_name": "ArchiveChat"}]},
   "migrations": [{"tag": "v1", "new_sqlite_classes": ["ArchiveChat"]}],
   "vars": {
-    "CHAT_ALLOWED_ORIGINS": "https://arsip.seekingomega.capital,http://127.0.0.1:8017,http://localhost:8017",
+    "CHAT_ALLOWED_ORIGINS": "https://arsip.seekingomega.capital",
     "CHAT_DAILY_REQUESTS": "100",
     "CHAT_HOURLY_PER_IP": "10"
   },

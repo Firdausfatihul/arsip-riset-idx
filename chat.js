@@ -6,7 +6,12 @@
   var form = document.getElementById('chat-form'), input = document.getElementById('chat-question');
   var log = document.getElementById('chat-history'), status = document.getElementById('chat-status');
   var send = document.getElementById('chat-send'), stop = document.getElementById('chat-stop');
-  var reset = document.getElementById('chat-new'), history = [], controller = null;
+  var reset = document.getElementById('chat-new'), context = null, turns = 0, controller = null;
+  var progress = document.getElementById('chat-progress'), meter = document.getElementById('chat-meter');
+  var activity = document.getElementById('chat-activity'), elapsed = document.getElementById('chat-elapsed');
+  var count = document.getElementById('chat-count');
+  function countInput(){ count.textContent = input.value.length + ' / 600 karakter'; }
+  input.addEventListener('input', countInput);
   var knownPaths = new Set(data.docs.map(function(d){ return d.path; }));
 
   function docHref(path){ return '#doc=' + encodeURIComponent(path).replace(/%2F/g, '/'); }
@@ -47,35 +52,45 @@
     var markdown = text.replace(/\[(D\d+)\]/g, function(label, id){
       return byId[id] ? '[' + id + '](' + docHref(byId[id].path) + ')' : label;
     });
-    target.innerHTML = window.DOMPurify.sanitize(window.marked.parse(markdown, {gfm: true}),
-      {FORBID_TAGS: ['img', 'video', 'audio', 'iframe', 'source', 'svg', 'math']});
-    // Only verified archive citations are clickable; model-generated URLs are not source evidence.
+    var fragment = window.DOMPurify.sanitize(window.marked.parse(markdown, {gfm: true}), {
+      ALLOWED_TAGS: ['p','br','strong','em','del','blockquote','ul','ol','li','h2','h3','h4','hr','pre','code','table','thead','tbody','tr','th','td','a'],
+      ALLOWED_ATTR: ['href'], ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false, RETURN_DOM_FRAGMENT: true
+    });
+    // Check links while detached, before any model-generated markup enters the page.
     var allowed = new Set(sources.map(function(s){ return docHref(s.path); }));
-    target.querySelectorAll('a').forEach(function(a){
+    fragment.querySelectorAll('a').forEach(function(a){
       if (!allowed.has(a.getAttribute('href'))) a.replaceWith(a.textContent);
     });
+    target.replaceChildren(fragment);
     target.classList.add('rendered');
   }
 
   function busy(value){
     send.disabled = value; input.disabled = value; stop.hidden = !value; reset.disabled = value;
     log.setAttribute('aria-busy', String(value));
+    progress.hidden = !value;
+    if (value){ meter.removeAttribute('value'); activity.textContent = 'Asisten mulai bekerja…'; elapsed.textContent = '0 detik'; }
   }
 
   form.addEventListener('submit', async function(event){
     event.preventDefault();
     var question = input.value.trim();
     if (!question || controller) return;
-    if (history.length >= 40){ status.textContent = 'Percakapan sudah panjang. Pilih Percakapan baru untuk melanjutkan.'; return; }
+    if (question.length > 600){ status.textContent = 'Maksimal 600 karakter per pertanyaan.'; return; }
+    if (turns >= 20){ status.textContent = 'Percakapan sudah panjang. Pilih Percakapan baru untuk melanjutkan.'; return; }
     controller = new AbortController();
     busy(true); reset.hidden = false;
     message('user', question);
+    var nextContext = null;
     var reply = message('assistant', ''), text = '', sources = [], summary = null, done = false;
     status.textContent = 'Menghubungkan ke asisten arsip…';
-    var timeout = setTimeout(function(){ if (controller) controller.abort('timeout'); }, 15 * 60 * 1000);
+    var started = Date.now(), ticker = setInterval(function(){
+      elapsed.textContent = Math.floor((Date.now() - started) / 1000) + ' detik';
+    }, 1000);
+    var timeout = setTimeout(function(){ if (controller) controller.abort('timeout'); }, 9 * 60 * 1000);
     try {
       var response = await fetch(endpoint, {method: 'POST', signal: controller.signal,
-        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: question, history: history})});
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: question, context: context || undefined})});
       if (!response.ok){
         var problem = await response.json().catch(function(){ return {}; });
         throw new Error(problem.error || 'Percakapan belum tersedia. Silakan coba lagi nanti.');
@@ -87,18 +102,29 @@
       function receive(line){
         if (!line.trim()) return;
         var event = JSON.parse(line);
-        if (event.type === 'status') status.textContent = event.text;
+        if (event.type === 'status'){
+          status.textContent = event.text;
+          if (event.phase === 'answer'){ meter.removeAttribute('value'); activity.textContent = 'Asisten sedang menulis jawaban…'; }
+        }
+        if (event.type === 'progress'){
+          meter.max = event.total; meter.value = event.completed;
+          status.textContent = event.text; activity.textContent = 'Membaca dan mencatat bukti…';
+        }
+        if (event.type === 'activity') activity.textContent = event.text;
         if (event.type === 'sources'){
           sources = event.sources.filter(function(s){ return knownPaths.has(s.path) && /^D\d+$/.test(s.source_id); });
           if (sources.length !== event.sources.length) throw new Error('Daftar arsip sudah diperbarui. Muat ulang halaman lalu coba lagi.');
           summary = sourceList(reply.block, sources);
         }
         if (event.type === 'delta'){
-          text += event.text; reply.content.textContent = text;
+          text += event.text;
+          if (text.length > 40000) throw new Error('Jawaban melampaui batas ukuran.');
+          reply.content.textContent = text;
         }
         if (event.type === 'error') throw new Error(event.text);
         if (event.type === 'done'){
-          done = true;
+          if (!/^[a-f0-9]{64}$/.test(event.context || '')) throw new Error('Konteks jawaban tidak valid. Muat ulang halaman.');
+          nextContext = event.context; done = true;
           if (summary) summary.textContent = sources.length + ' dokumen dibaca · lihat sumber';
         }
       }
@@ -106,12 +132,13 @@
         var part = await stream.read();
         pending += decoder.decode(part.value || new Uint8Array(), {stream: !part.done});
         var lines = pending.split('\n'); pending = lines.pop();
+        if (pending.length > 100000 || lines.some(function(line){ return line.length > 100000; })) throw new Error('Aliran jawaban tidak valid.');
         lines.forEach(receive);
         if (part.done){ receive(pending); break; }
       }
       if (!done || !text.trim()) throw new Error('Jawaban terputus sebelum selesai. Silakan coba lagi.');
       renderAnswer(reply.content, text, sources);
-      history.push({role: 'user', content: question}, {role: 'assistant', content: text});
+      context = nextContext; turns++;
       input.value = ''; input.placeholder = 'Tanyakan lanjutannya, misalnya: bagaimana risiko pendanaannya?';
       status.textContent = 'Jawaban selesai dari ' + sources.length + ' dokumen. Kamu bisa bertanya lagi.';
     } catch (error){
@@ -129,15 +156,15 @@
       });
       reply.block.appendChild(retry); status.textContent = description;
     } finally {
-      clearTimeout(timeout); controller = null; busy(false);
+      clearTimeout(timeout); clearInterval(ticker); controller = null; busy(false); countInput();
     }
   });
 
   stop.addEventListener('click', function(){ if (controller) controller.abort(); });
   reset.addEventListener('click', function(){
     if (controller) return;
-    history = []; log.replaceChildren(); status.textContent = ''; input.value = '';
+    context = null; turns = 0; log.replaceChildren(); status.textContent = ''; input.value = '';
     input.placeholder = 'Contoh: Analisis SOCI dari semua dokumen yang tersedia';
-    reset.hidden = true; input.focus();
+    reset.hidden = true; countInput(); input.focus();
   });
 })();
