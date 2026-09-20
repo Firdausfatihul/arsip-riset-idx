@@ -40,3 +40,10 @@ menggeneralisasi ketiadaan digest pada periode tertentu dari delapan dokumen yan
 dengan SOCI, padahal katalog keseluruhan memiliki dokumen lain pada periode tersebut.
 Anggap keterangan ketiadaan hanya berlaku pada bahan terpilih yang diperiksa, dan cek
 sumber untuk klaim cakupan. Pemeriksaan ID rujukan bukan pemeriksaan kebenaran seluruh kalimat.
+
+Instruksi jawaban selanjutnya diperketat untuk tidak memperluas ticker tanpa nama
+dalam sumber, tidak menafsirkan tag bersama sebagai hubungan bisnis, dan tidak
+menggeneralisasi cakupan katalog. Perubahan instruksi otomatis membatalkan cache
+jawaban terkait. Pengujian tambahan setelah perubahan ini sebagian menerima HTTP 429
+dari provider; catatannya dipertahankan di `provider-limited-followup.*`. Permintaan
+yang gagal atau tidak memiliki usage lengkap tidak dilaporkan sebagai panggilan gratis.

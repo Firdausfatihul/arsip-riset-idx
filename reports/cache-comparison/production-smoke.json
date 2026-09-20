@@ -60,11 +60,16 @@
       "elapsed_seconds": 0.46
     }
   ],
-  "latest_deployed_version": "92aebaec-3463-453f-affd-cf516cd38b8e",
+  "latest_deployed_version": "42041586-d16c-47dd-8eac-3be17f4e5dd0",
   "latest_analytics_verified": {
     "private_access": true,
     "question_text_recorded": true,
     "cost_rankings_available": true,
     "inputs_at_check": 5
+  },
+  "frontend_verified": {
+    "public_notice_visible": true,
+    "cached_answer_cost_usd": 0,
+    "cached_answer_input_tokens": 0
   }
 }

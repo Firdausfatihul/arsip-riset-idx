@@ -321,6 +321,15 @@ export async function converseLegacy(archive, model, question, history, emit, si
 }
 
 const PIPELINE = 'issuer-cache-v1';
+const ANSWER_RULES = '\nJawab berdasarkan bagian sumber berikut. Tanggal dokumen dan tanggal kejadian dapat berbeda. '
+  +'Bagian dengan tanggal belum pasti tetap disertakan agar informasi tidak hilang. '
+  +'Jika bahan hanya catatan ringkas, jangan menyimpulkan detail tidak ada dalam dokumen asal; sebutkan batas bukti dan perlunya pemeriksaan detail. '
+  +'Kutip persis hanya jika teks aslinya tersedia. Jangan mengarang kejadian pada tanggal yang diminta. '
+  +'Data historis tidak membuktikan kondisi masih sama pada tanggal lain. Tidak ditemukan hanya berarti tidak ditemukan dalam bahan yang diperiksa. '
+  +'Jangan menyamakan penurunan jumlah pemegang saham dengan bukti konsolidasi kepemilikan. '
+  +'Bahan ini hanya dokumen yang cocok dengan pencarian, bukan seluruh katalog arsip. Jangan mengklaim suatu periode tidak memiliki dokumen dalam katalog. '
+  +'Jangan memperluas ticker atau singkatan menjadi nama perusahaan jika nama itu tidak tertulis dalam bahan. '
+  +'Ticker/tag yang muncul bersama dalam postingan atau tabel hanya membuktikan penyebutan bersama, bukan hubungan bisnis, investasi atau kepemilikan.';
 const NOTE_LIMIT = 220000;
 const cacheOnce = async (cache, kind, key, compute, ttl) => cache
   ? cache.once(kind, key, compute, ttl) : {value:await compute(),hit:false,shared:false};
@@ -360,7 +369,7 @@ export async function converse(archive, model, question, history, emit, signal, 
   }
   const systemHash = await hash(index.system);
   // Contextual answers are scoped to their client. Source notes never include user history.
-  const answerKey = await hash([PIPELINE,index.version,index.retrieval_version,systemHash,MODEL,
+  const answerKey = await hash([PIPELINE,ANSWER_RULES,index.version,index.retrieval_version,systemHash,MODEL,
     question.trim().replace(/\s+/g,' '),history,history.length ? options.client || 'local' : 'public',scope]);
   const saved = cache?.get('answer',answerKey);
   if (saved) {
@@ -447,12 +456,7 @@ export async function converse(archive, model, question, history, emit, signal, 
   if(failure) throw failure;
   for(const r of results) if(r.status==='rejected') throw r.reason;
   signal?.throwIfAborted();
-  const instructions = '\nJawab berdasarkan bagian sumber berikut. Tanggal dokumen dan tanggal kejadian dapat berbeda. '
-    +'Bagian dengan tanggal belum pasti tetap disertakan agar informasi tidak hilang. '
-    +'Jika bahan hanya catatan ringkas, jangan menyimpulkan detail tidak ada dalam dokumen asal; sebutkan batas bukti dan perlunya pemeriksaan detail. '
-    +'Kutip persis hanya jika teks aslinya tersedia. Jangan mengarang kejadian pada tanggal yang diminta. '
-    +'Data historis tidak membuktikan kondisi masih sama pada tanggal lain. Tidak ditemukan hanya berarti tidak ditemukan dalam bahan yang diperiksa. '
-    +'Jangan menyamakan penurunan jumlah pemegang saham dengan bukti konsolidasi kepemilikan. '
+  const instructions = ANSWER_RULES
     +(context.some(c=>c.notes) ? 'Jika catatan ringkas tidak cukup untuk pertanyaan, minta pemeriksaan dokumen lengkap dengan menjawab HANYA [[SUMBER:D12]] '
       +'(ganti D12 dengan ID yang tersedia, maksimal dua ID dipisah koma). Jangan tulis jawaban lain pada permintaan pemeriksaan itu.' : '');
   const messages=[{role:'system',content:index.system+instructions},

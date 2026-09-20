@@ -1,0 +1,331 @@
+{
+  "mode": "actual OpenRouter receipts",
+  "model": "qwen/qwen3.7-flash",
+  "archive_version": "4acc82e4706c949d",
+  "created_at": "2026-09-20T16:13:53.968Z",
+  "baseline_reused_from": "2026-09-20T16:05:24.874Z",
+  "max_usd": 1,
+  "conservative_reserved_usd": 0.03329625,
+  "records": [
+    {
+      "case": "legacy",
+      "question": "di soci ada apa ya?",
+      "elapsed_ms": 96494,
+      "result": "complete",
+      "documents": 8,
+      "retrieval": {},
+      "usage": {
+        "calls": 10,
+        "input_bytes": 3304785,
+        "output_token_budget": 21200,
+        "known_cost_usd": 0.09922520000000001,
+        "prompt_tokens": 1213737,
+        "completion_tokens": 8628,
+        "cached_tokens": 307584,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "calls": [
+        {
+          "input_bytes": 358016,
+          "output_token_budget": 1800,
+          "cost": 0.0162655,
+          "prompt_tokens": 160599,
+          "completion_tokens": 514,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920196-j4zLJWq0xml992kZq27w"
+        },
+        {
+          "input_bytes": 392670,
+          "output_token_budget": 1800,
+          "cost": 0.0179719,
+          "prompt_tokens": 175423,
+          "completion_tokens": 1074,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920196-HatAKbHVqdkt643YrMeR"
+        },
+        {
+          "input_bytes": 387471,
+          "output_token_budget": 1800,
+          "cost": 0.012155,
+          "prompt_tokens": 119234,
+          "completion_tokens": 579,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920212-vMItXuG2nc3KfYsN5sYz"
+        },
+        {
+          "input_bytes": 387161,
+          "output_token_budget": 1800,
+          "cost": 0.00272038,
+          "prompt_tokens": 117991,
+          "completion_tokens": 804,
+          "cached_tokens": 117504,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920218-lfIIeiBHuxDukNe2SEqo"
+        },
+        {
+          "input_bytes": 382193,
+          "output_token_budget": 1800,
+          "cost": 0.00278358,
+          "prompt_tokens": 117767,
+          "completion_tokens": 1018,
+          "cached_tokens": 117504,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920226-AElD7Jw55jyuAAi6E4uP"
+        },
+        {
+          "input_bytes": 337941,
+          "output_token_budget": 1800,
+          "cost": 0.0109024,
+          "prompt_tokens": 106260,
+          "completion_tokens": 691,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920233-vNObmlvEKQRVXiwlxU8M"
+        },
+        {
+          "input_bytes": 391293,
+          "output_token_budget": 1800,
+          "cost": 0.0213773,
+          "prompt_tokens": 210813,
+          "completion_tokens": 740,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920234-dAxr0qVS9zqUHz4woUDL"
+        },
+        {
+          "input_bytes": 370400,
+          "output_token_budget": 1800,
+          "cost": 0.0128109,
+          "prompt_tokens": 124941,
+          "completion_tokens": 792,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920249-yltHOj1Fpe98ma6hRi2l"
+        },
+        {
+          "input_bytes": 271097,
+          "output_token_budget": 1800,
+          "cost": 0.00178762,
+          "prompt_tokens": 73289,
+          "completion_tokens": 662,
+          "cached_tokens": 72576,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920258-PH60lxFmPATehyb5pLg2"
+        },
+        {
+          "input_bytes": 26543,
+          "output_token_budget": 5000,
+          "cost": 0.00045062,
+          "prompt_tokens": 7420,
+          "completion_tokens": 1754,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "response_cache": null,
+          "generation_id": "gen-1789920269-16P2c5F575qjcAgERusI"
+        }
+      ],
+      "answer": "Berdasarkan arsip yang tersedia, berikut adalah rangkuman fakta mengenai **SOCI (PT Soechi Lines Tbk)** yang digabungkan dari berbagai sumber. Perlu dicatat bahwa terdapat inkonsistensi identitas emiten dalam arsip (beberapa menyebut PT Surya Citra Media, namun data fundamental dan aksi korporasi merujuk pada PT Soechi Lines Tbk). Analisis ini berfokus pada data material yang terverifikasi untuk PT Soechi Lines Tbk.\n\n### 1. Aksi Korporasi & Operasional (Agustus–September 2026)\nArsip mencatat beberapa aktivitas penting yang dilakukan SOCI:\n\n*   **Pendirian Anak Usaha:** SOCI mendirikan entitas baru bernama **Sea Voyage International Ltd (SVI)** di Marshall Islands [D11], [D12].\n    *   Kepemilikan: 100% oleh SOCI.\n    *   Modal Disetor: AS$500.000.\n    *   Tujuan: Mendukung kegiatan usaha pelayaran.\n    *   Dampak: Emiten menyatakan tidak ada dampak material terhadap kondisi keuangan dan hukum [D11], [D12].\n*   **Transaksi Pinjaman & Jaminan:** SOCI memberikan jaminan perusahaan (*corporate guarantee*) kepada PT Bank Mandiri (Persero) Tbk, Singapore Branch [D12], [D0].\n    *   Nilai Pokok Pinjaman: AS$54.900.000.\n    *   Penerima Jaminan: Anak usaha SOCI, **Eternity Ocean Maritime Ltd (EOM)**.\n    *   Risiko: Meningkatnya eksposur kontinjensi bagi SOCI jika EOM gagal memenuhi kewajiban [D12].\n*   **Penambahan Armada:** Terdapat pengumuman penambahan tanker/kapal baru yang telah memiliki kontrak sewa [D47], [D2]. Penulis analisis menyoroti pentingnya memisahkan pendapatan dari kapal baru dengan keuntungan non-recurring [D47].\n\n### 2. Data Fundamental & Struktur Kepemilikan (Per Agustus 2026)\nData dari Laporan Bulanan Registrasi Pemegang Efek (LBRE) per 31 Agustus 2026 menunjukkan hal berikut [D23]:\n\n| Indikator | Per 31 Juli 2026 | Per 31 Agustus 2026 | Perubahan |\n| :--- | :--- | :--- | :--- |\n| **Jumlah Saham Beredar** | 7.059.000.000 | 7.059.000.000 | Tidak berubah |\n| **Kepemilikan Pengendali** | 70,10% | 70,10% | Tidak berubah |\n| **Kepemilikan Publik** | 29,90% | 29,90% | Tidak berubah |\n| **Free Float** | 994.184.000 (14,08%) | 994.684.000 (14,09%) | +500.000 saham (+0,01%) |\n| **Jumlah Pemegang Saham** | 14.588 | 12.699 | -1.889 pemegang |\n\n*   **Catatan Penting:** Lampiran laporan keuangan interim auditan per 30 Juni 2026 gagal diekstraksi, sehingga angka kinerja keuangan (laba/rugi, arus kas) tidak dapat diverifikasi dari dokumen ini [D23].\n\n### 3. Sentimen Pasar & Diskusi Publik\n*   **Frekuensi Rendah:** SOCI jarang dibahas dibandingkan emiten besar lain. Di Stockbit, mention SOCI jauh lebih rendah daripada BYAN, ULTJ, atau GOTO [D47], [D49].\n*   **Konten Spekulatif:** Postingan pengguna cenderung bersifat teknis atau spekulatif tanpa dasar fundamental kuat. Contoh: tag `|BULL|` atau `|AREA|` tanpa analisis mendalam [D49].\n*   **Tidak Ada Rumor Material:** Tidak ditemukan diskusi tentang pengambilalihan, dividen, atau skandal manajemen dalam sampel arsip [D47], [D49].\n\n### 4. Ketidakpastian & Hal yang Belum Diketahui\nBerdasarkan batasan arsip saat ini, informasi berikut **tidak tersedia**:\n1.  **Kinerja Keuangan:** Tidak ada data laba bersih, pendapatan operasional, atau rasio keuangan SOCI karena kegagalan ekstraksi lampiran PDF/XLSX [D23].\n2.  **Detail Ekspansi:** Rencana operasional konkret SVI dan jadwal penambahan armada tidak dirinci secara spesifik [D11], [D12].\n3.  **Harga & Volume:** Tidak ada data harga terkini atau volume perdagangan reaksi pasar terhadap pengumuman ekspansi [D2], [D0].\n4.  **Identitas Pemberi Pinjam:** Selain Bank Mandiri sebagai penjamin fasilitas, identitas lengkap pihak pemberi pinjaman utama tidak selalu jelas dalam ringkasan [D0].\n\n### Kesimpulan\n\"Sosi\" (dalam konteks PT Soechi Lines Tbk) sedang dalam fase **ekspansi operasional** melalui pendirian anak usaha di Marshall Islands dan penambahan armada kapal gas dengan dukungan pinjaman bank. Namun, investor harus berhati-hati karena:\n1.  Tidak ada data kinerja keuangan terbaru yang dapat diakses dari arsip ini.\n2.  Adanya risiko kontinjensi sebesar AS$54,9 juta akibat jaminan pinjaman anak usaha.\n3.  Minat pasar ritel terhadap saham ini masih sangat rendah.\n\nUntuk analisis yang lebih komprehensif, diperlukan pemeriksaan langsung ke situs BEI/IDX Channel untuk laporan keuangan auditan dan detail perjanjian pinjaman yang tidak terekam dalam arsip ini."
+    },
+    {
+      "case": "indexed_first",
+      "question": "di soci ada apa ya?",
+      "elapsed_ms": 6641,
+      "result": "error",
+      "error": "Layanan AI sedang membatasi permintaan. Coba beberapa saat lagi.",
+      "retrieval": {
+        "pipeline": "issuer-cache-v1",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3198147,
+        "selected_source_bytes": 25911,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "date_scope": {
+          "date": null,
+          "filter": false
+        },
+        "terms": [
+          "SOCI"
+        ],
+        "documents_checked": 8
+      },
+      "usage": {
+        "calls": 1,
+        "input_bytes": 29697,
+        "output_token_budget": 5000,
+        "known_cost_usd": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 1
+      },
+      "calls": [
+        {
+          "input_bytes": 29697,
+          "output_token_budget": 5000,
+          "cost": null,
+          "prompt_tokens": null,
+          "completion_tokens": null,
+          "cached_tokens": null,
+          "cache_write_tokens": null,
+          "response_cache": null
+        }
+      ]
+    },
+    {
+      "case": "indexed_other_question",
+      "question": "SOCI tanggal 17 September 2026",
+      "elapsed_ms": 15431,
+      "result": "complete",
+      "documents": 8,
+      "retrieval": {
+        "pipeline": "issuer-cache-v1",
+        "source_cache_hits": 8,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3198147,
+        "selected_source_bytes": 22257,
+        "excluded_dated_records": 6,
+        "fallback_documents": 0,
+        "date_scope": {
+          "date": "2026-09-17",
+          "filter": true
+        },
+        "terms": [
+          "SOCI"
+        ],
+        "documents_checked": 8
+      },
+      "usage": {
+        "calls": 1,
+        "input_bytes": 25791,
+        "output_token_budget": 5000,
+        "known_cost_usd": 0.00037847,
+        "prompt_tokens": 7251,
+        "completion_tokens": 1238,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "calls": [
+        {
+          "input_bytes": 25791,
+          "output_token_budget": 5000,
+          "cost": 0.00037847,
+          "prompt_tokens": 7251,
+          "completion_tokens": 1238,
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "response_cache": "MISS",
+          "generation_id": "gen-1789920813-UgtRpvq8biVcOHQDn66P"
+        }
+      ],
+      "answer": "Berdasarkan arsip yang tersedia, **tidak ditemukan** informasi mengenai kejadian, pengumuman, atau aktivitas spesifik untuk PT Soechi Lines Tbk (SOCI) pada tanggal **17 September 2026**.\n\nBerikut adalah rincian fakta berdasarkan dokumen yang diperiksa:\n\n### 1. Status Data Tanggal 17 September 2026\n*   **Tidak Ada Dokumen:** Tidak ada entri dalam arsip D47, D49, D23, D2, D0, D12, atau D11 yang mencatat peristiwa pada tanggal 17 September 2026.\n*   **Jarak Waktu:** Tanggal tersebut berada di antara periode pelaporan terakhir (5–7 September 2026) dan posting terbaru (19 September 2026).\n\n### 2. Konteks Terdekat dari Arsip\nMeskipun tidak ada data spesifik untuk tanggal 17 September, arsip memberikan konteks berikut yang berlaku sebelum dan sesudah tanggal tersebut:\n\n**A. Periode Sebelumnya (5–7 September 2026)**\nPada minggu sebelumnya, SOCI hanya menerbitkan pengumuman rutin tanpa aksi korporasi [D23]:\n*   Penyampaian Laporan Keuangan Interim Auditan per 30 Juni 2026.\n*   Bukti iklan laporan keuangan.\n*   Laporan Bulanan Registrasi Pemegang Efek (LBRE) per 31 Agustus 2026.\n*   **Struktur Modal:** Tidak berubah. Free float naik tipis menjadi 14,09%. Jumlah pemegang saham KSEI menurun dari 14.588 menjadi 12.699 [D23].\n\n**B. Postingan Pasar (19 September 2026)**\nDua hari setelah tanggal yang ditanyakan, terdapat diskusi di Stockbit mengenai SOCI [D47]:\n*   Pembahasan mengenai penambahan tanker dan laba yang mengandung pendapatan lain-lain.\n*   Peringatan untuk memisahkan pendapatan kapal baru dari keuntungan yang tidak berulang.\n*   Ini merupakan opini pasar/spesulasi, bukan pengumuman resmi emiten pada tanggal 17 September.\n\n**C. Aksi Korporasi Terakhir (Agustus 2026)**\nAksi korporasi material terakhir tercatat pada Agustus 2026 [D12], yaitu:\n*   Pendirian entitas anak baru Sea Voyage International Ltd (SVI) dengan modal AS$500.000.\n*   Pemberian jaminan perusahaan hingga AS$54.9 juta untuk fasilitas pinjaman anak usaha EOM.\n\n### 3. Kesimpulan dan Batas Bukti\n*   **Fakta:** Tidak ada bukti dokumenter dalam arsip ini tentang aktivitas SOCI pada 17 September 2026.\n*   **Risiko/Kelemahan Data:** Penurunan jumlah pemegang saham yang signifikan pada akhir Agustus (catatan D23) belum disertai penjelasan penyebabnya, sehingga kondisi kepemilikan saham pada pertengahan September mungkin masih dipengaruhi oleh tren tersebut, namun hal ini bersifat hipotesis [D23].\n*   **Rekomendasi:** Untuk memastikan tidak ada pengumuman mendadak atau *trading volume* anomali pada 17 September 2026, diperlukan pemeriksaan langsung ke database pengumuman BEI (IDX) atau arsip harian Stockbit untuk rentang tanggal tersebut yang tidak tercakup dalam sampel arsip saat ini."
+    },
+    {
+      "case": "indexed_same_question_other_user",
+      "question": "di soci ada apa ya?",
+      "elapsed_ms": 5097,
+      "result": "error",
+      "error": "Layanan AI sedang membatasi permintaan. Coba beberapa saat lagi.",
+      "retrieval": {
+        "pipeline": "issuer-cache-v1",
+        "source_cache_hits": 8,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3198147,
+        "selected_source_bytes": 25911,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "date_scope": {
+          "date": null,
+          "filter": false
+        },
+        "terms": [
+          "SOCI"
+        ],
+        "documents_checked": 8
+      },
+      "usage": {
+        "calls": 1,
+        "input_bytes": 29697,
+        "output_token_budget": 5000,
+        "known_cost_usd": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 1
+      },
+      "calls": [
+        {
+          "input_bytes": 29697,
+          "output_token_budget": 5000,
+          "cost": null,
+          "prompt_tokens": null,
+          "completion_tokens": null,
+          "cached_tokens": null,
+          "cache_write_tokens": null,
+          "response_cache": null
+        }
+      ]
+    },
+    {
+      "case": "ambiguous_date",
+      "question": "coba cek soci tggl 17",
+      "elapsed_ms": 1,
+      "result": "complete",
+      "documents": 0,
+      "retrieval": {
+        "pipeline": "issuer-cache-v1",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "date_scope": {
+          "clarification": "Tanggal 17 bulan dan tahun berapa? Contoh: “tanggal 17 September 2026”.",
+          "filter": false
+        }
+      },
+      "usage": {
+        "calls": 0,
+        "input_bytes": 0,
+        "output_token_budget": 0,
+        "known_cost_usd": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "calls": [],
+      "answer": "Tanggal 17 bulan dan tahun berapa? Contoh: “tanggal 17 September 2026”."
+    }
+  ]
+}
