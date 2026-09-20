@@ -528,11 +528,17 @@ a.chip:hover{outline:1px solid var(--c)}
 .chat-message.user{background:var(--ground)}
 .chat-message h3{margin:0 0 8px;font:600 16px/1.4 var(--sans)}
 .chat-message.user p{margin:0;white-space:pre-wrap}
-.chat-answer{max-width:74ch;white-space:pre-wrap}
+.chat-answer{min-width:0;max-width:100%;white-space:pre-wrap}
+.chat-answer> :not(.chat-table-scroll){max-width:74ch}
 .chat-answer.rendered{white-space:normal}
 .chat-answer p{margin:0 0 12px}
-.chat-answer table{display:block;max-width:100%;overflow-x:auto;border-collapse:collapse;font-size:16px}
-.chat-answer th,.chat-answer td{padding:8px;border:1px solid var(--line);text-align:left}
+.chat-table-scroll{max-width:100%;overflow-x:auto;margin:0 0 16px;overscroll-behavior-x:contain}
+.chat-table-scroll:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.chat-answer table{width:100%;border-collapse:collapse;font-size:16px;line-height:1.5;overflow-wrap:normal;word-break:normal}
+.chat-answer th,.chat-answer td{min-width:10rem;padding:10px 12px;border:1px solid var(--line);text-align:left;vertical-align:top}
+.chat-answer th{background:var(--ground)}
+.chat-answer .chat-cell-compact{min-width:0;width:1%;white-space:nowrap}
+.chat-answer table a{display:inline-block;white-space:nowrap}
 .chat-answer pre{overflow-x:auto;white-space:pre-wrap}
 .chat-answer a,.chat-sources a{color:var(--c);text-underline-offset:3px}
 .chat-sources{margin-top:12px;font-size:16px}

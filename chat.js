@@ -61,6 +61,21 @@
     fragment.querySelectorAll('a').forEach(function(a){
       if (!allowed.has(a.getAttribute('href'))) a.replaceWith(a.textContent);
     });
+    fragment.querySelectorAll('table').forEach(function(table){
+      var rows = Array.from(table.rows);
+      var columns = Math.max.apply(null, rows.map(function(row){ return row.cells.length; }));
+      for (var column = 0; column < columns; column++) {
+        var cells = rows.map(function(row){ return row.cells[column]; }).filter(Boolean);
+        if (cells.every(function(cell){ return cell.textContent.trim().length <= 12; })) {
+          cells.forEach(function(cell){ cell.classList.add('chat-cell-compact'); });
+        }
+      }
+      var scroll = document.createElement('div');
+      scroll.className = 'chat-table-scroll'; scroll.tabIndex = 0;
+      scroll.setAttribute('role', 'region');
+      scroll.setAttribute('aria-label', 'Tabel jawaban; geser ke samping untuk melihat kolom lainnya');
+      table.replaceWith(scroll); scroll.appendChild(table);
+    });
     target.replaceChildren(fragment);
     target.classList.add('rendered');
   }
