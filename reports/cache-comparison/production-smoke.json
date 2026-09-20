@@ -1,0 +1,70 @@
+{
+  "worker_version": "76068c5e-2fa0-4b3e-b7b5-cf0646e6e9de",
+  "metrics_unauthenticated_status": 403,
+  "records": [
+    {
+      "documents": 8,
+      "batches": 8,
+      "usage": {
+        "calls": 1,
+        "input_bytes": 29308,
+        "output_token_budget": 5000,
+        "known_cost_usd": 0.000302196,
+        "prompt_tokens": 8887,
+        "completion_tokens": 1857,
+        "cached_tokens": 8576,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "cache_hit": false,
+      "clarification": false,
+      "question": "SOCI apa yang perlu diperhatikan?",
+      "elapsed_seconds": 24.38
+    },
+    {
+      "documents": 8,
+      "batches": 0,
+      "usage": {
+        "calls": 0,
+        "input_bytes": 0,
+        "output_token_budget": 0,
+        "known_cost_usd": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "cache_hit": true,
+      "clarification": false,
+      "question": "SOCI apa yang perlu diperhatikan?",
+      "elapsed_seconds": 0.56
+    },
+    {
+      "documents": 0,
+      "batches": 0,
+      "usage": {
+        "calls": 0,
+        "input_bytes": 0,
+        "output_token_budget": 0,
+        "known_cost_usd": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "cache_hit": false,
+      "clarification": true,
+      "question": "SOCI tanggal 17",
+      "elapsed_seconds": 0.46
+    }
+  ],
+  "latest_deployed_version": "92aebaec-3463-453f-affd-cf516cd38b8e",
+  "latest_analytics_verified": {
+    "private_access": true,
+    "question_text_recorded": true,
+    "cost_rankings_available": true,
+    "inputs_at_check": 5
+  }
+}

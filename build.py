@@ -2054,6 +2054,7 @@ def build_page(docs, by_cat, own=None):
             '<form id="chat-form" class="chat-form"><textarea id="chat-question" rows="2" maxlength="600" aria-describedby="chat-count" required aria-label="Pertanyaan tentang arsip" placeholder="Contoh: Analisis SOCI dari semua dokumen yang tersedia"></textarea>'
             '<div class="chat-actions"><button id="chat-send" type="submit">Tanyakan</button><button id="chat-stop" type="button" hidden>Hentikan</button></div></form>'
             '<p id="chat-count" class="chat-count">0 / 600 karakter</p>'
+            '<p class="chat-count">Pertanyaan dan pemakaian dicatat secara privat oleh pengelola untuk evaluasi layanan.</p>'
             '<div id="chat-progress" class="chat-progress" hidden><div class="chat-working"><span class="chat-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="chat-activity">Asisten mulai bekerja…</span><span id="chat-elapsed"></span></div><progress id="chat-meter" aria-label="Progres pembacaan dokumen"></progress></div>'
             '<p id="chat-status" class="chat-status" role="status"></p></section>'
             '<div id="overview">'

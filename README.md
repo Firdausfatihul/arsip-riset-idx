@@ -36,7 +36,10 @@ archivescrapingweb/
 ├── chat.js               # antarmuka percakapan; digabung ke index.html saat build
 ├── chat.config.json      # alamat API publik; bukan secret
 ├── worker/               # API Cloudflare Worker + Durable Object
-├── tools/build_worker.py # indeks pencarian dan bagian dokumen lengkap untuk Worker
+├── tools/build_worker.py # indeks pencarian, bagian sumber, dan indeks emiten untuk Worker
+├── tools/evidence_index.py # pemisahan sumber tanpa AI, dengan lokasi dan hash isi
+├── tools/compare_chat_costs.mjs # pembanding alur lama/baru, simulasi atau API nyata
+├── tools/chat_metrics.py # laporan biaya aktual melalui endpoint privat
 ├── tools/publish_chat.py # build dan perbarui backend + docs/ (tidak git push)
 ├── tools/chat_archive.py # pembaca arsip dan pemisah teks untuk build Worker (Python 3.9+, stdlib)
 ├── tools/sync_idx.py     # salin data dari IDX Signal Desk lokal (http://127.0.0.1:8787) lalu build
@@ -183,35 +186,98 @@ Riwayat singkat disimpan di SQLite: tiga pertukaran terakhir, jawaban lama maksi
 1.500 karakter. Token terikat hash IP, berlaku satu jam, maksimal 20 pertukaran.
 Token kedaluwarsa ditolak; barisnya dihapus saat permintaan berikutnya. Refresh atau
 Percakapan baru menghapus token dari memori tab. Perubahan jaringan/IP memerlukan
-Percakapan baru. Riwayat tidak dicatat ke log dan key tidak pernah masuk prompt.
+Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna dicatat di statistik privat pengelola; key tidak pernah masuk prompt.
 
 ### Cara dokumen dipilih dan dibaca
 
-- Ticker yang dikenali dicocokkan sebagai kata utuh, tidak peka huruf besar/kecil:
-  `SOCI` cocok, `social` tidak. Untuk pertanyaan tanpa ticker, Qwen menerjemahkan
-  pertanyaan dan konteks percakapan menjadi istilah pencarian. Ini pencarian teks,
-  belum indeks semantik; sinonim atau kode yang tidak disebut dapat terlewat.
-- Semua dokumen yang cocok disertakan, tanpa batas top-3/top-5, selama total bahan
-  tidak melampaui 4.000.000 byte JSON. Topik yang terlalu luas ditolak, bukan dipotong diam-diam. Pencarian Markdown
-  memakai isi lengkap; HTML memakai indeks teks viewer. Model menerima Markdown
-  atau HTML lengkap, termasuk data riset yang tertanam dalam skrip HTML.
-- Konteks dibagi menjadi bagian maksimal 384.000 byte JSON. Dua bagian dibaca
-  bersamaan, seluruh karakter dipertahankan, lalu catatan digabung sesuai urutan sumber.
-  Progress bar menghitung bagian yang benar-benar selesai; animasi mengetik dan waktu
-  tunggu tampil sejak pengiriman. Aktivitas pembacaan dikirim dari stream catatan model,
-  sedangkan teks jawaban akhir tampil bertahap. Tidak menampilkan reasoning internal. Mode bertahap memakai catatan antara, bukan memasukkan semua
-  file sekaligus ke satu panggilan; model masih bisa melewatkan detail saat merangkum.
-- Jika pembacaan gagal atau keluaran model terpotong, UI tidak menyatakan analisis
-  selesai. Catatan antara yang terpotong dicoba ulang sekali dengan batas keluaran
-  dua kali lebih besar; percobaan tambahan ini juga memakai kredit OpenRouter.
-  Jawaban akhir parsial ditandai dan tidak ditambahkan ke riwayat model.
-- Jawaban mengutamakan tanggal, fakta sumber, rumor, pertentangan, dan ketidakpastian.
-  Rujukan yang dikenal ditautkan ke arsip; URL buatan model tidak dibuat bisa diklik.
-  Markdown jawaban disanitasi dengan DOMPurify. Ini membantu keterlacakan, bukan
-  jaminan setiap klaim model benar; periksa sumber untuk keputusan penting.
-- Saat tombol Hentikan ditekan, browser memutus koneksi. Server berhenti setelah
-  mendeteksi koneksi putus; panggilan model yang sudah terkirim bisa tetap dikenakan biaya.
+- Pencarian menemukan **semua dokumen** yang cocok dengan ticker/kata utuh; tidak memakai top-3/top-5.
+  Pertanyaan tanpa ticker memakai satu panggilan kecil untuk menentukan istilah dari konteks percakapan.
+- `tools/evidence_index.py` membagi sumber secara deterministik saat build, tanpa API berbayar.
+  Heading emiten dipertahankan sebagai bagian utuh; baris tabel membawa header, artikel HTML tetap utuh,
+  dan skrip/data HTML tetap menjadi bagian sumber. Gabungan `content` seluruh bagian harus sama persis
+  dengan sumber asli. Setiap bagian mempunyai lokasi, ticker, tanggal, dan hash dokumen.
+- Worker mengambil bagian terkait dari setiap dokumen. Bagian prosa tetangga dan rujukan internal
+  disertakan untuk menjaga konteks. Kalau indeks hilang, versinya salah, atau tidak menemukan bagian
+  meskipun dokumen cocok, Worker kembali ke dokumen asal tersebut. Pencocokan tetap berbasis teks:
+  penyebutan hanya melalui alias/nama tanpa ticker dapat terlewat.
+- Tanggal dokumen dipisahkan dari tanggal kejadian. Hanya tanggal ISO di awal record yang jelas
+  diklasifikasikan sebagai tanggal kejadian; tanggal lainnya dicatat sebagai penyebutan tanggal.
+  Filter tanggal hanya membuang record dengan tanggal pasti yang berbeda. Tanggal tidak pasti,
+  rentang tanggal, dan bahan dengan tanggal relevan lain tetap dipertahankan. “Tanggal 17” tanpa
+  bulan/tahun meminta penjelasan tanpa panggilan model; tanggal lengkap dari pertanyaan sebelumnya
+  dapat menjadi konteks. Filter ini konservatif, bukan jaminan seluruh tanggal telah dikenali.
+- Bahan pendek langsung masuk ke satu panggilan jawaban. Bahan di atas 64 KB memakai catatan
+  sumber bersama untuk unit di atas 24 KB, maksimal dua pembaca bersamaan. Catatan membahas
+  bukti emiten tanpa pertanyaan atau riwayat pengguna. Permintaan detail/kutipan memakai teks asli
+  langsung jika muat. Jika model menyatakan catatan belum cukup, satu pemeriksaan tambahan atas
+  maksimal dua dokumen lengkap diperbolehkan; seluruh batas biaya/koneksi tetap berlaku.
+- Catatan ringkas dapat melewatkan detail. Model tidak boleh menganggap tidak tercatat berarti tidak
+  ada dalam dokumen. Fakta, rumor/pernyataan penulis, angka, tanggal dan ketidakpastian tetap dibedakan.
+  Jawaban memakai rujukan `[D…]` yang ditautkan ke arsip, bukan URL hasil karangan model.
+- Pembacaan gagal/terpotong tidak masuk cache. Retry pemotongan hanya satu kali dan tetap memakai
+  anggaran. Jawaban parsial ditandai belum selesai dan tidak menjadi riwayat percakapan.
+- Tombol Hentikan memutus koneksi. Server menghentikan pekerjaan setelah mendeteksi pemutusan;
+  provider masih dapat mengenakan biaya untuk pekerjaan yang sudah dikirim.
 
+### Cache bersama dan invalidasi
+
+SQLite Durable Object menyimpan `evidence_cache` dengan tiga jenis: `source` (bagian teks asli),
+`notes` (catatan bukti sumber), dan `answer` (jawaban permintaan identik). View `issuer_evidence`
+menyediakan `document_id`, `document_hash`, `source_path`, `document_date`, `tickers`, `event_date`,
+`source_line`, dan `content` untuk memeriksa bagian sumber yang sudah diminta. Indeks lengkap yang
+belum pernah diminta tetap tersedia sebagai Assets, sehingga tidak perlu mengisi database lewat AI.
+
+- Dokumen lama bersifat tetap; pembaruan normal hanya menambah dokumen. Cache sumber/catatan tidak
+  kedaluwarsa berdasarkan waktu, dikenali berdasarkan identitas/hash dokumen, ticker/istilah,
+  versi parser; catatan juga berdasarkan model, instruksi, metadata sumber dan isi unit.
+  Catatan menggunakan ID sumber lokal yang dipetakan ulang saat menjawab agar perubahan nomor
+  `[D…]` setelah build tidak membuat rujukan lama salah.
+- Cache jawaban: 15 menit, kuncinya mencakup pertanyaan, riwayat, model, versi seluruh arsip dan
+  instruksi. Pertanyaan dengan riwayat dibatasi ke klien yang sama; jawaban tanpa riwayat dapat
+  digunakan lintas pengguna. Pertanyaan yang hanya mirip tidak dipaksa memakai jawaban yang sama.
+- Pekerjaan dengan kunci sama yang datang bersamaan bergabung pada satu pekerjaan. Kegagalan
+  atau pembatalan pemilik pekerjaan bersama dapat menggagalkan penunggu; hasil parsial tidak disimpan.
+- Maksimal 512 entri / 16 MB isi cache; entri lama dikeluarkan bila batas tercapai. Batas per entri 1 MB.
+  Cache dapat bertahan setelah restart/deploy SQLite, tetapi selalu memeriksa versi sumber.
+- Prompt menempatkan bahan yang tetap sebelum pertanyaan/riwayat yang berubah untuk membantu cache
+  input otomatis provider. Tidak mengirim `cache_control` yang belum diverifikasi didukung endpoint.
+  Header cache respons OpenRouter juga diaktifkan untuk permintaan identik dengan TTL 15 menit.
+  Dukungan dan diskon provider tetap harus dibuktikan dari `usage`, bukan diasumsikan.
+
+### Biaya aktual dan perbandingan
+
+Setiap panggilan mencatat input/output token, input cache, cache write, biaya USD yang dilaporkan,
+ID generation, byte pesan, dan alokasi maksimum output. `analysis_usage` menyimpan hasil agregasi
+per analisis selama 365 hari, termasuk analisis gagal. `question_events` mencatat **setiap pertanyaan
+pengguna yang diterima dan lolos validasi isi**: teks, waktu, penanda klien anonim, topik, serta status
+(selesai, perlu tanggal lengkap, gagal, dibatalkan, server sibuk, atau kuota). Pertanyaan dan metrik
+dihubungkan lewat ID analisis. Permintaan ditolak sebelum isi dibaca/validasi ukuran, termasuk banjir
+permintaan, tidak menyimpan teks. Riwayat percakapan, key dan IP mentah tidak dicatat. Penanda
+klien berasal dari hash koneksi/IP dengan secret; bukan hitungan orang unik. Riwayat statistik ini
+berlaku sejak fitur diaktifkan dan tidak dapat merekonstruksi pertanyaan lama yang belum dicatat. Biaya yang belum dilaporkan ditandai `missing_usage_calls`; jangan menganggapnya
+nol. Batas anggaran byte/token tetap dicadangkan sebelum panggilan dan terpisah dari tagihan aktual.
+Rincian biaya permintaan tersedia pada bagian yang dapat dibuka di bawah jawaban.
+
+```bash
+node tools/compare_chat_costs.mjs           # simulasi offline, tidak memanggil provider
+node tools/compare_chat_costs.mjs --live    # perbandingan API nyata, batas cadangan konservatif US$1
+python3 tools/chat_metrics.py --days 7 --out reports/private/chat-metrics.json --html reports/private/chat-statistics.html
+```
+
+Hasil pembanding berada di `reports/cache-comparison/`. Alur lama tetap tersedia sebagai
+`converseLegacy` untuk kontrol pengujian, bukan pilihan dari browser publik. Mode nyata memakai
+key khusus `.env.chat`; biaya aktual berasal dari respons provider. Batas US$1 adalah cadangan
+konservatif berdasarkan byte dan tarif tertinggi endpoint yang diverifikasi pada 20 September 2026;
+verifikasi ulang tarif sebelum menjalankan ulang jika harga/model berubah. Cache provider tidak
+dipaksa kosong, sehingga laporan mencantumkan cached token dan hasil yang benar-benar ditagih.
+
+Endpoint `GET /api/chat/metrics?days=7` memerlukan bearer `CHAT_METRICS_TOKEN`, secret terpisah dari
+key OpenRouter. Nilainya disimpan lokal di `.env.chat.metrics` (izin 600, diabaikan Git), diunggah
+sebagai secret Worker, dan tidak masuk frontend. Tanpa secret, endpoint menolak akses. Pengelola
+memakai `tools/chat_metrics.py`; token tidak dicetak atau ditaruh pada URL. Laporan menyediakan
+pertanyaan berulang, topik teratas, tren harian, token/biaya, hasil proses, dan cache hit. Teks pertanyaan
+ditampilkan dengan escaping HTML. Laporan JSON/HTML privat disimpan di `reports/private/` yang
+diabaikan Git. `--limit` (maksimal 500) dan `--offset` menyediakan halaman riwayat berikutnya.
 
 ### Batas keamanan dan biaya
 
@@ -232,7 +298,7 @@ Batas backend tetap berlaku walaupun JavaScript browser diubah:
 | Koneksi | 4 unggahan, 2 analisis, batas keseluruhan 8 menit, pembaca lambat diputus setelah 10 detik |
 
 Alokasi keluaran memakai batas maksimum, bukan tagihan aktual. Model, endpoint, dan
-parameter tidak bisa dipilih pengguna. Tidak ada tools/function calling, eksekusi shell,
+parameter tidak bisa dipilih pengguna. Pemeriksaan ulang sumber hanya memakai ID dokumen yang ditemukan server. Tidak ada tools/function calling, eksekusi shell,
 atau pengambilan URL pengguna. HTML jawaban memakai allowlist tag sederhana; style,
 form, media, SVG, event handler, dan URL di luar sumber terverifikasi dibuang sebelum
 dipasang ke DOM. DOMPurify 3.4.15 dan marked memakai versi serta hash SRI terkunci.
@@ -248,7 +314,7 @@ akses provider. `tests/security.mjs` memblokir global fetch; `tests/worker_runti
 memakai workerd/SQLite dengan seluruh jaringan keluar diganti model simulasi.
 
 ```bash
-node --test tests/worker.mjs tests/security.mjs   # Node 22+ untuk node:sqlite
+node --test tests/worker.mjs tests/security.mjs tests/cache.mjs   # Node 22+ untuk node:sqlite
 NODE_PATH=/path/to/test-deps/node_modules node tests/chat_ui.cjs
 NODE_PATH=/path/to/test-deps/node_modules node tests/worker_runtime.cjs
 ```
@@ -268,8 +334,8 @@ ditentukan `worker/wrangler.jsonc`. Model tetap OpenRouter `qwen/qwen3.7-flash`.
   tidak bergantung pada batas CPU 10 ms Worker biasa. Waktu menunggu model tetap
   membutuhkan waktu nyata dan dapat berlangsung beberapa menit.
 - `tools/build_worker.py` menyiapkan indeks kata dan potongan isi lengkap dari hasil
-  build. Semua 50 dokumen saat ini menghasilkan 184 bagian; tidak ada pemotongan
-  top-k. Data ini dibundel sebagai Assets; Worker tidak membolehkan URL sumber
+  build. Seluruh sumber dan indeks bagian emiten dibundel sebagai Assets; tidak ada pemotongan
+  top-k. Data sumber lengkap tetap tersedia untuk fallback; Worker tidak membolehkan URL sumber
   arbitrer dari pengguna. Berkas hasilnya ada di `worker/.assets/`, diabaikan Git.
 - Kuota 100 pertanyaan/hari UTC dan 10/alamat IP/jam disimpan dalam SQLite Durable
   Object dan tetap ada setelah restart/deploy. Alamat koneksi Cloudflare di-hash.

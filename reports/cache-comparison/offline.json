@@ -1,0 +1,213 @@
+{
+  "mode": "offline simulation",
+  "model": "qwen/qwen3.7-flash",
+  "archive_version": "4acc82e4706c949d",
+  "created_at": "2026-09-20T16:04:31.787Z",
+  "baseline_reused_from": null,
+  "max_usd": null,
+  "conservative_reserved_usd": 0,
+  "records": [
+    {
+      "case": "legacy",
+      "question": "di soci ada apa ya?",
+      "elapsed_ms": 80,
+      "result": "complete",
+      "documents": 8,
+      "retrieval": {},
+      "usage": {
+        "calls": 10,
+        "input_bytes": 3279948,
+        "known_cost_usd": null,
+        "note": "offline simulation; no token or cost estimate"
+      },
+      "calls": [
+        {
+          "input_bytes": 358016,
+          "output_token_budget": 1800
+        },
+        {
+          "input_bytes": 392670,
+          "output_token_budget": 1800
+        },
+        {
+          "input_bytes": 387161,
+          "output_token_budget": 1800
+        },
+        {
+          "input_bytes": 382193,
+          "output_token_budget": 1800
+        },
+        {
+          "input_bytes": 387471,
+          "output_token_budget": 1800
+        },
+        {
+          "input_bytes": 337941,
+          "output_token_budget": 1800
+        },
+        {
+          "input_bytes": 391293,
+          "output_token_budget": 1800
+        },
+        {
+          "input_bytes": 271097,
+          "output_token_budget": 1800
+        },
+        {
+          "input_bytes": 370400,
+          "output_token_budget": 1800
+        },
+        {
+          "input_bytes": 1706,
+          "output_token_budget": 5000
+        }
+      ],
+      "answer": "Bukti SOCI [D47]."
+    },
+    {
+      "case": "indexed_first",
+      "question": "di soci ada apa ya?",
+      "elapsed_ms": 40,
+      "result": "complete",
+      "documents": 8,
+      "retrieval": {
+        "pipeline": "issuer-cache-v1",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3198147,
+        "selected_source_bytes": 25911,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "date_scope": {
+          "date": null,
+          "filter": false
+        },
+        "terms": [
+          "SOCI"
+        ],
+        "documents_checked": 8
+      },
+      "usage": {
+        "calls": 1,
+        "input_bytes": 29294,
+        "known_cost_usd": null,
+        "note": "offline simulation; no token or cost estimate"
+      },
+      "calls": [
+        {
+          "input_bytes": 29294,
+          "output_token_budget": 5000
+        }
+      ],
+      "answer": "Bukti SOCI [D47]."
+    },
+    {
+      "case": "indexed_other_question",
+      "question": "SOCI tanggal 17 September 2026",
+      "elapsed_ms": 2,
+      "result": "complete",
+      "documents": 8,
+      "retrieval": {
+        "pipeline": "issuer-cache-v1",
+        "source_cache_hits": 8,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3198147,
+        "selected_source_bytes": 22257,
+        "excluded_dated_records": 6,
+        "fallback_documents": 0,
+        "date_scope": {
+          "date": "2026-09-17",
+          "filter": true
+        },
+        "terms": [
+          "SOCI"
+        ],
+        "documents_checked": 8
+      },
+      "usage": {
+        "calls": 1,
+        "input_bytes": 25388,
+        "known_cost_usd": null,
+        "note": "offline simulation; no token or cost estimate"
+      },
+      "calls": [
+        {
+          "input_bytes": 25388,
+          "output_token_budget": 5000
+        }
+      ],
+      "answer": "Bukti SOCI [D47]."
+    },
+    {
+      "case": "indexed_same_question_other_user",
+      "question": "di soci ada apa ya?",
+      "elapsed_ms": 1,
+      "result": "complete",
+      "documents": 8,
+      "retrieval": {
+        "pipeline": "issuer-cache-v1",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": true,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "date_scope": {
+          "date": null,
+          "filter": false
+        },
+        "terms": [
+          "SOCI"
+        ]
+      },
+      "usage": {
+        "calls": 0,
+        "input_bytes": 0,
+        "known_cost_usd": null,
+        "note": "offline simulation; no token or cost estimate"
+      },
+      "calls": [],
+      "answer": "Bukti SOCI [D47]."
+    },
+    {
+      "case": "ambiguous_date",
+      "question": "coba cek soci tggl 17",
+      "elapsed_ms": 0,
+      "result": "complete",
+      "documents": 0,
+      "retrieval": {
+        "pipeline": "issuer-cache-v1",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "date_scope": {
+          "clarification": "Tanggal 17 bulan dan tahun berapa? Contoh: “tanggal 17 September 2026”.",
+          "filter": false
+        }
+      },
+      "usage": {
+        "calls": 0,
+        "input_bytes": 0,
+        "known_cost_usd": null,
+        "note": "offline simulation; no token or cost estimate"
+      },
+      "calls": [],
+      "answer": "Tanggal 17 bulan dan tahun berapa? Contoh: “tanggal 17 September 2026”."
+    }
+  ]
+}

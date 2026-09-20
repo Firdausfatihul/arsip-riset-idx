@@ -99,3 +99,22 @@ pada balasan yang sedang diproses agar terlihat sebelum isi jawaban panjang.
 
 
 Audit lanjutan untuk viewer web, HTML lama, kepemilikan, sinkronisasi, build dan sebagian pengaturan akun tersedia di [laporan web](reports/security-audit-web-2026-09-20.md).
+
+
+## Perubahan cache dan statistik pertanyaan — 20 September 2026
+
+Alur lama di bagian benchmark di atas dipertahankan sebagai kontrol `converseLegacy`.
+Alur produksi sekarang memakai indeks bagian sumber, cache SQLite dengan batas kapasitas,
+catatan tanpa riwayat pengguna, dan cache jawaban yang mencakup versi arsip serta konteks klien.
+Cache sumber/catatan tidak kedaluwarsa hanya karena waktu; perubahan hash/parser membatalkannya.
+
+Statistik privat menyimpan teks pertanyaan yang diterima setelah validasi, waktu, hash klien,
+status, topik, token dan biaya selama 365 hari. Ini perubahan kebijakan dari tidak menyimpan
+pertanyaan. Notice tersedia di formulir. Endpoint statistik memerlukan secret bearer terpisah,
+memiliki pagination, tidak mengirim key/IP mentah/riwayat model, dan menolak akses publik.
+Laporan HTML melakukan escaping teks input; ekspor privat diabaikan Git.
+
+`tests/cache.mjs` menguji rekonstruksi seluruh sumber, pemilihan bagian SOCI, fallback asli,
+cache lintas pengguna, invalidasi versi, pembacaan bersama, kegagalan/TTL, tanggal konservatif,
+dan pencatatan penggunaan aktual. Runtime workerd/SQLite juga menguji cache dan otorisasi metrik.
+Perbandingan biaya API nyata serta batas kualitas dicatat di `reports/cache-comparison/`.

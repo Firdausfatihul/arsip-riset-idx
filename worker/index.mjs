@@ -1,5 +1,5 @@
 import {DurableObject} from 'cloudflare:workers';
-import {Archive, ChatError, OpenRouter, MODEL, LIMITS, validate, readLimited, converse} from './core.mjs';
+import {Archive, CacheStore, hash, ChatError, OpenRouter, MODEL, LIMITS, validate, readLimited, converse} from './core.mjs';
 
 const allowed = (request, env) => !request.headers.get('Origin') ||
   (env.CHAT_ALLOWED_ORIGINS || '').split(',').includes(request.headers.get('Origin'));
@@ -17,7 +17,12 @@ export default {
   async fetch(request, env) {
     if (!allowed(request, env)) return new Response('Origin tidak diizinkan', {status:403});
     const path = new URL(request.url).pathname;
-    if (!['/api/chat', '/api/chat/config'].includes(path)) return new Response('Not found', {status:404});
+    if (!['/api/chat', '/api/chat/config', '/api/chat/metrics'].includes(path)) return new Response('Not found', {status:404});
+    if (path === '/api/chat/metrics') {
+      if (request.method !== 'GET' || !env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + env.CHAT_METRICS_TOKEN)
+        return json(request,{error:'Tidak diizinkan.'},403);
+      return env.CHAT.get(env.CHAT.idFromName('archive-global-v1')).fetch(request);
+    }
     if (request.method === 'OPTIONS') return new Response(null, {status:204, headers:{
       ...headers(request, 'text/plain'), 'Access-Control-Allow-Methods':'POST, GET, OPTIONS',
       'Access-Control-Allow-Headers':'Content-Type', 'Access-Control-Max-Age':'600'}});
@@ -41,6 +46,7 @@ export class ArchiveChat extends DurableObject {
     sql.exec('CREATE TABLE IF NOT EXISTS ingress (stamp INTEGER, client TEXT)');
     sql.exec('CREATE TABLE IF NOT EXISTS budget (day INTEGER PRIMARY KEY, bytes INTEGER, tokens INTEGER)');
     sql.exec('CREATE TABLE IF NOT EXISTS conversations (token TEXT PRIMARY KEY, client TEXT, expires INTEGER, turns INTEGER, history TEXT)');
+    this.cache = new CacheStore(sql);
   }
   admit(client) {
     const now = Math.floor(Date.now() / 1000), sql = this.ctx.storage.sql;
@@ -95,9 +101,19 @@ export class ArchiveChat extends DurableObject {
     return token;
   }
   async fetch(request) {
+    if (new URL(request.url).pathname === '/api/chat/metrics') {
+      if (!this.env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + this.env.CHAT_METRICS_TOKEN)
+        return json(request,{error:'Tidak diizinkan.'},403);
+      const params=new URL(request.url).searchParams;
+      const days = Math.max(1,Math.min(365,Number(params.get('days')) || 7));
+      const limit=Math.max(1,Math.min(500,Number(params.get('limit')) || 100));
+      const offset=Math.max(0,Math.min(100000,Number(params.get('offset')) || 0));
+      return json(request,this.cache.report(days,limit,offset));
+    }
     // Keep body uploads bounded before expensive decoding, parsing, or document retrieval.
     if (this.receiving >= 4) return json(request, {error:'Server sedang sibuk. Coba sebentar lagi.'}, 429);
     this.receiving++;
+    const analysisId=crypto.randomUUID(),started=Date.now();
     let body, client, conversation;
     try {
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(request.headers.get('CF-Connecting-IP') || 'local'));
@@ -106,15 +122,21 @@ export class ArchiveChat extends DurableObject {
       if ((request.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase() !== 'application/json' ||
           Number(request.headers.get('Content-Length') || 0) > LIMITS.body)
         throw new ChatError('Gunakan pertanyaan singkat dalam format yang tersedia.');
-      body = validate(JSON.parse(await readLimited(request.body, LIMITS.body, 5000, request.signal)));
+      const incoming = JSON.parse(await readLimited(request.body, LIMITS.body, 5000, request.signal));
+      body = validate(incoming);
+      this.cache.question(analysisId,await hash([client,this.env.CHAT_METRICS_TOKEN || 'local']),incoming.question,body.question);
       conversation = this.conversation(body.context, client);
     } catch (error) {
+      if(body)this.cache.finishQuestion(analysisId,'invalid_context');
       return json(request, {error:error instanceof ChatError ? error.message : 'Pertanyaan tidak valid atau terlalu panjang.'}, 400);
     } finally { this.receiving--; }
-    if (this.active.size >= 2 || this.active.has(client))
+    if (this.active.size >= 2 || this.active.has(client)) {
+      this.cache.finishQuestion(analysisId,'busy');
       return json(request, {error:'Asisten sedang melayani pertanyaan lain. Coba beberapa saat lagi.'}, 429);
+    }
     try { this.reserve(client); }
-    catch (error) { return json(request, {error:error instanceof ChatError ? error.message : 'Batas pemakaian belum dapat diperiksa.'}, 429); }
+    catch (error) { this.cache.finishQuestion(analysisId,'quota');return json(request, {error:error instanceof ChatError ? error.message : 'Batas pemakaian belum dapat diperiksa.'}, 429); }
+    this.cache.finishQuestion(analysisId,'running');
     this.active.add(client);
     const controller = new AbortController(), stream = new TransformStream(), writer = stream.writable.getWriter();
     const encoder = new TextEncoder();
@@ -130,19 +152,27 @@ export class ArchiveChat extends DurableObject {
     const emit = value => { controller.signal.throwIfAborted(); return write(value); };
     const timer = setTimeout(() => controller.abort(), 8 * 60 * 1000);
     writer.closed.catch(() => controller.abort());
+    const model = new OpenRouter(this.env.OPENROUTER_API_KEY, controller.signal, undefined, (bytes,tokens) => this.spend(bytes,tokens));
+    const retrieval = {};
     const run = async () => {
+      let outcome = 'error';
       try {
-        const result = await converse(this.archive,
-          new OpenRouter(this.env.OPENROUTER_API_KEY, controller.signal, undefined, (bytes,tokens) => this.spend(bytes,tokens)),
-          body.question, conversation.history, emit, controller.signal);
+        const result = await converse(this.archive, model, body.question, conversation.history, emit, controller.signal,
+          {cache:this.cache,client,metrics:retrieval});
         controller.signal.throwIfAborted();
         const context = this.remember(client, conversation, body.question, result.answer);
-        await emit({type:'done', documents:result.documents, batches:result.batches, model:MODEL, context});
+        await emit({type:'done', documents:result.documents, batches:result.batches, model:MODEL, context,
+          usage:model.usage(),cache_hit:!!result.cache_hit,clarification:!!result.clarification});
+        outcome = result.clarification ? 'clarification' : 'complete';
       } catch (error) {
         if (!(error instanceof ChatError)) console.error('Chat failure:', error.name);
         const text = error instanceof ChatError ? error.message : 'Koneksi atau proses analisis terhenti. Silakan coba lagi.';
         try { await write({type:'error', text}); } catch {}
       } finally {
+        retrieval.elapsed_ms=Date.now()-started;
+        if(outcome==='error'&&controller.signal.aborted)outcome='cancelled';
+        try { this.cache.record(analysisId,outcome,{usage:model.usage(),calls:model.receipts,retrieval}); }
+        catch (error) { console.error('Usage storage failed:',error.name); }
         clearTimeout(timer); controller.abort(); this.active.delete(client);
         writer.close().catch(() => {});
       }

@@ -9,6 +9,7 @@ import shutil
 
 from build_safety import check_output
 from chat_archive import read_archive, ROOT, SYSTEM, COMMON_WORDS, split_text
+from evidence_index import make_evidence, VERSION
 
 
 def build(directory, out):
@@ -29,11 +30,16 @@ def build(directory, out):
         asset = source_id + '.json'
         (out / asset).write_bytes(raw)
         digest.update(raw)
+        evidence = make_evidence(doc, tickers)
+        evidence_asset = source_id + '.evidence.json'
+        (out / evidence_asset).write_text(json.dumps(evidence, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         metadata.append({**{k: doc[k] for k in ('source_id', 'title', 'path', 'label', 'end', 'name')},
-                         'asset': asset, 'sizes': [len(json.dumps(p, ensure_ascii=False, separators=(',', ':')).encode()) for p in parts]})
+                         'asset': asset, 'evidence_asset': evidence_asset,
+                         'document_id': evidence['document_id'], 'document_hash': evidence['document_hash'],
+                         'sizes': [len(json.dumps(p, ensure_ascii=False, separators=(',', ':')).encode()) for p in parts]})
         for word in set(re.findall(r'\w+', (doc['title'] + '\n' + doc['search_body']).lower())):
             postings.setdefault(word, []).append(source_id)
-    manifest = {'version': digest.hexdigest()[:16], 'docs': metadata, 'tickers': sorted(tickers),
+    manifest = {'version': digest.hexdigest()[:16], 'retrieval_version': VERSION, 'docs': metadata, 'tickers': sorted(tickers),
                 'postings': postings, 'system': SYSTEM, 'commonWords': sorted(COMMON_WORDS)}
     (out / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     print(f'Worker: {len(docs)} dokumen lengkap, {sum(len(d["sizes"]) for d in metadata)} bagian, '

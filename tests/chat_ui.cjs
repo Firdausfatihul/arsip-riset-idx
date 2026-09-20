@@ -60,7 +60,7 @@ async function submit(text) {
   assert.equal(d.querySelector('.chat-answer a').getAttribute('href'), '#doc=' + source.path);
   assert.equal(d.querySelector('.chat-answer a[href^="https:"]'), null);
   assert.ok(d.querySelector('.chat-answer').textContent.includes('🚢'));
-  assert.ok(d.querySelector('.chat-sources summary').textContent.includes('dokumen dibaca'));
+  assert.ok(d.querySelector('.chat-sources summary').textContent.includes('dokumen ditelusuri'));
   await submit('Bagaimana risikonya?');
   assert.equal(requests[1].context, 'a'.repeat(64));
   mode = 'error'; await submit('Tolong lanjutkan');

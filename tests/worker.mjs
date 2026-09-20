@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
-import {Archive, OpenRouter, ChatError, validate, searchTerms, batches, size, converse, MODEL, LIMITS, readLimited} from '../worker/core.mjs';
+import {Archive, OpenRouter, ChatError, validate, searchTerms, batches, size, converseLegacy as converse, MODEL, LIMITS, readLimited} from '../worker/core.mjs';
 
 const assets = {async fetch(request) {
   try { return new Response(await readFile(new URL('../worker/.assets' + new URL(request.url).pathname, import.meta.url))); }

@@ -82,7 +82,7 @@
     busy(true); reset.hidden = false;
     message('user', question);
     var nextContext = null;
-    var reply = message('assistant', ''), text = '', sources = [], summary = null, done = false;
+    var reply = message('assistant', ''), text = '', sources = [], summary = null, done = false, usage = null, cacheHit = false, clarification = false;
     reply.block.insertBefore(progress, reply.content);
     reply.block.scrollIntoView?.({block: 'nearest'});
     status.textContent = 'Menghubungkan ke asisten arsip…';
@@ -127,7 +127,8 @@
         if (event.type === 'done'){
           if (!/^[a-f0-9]{64}$/.test(event.context || '')) throw new Error('Konteks jawaban tidak valid. Muat ulang halaman.');
           nextContext = event.context; done = true;
-          if (summary) summary.textContent = sources.length + ' dokumen dibaca · lihat sumber';
+          usage = event.usage; cacheHit = !!event.cache_hit; clarification = !!event.clarification;
+          if (summary) summary.textContent = sources.length + ' dokumen ditelusuri · lihat sumber';
         }
       }
       while (true){
@@ -140,9 +141,19 @@
       }
       if (!done || !text.trim()) throw new Error('Jawaban terputus sebelum selesai. Silakan coba lagi.');
       renderAnswer(reply.content, text, sources);
+      if (usage && typeof usage.known_cost_usd === 'number' && Number.isFinite(usage.known_cost_usd)){
+        var cost = document.createElement('details'), costTitle = document.createElement('summary'), detail = document.createElement('p');
+        costTitle.textContent = cacheHit ? 'Jawaban tersimpan · tanpa panggilan AI baru' : 'Pemakaian AI permintaan ini';
+        detail.textContent = 'Biaya tercatat: US$' + usage.known_cost_usd.toFixed(6) +
+          ' · Input: ' + Number(usage.prompt_tokens || 0).toLocaleString('id-ID') +
+          ' token · Output: ' + Number(usage.completion_tokens || 0).toLocaleString('id-ID') +
+          ' token · Input dari cache provider: ' + Number(usage.cached_tokens || 0).toLocaleString('id-ID') +
+          ' token.' + (usage.missing_usage_calls ? ' Rincian biaya sebagian panggilan belum tersedia; angka ini belum total lengkap.' : '');
+        cost.className = 'chat-sources'; cost.appendChild(costTitle); cost.appendChild(detail); reply.block.appendChild(cost);
+      }
       context = nextContext; turns++;
       input.value = ''; input.placeholder = 'Tanyakan lanjutannya, misalnya: bagaimana risiko pendanaannya?';
-      status.textContent = 'Jawaban selesai dari ' + sources.length + ' dokumen. Kamu bisa bertanya lagi.';
+      status.textContent = clarification ? 'Lengkapi tanggal untuk melanjutkan.' : 'Jawaban selesai berdasarkan ' + sources.length + ' dokumen. Kamu bisa bertanya lagi.';
     } catch (error){
       var aborted = controller.signal.aborted;
       var description = aborted ? (controller.signal.reason === 'timeout' ? 'Proses terlalu lama. Coba pertanyaan yang lebih spesifik.' : 'Proses dihentikan.') :
