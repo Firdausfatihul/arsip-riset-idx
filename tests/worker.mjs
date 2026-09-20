@@ -8,12 +8,12 @@ const assets = {async fetch(request) {
   catch { return new Response('Not found', {status:404}); }
 }};
 const archive = new Archive(assets);
-test('all generated parts reconstruct all 50 deployed source files exactly', async () => {
+test('all generated parts reconstruct all 50 original research documents exactly', async () => {
   const index = await archive.manifest();
   assert.equal(index.docs.length, 50);
   for (const doc of index.docs) {
     const data = await archive.read(doc.asset);
-    const source = await readFile(new URL('../site/' + doc.path, import.meta.url), 'utf8');
+    const source = await readFile(new URL(doc.path.endsWith('.html') ? '../needtobeindexed/' + doc.name : '../site/' + doc.path, import.meta.url), 'utf8');
     assert.equal(data.parts.map(p => p.text).join(''), source, doc.name);
   }
 });

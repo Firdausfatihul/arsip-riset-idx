@@ -21,13 +21,14 @@ import sqlite3
 import subprocess
 import sys
 import time
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import date, datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
-from urllib.request import Request, urlopen
+from urllib.parse import quote, urlsplit
+from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -56,18 +57,38 @@ class ProfileMismatch(Exception):
 
 # ---------------------------------------------------------------- server
 
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise ValueError("Redirect dari server sinkron ditolak.")
+
+
 class Server:
     def __init__(self, base):
+        parsed = urlsplit(base)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("Alamat Signal Desk tidak valid.")
+        if parsed.scheme == "http" and parsed.hostname not in ("localhost", "127.0.0.1", "::1"):
+            raise ValueError("HTTP hanya untuk loopback; server jarak jauh harus HTTPS.")
+        self.local = parsed.hostname in ("localhost", "127.0.0.1", "::1")
         self.base = base.rstrip("/")
+        self.opener = build_opener(NoRedirect())
+
+    def request(self, path, body=None, timeout=60):
+        if not path.startswith("/api/") or path.startswith("//"):
+            raise ValueError("Path sinkron tidak valid.")
+        req = Request(self.base + path, data=None if body is None else json.dumps(body).encode(),
+                      headers={"content-type": "application/json"})
+        with self.opener.open(req, timeout=timeout) as response:
+            raw = response.read(32 * 1024 * 1024 + 1)
+        if len(raw) > 32 * 1024 * 1024:
+            raise ValueError("Respons Signal Desk terlalu besar.")
+        return json.loads(raw)
 
     def get(self, path, timeout=60):
-        with urlopen(self.base + path, timeout=timeout) as r:
-            return json.load(r)
+        return self.request(path, timeout=timeout)
 
     def post(self, path, body, timeout=300):
-        req = Request(self.base + path, data=json.dumps(body).encode(), headers={"content-type": "application/json"})
-        with urlopen(req, timeout=timeout) as r:
-            return json.load(r)
+        return self.request(path, body, timeout)
 
 
 # ---------------------------------------------------------------- berkas
@@ -75,11 +96,21 @@ class Server:
 def write_if_changed(path, text):
     """Tulis atomik; kembalikan True kalau isi berubah."""
     data = text.encode("utf-8")
+    if path.is_symlink():
+        raise ValueError("Tujuan sinkron tidak boleh symlink.")
     if path.exists() and path.read_bytes() == data:
         return False
-    tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_bytes(data)
-    os.replace(tmp, path)
+    if path.is_symlink() or path.parent.resolve() != DEST.resolve():
+        raise ValueError("Tujuan sinkron bukan berkas biasa dalam folder yang dikelola.")
+    fd, tmp = tempfile.mkstemp(prefix=".sync-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
     return True
 
 
@@ -92,6 +123,16 @@ def redact(text):
 # ---------------------------------------------------------------- digest per jendela
 
 def digest_name(w):
+    for key in ("start_date", "end_date"):
+        if not isinstance(w[key], str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", w[key]):
+            raise ValueError("Tanggal jendela tidak valid.")
+        date.fromisoformat(w[key])
+    for key in ("start_at", "end_at"):
+        if not isinstance(w[key], str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?", w[key]):
+            raise ValueError("Waktu jendela tidak valid.")
+        datetime.fromisoformat(w[key].replace("Z", "+00:00"))
+    if w["start_at"][:10] != w["start_date"] or w["end_at"][:10] != w["end_date"]:
+        raise ValueError("Tanggal dan waktu jendela tidak konsisten.")
     start_t, end_t = w["start_at"][11:16], w["end_at"][11:16]
     name = f"digest_{w['start_date']}_{w['end_date']}"
     if (start_t, end_t) != ("00:00", "23:59"):
@@ -162,7 +203,11 @@ DOMICILE = {"national": "L", "foreign": "F", "all": "A"}
 
 
 def https_or_none(url):
-    return url if str(url or "").startswith("https://") else None
+    try:
+        parsed = urlsplit(url or "")
+        return url if parsed.scheme == "https" and parsed.hostname and not parsed.username and not parsed.password and not re.search(r"[\x00-\x20\x7f]", url) else None
+    except ValueError:
+        return None
 
 
 def chosen_version(periods, month):
@@ -288,6 +333,8 @@ def ownership_data(server, index, ledger, pid):
     dari bulan data sebelumnya (lihat match_renamed), sehingga viewer bisa membandingkan dua bulan mana pun.
     """
     tickers = sorted({c["ticker"] for c in index["companies"]} | set((ledger or {}).get("tickers") or []))
+    if len(tickers) > 5000 or any(not isinstance(t, str) or not re.fullmatch(r"[A-Z0-9]{2,12}", t) for t in tickers):
+        raise ValueError("Kode emiten dari server tidak valid.")
     with ThreadPoolExecutor(max_workers=4) as pool:
         details = list(pool.map(lambda t: server.get(f"/api/ownership/{quote(t)}?profile_id={pid}"), tickers))
     months = sorted(index["ksei"]["months"])
@@ -349,11 +396,11 @@ def ownership_data(server, index, ledger, pid):
 
 
 def sync_ownership(server, state, force, profile, guard):
-    pid = quote(profile["id"])
+    pid = quote(profile["id"], safe="")
     index = server.get(f"/api/ownership?profile_id={pid}")
     if index.get("profile_id") not in (None, profile["id"]):
         raise ProfileMismatch(f"data kepemilikan dari profil '{index.get('profile_id')}', bukan '{profile['id']}'")
-    ledger = read_ledger(profile)
+    ledger = read_ledger(profile) if getattr(server, "local", False) else None
     fp = json.dumps({"format": OWNERSHIP_FORMAT,
                      "index": {k: index.get(k) for k in ("profile_id", "updated_at", "parser_version", "counts", "ksei")},
                      "ksei_files": ledger and ledger["files"], "ksei_tickers": ledger and len(ledger["tickers"])}, sort_keys=True)
@@ -380,6 +427,8 @@ def prune(prefix, keep, allow_empty):
         print(f"  server tidak mengembalikan data {prefix.rstrip('_')}; {len(stale)} berkas lama dibiarkan")
         return []
     for p in stale:
+        if p.is_symlink():
+            raise ValueError("Berkas sinkron lama tidak boleh symlink.")
         p.unlink()
     return [p.name for p in stale]
 
@@ -391,7 +440,7 @@ def load_state():
         return {}
 
 
-def sync_once(args):
+def _sync_once(args):
     server = Server(args.server)
     server.get("/api/health", timeout=10)
     DEST.mkdir(parents=True, exist_ok=True)
@@ -422,6 +471,48 @@ def sync_once(args):
     for name in removed:
         print(f"  - {name}")
     return bool(changed or removed)
+
+
+def sync_once(args):
+    global DEST, STATE, OWNERSHIP_JSON
+    original, old_state, old_ownership = DEST, STATE, OWNERSHIP_JSON
+    if original.is_symlink() or not original.resolve().is_relative_to((ROOT / "needtobeindexed").resolve()):
+        raise ValueError("Folder sinkron menunjuk keluar arsip.")
+    original.mkdir(parents=True, exist_ok=True)
+    def managed(path):
+        return path.name in (".sync.json", "kepemilikan.json") or bool(OWNED.fullmatch(path.name))
+    originals = {}
+    for path in original.iterdir():
+        if managed(path):
+            if path.is_symlink() or not path.is_file():
+                raise ValueError("Berkas sinkron harus file biasa.")
+            originals[path.name] = path.read_bytes()
+    with tempfile.TemporaryDirectory(prefix="archives-sync-") as folder:
+        stage = Path(folder)
+        for name, data in originals.items():
+            (stage / name).write_bytes(data)
+        try:
+            DEST, STATE, OWNERSHIP_JSON = stage, stage / ".sync.json", stage / "kepemilikan.json"
+            changed = _sync_once(args)
+        finally:
+            DEST, STATE, OWNERSHIP_JSON = original, old_state, old_ownership
+        staged = {p.name: p.read_bytes() for p in stage.iterdir() if managed(p)}
+        # Refuse concurrent edits instead of silently overwriting them.
+        current = {p.name: p.read_bytes() for p in original.iterdir() if managed(p) and p.is_file() and not p.is_symlink()}
+        if current != originals or any(p.is_symlink() for p in original.iterdir() if managed(p)):
+            raise RuntimeError("Arsip berubah selama sinkron; hasil sementara dibatalkan.")
+        try:
+            for name, data in staged.items():
+                write_if_changed(original / name, data.decode("utf-8"))
+            for name in originals.keys() - staged.keys():
+                (original / name).unlink()
+        except Exception:
+            for name, data in originals.items():
+                write_if_changed(original / name, data.decode("utf-8"))
+            for name in staged.keys() - originals.keys():
+                (original / name).unlink(missing_ok=True)
+            raise
+        return changed
 
 
 def build(args):

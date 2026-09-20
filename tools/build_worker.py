@@ -7,11 +7,13 @@ from pathlib import Path
 import re
 import shutil
 
+from build_safety import check_output
 from chat_archive import read_archive, ROOT, SYSTEM, COMMON_WORDS, split_text
 
 
 def build(directory, out):
     docs, tickers = read_archive(directory)
+    out = check_output(out, ROOT, [ROOT / "needtobeindexed", directory], kind="worker")
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)

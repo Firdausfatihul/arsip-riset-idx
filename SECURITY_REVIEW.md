@@ -96,3 +96,6 @@ pada balasan yang sedang diproses agar terlihat sebelum isi jawaban panjang.
 - [OWASP: LLM Prompt Injection Prevention](https://cheatsheetseries.owasp.org/cheatsheets/LLM_Prompt_Injection_Prevention_Cheat_Sheet.html)
 - [DOMPurify security advisories](https://github.com/cure53/DOMPurify/security/advisories)
 - [OpenRouter reasoning controls](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)
+
+
+Audit lanjutan untuk viewer web, HTML lama, kepemilikan, sinkronisasi, build dan sebagian pengaturan akun tersedia di [laporan web](reports/security-audit-web-2026-09-20.md).

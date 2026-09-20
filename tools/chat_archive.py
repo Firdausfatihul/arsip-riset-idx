@@ -1,6 +1,7 @@
 """Read the built archive and prepare complete source text for the chat index."""
 import json
 from pathlib import Path
+from html.parser import HTMLParser
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +18,28 @@ Jika bukti tidak cukup, jelaskan apa yang belum ditemukan dan dokumen yang perlu
 """
 
 
+class ReportContent(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.content = None
+
+    def handle_starttag(self, tag, attrs):
+        values = dict(attrs)
+        if tag == "iframe" and values.get("id") == "report-content":
+            self.content = values.get("srcdoc")
+
+
+def report_source(text):
+    parser = ReportContent()
+    parser.feed(text)
+    if parser.content is None:
+        return text
+    bridge = '<script>' + (ROOT / "report-frame.js").read_text() + '</script>'
+    if not parser.content.endswith(bridge):
+        raise ValueError("Pembungkus laporan tidak sesuai build.")
+    return parser.content[:-len(bridge)]
+
+
 def read_archive(directory):
     directory = Path(directory).resolve()
     match = re.search(r'id="arsip-data">(.*?)</script>', (directory / "index.html").read_text(encoding="utf-8"), re.S)
@@ -30,6 +53,8 @@ def read_archive(directory):
         if not target.is_relative_to(directory):
             raise ValueError("Lokasi dokumen dalam indeks tidak valid.")
         doc["body"] = target.read_text(encoding="utf-8")
+        if doc["kind"] == "html":
+            doc["body"] = report_source(doc["body"])
         # Search HTML using its visible/data text index; send its entire file to the model.
         doc["search_body"] = doc["body"] if doc["kind"] == "md" else doc.get("text", "")
         doc["source_id"] = doc["id"].upper()

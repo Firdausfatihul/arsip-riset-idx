@@ -1,7 +1,7 @@
 # Arsip Riset IDX
 
 Viewer Markdown statis untuk arsip riset pasar modal (Stockbit, Keterbukaan Informasi emiten BEI, Australia, dan Singapura, serta data IDX Signal Desk).
-File di `needtobeindexed/` **tidak dikonversi**: file disalin apa adanya lalu dirender di browser.
+File sumber di `needtobeindexed/` tidak diubah. Markdown disalin mentah; HTML lama dibungkus dalam iframe terisolasi saat build.
 `build.py` hanya membuat halaman daftar dan pencarian, karena static host tidak bisa membaca isi folder.
 
 > Untuk agent (Codex, Claude, dll.): semua yang dibutuhkan untuk membangun ulang dan meng-host ulang ada di file ini.
@@ -29,7 +29,10 @@ archivescrapingweb/
 ├── needtobeindexed/      # SUMBER: taruh file .md di sini (file .html lama juga masih didukung)
 │   └── idx-signal-desk/  # DISALIN OTOMATIS oleh tools/sync_idx.py (jangan isi manual; isinya ditimpa)
 │       └── kepemilikan.json  # data tab Kepemilikan Saham
-├── build.py              # generator (Python 3.8+, stdlib saja)
+├── build.py              # generator (Python 3.9+, stdlib saja)
+├── report-frame.js       # pencarian dan navigasi lokal di laporan HTML terisolasi
+├── report-shell.js       # pembungkus tepercaya untuk laporan HTML
+├── tools/build_safety.py # batas aman sumber dan output build
 ├── chat.js               # antarmuka percakapan; digabung ke index.html saat build
 ├── chat.config.json      # alamat API publik; bukan secret
 ├── worker/               # API Cloudflare Worker + Durable Object
@@ -86,7 +89,7 @@ BASE_URL=https://arsip.contoh.com python3 build.py # + <link rel=canonical> dan 
 python3 build.py --fragment-index /tmp/artifact/index.html   # versi index tanpa <html>/<head>/<body>, khusus Claude Artifact
 ```
 
-Peringatan: folder `--out` **dihapus total** (`shutil.rmtree`) sebelum ditulis ulang. Jangan arahkan ke folder yang berisi file lain. File `CNAME` yang sudah ada dipertahankan agar domain GitHub Pages tidak hilang.
+Folder `--out` dibuat ulang. Build menolak symlink, akar proyek, folder yang beririsan dengan sumber, dan folder berisi data yang tidak dikenali sebagai hasil build arsip. Pemeriksaan ini membantu mencegah salah tujuan; penanda build bukan bukti bahwa semua file di folder boleh dibuang. Jangan arahkan ke folder yang berisi file lain. File `CNAME` yang sudah ada dipertahankan agar domain GitHub Pages tidak hilang.
 
 Output terminal menampilkan satu baris per dokumen: `kategori | tanggal | file sumber -> path di site`.
 Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
@@ -145,9 +148,10 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   - File `.md`: yang dicari isi mentahnya (`content`).
   - File `.html`: yang dicari teks yang tampil (tanpa `<script>`/`<style>`) plus nilai string data JSON di `<script>`
     (mis. `const records=[{"summary": "..."}]`), disimpan sebagai `text` (lihat `html_text()` di `build.py`).
-    Temuan juga ditandai di dalam iframe kalau satu origin. Kalau tidak, hanya jumlahnya yang tampil.
-- File `.html` di `needtobeindexed/` disalin ke `files/…` apa adanya (plus satu bar navigasi "← Arsip Riset IDX" setelah `<body>`)
-  dan dibuka di dalam viewer lewat `<iframe>`. Bar itu menyembunyikan dirinya saat di-iframe dari halaman yang sama, dan tetap tampil saat file dibuka langsung.
+    Penandaan dikirim melalui pesan terbatas ke iframe terisolasi, maksimal 500 kemunculan; pencarian maksimal 128 karakter. Jumlah indeks tetap tersedia jika frame belum merespons.
+- HTML lama ditempatkan utuh dalam `srcdoc` dengan `sandbox="allow-scripts allow-popups"`, tanpa `allow-same-origin`. Pembungkus tepercaya menyediakan navigasi kembali dan pesan pencarian. Laporan tidak mendapat akses DOM/storage halaman utama. Tautan tanggal dan salin nomor postingan tetap tersedia; jika clipboard tidak tersedia, nomor tampil sebagai teks yang dapat dipilih.
+- CSP melalui meta membatasi skrip ke hash hasil build/CDN yang dikunci, koneksi ke situs dan API chat, serta memblokir form/object. Markdown hanya mengizinkan tag baca dan tautan HTTP(S)/anchor; style/form/SVG/media dibuang. Referrer dimatikan. CSP meta tidak menyediakan HSTS atau perlindungan `frame-ancestors`.
+- Data kepemilikan divalidasi sebelum dirender: versi/skema, tipe angka, indeks investor, ticker unik, rentang tanggal, serta batas jumlah baris. Data rusak menampilkan pesan gagal dan tombol coba lagi.
 - **Pengunjung** (hanya jalan di Claude Artifact; di host lain angka tidak tampil, halaman tetap normal):
   - *Pengunjung lalu*: kemampuan `db`. Satu dokumen per browser di `visitors/<id-acak-localStorage>` dengan
     `pages.<kunci-halaman> = {count, first, last}`. Angka = jumlah browser unik yang pernah membuka halaman itu,
@@ -369,6 +373,8 @@ python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # 
 - Berkas yang tidak lagi dihasilkan server dihapus dari folder itu (hanya pola `digest_*.md` / `kepemilikan_*.md`, dan tidak pernah kalau server mengembalikan daftar kosong).
 - Profil: yang pertama kali disinkron dicatat di `.sync.json`. Kalau profil aktif di Signal Desk berbeda, sinkron dilewati (exit 2)
   supaya data profil lain tidak menimpa. Profil aktif dicek lagi sebelum menghapus berkas lama dan sebelum menyimpan status. Ganti sengaja dengan `--profile <id>`.
+- Sinkron menyusun hasil di direktori sementara terlebih dahulu. Penjagaan profil dan keberhasilan seluruh pengambilan diperiksa sebelum menulis tujuan. Perubahan bersamaan pada tujuan membatalkan commit; kegagalan commit biasa dipulihkan dari snapshot. Ini bukan transaksi atomik terhadap mati listrik/SIGKILL di tengah beberapa berkas. Berkas sementara memakai nama acak dan tujuan symlink ditolak.
+- HTTP hanya diizinkan untuk loopback; server jauh harus HTTPS, tanpa kredensial di URL dan tanpa redirect. Respons maksimal 32 MB. Path ledger lokal hanya dipakai untuk server loopback dan SQLite dibuka read-only.
 - Exit code: 0 ok, 1 server tidak bisa dihubungi / HTTP error / data tak terduga, 2 profil beda, 3 build gagal.
   Mode `--watch` terus jalan walau satu putaran gagal. Dengan `--fragment-index`, build selalu dijalankan supaya fragment Artifact ikut kode terbaru.
 - Publish ke Artifact tetap lewat Claude Code (skrip tidak bisa memanggil tool Artifact): minta "publish" setelah sinkron.
@@ -462,3 +468,14 @@ Membuka `site/index.html` langsung dengan dobel klik (`file://`) juga bisa, tapi
 | `sync_idx.py`: "Dilewati: profil aktif …" | Aktifkan profil yang sama di Signal Desk, atau `--profile <id>` untuk sengaja ganti sumber. |
 | `build.py`: "Nama berkas ganda" | Nama berkas harus unik di seluruh `needtobeindexed/` termasuk subfolder. |
 | Link "← Arsip Riset IDX" di file HTML rusak | Link itu relatif `../../../index.html`, jadi `index.html` harus di root host. |
+
+## Audit web dan data
+
+Lihat [laporan audit web](reports/security-audit-web-2026-09-20.md). Jalankan hanya di salinan terisolasi tanpa secret:
+
+```bash
+python3 -B -m unittest discover -s tests -p test_sync_security.py
+NODE_PATH=/path/to/test-deps/node_modules node tests/web_security.cjs
+```
+
+Uji web memeriksa seluruh 963 emiten dalam data saat audit. Uji ini tidak menghubungi layanan model atau menjalankan sinkronisasi terhadap server asli. Uji DOM tidak menggantikan pemeriksaan CSP/sandbox di browser.

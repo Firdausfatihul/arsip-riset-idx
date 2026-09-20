@@ -15,6 +15,8 @@ Pemakaian:
 Tambah berkas ke needtobeindexed/, jalankan ulang, lalu upload folder site/.
 """
 import argparse
+import base64
+import hashlib
 import html
 import json
 import os
@@ -22,7 +24,10 @@ import re
 import shutil
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from urllib.parse import quote
+from html.parser import HTMLParser
+from urllib.parse import quote, urlsplit
+
+from tools.build_safety import check_output, check_source
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "needtobeindexed"
@@ -347,6 +352,7 @@ def html_info(raw):
 
 
 def load_doc(path, index):
+    check_source(path, SRC)
     stem = path.stem
     text = path.read_text(encoding="utf-8", errors="replace")
     modified = datetime.fromtimestamp(path.stat().st_mtime).date()
@@ -390,19 +396,49 @@ def load_doc(path, index):
     return doc
 
 
+def script_hash(script):
+    return "'sha256-" + base64.b64encode(hashlib.sha256(script.encode()).digest()).decode() + "'"
+
+
+def report_scripts(raw):
+    # Only hashes of inline report scripts are allowed; no remote scripts, handlers, or eval.
+    return re.findall(r"<script\b[^>]*>(.*?)</script\s*>", raw, re.S | re.I)
+
+
+class ReportHandlers(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.values = set()
+
+    def handle_starttag(self, tag, attrs):
+        for name, value in attrs:
+            if name.startswith("on") and value:
+                self.values.add(value)
+
+
 def with_nav_bar(doc):
-    """HTML lama tetap disajikan apa adanya, hanya diberi bar kembali ke arsip."""
+    """Keep original report intact inside an opaque sandbox, including on direct URLs."""
     raw = doc["raw"]
-    # Saat dibuka di dalam viewer (iframe dari halaman yang sama), bar disembunyikan.
-    bar = ('<div id="arsip-bar" role="navigation" aria-label="Arsip" style="display:flex;flex-wrap:wrap;gap:4px 10px;'
-           "align-items:center;margin:0;padding:10px max(16px,calc((100% - 1260px)/2));background:#0b1620;"
-           'color:#b9c8d4;font:500 13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace">'
-           f'<a href="../../../index.html" style="color:#ffffff;text-decoration:none;font-weight:600">← {SITE_NAME}</a>'
-           f'<span style="opacity:.5">/</span><span>{esc(doc["catName"])}</span>'
-           f'<span style="opacity:.5">/</span><span>{esc(doc["label"])}</span></div>'
-           '<script>try{if(window.frameElement){document.getElementById("arsip-bar").remove()}}catch(e){}</script>')
-    m = re.search(r"<body[^>]*>", raw, re.I)
-    return raw[:m.end()] + bar + raw[m.end():] if m else bar + raw
+    bridge = (ROOT / "report-frame.js").read_text()
+    shell = (ROOT / "report-shell.js").read_text()
+    scripts = [shell, bridge] + report_scripts(raw)
+    handlers = ReportHandlers()
+    handlers.feed(raw)
+    handler_policy = " 'unsafe-hashes' " + " ".join(script_hash(v) for v in sorted(handlers.values)) if handlers.values else ""
+    policy = ("default-src 'none'; script-src " + " ".join(script_hash(x) for x in scripts) + handler_policy +
+              "; style-src 'unsafe-inline'; img-src data:; frame-src 'self'; base-uri 'none'; form-action 'none'")
+    content = raw + '<script>' + bridge + '</script>'
+    return ('<!doctype html><html lang="id"><head><meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<meta name="referrer" content="no-referrer">'
+            f'<meta http-equiv="Content-Security-Policy" content="{esc(policy)}">'
+            f'<title>{esc(doc["title"])}</title>'
+            '<style>html,body{margin:0;height:100%;font:16px system-ui}body{display:flex;flex-direction:column}'
+            'nav{padding:12px;background:#0b1620}nav a{color:white}iframe{border:0;width:100%;flex:1;min-height:0}[hidden]{display:none}</style>'
+            '</head><body><nav id="report-nav"><a href="../../../index.html">← Arsip Riset IDX</a></nav>'
+            f'<iframe id="report-content" title="{esc(doc["title"])}" sandbox="allow-scripts allow-popups" '
+            f'referrerpolicy="no-referrer" srcdoc="{esc(content)}"></iframe>'
+            f'<script>{shell}</script></body></html>')
 
 
 # ---------------------------------------------------------------- styles
@@ -778,7 +814,7 @@ APP_JS = r"""
     })
     .catch(function(){});
 
-  var docs = data.docs, byPath = {};
+  var docs = data.docs, byPath = Object.create(null);
   docs.forEach(function(d){
     byPath[d.path] = d;
     d.hay = [d.title, d.desc, d.label, d.catName, d.name].concat(d.tickers).join(' ').toLowerCase();
@@ -836,7 +872,18 @@ APP_JS = r"""
   function count(hay, q){ var n = 0, i = hay.indexOf(q); while (i !== -1 && n < 999){ n++; i = hay.indexOf(q, i + q.length); } return n; }
 
   function toHtml(md){
-    if (window.marked && window.DOMPurify) return window.DOMPurify.sanitize(window.marked.parse(md, {gfm: true}));
+    if (window.marked && window.DOMPurify) {
+      var clean = window.DOMPurify.sanitize(window.marked.parse(md, {gfm:true}), {
+        ALLOWED_TAGS:['p','br','strong','em','del','blockquote','ul','ol','li','h1','h2','h3','h4','h5','h6','hr','pre','code','table','thead','tbody','tfoot','tr','th','td','a','details','summary','sup','sub','dl','dt','dd'],
+        ALLOWED_ATTR:['href','title','colspan','rowspan'], ALLOW_DATA_ATTR:false, ALLOW_ARIA_ATTR:false,
+        RETURN_DOM_FRAGMENT:true
+      });
+      clean.querySelectorAll('a').forEach(function(a){
+        var href = a.getAttribute('href') || '';
+        if (!/^(https?:\/\/|#)/i.test(href) || /[\u0000-\u0020\u007f]/.test(href)) a.removeAttribute('href');
+      });
+      var holder = document.createElement('div'); holder.appendChild(clean); return holder.innerHTML;
+    }
     return null;
   }
 
@@ -854,7 +901,7 @@ APP_JS = r"""
 
   // Rapikan hasil Markdown: bagian emiten, baris "Label: isi", jadwal, dan id untuk daftar isi.
   function enhance(root, doc){
-    var used = {}, toc = [], emiten = [], section = null, dl = null;
+    var used = Object.create(null), toc = [], emiten = [], section = null, dl = null;
     function uid(base){ var c = base, n = 2; while (used[c]){ c = base + '-' + n; n++; } used[c] = 1; return c; }
     function addEmiten(id, code){ if (!emiten.some(function(e){ return e[1] === code; })) emiten.push([id, code]); }
     var h1 = root.querySelector('h1');
@@ -976,21 +1023,18 @@ APP_JS = r"""
     }
   }
 
-  // Laporan HTML di iframe: tandai temuan di dalamnya kalau satu origin; kalau tidak, cukup hitung dari teks indeks.
+  // Only the trusted report shell is same-origin; source HTML stays inside its opaque frame.
   function markFrame(frame, doc, q){
-    var root = null;
-    try { root = frame.contentDocument && frame.contentDocument.body; } catch (e){}
-    if (root){
-      root.querySelectorAll('mark.arsip-hit').forEach(function(m){ m.replaceWith(m.textContent); });
-      root.normalize();
-    }
-    var res = {total: 0, first: null};
-    if (q.length >= 2){
-      if (root) res = highlight(root, q);
-      if (!res.total) res = {total: count(doc.body, q.toLowerCase()), first: null};
-    }
-    hitNote(q, res);
+    var query = q.slice(0, 128);
+    hitNote(query, {total:query.length >= 2 ? count(doc.body, query.toLowerCase()) : 0, first:null});
     renderedQuery = q;
+    try {
+      if (typeof frame.contentWindow.archiveFind !== 'function') return;
+      frame.contentWindow.archiveFind(query).then(function(total){
+        if (current !== doc || input.value.trim() !== q || total === null) return;
+        hitNote(query, {total:total, first:total ? {scrollIntoView:function(){ frame.contentWindow.archiveJump(); }} : null});
+      });
+    } catch (e) { /* Text index remains available if the report cannot load. */ }
   }
 
   function tocHtml(info, doc){
@@ -1019,7 +1063,7 @@ APP_JS = r"""
       '<h1>' + esc(doc.title) + '</h1><p class="meta">' + meta.join('') + '</p><p class="hit-note" hidden></p></header>';
     if (doc.kind !== 'md'){
       // Laporan HTML ditampilkan utuh di dalam viewer, apa adanya.
-      reader.innerHTML = head + '<iframe class="doc-frame" src="' + esc(doc.path) + '" title="' + esc(doc.title) + '"></iframe>';
+      reader.innerHTML = head + '<iframe class="doc-frame" referrerpolicy="no-referrer" src="' + esc(doc.path) + '" title="' + esc(doc.title) + '"></iframe>';
       var frame = reader.querySelector('.doc-frame');
       frame.addEventListener('load', function(){ if (current === doc) markFrame(frame, doc, input.value.trim()); });
       current = doc; renderedQuery = q; paintStats();
@@ -1053,7 +1097,7 @@ APP_JS = r"""
     } else {
       prose.innerHTML = html;
       var info = enhance(prose, doc);
-      doc.codeMap = {};
+      doc.codeMap = Object.create(null);
       info.emiten.forEach(function(e){ doc.codeMap[e[1].toLowerCase()] = e[0]; });
       prose.insertAdjacentHTML('beforebegin', tocHtml(info, doc));
       syncContents();
@@ -1063,7 +1107,7 @@ APP_JS = r"""
   }
 
   function show(doc, section){
-    var q = input.value.trim(), fresh = current !== doc;
+    var q = input.value.trim().slice(0,128), fresh = current !== doc;
     // .doc-loading masih tampil = dokumen besar belum/tidak jadi dirender (mis. ditinggal saat memuat): render ulang.
     if (fresh || (doc.kind === 'md' && (renderedQuery !== q || reader.querySelector('.doc-loading')))) renderDoc(doc, q);
     overview.hidden = true; reader.hidden = false;
@@ -1252,6 +1296,44 @@ APP_JS = r"""
     return fallback;
   }
 
+  function validateOwn(d){
+    function require(ok){ if (!ok) throw new Error('Struktur data kepemilikan tidak valid.'); }
+    function array(a, max){ require(Array.isArray(a) && a.length <= max); return a; }
+    function number(v){ require(v === null || (typeof v === 'number' && Number.isFinite(v))); }
+    function index(v, table){ require(Number.isSafeInteger(v) && v >= 0 && v < table.length); }
+    function flag(v){ require(v === 0 || v === 1); }
+    function url(v){ require(v === null || (typeof v === 'string' && v.length <= 4096)); }
+    require(d && d.format === 2);
+    array(d.months,240); require(d.months.length === own.months.length && d.months.length > 0);
+    d.months.forEach(function(m,i){ require(m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m.p) && m.p === own.months[i].p); url(m.url); });
+    [d.names,d.classes,d.categories].forEach(function(a){ array(a,200000).forEach(function(v){ require(typeof v === 'string' && v.length <= 4000); }); });
+    var seen = new Set(), count = 0;
+    function rows(a, length, check){ array(a,200000).forEach(function(row){ require(Array.isArray(row) && row.length === length); require(++count <= 500000); check(row); }); }
+    array(d.companies,5000).forEach(function(c){
+      require(c && /^[A-Z0-9]{2,12}$/.test(c.t) && !seen.has(c.t) && typeof c.n === 'string' && c.n.length <= 4000); seen.add(c.t);
+      ['k','f','c','d','b'].forEach(function(key){
+        if (c[key] === undefined && (key === 'd' || key === 'b')) return;
+        array(c[key],240); require(c[key].length === d.months.length);
+        c[key].forEach(function(v){
+          if (v === null) return;
+          if (key === 'k'){
+            number(v.tp); rows(v.h,7,function(r){ require(Number.isSafeInteger(r[0]) && r[0] >= 0); index(r[1],d.names); index(r[2],d.classes); require(typeof r[3] === 'string'); r.slice(4).forEach(number); });
+            if (v.i) array(v.i,1000).forEach(function(x){ require(typeof x === 'string'); });
+          } else if (key === 'f'){
+            require(Array.isArray(v) && v.length === 4); number(v[0]); flag(v[1]); url(v[2]); array(v[3],1000).forEach(number);
+          } else if (key === 'c'){
+            require(Array.isArray(v) && v.length === 2); number(v[0]); flag(v[1]);
+          } else if (key === 'd'){
+            number(v.s); url(v.u); rows(v.h,5,function(r){ index(r[0],d.names); r.slice(1,4).forEach(number); flag(r[4]); });
+          } else {
+            url(v.u); rows(v.r,6,function(r){ require(typeof r[0] === 'string'); index(r[1],d.categories); r.slice(2,5).forEach(number); flag(r[5]); });
+            rows(v.t,4,function(r){ require(typeof r[0] === 'string'); r.slice(1).forEach(number); });
+          }
+        });
+      });
+    });
+  }
+
   function loadOwn(){
     if (ownData) return Promise.resolve(ownData);
     if (!ownLoading){
@@ -1261,14 +1343,15 @@ APP_JS = r"""
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       }).then(function(d){
-        d.byT = {};
+        validateOwn(d);
+        d.byT = Object.create(null);
         d.companies.forEach(function(c){ d.byT[c.t] = c; c.hay = (c.t + ' ' + c.n).toLowerCase(); c.g = []; });
         ownPick.innerHTML = '<option value="">Semua emiten</option>' + d.companies.map(function(c){
           return '<option value="' + esc(c.t) + '">' + esc(c.t + (c.n ? ' · ' + c.n : '')) + '</option>';
         }).join('');
         ownData = d; ownLoading = null;
         return d;
-      }, function(e){ ownLoading = null; throw e; });
+      }).catch(function(e){ ownLoading = null; throw e; });
     }
     return ownLoading;
   }
@@ -1278,7 +1361,7 @@ APP_JS = r"""
     if (c.g[i] !== undefined) return c.g[i];
     var k = c.k[i], g = null;
     if (k){
-      g = {};
+      g = Object.create(null);
       k.h.forEach(function(r){
         var x = g[r[0]];
         if (!x){ g[r[0]] = {name: ownData.names[r[1]], cls: ownData.classes[r[2]], lf: r[3], pct: r[4], total: r[5], rows: r[6]}; return; }
@@ -1410,7 +1493,7 @@ APP_JS = r"""
   }
 
   function investors(c, from, to){
-    var gf = groupsAt(c, from) || {}, gt = groupsAt(c, to) || {}, seen = {}, rows = [];
+    var gf = groupsAt(c, from) || {}, gt = groupsAt(c, to) || {}, seen = Object.create(null), rows = [];
     Object.keys(gt).concat(Object.keys(gf)).forEach(function(inv){
       if (seen[inv]) return;
       seen[inv] = true;
@@ -1688,7 +1771,7 @@ APP_JS = r"""
     ms.forEach(function(m, i){
       var label = narrow ? BULAN[+m.p.slice(5, 7) - 1].slice(0, 3) : monthText(i, true).replace(/ \d{4}$/, '');
       s += '<text class="' + (i === st.from || i === st.to ? 'sel' : '') + '" x="' + X(i).toFixed(1) + '" y="' + (axY + 16) + '" text-anchor="middle">' + esc(label) + '</text>';
-      if (!i || m.p.slice(0, 4) !== ms[i - 1].p.slice(0, 4)) s += '<text x="' + X(i).toFixed(1) + '" y="' + (axY + 31) + '" text-anchor="middle">' + m.p.slice(0, 4) + '</text>';
+      if (!i || m.p.slice(0, 4) !== ms[i - 1].p.slice(0, 4)) s += '<text x="' + X(i).toFixed(1) + '" y="' + (axY + 31) + '" text-anchor="middle">' + esc(m.p.slice(0, 4)) + '</text>';
     });
     function tipLines(i){
       return panes.map(function(p){ return p.series.map(function(se){ return [se, p.fmt(se.v[i])]; }); }).reduce(function(a, b){ return a.concat(b); }, []);
@@ -1795,7 +1878,7 @@ APP_JS = r"""
   }
 
   function filter(){
-    var raw = input.value.trim(), q = raw.toLowerCase(), shown = 0;
+    var raw = input.value.trim().slice(0,128), q = raw.toLowerCase(), shown = 0;
     docs.forEach(function(d){
       var hits = q ? count(d.body, q) : 0;
       var hit = q ? hits > 0 || d.hay.indexOf(q) !== -1 : d.cat === selectedCategory;
@@ -1926,7 +2009,7 @@ def build_page(docs, by_cat, own=None):
     "docs": entries,
     "own": own and {k: own[k] for k in ("path", "months", "count", "tickers")}
     }
-    data_json = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
+    data_json = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     desc = ("Arsip riset pasar modal: laporan Stockbit, keterbukaan informasi Indonesia, Australia, dan Singapura, serta digest per emiten, dikelompokkan per sumber "
             "dan tanggal, plus grafik kepemilikan saham KSEI per emiten.")
     canonical = f'<link rel="canonical" href="{esc(BASE_URL)}/">' if BASE_URL else ""
@@ -1953,7 +2036,7 @@ def build_page(docs, by_cat, own=None):
                     f'<p class="tally"><span><b>{angka(own["count"])}</b> emiten</span><span><b>{len(own["months"])}</b> bulan data KSEI</span>'
                     f"<span>{esc(span_own)}</span>" + stat_span("kepemilikan", live_label="melihat", always_live=True) + "</p></header>"
                     '<div class="own-bar">'
-                    '<label class="own-field own-search">Cari<input id="own-cari" type="search" placeholder="Kode atau nama, mis. BBCA" autocomplete="off" spellcheck="false"></label>'
+                    '<label class="own-field own-search">Cari<input id="own-cari" type="search" maxlength="128" placeholder="Kode atau nama, mis. BBCA" autocomplete="off" spellcheck="false"></label>'
                     '<label class="own-field own-pick">Emiten<select id="own-emiten"><option value="">Semua emiten</option></select></label>'
                     '<label class="own-field own-month">Dari<select id="own-dari"></select></label>'
                     '<label class="own-field own-month">Sampai<select id="own-sampai"></select></label></div>'
@@ -1961,7 +2044,7 @@ def build_page(docs, by_cat, own=None):
     body = (tabs + '<div class="app"><main class="stage">'
             f'<nav class="category-nav" aria-label="Sumber dokumen">{"".join(category_links)}</nav>'
             '<div class="search"><label for="cari">Cari di semua arsip</label>'
-            '<div class="search-controls"><input id="cari" type="search" autocomplete="off" placeholder="Kode saham, nama, kata, atau tanggal…" aria-describedby="cari-catatan">'
+            '<div class="search-controls"><input id="cari" type="search" maxlength="128" autocomplete="off" placeholder="Kode saham, nama, kata, atau tanggal…" aria-describedby="cari-catatan">'
             '<button id="hapus-cari" type="button" hidden>Hapus pencarian</button></div>'
             '<p class="search-note" id="cari-catatan" aria-live="polite"></p></div>'
             '<section class="chat" aria-labelledby="chat-title">'
@@ -1999,9 +2082,13 @@ def ownership_meta():
     """Ringkasan kepemilikan.json untuk tab Kepemilikan Saham, atau None kalau belum disinkron."""
     if not OWN_SRC.is_file():
         return None
+    check_source(OWN_SRC, SRC)
     raw = json.loads(OWN_SRC.read_text(encoding="utf-8"))
     months = [{"p": m["p"], "asOf": m.get("asOf")} for m in raw.get("months") or []]
     companies = raw.get("companies") or []
+    if len(months) > 240 or any(not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", m["p"]) or
+                               (m["asOf"] is not None and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", m["asOf"])) for m in months):
+        raise ValueError("Tanggal metadata kepemilikan tidak valid.")
     if not months or not companies:
         return None
     return {"path": OWN_PATH, "months": months, "count": len(companies), "tickers": [c["t"] for c in companies]}
@@ -2029,7 +2116,11 @@ def main():
     by_cat = {k: [d for d in docs if d["cat"] == k] for k in CATEGORIES}
     by_cat = {k: v for k, v in by_cat.items() if v}
 
-    out = args.out
+    out = check_output(args.out, ROOT, [SRC], kind="site")
+    if args.fragment_index:
+        fragment = args.fragment_index.resolve()
+        if fragment.is_relative_to(SRC.resolve()) or (fragment.is_relative_to(ROOT) and not fragment.is_relative_to(out)):
+            raise SystemExit("Lokasi fragment tidak boleh menimpa sumber proyek.")
     # GitHub Pages custom-domain settings live in the generated directory.
     cname = (out / "CNAME").read_text(encoding="utf-8") if (out / "CNAME").is_file() else None
     if out.exists():
@@ -2054,10 +2145,25 @@ def main():
         (out / OWN_PATH).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(OWN_SRC, out / OWN_PATH)
     head, body = build_page(docs, by_cat, own)
+    chat_js = (ROOT / "chat.js").read_text()
+    endpoint = urlsplit(CHAT_API_URL)
+    if CHAT_API_URL.startswith("/") and not CHAT_API_URL.startswith("//"):
+        api_origin = "'self'"
+    elif endpoint.scheme in ("https", "http") and endpoint.hostname and not endpoint.username and not endpoint.password:
+        if endpoint.scheme == "http" and endpoint.hostname not in ("127.0.0.1", "localhost"):
+            raise ValueError("API publik harus HTTPS.")
+        api_origin = endpoint.scheme + "://" + endpoint.netloc
+    else:
+        raise ValueError("Alamat API chat tidak valid.")
+    policy = ("default-src 'none'; script-src " + script_hash(APP_JS + "\n" + chat_js) + " " +
+              " ".join(src for src, _ in LIBS) + "; style-src 'unsafe-inline' https://fonts.googleapis.com; "
+              "font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' " + api_origin +
+              "; frame-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'")
+    security_meta = '<meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="' + esc(policy) + '">'
     (out / "index.html").write_text(
         '<!doctype html>\n<html lang="id"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
-        f"{head}</head><body>{body}</body></html>\n", encoding="utf-8")
+        f"{security_meta}{head}</head><body>{body}</body></html>\n", encoding="utf-8")
     if args.fragment_index:
         args.fragment_index.parent.mkdir(parents=True, exist_ok=True)
         args.fragment_index.write_text(head + body, encoding="utf-8")
