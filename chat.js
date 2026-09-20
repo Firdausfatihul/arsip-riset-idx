@@ -83,6 +83,8 @@
     message('user', question);
     var nextContext = null;
     var reply = message('assistant', ''), text = '', sources = [], summary = null, done = false;
+    reply.block.insertBefore(progress, reply.content);
+    reply.block.scrollIntoView?.({block: 'nearest'});
     status.textContent = 'Menghubungkan ke asisten arsip…';
     var started = Date.now(), ticker = setInterval(function(){
       elapsed.textContent = Math.floor((Date.now() - started) / 1000) + ' detik';
@@ -108,7 +110,7 @@
         }
         if (event.type === 'progress'){
           meter.max = event.total; meter.value = event.completed;
-          status.textContent = event.text; activity.textContent = 'Membaca dan mencatat bukti…';
+          status.textContent = event.text; activity.textContent = event.text;
         }
         if (event.type === 'activity') activity.textContent = event.text;
         if (event.type === 'sources'){
@@ -163,7 +165,7 @@
   stop.addEventListener('click', function(){ if (controller) controller.abort(); });
   reset.addEventListener('click', function(){
     if (controller) return;
-    context = null; turns = 0; log.replaceChildren(); status.textContent = ''; input.value = '';
+    context = null; turns = 0; form.after(progress); log.replaceChildren(); status.textContent = ''; input.value = '';
     input.placeholder = 'Contoh: Analisis SOCI dari semua dokumen yang tersedia';
     reset.hidden = true; countInput(); input.focus();
   });

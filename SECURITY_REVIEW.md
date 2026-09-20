@@ -47,6 +47,32 @@ Test tidak mengeksekusi payload destruktif di OS. SQL injection dicoba pada SQLi
 `:memory:` dengan parameterized query. Skenario SSRF menguji penolakan parameter
 URL dan endpoint tetap; tidak menghubungi layanan metadata atau host pihak ketiga.
 
+## Verifikasi produksi setelah patch
+
+Hanya pertanyaan riset biasa yang dikirim ke API publik; tidak ada flood atau payload
+serangan. Worker version `caec7ce0-f5a1-41ef-98f0-96db47226af0` berhasil dideploy.
+
+Pertanyaan SOCI, delapan dokumen lengkap, sembilan kelompok pembacaan:
+
+| Ukuran | Hasil |
+|---|---:|
+| Respons | HTTP 200, event `done` diterima |
+| Aktivitas pembacaan pertama | 14.5 detik |
+| Teks jawaban pertama | 100.3 detik |
+| Selesai | 121.1 detik |
+| Teks jawaban | 5,960 karakter |
+| Pembanding sebelum patch | 237 detik, lima kelompok berurutan |
+
+Durasi sekitar 49% lebih singkat dalam perbandingan dua percobaan ini. Ini bukan
+benchmark terkontrol atau jaminan latensi: prompt, beban provider, panjang jawaban,
+dan kondisi jaringan dapat berubah. Perubahan mencakup paralelisme, ukuran kelompok,
+dan batas catatan antara. Semua dokumen dipertahankan; kualitas setiap klaim model
+belum diaudit lewat benchmark ini.
+
+Browser publik juga berhasil menyelesaikan pertanyaan singkat SSTM dengan sumber
+D19, rendering Markdown, dan kontrol kembali aktif. Indikator progres ditempatkan
+pada balasan yang sedang diproses agar terlihat sebelum isi jawaban panjang.
+
 ## Batas perlindungan
 
 - Ini audit terbatas, bukan jaminan bebas celah atau penetration test independen.
