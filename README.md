@@ -39,6 +39,7 @@ archivescrapingweb/
 ├── worker/               # API Cloudflare Worker + Durable Object
 ├── tools/build_worker.py # indeks pencarian, bagian sumber, dan indeks emiten untuk Worker
 ├── tools/evidence_index.py # pemisahan sumber tanpa AI, dengan lokasi dan hash isi
+├── tools/event_index.py  # tabel aksi korporasi per emiten tanpa AI (events.json) untuk pertanyaan screening
 ├── tools/compare_chat_costs.mjs # pembanding alur lama/baru, simulasi atau API nyata
 ├── tools/chat_metrics.py # laporan biaya aktual melalui endpoint privat
 ├── tools/publish_chat.py # build dan perbarui backend + docs/ (tidak git push)
@@ -228,6 +229,28 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   Bahan di atas itu memakai catatan sumber bersama untuk unit di atas 24 KB, maksimal dua pembaca bersamaan.
   Catatan membahas bukti emiten tanpa pertanyaan atau riwayat pengguna. Jika model menyatakan catatan belum cukup, satu pemeriksaan tambahan atas
   maksimal dua dokumen lengkap diperbolehkan; seluruh batas biaya/koneksi tetap berlaku.
+- Kalimat penyangkalan ("Tidak ada aksi korporasi seperti rights issue…", "belum merencanakan delisting") tidak
+  dihitung sebagai kecocokan kata topik. Dokumen yang hanya menyebut topik dalam penyangkalan tidak dibaca.
+- **Topik terlalu luas** (tanpa kode saham, bahan di atas 350 KB):
+  - Jika pertanyaan menyebut jenis aksi korporasi (rights issue, private placement, stock split, buyback,
+    tender offer, go private/delisting, akuisisi, perubahan pengendali/backdoor, KBLI/kegiatan usaha, merger,
+    dividen, saham bonus), jawaban memakai **tabel aksi korporasi** `events.json` dari `tools/event_index.py`.
+    Tabel dibuat saat build tanpa AI: bullet fakta per emiten di digest (bukan skenario/risiko) dan kalimat
+    atau baris yang menyebut kode saham berhuruf besar di KI/Stockbit, tanpa penyangkalan. Kode menyusun
+    daftar lengkap dan jumlah emiten; model hanya menulis ringkasan ±350 kata. Pencocokan kata dapat
+    memasukkan emiten yang hanya disebut sepintas atau kejadian historis; bukti tiap baris ditautkan.
+  - Topik lain yang terlalu besar untuk catatan (lebih dari 6 unit catatan atau 4 MB) dijawab dengan daftar
+    emiten yang menyebut topik itu, tanpa AI, disertai saran bertanya per kode.
+- **Hitungan tidak diserahkan ke model.** Permintaan dokumen per tanggal memberi model "FAKTA TERHITUNG SISTEM"
+  (jumlah bagian emiten dan baris tabel bertanggal, beserta kodenya). Setelah jawaban selesai, pemeriksa angka
+  mencocokkan jumlah ("18 emiten") dan nominal/persen dengan bahan sumber; angka yang tidak ditemukan persis
+  diberi catatan di bawah jawaban. Nilai yang dibulatkan/dipotong dan singkatan satuan (Rp20,817tn → Rp20,8 triliun)
+  dianggap cocok. Pemeriksa ini tidak menilai perhitungan yang sah atau angka yang benar tetapi ditempelkan ke
+  emiten yang salah.
+- **Nama emiten diambil dari arsip, bukan ingatan model.** `events.json` memuat nama resmi per kode dari pola
+  "PT … Tbk (KODE)" (semua nama untuk kode yang berganti nama). Nama itu diberikan ke model untuk kode di bahan,
+  dicantumkan di daftar screening, dan nama lain yang ditulis model diberi catatan beserta nama menurut arsip.
+  Tanpa daftar ini, uji 35 pertanyaan menemukan 23 nama perusahaan karangan model; dengan daftar ini, 0.
 - Catatan ringkas dapat melewatkan detail. Model tidak boleh menganggap tidak tercatat berarti tidak
   ada dalam dokumen. Fakta, rumor/pernyataan penulis, angka, tanggal dan ketidakpastian tetap dibedakan.
   Jawaban memakai rujukan `[D…]` yang ditautkan ke arsip, bukan URL hasil karangan model.

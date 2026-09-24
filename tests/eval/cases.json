@@ -402,11 +402,17 @@
   },
   {
    "id": "stock_split",
-   "question": "ada yang mau stock split?"
+   "question": "ada yang mau stock split?",
+   "facts": [
+    "RAJA|PBSA"
+   ]
   },
   {
    "id": "rights_issue",
-   "question": "siapa aja yang mau rights issue"
+   "question": "siapa aja yang mau rights issue",
+   "facts": [
+    "EURO|BAJA|KOTA"
+   ]
   },
   {
    "id": "heldout_uma",
@@ -431,6 +437,20 @@
    "facts": [
     "IPAC|delisting|go private"
    ]
+  },
+  {
+   "id": "count_ki22",
+   "question": "berapa emiten yang punya pengumuman bertanggal 22 September di dokumen keterbukaan informasi 22 September 2026?",
+   "docs_all": [
+    "ki_22092026.md"
+   ],
+   "facts": [
+    "\\b25\\b"
+   ]
+  },
+  {
+   "id": "pp_screen",
+   "question": "siapa aja yang mau private placement?"
   }
  ]
 }

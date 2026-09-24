@@ -86,7 +86,8 @@ async function evaluate(c){
   const precision=gold&&found.length?found.filter(d=>gold.includes(d)).length/found.length:null;
   return {id:c.id,question:c.question,status,error:r.error,pass:Object.values(checks).every(Boolean),checks,facts,
     terms,sources:found,source_precision:precision,citations:refs,invalid_citations:refs.filter(d=>!found.includes(d)),
-    incomplete:!!r.result?.incomplete,answer,usage:r.usage,elapsed_ms:r.elapsed_ms,attempts:r.attempts,
+    incomplete:!!r.result?.incomplete,path:r.result?.screening?'table':r.result?.overview?'list':'text',
+    unverified_numbers:r.metrics.unverified_numbers||[],wrong_names:r.metrics.wrong_names||[],answer,usage:r.usage,elapsed_ms:r.elapsed_ms,attempts:r.attempts,
     retrieval:Object.fromEntries(Object.entries(r.metrics).filter(([k])=>!['date_scope'].includes(k)))};
 }
 
@@ -96,7 +97,7 @@ await Promise.all(Array.from({length:concurrency},async()=>{
   while(next<selected.length){
     const i=next++;results[i]=await evaluate(selected[i]);
     const r=results[i];
-    console.log(`${r.pass?'PASS':'FAIL'} ${r.id.padEnd(14)} ${r.status.padEnd(13)} docs=${r.sources?.length??0} $${(r.usage?.known_cost_usd||0).toFixed(4)} ${r.error||''}`);
+    console.log(`${r.pass?'PASS':'FAIL'} ${r.id.padEnd(16)} ${r.status.padEnd(13)} ${(r.path||'').padEnd(5)} docs=${r.sources?.length??0} $${(r.usage?.known_cost_usd||0).toFixed(4)} ${r.unverified_numbers?.length?'angka?='+r.unverified_numbers.join(';')+' ':''}${r.wrong_names?.length?'nama?='+r.wrong_names.map(n=>n.code+'='+n.written).join(';')+' ':''}${r.error||''}`);
   }
 }));
 const sum=(f)=>results.reduce((n,r)=>n+(f(r)||0),0),prec=results.filter(r=>r.source_precision!==null&&r.source_precision!==undefined);
@@ -104,7 +105,7 @@ const summary={label,impl,archive_version:manifest.version,created_at:new Date()
   passed:sum(r=>r.pass),completed:sum(r=>r.status==='complete'),errors:sum(r=>r.status==='error'),
   facts_hit:sum(r=>r.facts?.filter(f=>f.hit).length),facts_total:sum(r=>r.facts?.length),
   mean_source_precision:prec.length?prec.reduce((n,r)=>n+r.source_precision,0)/prec.length:null,
-  invalid_citations:sum(r=>r.invalid_citations?.length),cost_usd:sum(r=>r.usage?.known_cost_usd),
+  invalid_citations:sum(r=>r.invalid_citations?.length),flagged_numbers:sum(r=>r.unverified_numbers?.length),wrong_names:sum(r=>r.wrong_names?.length),cost_usd:sum(r=>r.usage?.known_cost_usd),
   provider_calls:sum(r=>r.usage?.calls)};
 const out=path.join(root,'reports/eval');await mkdir(out,{recursive:true});
 await writeFile(path.join(out,label+'.json'),JSON.stringify({summary,results},null,2)+'\n');

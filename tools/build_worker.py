@@ -13,6 +13,7 @@ import sys
 from build_safety import check_output
 from chat_archive import read_archive, ROOT, SYSTEM, COMMON_WORDS, WORD_TICKERS, split_text
 from evidence_index import make_evidence, VERSION
+from event_index import make_events, term_tickers
 
 sys.path.insert(0, str(ROOT))
 from build import text_ranges  # noqa: E402  (rentang tanggal yang sama dengan katalog situs)
@@ -40,7 +41,7 @@ def build(directory, out):
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
-    postings, metadata = {}, []
+    postings, metadata, evidences = {}, [], {}
     digest = hashlib.sha256()
     for doc in docs:
         source_id = doc['source_id']
@@ -53,6 +54,7 @@ def build(directory, out):
         (out / asset).write_bytes(raw)
         digest.update(raw)
         evidence = make_evidence(doc, tickers)
+        evidences[source_id] = evidence
         evidence_asset = source_id + '.evidence.json'
         (out / evidence_asset).write_text(json.dumps(evidence, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         metadata.append({**{k: doc[k] for k in ('source_id', 'title', 'path', 'label', 'start', 'end', 'name', 'cat')},
@@ -63,10 +65,13 @@ def build(directory, out):
             postings.setdefault(word, []).append(source_id)
     manifest = {'version': digest.hexdigest()[:16], 'retrieval_version': VERSION, 'docs': metadata, 'tickers': sorted(tickers),
                 'postings': postings, 'system': SYSTEM, 'commonWords': sorted(COMMON_WORDS),
-                'wordTickers': sorted(t for t in tickers if t.lower() in WORD_TICKERS)}
+                'wordTickers': sorted(t for t in tickers if t.lower() in WORD_TICKERS),
+                'termTickers': term_tickers(tickers)}
     (out / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    events = make_events(docs, tickers, evidences)
+    (out / 'events.json').write_text(json.dumps(events, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     print(f'Worker: {len(docs)} dokumen lengkap, {sum(len(d["sizes"]) for d in metadata)} bagian, '
-          f'{len(postings)} kata indeks -> {out}')
+          f'{len(postings)} kata indeks, {len(events["events"])} aksi korporasi -> {out}')
 
 
 if __name__ == '__main__':

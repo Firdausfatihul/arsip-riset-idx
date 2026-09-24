@@ -52,7 +52,7 @@ test('full archive queries use SQLite, retain known evidence and finish cross-ma
  console.log(JSON.stringify({thematicBytes:size(messages),documents:result.documents,sourceReads:stats.database_source_reads,modelCalls:calls.length+1}));
  const second={};const before=calls.length;
  await converse(archive,model,'Jelaskan hubungan emiten Indonesia dengan ASX dan Singapura',[],async()=>{},new AbortController().signal,{metrics:second,cache});
- assert.equal(second.candidate_cache_hit,true);assert.equal(calls.length,before);assert.equal(second.source_cache_hits,result.documents);
+ assert.equal(second.candidate_cache_hit,true);assert.equal(calls.length,before);assert.equal(second.source_cache_hits,second.documents_checked);
  db.close();
 });
 

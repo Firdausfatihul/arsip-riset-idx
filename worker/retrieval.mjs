@@ -46,11 +46,23 @@ export function dateQuery(question, history = [], years = []) {
 // Ticker codes match case-sensitively: "naik" in prose is not the ticker NAIK.
 export const pattern = (term, tickers = new Set()) => new RegExp('(?<![\\p{L}\\p{N}_])' + term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+') + '(?![\\p{L}\\p{N}_])',
   tickers.has(term) ? 'u' : 'iu');
-export function selectRecords(data, terms, tickers = new Set()) {
-  const patterns = terms.map(t => pattern(t,tickers)), selected = new Set(), rows = data.records;
+// "Tidak ada aksi korporasi seperti rights issue" mentions a topic without it happening.
+// Keep in sync with NEGATION in tools/event_index.py.
+export const NEGATION = /\b(tidak ada|tidak terdapat|belum ada|tanpa adanya|tidak mengindikasikan|tidak menunjukkan|tidak mengungkapkan|tidak disebutkan|tidak dilaporkan|tidak diumumkan|belum merencanakan|tidak merencanakan|tidak berencana|belum berencana|none)\b/i;
+export function affirmed(text, re) {
+  for (const m of text.matchAll(new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'))) {
+    const clause = text.slice(Math.max(0, m.index - 400), m.index).split(/[;:.]\s|\n/).pop();
+    if (!NEGATION.test(clause)) return true;
+  }
+  return false;
+}
+export function selectRecords(data, terms, tickers = new Set(), {keepNegated = false} = {}) {
+  const patterns = terms.map(t => [pattern(t,tickers), tickers.has(t)]), selected = new Set(), rows = data.records;
   for (let i=0;i<rows.length;i++) {
     const row = rows[i];
-    if (terms.some(t => tickers.has(t) && row.tickers.includes(t)) || patterns.some(p => p.test(row.content))) {
+    // Topic words must appear at least once outside a negation; ticker codes match as written.
+    if (terms.some(t => tickers.has(t) && row.tickers.includes(t)) ||
+        patterns.some(([p, code]) => code || keepNegated ? p.test(row.content) : affirmed(row.content, p))) {
       selected.add(i);
       // Untitled prose can carry supporting detail into the adjacent paragraph.
       if (row.kind === 'context' && !row.content.trim().startsWith('|')) {

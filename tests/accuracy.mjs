@@ -85,7 +85,67 @@ test('when model terms and the retry both miss, the user\'s own distinctive word
   const replies = ['{"terms":["Tanoto Foundation"]}', '{"terms":[]}'];
   const model = {complete:async () => replies.shift(), answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
   const stats = {};
-  const result = await converse(new Archive(assets), model, 'Tanoko?', [], () => {}, null, {metrics:stats});
-  assert.deepEqual(result.terms, ['Tanoko']);
+  // Lowercase, so the capitalised-name guard does not apply and the last-resort path is exercised.
+  const result = await converse(new Archive(assets), model, 'tanoko?', [], () => {}, null, {metrics:stats});
+  assert.deepEqual(result.terms, ['tanoko']);
   assert.equal(result.documents, 2);
+});
+
+const events = await read('events.json');
+test('corporate-action table skips negations, routine treasury holdings and KBLI as an issuer', () => {
+  // A negated list is not an event; a later affirmative clause in the same bullet still is (BAJA).
+  assert.ok(!events.events.some(e => /^tidak ada aksi korporasi seperti [^.;]*$/i.test(e.text)));
+  assert.ok(events.events.some(e => e.ticker === 'BAJA' && e.type === 'rights_issue'));
+  assert.ok(!events.events.some(e => e.type === 'buyback' && /^Saham treasuri (tetap )?[\d.]+ lembar/.test(e.text)));
+  assert.ok(!events.events.some(e => e.ticker === 'KBLI' && e.type === 'business_change'));
+  assert.ok(events.events.some(e => e.ticker === 'EURO' && e.type === 'rights_issue'));
+  assert.deepEqual(directTickers('emiten indonesia apa saja yang baru menambah KBLI', manifest), []);
+  assert.deepEqual(directTickers('analisa saham KBLI', manifest), ['KBLI']);
+});
+
+test('screening questions are answered from the table: code writes the full list and the count', async () => {
+  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
+  let calls = 0, material = '';
+  const model = {complete:async () => '{"terms":["rights issue","HMETD"]}',
+    answer:async (m, emit) => { calls++; material = m[1].content; const t = 'Ringkasan: EURO rights issue 2 miliar saham.'; await emit({type:'delta', text:t}); return t; }};
+  const stats = {};
+  const result = await converse(new Archive(assets), model, 'siapa aja yang mau rights issue', [], () => {}, null, {metrics:stats});
+  assert.equal(result.screening, true);
+  assert.equal(calls, 1);
+  assert.match(material, new RegExp('FAKTA TERHITUNG SISTEM: ' + stats.screening.issuers + ' emiten'));
+  assert.match(result.answer, new RegExp('Daftar lengkap: ' + stats.screening.issuers + ' emiten'));
+  assert.match(result.answer, /\| EURO · PT Estee Gold Feet Tbk \|/);
+  assert.match(material, /EURO \(PT Estee Gold Feet Tbk\)/);
+});
+
+test('document requests get code-computed counts; numbers absent from the sources are flagged', async () => {
+  const {documentFacts, unverifiedNumbers} = await import('../worker/screening.mjs');
+  const doc = manifest.docs.find(d => d.name === 'ki_22092026.md');
+  const facts = documentFacts(doc, (await read(doc.evidence_asset)).records, new Set(manifest.tickers));
+  assert.match(facts, /25 baris tabel bertanggal 22 September, 25 emiten berbeda/);
+  assert.deepEqual(unverifiedNumbers('Ada 18 emiten dan 25 emiten; Rp1,422181; 85.000.000 saham; 99,9% [D39].', facts + ' Rp1,422181 85.000.000'),
+    ['18 emiten', '99,9%']);
+});
+
+test('a name the user wrote is searched even when the model "corrects" it', async () => {
+  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
+  const model = {complete:async () => '{"terms":["Tanoto","TPI"]}', answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
+  const result = await converse(new Archive(assets), model, 'Tanoko?', [], () => {}, null, {metrics:{}});
+  assert.equal(result.terms[0], 'Tanoko');
+  const names = result.sources.map(s => manifest.docs.find(d => d.source_id === s.source_id).name);
+  assert.ok(names.includes('digest_2026-08-26_2026-08-27.md') && names.includes('digest_2026-09-07_2026-09-09.md'));
+});
+
+test('issuer names that differ from the archive are reported with the official name', async () => {
+  const {wrongNames} = await import('../worker/screening.mjs');
+  const names = events.names;
+  assert.equal(names.BAJA, 'PT Saranacentral Bajatama Tbk');
+  const found = wrongNames('**BAJA** (Barata Indonesia) dan EURO (Elnusa Tbk); PT Pelita IMC Logistik Tbk (PSSI); VICI (Akuisisi tahap penjajakan); MKNT (Pergantian Pengurus); SINI (Sinarmas Agro Resources).',
+    names, events.aliases, events.plainWords);
+  assert.deepEqual(found.map(n => n.code), ['BAJA', 'EURO', 'SINI']);
+});
+
+test('a renamed issuer accepts every name the archive used', async () => {
+  const {wrongNames} = await import('../worker/screening.mjs');
+  assert.deepEqual(wrongNames('PT APAC Inti Corpora Tbk (IPAC) dan IPAC (PT Era Graharealty Tbk)', events.names, events.aliases), []);
 });
