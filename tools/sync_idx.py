@@ -9,6 +9,8 @@ Yang disalin, ke needtobeindexed/idx-signal-desk/ (folder ini milik skrip, isiny
   digest_<awal>_<akhir>[_HHMM-HHMM].md   satu per jendela "Saved Intelligence" (render /api/share/render)
   kepemilikan.json                       semua bulan KSEI: pemegang >1%, free float resmi, dan jumlah pemegang per emiten
                                          (dibaca tab Kepemilikan Saham di viewer)
+  kepemilikan-perubahan.json             laporan perubahan kepemilikan pemegang saham per emiten (Jul 2023–),
+                                         diambil viewer saat satu emiten dibuka
 Hanya membaca: GET, render tanpa menulis berkas, dan ledger kepemilikan dibuka read-only. Tidak memicu scraping IDX.
 """
 import argparse
@@ -39,8 +41,9 @@ STATE = DEST / ".sync.json"
 # kepemilikan_*.md adalah format lama (satu berkas per bulan); dihapus saat kepemilikan.json ditulis.
 OWNED = re.compile(r"^(digest|kepemilikan)_[\w\-]+\.md$")
 OWNERSHIP_JSON = DEST / "kepemilikan.json"
+FILINGS_JSON = DEST / "kepemilikan-perubahan.json"
 # Naikkan kalau bentuk kepemilikan.json berubah, supaya sinkron berikutnya membuatnya ulang.
-OWNERSHIP_FORMAT = 2
+OWNERSHIP_FORMAT = 3
 
 # Arsip ini bisa dibagikan lewat link. Nomor HP pribadi (mis. corporate secretary) dan kode akses rapat
 # yang ikut terkutip dari pengumuman disamarkan; nama, alamat usaha, dan angka kepemilikan tidak diubah.
@@ -192,7 +195,16 @@ def read_ledger(profile):
             tickers = [r[0] for r in con.execute("""SELECT DISTINCT h.ticker FROM ksei_holdings h
                                                     JOIN ksei_files f ON f.file_id=h.file_id WHERE f.active=1""")]
             files = [list(r) for r in con.execute("SELECT file_id, as_of, fetched_at FROM ksei_files WHERE active=1 ORDER BY as_of, fetched_at")]
-        return {"tickers": sorted(tickers), "files": files}
+            tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            filings = coverage = None
+            if "filings" in tables:
+                tickers += [r[0] for r in con.execute("SELECT DISTINCT ticker FROM filings WHERE ticker IS NOT NULL")]
+                filings = list(con.execute("SELECT count(*), max(updated_at) FROM filings").fetchone())
+            if {"backfill_sources", "backfill_months"} <= tables:
+                listed, downloaded = con.execute("SELECT count(*), count(local_path) FROM backfill_sources WHERE kind='filings'").fetchone()
+                first, last = con.execute("SELECT min(month), max(month) FROM backfill_months WHERE kind='filings'").fetchone()
+                coverage = {"listed": listed, "downloaded": downloaded, "from": first, "to": last}
+        return {"tickers": sorted(set(tickers)), "files": files, "filings": filings, "coverage": coverage}
     except sqlite3.Error as e:
         print(f"  ledger kepemilikan tidak terbaca ({e}); hanya emiten yang punya laporan emiten yang disalin", file=sys.stderr)
         return None
@@ -321,6 +333,89 @@ def issue_text(issue):
     return ISSUE_TEXT.get(code, code) + (f" ({detail})" if detail else "")
 
 
+FILING_ISSUES = {
+    "reconciliation_mismatch": "saham sebelum ± transaksi tidak sama dengan sesudah",
+    "pct_inconsistent_with_total_shares": "persen tidak cocok dengan total saham emiten",
+    "pct_inconsistent_with_paid_up_capital": "persen tidak cocok dengan modal disetor",
+    "unreported_change_between_filings": "ada perubahan yang tidak dilaporkan sejak laporan sebelumnya",
+    "shares_and_percentage_move_in_opposite_directions": "lembar dan persen bergerak berlawanan",
+    "percentage_out_of_range": "persen di luar 0–100",
+    "controller_claim_below_5pct": "ditandai pengendali tetapi di bawah 5%",
+    "price_may_be_total_value": "harga mungkin nilai total transaksi",
+    "transaction_row_incomplete": "baris transaksi tidak lengkap",
+    "required_field_missing": "kolom wajib kosong",
+    "announcement_code_mismatch": "kode di pengumuman IDX berbeda dengan formulir",
+    "target_ticker_unresolved": "saham sasaran belum dikenali",
+    "scanned_pdf_no_text": "PDF hasil pindai, teksnya belum terbaca",
+    "unrecognized_filing_layout": "format formulir belum dikenali",
+    "bae_table_unrecognized": "tabel surat BAE belum terbaca",
+    "parse_failed": "PDF gagal dibaca",
+}
+# Ringkasan global backfill (bulan belum lengkap, unduhan gagal) bukan catatan satu laporan.
+GLOBAL_AUDIT = ("month_listing_incomplete", "source_not_downloaded")
+FIRST_FILING_DAY = "2023-01-01"
+
+
+GAP_DETAIL = re.compile(r"previous report ended at ([\d,]+), next starts at ([\d,]+) \(([+-][\d,]+) shares")
+
+
+def filing_note(issue):
+    code, _, detail = str(issue).partition(":")
+    detail = detail.strip()
+    gap = GAP_DETAIL.search(detail) if code == "unreported_change_between_filings" else None
+    if gap:
+        end, start, diff = (x.replace(",", ".") for x in gap.groups())
+        return f"selisih {diff} lembar dari laporan sebelumnya (berakhir {end}, laporan ini mulai {start})"
+    return redact(FILING_ISSUES.get(code, code) + (f" ({detail[:200]})" if detail else ""))
+
+
+def filing_date(value, today):
+    value = str(value or "")[:10]
+    return value if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) and FIRST_FILING_DAY <= value <= today else None
+
+
+def filing_rows(filings, audit, today):
+    """Laporan perubahan kepemilikan satu emiten, urut tanggal, hanya kolom yang ditampilkan.
+
+    [tanggal, pemegang, jabatan/status, lembar sebelum, lembar sesudah, % sebelum, % sesudah,
+     [[jenis transaksi, arah 1/-1/0, lembar, harga, tanggal]], 1 kalau tervalidasi, [catatan], url PDF]
+    Angka persis yang dilaporkan; catatan hanya menandai, tidak mengoreksi. Tanggal di luar 2023–hari ini dikosongkan
+    dan diberi catatan supaya satu tanggal salah ketik tidak merusak data viewer.
+    """
+    extra = {}
+    for a in audit or []:
+        if a.get("source") == "filing" and a.get("check") not in GLOBAL_AUDIT and a.get("reference"):
+            extra.setdefault((a["reference"], a.get("date")), []).append(a)
+    rows = []
+    for f in filings or []:
+        if f.get("public_float"):
+            continue
+        notes = [filing_note(x) for x in f.get("issues") or []]
+        raw_date = f.get("event_date")
+        day = filing_date(raw_date, today)
+        if raw_date and not day:
+            notes.append(redact(f"tanggal tidak wajar ({str(raw_date)[:20]})"))
+        url = https_or_none(f.get("source_url"))
+        shares = f.get("shares_after")
+        for a in extra.get((f.get("source_url"), raw_date), []):
+            # Satu surat BAE bisa berisi beberapa pemegang: cocokkan catatan persen lewat jumlah lembarnya.
+            if a["check"] == "pct_inconsistent_with_total_shares" and shares is not None and f"{shares:,}" not in (a.get("detail") or ""):
+                continue
+            note = filing_note(f"{a['check']}: {a.get('detail') or ''}")
+            if note not in notes:
+                notes.append(note)
+        role = [str(f.get("position") or f.get("category") or "").strip()]
+        if f.get("controller"):
+            role.append("Pengendali")
+        tx = [[redact(str(t.get("type") or ""))[:120], t.get("direction") if t.get("direction") in (1, -1, 0) else None,
+               t.get("shares"), t.get("price"), filing_date(t.get("date"), today)] for t in f.get("transactions") or []]
+        rows.append([day, redact((f.get("holder_name") or "").strip())[:300], redact(" · ".join(r for r in role if r))[:200],
+                     f.get("shares_before"), shares, f.get("pct_before"), f.get("pct_after"), tx,
+                     int(f.get("validation") == "ok"), notes, url])
+    rows.sort(key=lambda r: (r[0] or "", r[1]))
+    return rows
+
+
 def ownership_data(server, index, ledger, pid):
     """Semua bulan KSEI dalam satu struktur ringkas untuk tab Kepemilikan Saham.
 
@@ -331,6 +426,7 @@ def ownership_data(server, index, ledger, pid):
                 d: [daftar pemegang saham laporan emiten], b: [jenis pemilik BAE]}]  (d dan b tidak ada kalau kosong semua)
     Nomor investor tetap sama lintas bulan per emiten: nama yang sama, atau nama mirip dengan lembar persis sama
     dari bulan data sebelumnya (lihat match_renamed), sehingga viewer bisa membandingkan dua bulan mana pun.
+    Hasil kedua: laporan perubahan kepemilikan per emiten (lihat filing_rows), ditulis ke berkas terpisah.
     """
     tickers = sorted({c["ticker"] for c in index["companies"]} | set((ledger or {}).get("tickers") or []))
     if len(tickers) > 5000 or any(not isinstance(t, str) or not re.fullmatch(r"[A-Z0-9]{2,12}", t) for t in tickers):
@@ -348,8 +444,11 @@ def ownership_data(server, index, ledger, pid):
             table.append(value)
         return lookup[key]
 
-    companies = []
+    companies, filings, today = [], {}, date.today().isoformat()
     for d in sorted(details, key=lambda d: d["ticker"]):
+        rows = filing_rows(d.get("filings"), d.get("ownership_audit"), today)
+        if rows:
+            filings[d["ticker"]] = rows
         ksei = {p["period"]: p for p in d.get("ksei_periods") or []}
         ids, prev, k, f, c, dps, bae = {}, None, [], [], [], [], []
         for i, month in enumerate(months):
@@ -384,15 +483,17 @@ def ownership_data(server, index, ledger, pid):
                 entry["i"] = [redact(issue_text(x)) for x in issues]
             k.append(entry)
             prev = groups
-        if any(k) or any(f) or any(dps):
+        if any(k) or any(f) or any(dps) or rows:
             company = {"t": d["ticker"], "n": redact((d.get("company_name") or "").strip()), "k": k, "f": f, "c": c}
             if any(dps):
                 company["d"] = dps
             if any(bae):
                 company["b"] = bae
             companies.append(company)
-    return {"format": OWNERSHIP_FORMAT, "updated": index.get("updated_at"), "months": meta,
+    data = {"format": OWNERSHIP_FORMAT, "updated": index.get("updated_at"), "months": meta,
             "names": names, "classes": classes, "categories": categories, "companies": companies}
+    changes = {"format": 1, "coverage": (ledger or {}).get("coverage"), "companies": filings}
+    return data, changes
 
 
 def sync_ownership(server, state, force, profile, guard):
@@ -403,15 +504,19 @@ def sync_ownership(server, state, force, profile, guard):
     ledger = read_ledger(profile) if getattr(server, "local", False) else None
     fp = json.dumps({"format": OWNERSHIP_FORMAT,
                      "index": {k: index.get(k) for k in ("profile_id", "updated_at", "parser_version", "counts", "ksei")},
-                     "ksei_files": ledger and ledger["files"], "ksei_tickers": ledger and len(ledger["tickers"])}, sort_keys=True)
+                     "ksei_files": ledger and ledger["files"], "ksei_tickers": ledger and len(ledger["tickers"]),
+                     "filings": ledger and ledger["filings"], "coverage": ledger and ledger["coverage"]}, sort_keys=True)
     if not force and state.get("ownership") == fp and OWNERSHIP_JSON.exists():
         return [], []
-    data = ownership_data(server, index, ledger, pid)
+    data, changes = ownership_data(server, index, ledger, pid)
     if not data["companies"]:
         print("  server tidak mengembalikan data kepemilikan; kepemilikan.json lama dibiarkan")
         return [], []
     text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     changed = [OWNERSHIP_JSON.name] if write_if_changed(OWNERSHIP_JSON, text) else []
+    if changes["companies"]:
+        if write_if_changed(FILINGS_JSON, json.dumps(changes, ensure_ascii=False, separators=(",", ":"))):
+            changed.append(FILINGS_JSON.name)
     guard()
     removed = prune("kepemilikan_", set(), allow_empty=True)
     state["ownership"] = fp
@@ -474,13 +579,13 @@ def _sync_once(args):
 
 
 def sync_once(args):
-    global DEST, STATE, OWNERSHIP_JSON
-    original, old_state, old_ownership = DEST, STATE, OWNERSHIP_JSON
+    global DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON
+    original, old_state, old_ownership, old_filings = DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON
     if original.is_symlink() or not original.resolve().is_relative_to((ROOT / "needtobeindexed").resolve()):
         raise ValueError("Folder sinkron menunjuk keluar arsip.")
     original.mkdir(parents=True, exist_ok=True)
     def managed(path):
-        return path.name in (".sync.json", "kepemilikan.json") or bool(OWNED.fullmatch(path.name))
+        return path.name in (".sync.json", "kepemilikan.json", "kepemilikan-perubahan.json") or bool(OWNED.fullmatch(path.name))
     originals = {}
     for path in original.iterdir():
         if managed(path):
@@ -493,9 +598,10 @@ def sync_once(args):
             (stage / name).write_bytes(data)
         try:
             DEST, STATE, OWNERSHIP_JSON = stage, stage / ".sync.json", stage / "kepemilikan.json"
+            FILINGS_JSON = stage / "kepemilikan-perubahan.json"
             changed = _sync_once(args)
         finally:
-            DEST, STATE, OWNERSHIP_JSON = original, old_state, old_ownership
+            DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON = original, old_state, old_ownership, old_filings
         staged = {p.name: p.read_bytes() for p in stage.iterdir() if managed(p)}
         # Refuse concurrent edits instead of silently overwriting them.
         current = {p.name: p.read_bytes() for p in original.iterdir() if managed(p) and p.is_file() and not p.is_symlink()}

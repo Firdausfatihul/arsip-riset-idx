@@ -109,6 +109,9 @@ EXPLICIT_RANGE = re.compile(r"\d{4}-\d{2}-\d{2}[_\-\s]+(?:to[_\-\s]+)?\d{4}-\d{2
 # Data tab Kepemilikan Saham: disalin apa adanya, viewer mengambilnya saat tab dibuka.
 OWN_SRC = SRC / "idx-signal-desk" / "kepemilikan.json"
 OWN_PATH = "files/kepemilikan/kepemilikan.json"
+# Laporan perubahan kepemilikan (tools/sync_idx.py), diambil viewer saat satu emiten dibuka.
+CHANGES_SRC = SRC / "idx-signal-desk" / "kepemilikan-perubahan.json"
+CHANGES_PATH = "files/kepemilikan/kepemilikan-perubahan.json"
 
 
 # ---------------------------------------------------------------- helpers
@@ -693,6 +696,12 @@ a.chip:hover{outline:1px solid var(--c)}
 }
 
 /* kepemilikan saham */
+.own-flag{display:block;margin-top:4px;font:500 13px/1.4 var(--sans);color:var(--down)}
+.own-flag.note{color:var(--muted)}
+#own-changes .own-table td,#own-changes .own-table th{vertical-align:top}
+#own-changes .own-table .own-date{min-width:0;white-space:nowrap;font-weight:500}
+#own-changes .own-table .own-holder{min-width:12rem;max-width:26rem;text-align:left;white-space:normal}
+#own-changes .own-table .own-tx{min-width:14rem;text-align:left;white-space:normal;font-size:14px}
 .own{--s1:var(--own);--s2:var(--dg);--s3:var(--sb);--s4:var(--kip);min-width:0;max-width:1320px;margin-inline:auto;padding-left:max(var(--gutter),env(safe-area-inset-left,0px));padding-right:max(var(--gutter),env(safe-area-inset-right,0px));padding-block:24px 72px}
 .own-hero{display:grid;gap:10px;padding-bottom:22px;border-bottom:1px solid var(--line-strong)}
 .own-hero h1{margin:0;font:600 clamp(30px,4.4vw,46px)/1.05 var(--cond);letter-spacing:-.012em}
@@ -1309,7 +1318,7 @@ APP_JS = r"""
     function index(v, table){ require(Number.isSafeInteger(v) && v >= 0 && v < table.length); }
     function flag(v){ require(v === 0 || v === 1); }
     function url(v){ require(v === null || (typeof v === 'string' && v.length <= 4096)); }
-    require(d && d.format === 2);
+    require(d && (d.format === 2 || d.format === 3));  // 3 = bentuk sama, ditambah emiten yang hanya punya laporan perubahan
     array(d.months,240); require(d.months.length === own.months.length && d.months.length > 0);
     d.months.forEach(function(m,i){ require(m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m.p) && m.p === own.months[i].p); url(m.url); });
     [d.names,d.classes,d.categories].forEach(function(a){ array(a,200000).forEach(function(v){ require(typeof v === 'string' && v.length <= 4000); }); });
@@ -1360,6 +1369,45 @@ APP_JS = r"""
       }).catch(function(e){ ownLoading = null; throw e; });
     }
     return ownLoading;
+  }
+
+  // Laporan perubahan kepemilikan (formulir KSEI/IDX, surat BAE), berkas terpisah; diambil saat satu emiten dibuka.
+  var changesData = null, changesLoading = null;
+  function validateChanges(d){
+    function require(ok){ if (!ok) throw new Error('Struktur laporan perubahan tidak valid.'); }
+    function number(v){ require(v === null || (typeof v === 'number' && Number.isFinite(v))); }
+    function text(v, max){ require(typeof v === 'string' && v.length <= max); }
+    function day(v){ require(v === null || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v))); }
+    require(d && d.format === 1 && d.companies && typeof d.companies === 'object' && !Array.isArray(d.companies));
+    var cov = d.coverage;
+    require(cov == null || (typeof cov === 'object' && Number.isSafeInteger(cov.listed) && Number.isSafeInteger(cov.downloaded)));
+    var keys = Object.keys(d.companies), count = 0;
+    require(keys.length <= 5000);
+    keys.forEach(function(t){
+      require(/^[A-Z0-9]{2,12}$/.test(t));
+      var rows = d.companies[t];
+      require(Array.isArray(rows) && rows.length <= 20000);
+      rows.forEach(function(r){
+        require(Array.isArray(r) && r.length === 11 && ++count <= 300000);
+        day(r[0]); text(r[1], 300); text(r[2], 200); r.slice(3, 7).forEach(number);
+        require(Array.isArray(r[7]) && r[7].length <= 200);
+        r[7].forEach(function(x){ require(Array.isArray(x) && x.length === 5); text(x[0], 120); require(x[1] === null || x[1] === 1 || x[1] === -1 || x[1] === 0); number(x[2]); number(x[3]); day(x[4]); });
+        require(r[8] === 0 || r[8] === 1);
+        require(Array.isArray(r[9]) && r[9].length <= 50); r[9].forEach(function(x){ text(x, 400); });
+        require(r[10] === null || (typeof r[10] === 'string' && r[10].length <= 4096));
+      });
+    });
+  }
+  function loadChanges(){
+    if (changesData) return Promise.resolve(changesData);
+    if (!changesLoading){
+      changesLoading = fetch(own.changes + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function(d){ validateChanges(d); changesData = d; changesLoading = null; return d; })
+        .catch(function(e){ changesLoading = null; throw e; });
+    }
+    return changesLoading;
   }
 
   // Pemegang satu emiten di satu bulan, dijumlahkan per investor (nomor investor sama lintas bulan).
@@ -1448,6 +1496,7 @@ APP_JS = r"""
     if (c){
       ownBody.innerHTML = detailHtml(c);
       trendChart(document.getElementById('own-trend'), c);
+      if (own.changes) fillChanges(c);
     } else {
       ownBody.innerHTML = (st.t ? '<p class="own-note">Kode ' + esc(st.t) + ' tidak ada di data kepemilikan. Pilih dari daftar di bawah.</p>' : '') + listHtml();
     }
@@ -1598,7 +1647,7 @@ APP_JS = r"""
       }).join('') + '</tbody></table></div><p class="own-note">Baris dengan nama investor sama dijumlahkan. Nama yang ejaannya mirip dengan jumlah lembar persis sama pada bulan data sebelumnya dianggap investor yang sama.</p>';
     h += '</section>';
 
-    h += dpsHtml(c) + baeHtml(c);
+    h += dpsHtml(c) + (own.changes ? '<section class="own-card" id="own-changes"><div class="own-card-head"><h3>Laporan perubahan kepemilikan</h3></div><p class="own-note">Memuat laporan…</p></section>' : '') + baeHtml(c);
 
     var notes = [];
     (same ? [to] : [from, to]).forEach(function(i){
@@ -1670,6 +1719,58 @@ APP_JS = r"""
       'Peran menurut laporan, bukan riwayat jabatan. Nama yang tidak disebut di salah satu laporan berarti tidak tercantum di laporan itu, bukan nol.';
     if (newest != null && newest > pr.cur) note += ' Laporan ' + monthName(newest) + ' ada tetapi tabelnya belum terbaca oleh Signal Desk' + (safeUrl(list[newest].u) ? ' (' + sourceLink(list[newest].u, 'buka di IDX') + ')' : '') + '.';
     return h + '<p class="own-note">' + note + '</p></section>';
+  }
+
+  function fillChanges(c){
+    var st = ownState, key = c.t + '|' + st.from + '|' + st.to;
+    function put(html){
+      var el = document.getElementById('own-changes');
+      if (el && ownState.t === c.t && c.t + '|' + ownState.from + '|' + ownState.to === key) el.innerHTML = html;
+    }
+    loadChanges().then(function(d){ put(changesHtml(c, d)); }, function(){
+      put('<div class="own-card-head"><h3>Laporan perubahan kepemilikan</h3></div><p class="own-note">Laporan perubahan belum berhasil dimuat. Buka ulang emiten ini untuk mencoba lagi.</p>');
+    });
+  }
+
+  // Laporan perubahan kepemilikan satu emiten: yang tanggalnya di rentang Dari–Sampai tampil, sisanya di balik "Laporan lain".
+  // Sampai = bulan terakhir berarti tanpa batas akhir (laporan lebih baru dari data KSEI tetap tampil).
+  function changesHtml(c, d){
+    var st = ownState, rows = (d.companies[c.t] || []).slice().reverse(), cov = d.coverage;
+    var lo = own.months[st.from].p + '-01', hi = st.to === own.months.length - 1 ? '9999' : own.months[st.to].p + '-31';
+    function dayText(v){ return v ? +v.slice(8, 10) + ' ' + BULAN[+v.slice(5, 7) - 1].slice(0, 3) + ' ' + v.slice(0, 4) : '—'; }
+    function pos(sh, pct){ return (sh == null ? '—' : num(sh, 0)) + '<span class="own-tags">' + (pct == null ? '' : num(pct, 4) + '%') + '</span>'; }
+    function table(list){
+      return '<div class="own-scroll"><table class="own-table"><thead><tr><th scope="col" class="own-date">Tanggal</th><th scope="col" class="own-holder">Pemegang</th><th scope="col">Sebelum</th>' +
+        '<th scope="col">Sesudah</th><th scope="col">Perubahan</th><th scope="col" class="own-tx">Transaksi</th><th scope="col">Sumber</th></tr></thead><tbody>' +
+        list.map(function(r){
+          var ds = r[3] != null && r[4] != null ? r[4] - r[3] : null, dp = r[5] != null && r[6] != null ? r[6] - r[5] : null;
+          var tags = r[2] ? [r[2]] : [];
+          var tx = r[7].map(function(x){
+            return esc(x[0] || 'Transaksi') + (x[2] != null ? ' ' + num(x[2], 0) : '') + (x[3] != null ? ' @ Rp' + num(x[3], 2) : '') + (x[4] && x[4] !== r[0] ? ' · ' + dayText(x[4]) : '');
+          });
+          return '<tr><td class="own-date">' + dayText(r[0]) + '</td>' +
+            '<th scope="row" class="own-holder">' + esc(r[1] || '—') + (tags.length ? '<span class="own-tags">' + esc(tags.join(' · ')) + '</span>' : '') +
+            (r[9].length ? '<span class="own-flag' + (r[8] ? ' note' : '') + '">' + (r[8] ? 'Catatan: ' : 'Perlu dicek: ') + esc(r[9].join('; ')) + '</span>' : '') + '</th>' +
+            '<td>' + pos(r[3], r[5]) + '</td><td><strong>' + pos(r[4], r[6]) + '</strong></td>' +
+            '<td class="' + tone(ds) + '">' + (ds == null ? '—' : ds ? signed(ds, 0) : 'tetap') + (dp == null || !r2(dp) ? '' : '<span class="own-tags">' + signed(dp, 4, 'poin') + '</span>') + '</td>' +
+            '<td class="own-tx">' + (tx.length ? tx.join('<br>') : '—') + '</td>' +
+            '<td>' + (sourceLink(r[10], 'PDF') || '—') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    var inside = rows.filter(function(r){ return r[0] && r[0] >= lo && r[0] <= hi; }), other = rows.filter(function(r){ return inside.indexOf(r) === -1; });
+    var h = '<div class="own-card-head"><h3>Laporan perubahan kepemilikan</h3><span>' + inside.length + ' laporan di rentang' + (rows.length ? ' · ' + rows.length + ' total' : '') + '</span></div>';
+    if (!rows.length) h += '<p class="own-note">Belum ada laporan perubahan kepemilikan untuk emiten ini di Signal Desk.</p>';
+    else {
+      h += inside.length ? table(inside) : '<p class="own-note">Tidak ada laporan perubahan dengan tanggal di rentang ' + esc(monthText(st.from)) + ' → ' + esc(monthText(st.to)) + '.</p>';
+      if (other.length) h += '<details class="own-twin"><summary>Laporan lain di luar rentang (' + other.length + ')</summary>' + table(other) + '</details>';
+    }
+    var note = 'Formulir perubahan kepemilikan (KSEI/IDX) dan surat BAE pemegang ≥5%, dibaca otomatis dari PDF. Angka persis seperti dilaporkan; "Perlu dicek" menandai angka yang tidak saling cocok, tanpa mengoreksinya. ' +
+      'Tanggal = tanggal transaksi terakhir di laporan.';
+    if (cov && cov.listed){
+      note += ' Cakupan: ' + (cov.from ? esc(cov.from) + ' s/d ' + esc(cov.to || '') + ', ' : '') + num(cov.downloaded, 0) + ' dari ' + num(cov.listed, 0) + ' PDF laporan sudah diunduh' +
+        (cov.downloaded < cov.listed ? '; daftar ini belum lengkap.' : '.');
+    }
+    return h + '<p class="own-note">' + note + '</p>';
   }
 
   // Jenis pemilik dari laporan BAE (hanya sebagian emiten punya tabel ini yang terbaca).
@@ -2013,7 +2114,7 @@ def build_page(docs, by_cat, own=None):
     "version": BUILD_ID,
     "chatApi": CHAT_API_URL,
     "docs": entries,
-    "own": own and {k: own[k] for k in ("path", "months", "count", "tickers")}
+    "own": own and {k: own[k] for k in ("path", "changes", "months", "count", "tickers")}
     }
     data_json = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     desc = ("Arsip riset pasar modal: laporan Stockbit, keterbukaan informasi Indonesia, Australia, dan Singapura, serta digest per emiten, dikelompokkan per sumber "
@@ -2098,7 +2199,11 @@ def ownership_meta():
         raise ValueError("Tanggal metadata kepemilikan tidak valid.")
     if not months or not companies:
         return None
-    return {"path": OWN_PATH, "months": months, "count": len(companies), "tickers": [c["t"] for c in companies]}
+    changes = None
+    if CHANGES_SRC.is_file():
+        check_source(CHANGES_SRC, SRC)
+        changes = CHANGES_PATH
+    return {"path": OWN_PATH, "changes": changes, "months": months, "count": len(companies), "tickers": [c["t"] for c in companies]}
 
 
 def main():
@@ -2151,6 +2256,8 @@ def main():
     if own:
         (out / OWN_PATH).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(OWN_SRC, out / OWN_PATH)
+        if own["changes"]:
+            shutil.copy2(CHANGES_SRC, out / CHANGES_PATH)
     head, body = build_page(docs, by_cat, own)
     chat_js = (ROOT / "chat.js").read_text()
     endpoint = urlsplit(CHAT_API_URL)

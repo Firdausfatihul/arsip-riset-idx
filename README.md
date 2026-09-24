@@ -28,7 +28,8 @@ Sumber build: `needtobeindexed/`, `build.py`, `chat.js`, dan `chat.config.json` 
 archivescrapingweb/
 ├── needtobeindexed/      # SUMBER: taruh file .md di sini (file .html lama juga masih didukung)
 │   └── idx-signal-desk/  # DISALIN OTOMATIS oleh tools/sync_idx.py (jangan isi manual; isinya ditimpa)
-│       └── kepemilikan.json  # data tab Kepemilikan Saham
+│       ├── kepemilikan.json  # data tab Kepemilikan Saham
+│       └── kepemilikan-perubahan.json  # laporan perubahan kepemilikan per emiten
 ├── build.py              # generator (Python 3.9+, stdlib saja)
 ├── report-frame.js       # pencarian dan navigasi lokal di laporan HTML terisolasi
 ├── report-shell.js       # pembungkus tepercaya untuk laporan HTML
@@ -49,6 +50,7 @@ archivescrapingweb/
     ├── index.html        # aplikasi viewer + daftar dokumen + isi .md ≤256 KB tertanam (JSON)
     ├── files/<kategori>/<YYYY-MM-DD>/<nama-asli>.md   # salinan mentah
     ├── files/kepemilikan/kepemilikan.json            # salinan data kepemilikan, diambil viewer saat tab dibuka
+    ├── files/kepemilikan/kepemilikan-perubahan.json  # laporan perubahan, diambil saat satu emiten dibuka
     ├── robots.txt
     ├── sitemap.xml       # hanya dibuat kalau BASE_URL di-set
     └── .nojekyll         # supaya GitHub Pages tidak memproses folder
@@ -141,7 +143,10 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
     batang "siapa menambah, siapa mengurangi" antara Dari dan Sampai; tabel pemegang >1% dengan perubahan persen dan lembar serta tren kecil;
     **daftar pemegang saham (DPS) dari laporan emiten**: pemegang ≥5%/pengendali/afiliasi, direksi dan komisaris dengan lembar dan persen,
     dibanding laporan sebelumnya, plus jumlah pemegang saham dan total saham; **jenis pemilik (laporan BAE)** dengan jumlah pemegang per jenis
-    (hanya ±30 emiten yang tabelnya terbaca); tautan file KSEI dan laporan emiten di IDX.
+    (hanya ±30 emiten yang tabelnya terbaca); **laporan perubahan kepemilikan** (formulir KSEI/IDX dan surat BAE ≥5%, Jul 2023–):
+    tanggal, pemegang, lembar/persen sebelum dan sesudah, transaksi, PDF, dan catatan "Perlu dicek" dari audit Signal Desk tanpa mengoreksi angka;
+    laporan di rentang Dari–Sampai tampil, sisanya di balik "Laporan lain" (Sampai = bulan terakhir berarti tanpa batas akhir);
+    tautan file KSEI dan laporan emiten di IDX.
   - Laporan emiten tidak terbit tiap bulan, jadi angka laporan memakai laporan terakhir sampai Sampai, dibanding laporan terakhir sampai Dari
     (atau laporan paling awal di dalam rentang). Laporan yang ada tetapi tabelnya belum terbaca Signal Desk ditandai, dengan tautan ke PDF-nya.
   - Semua grafik SVG buatan sendiri di `APP_JS`, tanpa library.
@@ -485,6 +490,10 @@ python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # 
   Berkas lama `kepemilikan_<tanggal>.md` (format sebelum 15 Sep 2026) dihapus otomatis. `/api/ownership` hanya mendaftar emiten yang punya laporan emiten,
   jadi daftar kode emiten KSEI (mis. ASII, BMRI) dan identitas file KSEI aktif dibaca langsung dari
   `<data_dir profil>/ownership/ledger.sqlite3` dalam mode read-only. Kalau ledger tidak terbaca, hanya emiten dari `/api/ownership` yang disalin.
+- `kepemilikan-perubahan.json`: field `filings` dan `ownership_audit` dari `/api/ownership/<KODE>` (hasil `idx-digest ownership-backfill`),
+  hanya kolom yang ditampilkan (lihat docstring `filing_rows()`). Catatan audit global (bulan belum lengkap, unduhan gagal) tidak ditempel per laporan;
+  cakupan unduhan ditulis sekali. Tanggal di luar 2023–hari ini dikosongkan dan diberi catatan. Sinkron berikutnya berjalan saat jumlah/waktu
+  pembaruan tabel `filings` atau jumlah PDF terunduh di ledger berubah. Publikasikan setelah backfill selesai supaya daftar tidak tampil setengah.
 - Disamarkan otomatis (di digest dan kepemilikan): nomor HP Indonesia (`08…`, `+62 8…`) dan kode akses rapat (`Passcode: …`, `pwd=…`),
   karena arsip bisa dibagikan lewat link. Nama, alamat, dan angka dari pengumuman tidak diubah. Setelah mengubah pola di `REDACTIONS`, jalankan sekali dengan `--force`.
 - Hanya endpoint baca. `/api/share/export` sengaja **tidak** dipakai karena menulis berkas ke `data/share/` scraper. Skrip tidak memicu scraping.

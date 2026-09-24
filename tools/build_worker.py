@@ -7,9 +7,31 @@ from pathlib import Path
 import re
 import shutil
 
+from datetime import date
+import sys
+
 from build_safety import check_output
 from chat_archive import read_archive, ROOT, SYSTEM, COMMON_WORDS, WORD_TICKERS, split_text
 from evidence_index import make_evidence, VERSION
+
+sys.path.insert(0, str(ROOT))
+from build import text_ranges  # noqa: E402  (rentang tanggal yang sama dengan katalog situs)
+
+
+def covers(doc):
+    """Periode yang dibahas dokumen satu tanggal, untuk permintaan per tanggal di chat.
+
+    Katalog situs memakai tanggal laporan (stockbit_24092026 = 24 Sep), tetapi awal dokumen
+    sering menulis periode yang berakhir di tanggal itu ("periode 23–24 September 2026").
+    Path dan tanggal situs tidak diubah; hanya chat yang memakai rentang ini.
+    """
+    if doc['start'] != doc['end']:
+        return [doc['start'], doc['end']]
+    day = date.fromisoformat(doc['end'])
+    for s, e in text_ranges(doc['body']):
+        if e == day and s < e and (e - s).days <= 31:
+            return [s.isoformat(), e.isoformat()]
+    return [doc['start'], doc['end']]
 
 
 def build(directory, out):
@@ -34,7 +56,7 @@ def build(directory, out):
         evidence_asset = source_id + '.evidence.json'
         (out / evidence_asset).write_text(json.dumps(evidence, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         metadata.append({**{k: doc[k] for k in ('source_id', 'title', 'path', 'label', 'start', 'end', 'name', 'cat')},
-                         'asset': asset, 'evidence_asset': evidence_asset,
+                         'covers': covers(doc), 'asset': asset, 'evidence_asset': evidence_asset,
                          'document_id': evidence['document_id'], 'document_hash': evidence['document_hash'],
                          'sizes': [len(json.dumps(p, ensure_ascii=False, separators=(',', ':')).encode()) for p in parts]})
         for word in set(re.findall(r'\w+', (doc['title'] + '\n' + doc['search_body']).lower())):

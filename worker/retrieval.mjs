@@ -85,7 +85,8 @@ export function documentRequest(question, scope, index) {
   if (!wantsDoc || (!scope.date && !/\b(terbaru|terakhir|latest|paling baru)\b/i.test(question))) return null;
   let docs = index.docs.filter(d => !cats.length || cats.includes(d.cat));
   if (scope.date) {
-    docs = docs.filter(d => d.start && d.start <= scope.date && scope.date <= d.end);
+    // covers = periode yang dibahas (mis. laporan 24 Sep tentang 23–24 Sep); dokumen lama tanpa covers memakai tanggal katalog.
+    docs = docs.filter(d => { const [s,e] = d.covers || [d.start,d.end]; return s && s <= scope.date && scope.date <= e; });
     // Without a category, only single-day documents are an unambiguous match for a date.
     if (!cats.length) docs = docs.filter(d => d.start === d.end);
   } else {

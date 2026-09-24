@@ -37,7 +37,9 @@ test('whole-document requests resolve by category and date, including a missing 
   const years = [...new Set(manifest.docs.map(d => +d.end.slice(0, 4)))];
   const scope = dateQuery('summary dokumen keterbukaan informasi tanggal 22 september', [], years);
   assert.equal(scope.date, '2026-09-22');
-  assert.deepEqual(documentRequest('summary dokumen keterbukaan informasi tanggal 22 september', scope, manifest).map(d => d.name), ['ki_22092026.md']);
+  // KI 24 September covers 22–24 September (its opening states the period), so it matches too.
+  const names = documentRequest('summary dokumen keterbukaan informasi tanggal 22 september', scope, manifest).map(d => d.name);
+  assert.ok(names.includes('ki_22092026.md') && names.every(n => n.startsWith('ki_')), names.join());
   assert.equal(documentRequest('SOCI tanggal 17 September 2026', dateQuery('SOCI tanggal 17 September 2026'), manifest), null);
   assert.ok(dateQuery('SOCI tanggal 17', [], years).clarification, 'day without month still asks');
 });
@@ -62,4 +64,28 @@ test('invalid citations become a notice; follow-up terms are reused from the sto
   const second = await converse(archive, model, 'Analisa lebih dalam gunakan lebih banyak dokumen', history, () => {});
   assert.deepEqual(second.terms, ['VISI']);
   assert.equal(asked.length, 0, 'no model call needed to re-guess the search terms');
+});
+
+test('zero-hit model terms get one retry with other wording, never repeating the failed terms', async () => {
+  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
+  const archive = new Archive(assets), prompts = [];
+  const replies = ['{"terms":["transaksi nego gede"]}', '{"terms":["transaksi nego gede","pasar negosiasi","crossing"]}'];
+  const model = {complete:async m => { prompts.push(m[0].content); return replies.shift(); },
+    answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
+  const stats = {};
+  const result = await converse(archive, model, 'apakah ada transaksi nego gede?', [], () => {}, null, {metrics:stats});
+  assert.deepEqual(result.terms, ['pasar negosiasi', 'crossing']);
+  assert.ok(result.documents >= 3);
+  assert.match(prompts[1], /tidak ditemukan dalam arsip/);
+  assert.equal(stats.term_retry.failed[0], 'transaksi nego gede');
+});
+
+test('when model terms and the retry both miss, the user\'s own distinctive words are searched', async () => {
+  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
+  const replies = ['{"terms":["Tanoto Foundation"]}', '{"terms":[]}'];
+  const model = {complete:async () => replies.shift(), answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
+  const stats = {};
+  const result = await converse(new Archive(assets), model, 'Tanoko?', [], () => {}, null, {metrics:stats});
+  assert.deepEqual(result.terms, ['Tanoko']);
+  assert.equal(result.documents, 2);
 });

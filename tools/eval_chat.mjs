@@ -24,6 +24,9 @@ if(!key)throw Error('OPENROUTER_API_KEY missing in .env.chat');
 const {cases}=JSON.parse(await readFile(path.join(root,'tests/eval/cases.json'),'utf8'));
 const manifest=JSON.parse(await readFile(path.join(assets,'manifest.json'),'utf8'));
 const readAsset=async name=>readFile(path.join(assets,name));
+// Cases name documents by file name; source IDs (D12…) shift whenever documents are added.
+const idOf=Object.fromEntries(manifest.docs.map(d=>[d.name,d.source_id]));
+const ids=list=>list?.map(n=>{if(!idOf[n])throw Error('Unknown document in case: '+n);return idOf[n];});
 
 function sqlite(){
   const db=new DatabaseSync(':memory:');
@@ -69,18 +72,20 @@ async function evaluate(c){
   const r=await run(c.question,history,c.id);
   const answer=r.result?.answer||'',terms=(r.result?.terms||r.metrics.terms||[]).map(String);
   const status=r.result?(r.result.clarification?'clarification':'complete'):'error';
-  const ids=r.sources.map(s=>s.source_id),termsUpper=terms.map(t=>t.toUpperCase());
+  const found=r.sources.map(s=>s.source_id),termsUpper=terms.map(t=>t.toUpperCase());
+  const gold=ids(c.gold),docsAll=ids(c.docs_all),docsAny=ids(c.docs_any);
   const checks={};
   checks.status=c.status==='any'||status==='complete';
   if(c.terms_include)checks.terms_include=c.terms_include.every(t=>termsUpper.includes(t));
   if(c.terms_exclude)checks.terms_exclude=!c.terms_exclude.some(t=>termsUpper.includes(t));
-  if(c.docs_all)checks.docs_all=c.docs_all.every(d=>ids.includes(d));
+  if(docsAll)checks.docs_all=docsAll.every(d=>found.includes(d));
+  if(docsAny)checks.docs_any=docsAny.some(d=>found.includes(d));
   const facts=(c.facts||[]).map(f=>({fact:f,hit:new RegExp(f,'i').test(answer)}));
   if(facts.length)checks.facts=facts.every(f=>f.hit);
   const refs=[...new Set([...answer.matchAll(/\[(D\d+)\]/g)].map(m=>m[1]))];
-  const precision=c.gold&&ids.length?ids.filter(d=>c.gold.includes(d)).length/ids.length:null;
+  const precision=gold&&found.length?found.filter(d=>gold.includes(d)).length/found.length:null;
   return {id:c.id,question:c.question,status,error:r.error,pass:Object.values(checks).every(Boolean),checks,facts,
-    terms,sources:ids,source_precision:precision,citations:refs,invalid_citations:refs.filter(d=>!ids.includes(d)),
+    terms,sources:found,source_precision:precision,citations:refs,invalid_citations:refs.filter(d=>!found.includes(d)),
     incomplete:!!r.result?.incomplete,answer,usage:r.usage,elapsed_ms:r.elapsed_ms,attempts:r.attempts,
     retrieval:Object.fromEntries(Object.entries(r.metrics).filter(([k])=>!['date_scope'].includes(k)))};
 }

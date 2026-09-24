@@ -1,49 +1,436 @@
 {
-  "note": "Kasus uji akurasi chat dari log pertanyaan nyata. gold = dokumen yang benar-benar memuat kode (huruf besar, persis). facts = regex yang wajib muncul di jawaban (tidak peka huruf besar-kecil). Nomor D mengikuti build arsip 52 dokumen per 22 September 2026.",
-  "cases": [
-    {"id": "ki22_full", "question": "ringkas keterbukaan informasi 22 September 2026",
-     "docs_all": ["D39"], "facts": ["VISI", "EURO", "PPGL"]},
-    {"id": "ki22_noyear", "question": "summary dokumen keterbukaan informasi tanggal 22 september",
-     "docs_all": ["D39"], "facts": ["VISI", "EURO"]},
-    {"id": "soci", "question": "analisis soci",
-     "terms_include": ["SOCI"], "gold": ["D0","D2","D11","D12","D23","D41","D48","D51"], "docs_all": ["D12"], "facts": ["Sea Voyage|SVI", "tanker"]},
-    {"id": "lopi_pp", "question": "lopi mau pp tapi blm dpt persetujuan di rupslb nya ga si?",
-     "terms_include": ["LOPI"], "gold": ["D0","D1","D2","D5","D14","D25","D41","D43"]},
-    {"id": "kdtn_huayou", "question": "Kdtn di akuisisi oleh huayou",
-     "terms_include": ["KDTN"], "gold": ["D0","D1","D2","D23","D41","D43","D44","D45","D46","D50","D51"], "docs_all": ["D45"], "facts": ["Huayou"]},
-    {"id": "esta_owner", "question": "Pemilik esta",
-     "terms_include": ["ESTA"], "gold": ["D4","D27","D48","D49"], "docs_all": ["D27"], "facts": ["90,77", "9,23"]},
-    {"id": "nasi_naik", "question": "analisakan semua dokumen yang berkaitan dengan NASI dan perkiraan alasan kenapa sahamnya naik banyak akhir-akhir ini",
-     "terms_include": ["NASI"], "terms_exclude": ["NAIK"], "gold": ["D25","D28","D41","D49"], "docs_all": ["D25","D28"], "facts": ["807\\.400\\.000|789\\.112\\.018|22,73"]},
-    {"id": "true_naik", "question": "Analisa dokumen berhubungan TRUE yang bisa menjelaskan mengapa harga naik belakangan",
-     "terms_include": ["TRUE"], "terms_exclude": ["NAIK"], "gold": ["D2","D4","D23","D26","D35","D37","D39","D41","D48","D49","D51"]},
-    {"id": "feg_xingye", "question": "Ringkas keterbukaan Australia dalam arsip: apa perkembangan Far East Gold (FEG) dan Xingye? Jawab maksimal 70 kata dengan timeline singkat, hak suara, status dan sumber.",
-     "terms_exclude": ["EAST", "GOLD"], "docs_all": ["D3"], "facts": ["34,57", "3 November"]},
-    {"id": "enrg", "question": "ada apa dengan ENRG",
-     "terms_include": ["ENRG"], "gold": ["D0","D1","D2","D4","D6","D10","D41","D44","D50","D51"]},
-    {"id": "blue", "question": "analisi saham BLUE dari informasi dan dokumen yg tersedia, apa tujuannya dan bagaimana potensinya",
-     "terms_include": ["BLUE"], "gold": ["D0","D4","D25","D41","D44","D49"]},
-    {"id": "adhi_mra", "question": "apakah ada tentang \"Press Release \"ADHI Karya Masuki Tahap Implementasi Restrukturisasi melalui Penandatanganan Master Restructuring Agreement\" [ADHI ]\" ?",
-     "terms_include": ["ADHI"], "facts": ["Master Restructuring Agreement|MRA"]},
-    {"id": "kbli", "question": "emiten indonesia apa saja yang baru menambah KBLI",
-     "facts": ["KBLI"]},
-    {"id": "broad", "question": "Saham apa yang paling menarik", "status": "any"},
-    {"id": "followup_buka", "prime": "analisis BUKA", "question": "Analisa lebih dalam gunakan lebih banyak dokumen",
-     "terms_include": ["BUKA"], "gold": ["D11","D21","D27","D32","D40","D41","D50","D51"]},
-    {"id": "tanoko", "question": "Tanoko?", "docs_all": ["D14","D25"], "facts": ["AVIA"]},
-    {"id": "ipac_d41", "question": "Fokus APAC Realty dan IPAC (PT ERA Graharealty Tbk). Periksa sumber D41: transaksi 11 September 2026 itu rencana, bukan selesai. Buat timeline singkat maksimal 100 kata: kepemilikan awal, rencana tender (persentase dan harga), target penyelesaian serta syaratnya. Cantumkan sumber.",
-     "docs_all": ["D29"], "facts": ["20 Oktober|go private|delisting"]},
-    {"id": "sgx_thematic", "question": "simpulkan emiten indonesia yg berhubungan atau baru akuisisi dari singapur only dan urutkan timeline",
-     "facts": ["IPAC|Graharealty"]},
-    {"id": "gtsi_lead", "question": "analisa GTSI dan LEAD. coba bandingkan prospek masa depan perusahaan ini",
-     "terms_include": ["GTSI", "LEAD"], "gold": ["D2","D25","D41","D51","D27"]},
-    {"id": "heli_lower", "question": "Analisa heli dan semua dokumen",
-     "terms_include": ["HELI"], "gold": ["D0","D1","D2","D16","D20","D34","D35","D37","D38","D39","D40","D41","D46","D47","D48","D49","D51"]},
-    {"id": "aims_lower", "question": "analisis aims dari semua dokumen",
-     "terms_include": ["AIMS"], "gold": ["D4","D14","D21","D25","D32","D38","D39","D40","D43"]},
-    {"id": "buka_lower", "question": "Analisa buka dan semua dokumen yang tersedia",
-     "terms_include": ["BUKA"], "gold": ["D11","D21","D27","D32","D40","D41","D50","D51"]},
-    {"id": "soci_date", "question": "SOCI tanggal 17 September 2026", "terms_include": ["SOCI"], "status": "any"},
-    {"id": "tanker", "question": "apakah ada news terkait perkapalan / tanker?", "facts": ["SOCI"]}
-  ]
+ "note": "Kasus uji akurasi chat dari log pertanyaan nyata. gold = dokumen yang benar-benar memuat kode (huruf besar, persis). facts = regex yang wajib muncul di jawaban (tidak peka huruf besar-kecil). Dokumen dirujuk dengan nama file, supaya tetap benar saat nomor D bergeser. holdout = kata-katanya sengaja tidak ada di daftar istilah instruksi, untuk mengukur kemampuan menerjemahkan sendiri.",
+ "cases": [
+  {
+   "id": "ki22_full",
+   "question": "ringkas keterbukaan informasi 22 September 2026",
+   "docs_all": [
+    "ki_22092026.md"
+   ],
+   "facts": [
+    "VISI",
+    "EURO",
+    "PPGL"
+   ]
+  },
+  {
+   "id": "ki22_noyear",
+   "question": "summary dokumen keterbukaan informasi tanggal 22 september",
+   "docs_all": [
+    "ki_22092026.md"
+   ],
+   "facts": [
+    "VISI",
+    "EURO"
+   ]
+  },
+  {
+   "id": "soci",
+   "question": "analisis soci",
+   "terms_include": [
+    "SOCI"
+   ],
+   "gold": [
+    "Analisis_Stockbit_25-31_Agustus_2026.html",
+    "Laporan_Stockbit_Agustus_September_2026.html",
+    "digest_2026-08-20_2026-08-21.md",
+    "digest_2026-08-21_2026-08-24.md",
+    "digest_2026-09-05_2026-09-07.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_19092026.md",
+    "stockbit_review_2026-09-13_14.html"
+   ],
+   "docs_all": [
+    "digest_2026-08-21_2026-08-24.md"
+   ],
+   "facts": [
+    "Sea Voyage|SVI",
+    "tanker"
+   ]
+  },
+  {
+   "id": "lopi_pp",
+   "question": "lopi mau pp tapi blm dpt persetujuan di rupslb nya ga si?",
+   "terms_include": [
+    "LOPI"
+   ],
+   "gold": [
+    "Analisis_Stockbit_25-31_Agustus_2026.html",
+    "Laporan_Arsip_Stockbit_Agustus_September_2026.html",
+    "Laporan_Stockbit_Agustus_September_2026.html",
+    "digest_2026-08-10_2026-08-15_0000-1959.md",
+    "digest_2026-08-26_2026-08-27.md",
+    "digest_2026-09-07_2026-09-09.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_01092026.md"
+   ]
+  },
+  {
+   "id": "kdtn_huayou",
+   "question": "Kdtn di akuisisi oleh huayou",
+   "terms_include": [
+    "KDTN"
+   ],
+   "gold": [
+    "Analisis_Stockbit_25-31_Agustus_2026.html",
+    "Laporan_Arsip_Stockbit_Agustus_September_2026.html",
+    "Laporan_Stockbit_Agustus_September_2026.html",
+    "digest_2026-09-05_2026-09-07.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_01092026.md",
+    "stockbit_15-19_agustus_2026_indeks.html",
+    "stockbit_15092026.md",
+    "stockbit_17092026.md",
+    "stockbit_ki_review_2026-09-05_2026-09-10.md",
+    "stockbit_review_2026-09-13_14.html"
+   ],
+   "docs_all": [
+    "stockbit_15092026.md"
+   ],
+   "facts": [
+    "Huayou"
+   ]
+  },
+  {
+   "id": "esta_owner",
+   "question": "Pemilik esta",
+   "terms_include": [
+    "ESTA"
+   ],
+   "gold": [
+    "digest_2026-08-10_2026-08-11.md",
+    "digest_2026-09-09_2026-09-10.md",
+    "stockbit_19092026.md",
+    "stockbit_22092026.md"
+   ],
+   "docs_all": [
+    "digest_2026-09-09_2026-09-10.md"
+   ],
+   "facts": [
+    "90,77",
+    "9,23"
+   ]
+  },
+  {
+   "id": "nasi_naik",
+   "question": "analisakan semua dokumen yang berkaitan dengan NASI dan perkiraan alasan kenapa sahamnya naik banyak akhir-akhir ini",
+   "terms_include": [
+    "NASI"
+   ],
+   "terms_exclude": [
+    "NAIK"
+   ],
+   "gold": [
+    "digest_2026-09-07_2026-09-09.md",
+    "digest_2026-09-10_2026-09-10.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_22092026.md"
+   ],
+   "docs_all": [
+    "digest_2026-09-07_2026-09-09.md",
+    "digest_2026-09-10_2026-09-10.md"
+   ],
+   "facts": [
+    "807\\.400\\.000|789\\.112\\.018|22,73"
+   ]
+  },
+  {
+   "id": "true_naik",
+   "question": "Analisa dokumen berhubungan TRUE yang bisa menjelaskan mengapa harga naik belakangan",
+   "terms_include": [
+    "TRUE"
+   ],
+   "terms_exclude": [
+    "NAIK"
+   ],
+   "gold": [
+    "Laporan_Stockbit_Agustus_September_2026.html",
+    "digest_2026-08-10_2026-08-11.md",
+    "digest_2026-09-05_2026-09-07.md",
+    "digest_2026-09-08_2026-09-10.md",
+    "ki_17092026.md",
+    "ki_19092026.md",
+    "ki_22092026.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_19092026.md",
+    "stockbit_22092026.md",
+    "stockbit_review_2026-09-13_14.html"
+   ]
+  },
+  {
+   "id": "feg_xingye",
+   "question": "Ringkas keterbukaan Australia dalam arsip: apa perkembangan Far East Gold (FEG) dan Xingye? Jawab maksimal 70 kata dengan timeline singkat, hak suara, status dan sumber.",
+   "terms_exclude": [
+    "EAST",
+    "GOLD"
+   ],
+   "docs_all": [
+    "asx_20260913.md"
+   ],
+   "facts": [
+    "34,57",
+    "3 November"
+   ]
+  },
+  {
+   "id": "enrg",
+   "question": "ada apa dengan ENRG",
+   "terms_include": [
+    "ENRG"
+   ],
+   "gold": [
+    "Analisis_Stockbit_25-31_Agustus_2026.html",
+    "Laporan_Arsip_Stockbit_Agustus_September_2026.html",
+    "Laporan_Stockbit_Agustus_September_2026.html",
+    "digest_2026-08-10_2026-08-11.md",
+    "digest_2026-08-10_2026-08-18_0000-1959.md",
+    "digest_2026-08-19_2026-08-20.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_15-19_agustus_2026_indeks.html",
+    "stockbit_ki_review_2026-09-05_2026-09-10.md",
+    "stockbit_review_2026-09-13_14.html"
+   ]
+  },
+  {
+   "id": "blue",
+   "question": "analisi saham BLUE dari informasi dan dokumen yg tersedia, apa tujuannya dan bagaimana potensinya",
+   "terms_include": [
+    "BLUE"
+   ],
+   "gold": [
+    "Analisis_Stockbit_25-31_Agustus_2026.html",
+    "digest_2026-08-10_2026-08-11.md",
+    "digest_2026-09-07_2026-09-09.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_15-19_agustus_2026_indeks.html",
+    "stockbit_22092026.md"
+   ]
+  },
+  {
+   "id": "adhi_mra",
+   "question": "apakah ada tentang \"Press Release \"ADHI Karya Masuki Tahap Implementasi Restrukturisasi melalui Penandatanganan Master Restructuring Agreement\" [ADHI ]\" ?",
+   "terms_include": [
+    "ADHI"
+   ],
+   "facts": [
+    "Master Restructuring Agreement|MRA"
+   ]
+  },
+  {
+   "id": "kbli",
+   "question": "emiten indonesia apa saja yang baru menambah KBLI",
+   "facts": [
+    "KBLI"
+   ]
+  },
+  {
+   "id": "broad",
+   "question": "Saham apa yang paling menarik",
+   "status": "any"
+  },
+  {
+   "id": "followup_buka",
+   "prime": "analisis BUKA",
+   "question": "Analisa lebih dalam gunakan lebih banyak dokumen",
+   "terms_include": [
+    "BUKA"
+   ],
+   "gold": [
+    "digest_2026-08-20_2026-08-21.md",
+    "digest_2026-09-02_2026-09-05.md",
+    "digest_2026-09-09_2026-09-10.md",
+    "digest_2026-09-12_2026-09-14.md",
+    "pemeriksaan_55_emiten_14_September_2026.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_ki_review_2026-09-05_2026-09-10.md",
+    "stockbit_review_2026-09-13_14.html"
+   ]
+  },
+  {
+   "id": "tanoko",
+   "question": "Tanoko?",
+   "docs_all": [
+    "digest_2026-08-26_2026-08-27.md",
+    "digest_2026-09-07_2026-09-09.md"
+   ],
+   "facts": [
+    "AVIA"
+   ]
+  },
+  {
+   "id": "ipac_d41",
+   "question": "Fokus APAC Realty dan IPAC (PT ERA Graharealty Tbk). Periksa sumber D41: transaksi 11 September 2026 itu rencana, bukan selesai. Buat timeline singkat maksimal 100 kata: kepemilikan awal, rencana tender (persentase dan harga), target penyelesaian serta syaratnya. Cantumkan sumber.",
+   "docs_all": [
+    "digest_2026-09-11_2026-09-11.md"
+   ],
+   "facts": [
+    "20 Oktober|go private|delisting"
+   ]
+  },
+  {
+   "id": "sgx_thematic",
+   "question": "simpulkan emiten indonesia yg berhubungan atau baru akuisisi dari singapur only dan urutkan timeline",
+   "facts": [
+    "IPAC|Graharealty"
+   ]
+  },
+  {
+   "id": "gtsi_lead",
+   "question": "analisa GTSI dan LEAD. coba bandingkan prospek masa depan perusahaan ini",
+   "terms_include": [
+    "GTSI",
+    "LEAD"
+   ],
+   "gold": [
+    "Laporan_Stockbit_Agustus_September_2026.html",
+    "digest_2026-09-07_2026-09-09.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_review_2026-09-13_14.html",
+    "digest_2026-09-09_2026-09-10.md"
+   ]
+  },
+  {
+   "id": "heli_lower",
+   "question": "Analisa heli dan semua dokumen",
+   "terms_include": [
+    "HELI"
+   ],
+   "gold": [
+    "Analisis_Stockbit_25-31_Agustus_2026.html",
+    "Laporan_Arsip_Stockbit_Agustus_September_2026.html",
+    "Laporan_Stockbit_Agustus_September_2026.html",
+    "digest_2026-08-27_2026-08-31.md",
+    "digest_2026-09-02_2026-09-04.md",
+    "ki_15092026_id.md",
+    "ki_17092026.md",
+    "ki_19092026.md",
+    "ki_20260915.md",
+    "ki_22092026.md",
+    "pemeriksaan_55_emiten_14_September_2026.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_17092026.md",
+    "stockbit_18092026.md",
+    "stockbit_19092026.md",
+    "stockbit_22092026.md",
+    "stockbit_review_2026-09-13_14.html"
+   ]
+  },
+  {
+   "id": "aims_lower",
+   "question": "analisis aims dari semua dokumen",
+   "terms_include": [
+    "AIMS"
+   ],
+   "gold": [
+    "digest_2026-08-10_2026-08-11.md",
+    "digest_2026-08-26_2026-08-27.md",
+    "digest_2026-09-02_2026-09-05.md",
+    "digest_2026-09-07_2026-09-09.md",
+    "digest_2026-09-12_2026-09-14.md",
+    "ki_20260915.md",
+    "ki_22092026.md",
+    "pemeriksaan_55_emiten_14_September_2026.md",
+    "stockbit_01092026.md"
+   ]
+  },
+  {
+   "id": "buka_lower",
+   "question": "Analisa buka dan semua dokumen yang tersedia",
+   "terms_include": [
+    "BUKA"
+   ],
+   "gold": [
+    "digest_2026-08-20_2026-08-21.md",
+    "digest_2026-09-02_2026-09-05.md",
+    "digest_2026-09-09_2026-09-10.md",
+    "digest_2026-09-12_2026-09-14.md",
+    "pemeriksaan_55_emiten_14_September_2026.md",
+    "penelusuran_stockbit_20-24_agustus_2026.html",
+    "stockbit_ki_review_2026-09-05_2026-09-10.md",
+    "stockbit_review_2026-09-13_14.html"
+   ]
+  },
+  {
+   "id": "soci_date",
+   "question": "SOCI tanggal 17 September 2026",
+   "terms_include": [
+    "SOCI"
+   ],
+   "status": "any"
+  },
+  {
+   "id": "tanker",
+   "question": "apakah ada news terkait perkapalan / tanker?",
+   "facts": [
+    "SOCI"
+   ]
+  },
+  {
+   "id": "nego_gede",
+   "question": "apakah ada transaksi nego gede?",
+   "docs_any": [
+    "digest_2026-08-26_2026-08-27.md",
+    "digest_2026-09-12_2026-09-14.md",
+    "pemeriksaan_55_emiten_14_September_2026.md",
+    "stockbit_15-19_agustus_2026_indeks.html"
+   ],
+   "facts": [
+    "negosiasi|crossing",
+    "MBSS|PSSI|POWR"
+   ]
+  },
+  {
+   "id": "crossing",
+   "question": "ada info crossing saham?",
+   "docs_any": [
+    "digest_2026-08-26_2026-08-27.md"
+   ],
+   "facts": [
+    "MBSS|Wibowo"
+   ]
+  },
+  {
+   "id": "go_private",
+   "question": "emiten mana yang mau go private?",
+   "facts": [
+    "IPAC"
+   ]
+  },
+  {
+   "id": "tender_offer",
+   "question": "ada yang lagi tender offer ga?"
+  },
+  {
+   "id": "stock_split",
+   "question": "ada yang mau stock split?"
+  },
+  {
+   "id": "rights_issue",
+   "question": "siapa aja yang mau rights issue"
+  },
+  {
+   "id": "heldout_uma",
+   "holdout": true,
+   "question": "ada saham yg kena UMA ga?",
+   "docs_any": [
+    "digest_2026-09-02_2026-09-04.md"
+   ],
+   "facts": [
+    "GRPH"
+   ]
+  },
+  {
+   "id": "heldout_backdoor",
+   "holdout": true,
+   "question": "siapa aja yg dicurigai mau backdoor?"
+  },
+  {
+   "id": "heldout_delist",
+   "holdout": true,
+   "question": "ada emiten yg mau cabut dari bursa?",
+   "facts": [
+    "IPAC|delisting|go private"
+   ]
+  }
+ ]
 }

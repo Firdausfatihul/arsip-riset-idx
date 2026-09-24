@@ -3,16 +3,19 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {JSDOM,VirtualConsole}=require('jsdom'),{marked}=require('marked'),purify=require('dompurify');
 const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'site/index.html'),'utf8').replace(/<style>[\s\S]*?<\/style>/g,'');
 const ownership=JSON.parse(fs.readFileSync(path.join(root,'site/files/kepemilikan/kepemilikan.json'),'utf8'));
+const changesFile=path.join(root,'site/files/kepemilikan/kepemilikan-perubahan.json');
+const changes=fs.existsSync(changesFile)?JSON.parse(fs.readFileSync(changesFile,'utf8')):{format:1,coverage:null,companies:{}};
 const delay=ms=>new Promise(r=>setTimeout(r,ms));let checks=0;
-function setup(mutate){
+function setup(mutate,mutateChanges){
  const errors=[],console=new VirtualConsole();console.on('jsdomError',e=>errors.push(e.message));
  const dom=new JSDOM(html,{url:'https://archive.test/',runScripts:'outside-only',virtualConsole:console});
- const w=dom.window,d=w.document;let data=JSON.parse(d.getElementById('arsip-data').textContent),own=structuredClone(ownership);
- if(mutate)mutate(data,own);d.getElementById('arsip-data').textContent=JSON.stringify(data);
+ const w=dom.window,d=w.document;let data=JSON.parse(d.getElementById('arsip-data').textContent),own=structuredClone(ownership),ch=structuredClone(changes);
+ if(mutate)mutate(data,own);if(mutateChanges)mutateChanges(ch);d.getElementById('arsip-data').textContent=JSON.stringify(data);
  w.marked=marked;w.DOMPurify=purify(w);w.TextDecoder=TextDecoder;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.fetch=async url=>{
   if(String(url).startsWith('version.json'))return Response.json({version:data.version});
   if(String(url).startsWith(data.own.path))return Response.json(own);
+  if(data.own.changes&&String(url).startsWith(data.own.changes))return Response.json(ch);
   const file=data.docs.find(x=>String(url).split('?')[0]===x.path);
   if(file)return new Response(fs.readFileSync(path.join(root,'site',file.path),'utf8'));
   throw Error('Network forbidden: '+url);
@@ -41,9 +44,21 @@ async function test(name,fn){await fn();checks++;console.log('PASS',name);}
  });
  await test('all current ownership data passes schema, all companies render detail including charts',async()=>{
   const {dom,d,data,route,errors}=setup();route('#kepemilikan=');await delay(5);
-  assert.ok(d.querySelector('#own-body table'));assert.equal(d.querySelectorAll('#own-emiten option').length,964);
+  assert.ok(d.querySelector('#own-body table'));assert.equal(d.querySelectorAll('#own-emiten option').length,ownership.companies.length+1);
   for(const company of ownership.companies){route('#kepemilikan='+company.t);assert.ok(d.querySelector('#own-trend svg'),company.t);}
-  assert.deepEqual(errors,[]);dom.window.close();
+  await delay(10);assert.deepEqual(errors,[]);dom.window.close();
+ });
+ const filed=Object.keys(changes.companies)[0];
+ if(filed)await test('ownership-change filings render, hostile values stay inert, malformed file is rejected',async()=>{
+  let {dom,d,route,errors}=setup();route('#kepemilikan='+filed);await delay(10);
+  assert.equal(d.querySelectorAll('#own-changes tbody tr').length,changes.companies[filed].length);assert.deepEqual(errors,[]);dom.window.close();
+  ({dom,d,route,errors}=setup(null,ch=>{const r=ch.companies[filed][0];r[1]='<img src=x onerror=bad>';r[2]='<svg onload=bad>';r[9]=['<script>bad()</script>'];r[10]='javascript:alert(1)';r[7]=[['<b>x</b>',1,1,1,null]];}));
+  route('#kepemilikan='+filed);await delay(10);
+  assert.equal(d.querySelector('#own-changes img,#own-changes svg,#own-changes script,#own-changes b,#own-changes a[href^="javascript:"]'),null);assert.deepEqual(errors,[]);dom.window.close();
+  for(const attack of [ch=>ch.companies[filed][0][0]='2026-13-99x',ch=>ch.companies[filed][0][3]='1',ch=>ch.companies['bad key']=[],ch=>ch.format=2]){
+   ({dom,d,route}=setup(null,attack));route('#kepemilikan='+filed);await delay(10);
+   assert.equal(d.querySelector('#own-changes table'),null);assert.match(d.getElementById('own-changes').textContent,/belum berhasil dimuat/);dom.window.close();
+  }
  });
  await test('hostile names and URLs in ownership stay inert',async()=>{
   const {dom,d,route,errors}=setup((data,own)=>{own.companies[0].n='<img src=x onerror=bad>';own.names.fill('<svg onload=bad>');own.months.forEach(m=>m.url='javascript:alert(1)');});
@@ -80,5 +95,5 @@ async function test(name,fn){await fn();checks++;console.log('PASS',name);}
   sw.dispatchEvent(new sw.MessageEvent('message',{source:null,origin:'null',data:{type:'archive:found',id:1,total:1}}));await delay(5);assert.equal(resolved,false);
   sw.dispatchEvent(new sw.MessageEvent('message',{source:sw.document.querySelector('iframe').contentWindow,origin:'null',data:{type:'archive:found',id:1,total:2}}));assert.equal(await result,2);sw.close();
  });
- console.log('Completed',checks,'web security scenarios (including 963 company renders).');
+ console.log('Completed',checks,'web security scenarios (including',ownership.companies.length,'company renders).');
 })().catch(e=>{console.error(e);process.exitCode=1;});

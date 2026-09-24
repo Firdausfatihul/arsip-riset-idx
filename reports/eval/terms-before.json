@@ -1,0 +1,2474 @@
+{
+  "summary": {
+    "label": "terms-before",
+    "impl": "/private/tmp/claude-501/-Users-macbookair-Documents-project-archivescrapingweb/47393bc8-1aad-4460-8634-6398337bdc0d/scratchpad/before2/worker",
+    "archive_version": "b35cf10e1e3797ea",
+    "created_at": "2026-09-24T02:04:42.394Z",
+    "cases": 33,
+    "passed": 28,
+    "completed": 28,
+    "errors": 5,
+    "facts_hit": 20,
+    "facts_total": 25,
+    "mean_source_precision": 0.9935897435897437,
+    "invalid_citations": 0,
+    "cost_usd": 0.08936237400000001,
+    "provider_calls": 73
+  },
+  "results": [
+    {
+      "id": "ki22_full",
+      "question": "ringkas keterbukaan informasi 22 September 2026",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "docs_all": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "VISI",
+          "hit": true
+        },
+        {
+          "fact": "EURO",
+          "hit": true
+        },
+        {
+          "fact": "PPGL",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "KI — Corporate action, expansion, dan potensi perubahan bisnis · 22 September 2026"
+      ],
+      "sources": [
+        "D39"
+      ],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip **D39** (tanggal analisis 22 September 2026), berikut adalah ringkasan keterbukaan informasi dan corporate action yang tercatat pada tanggal tersebut. Analisis ini memisahkan fakta pengumuman, perhitungan bersyarat, dan batas bukti.\n\n### 1. Ringkasan Emiten dengan Update Terbaru pada 22 September 2026\nBerikut adalah daftar emiten yang memiliki pengumuman atau koreksi terbaru pada tanggal 22 September 2026, diurutkan berdasarkan waktu pembaruan dalam digest:\n\n| Emiten | Waktu Update | Kategori & Inti Informasi | Status/Batas Bukti |\n| :--- | :--- | :--- | :--- |\n| **VICI** | Jam tidak tersedia | Akuisisi tahap penjajakan; rapat dijadwalkan 29 Oktober. | Agenda rapat belum diumumkan; nilai akuisisi brand belum ada [D:4336–4350]. |\n| **CDIA** | 16:22:10 | Cash dividend Rp1,422181 per saham. Cum-date 30 Sept, pembayaran 22 Okt [D:1107; 1111–1118]. | Dividend yield belum dapat dihitung tanpa harga pasar terkini [D:1111–1121]. |\n| **HRUM** | 16:06:11 | Pengangkatan direktur baru Stephanus E. D. Sutantio. Perubahan kegiatan usaha belum dirinci [D:1754; 1759–1767]. | Bukan akuisisi terkonfirmasi [D:1838–1840]. |\n| **AKKU** | 15:56:21 | Audit Juni beropini *qualified*; harapan pembukaan suspensi bukan keputusan Bursa [D:215; 225–230]. | Risiko kelangsungan usaha perlu perhatian terpisah [D:270]. |\n| **ASGR** | 15:54:14 | Koreksi registrasi; pengendali dan *free float* dilaporkan tetap [D:509; 514–534]. | Tidak menunjukkan konsentrasi kepemilikan baru [D:514–534]. |\n| **PSSI** | 15:33:33 | Distribusi treasury shares (rasio 30:1). Update terakhir adalah bukti iklan [D:3291–3299]. | Persetujuan pembagian saham belum diperoleh dari regulator [D:3318–3329]. |\n| **ARKO** | 15:30:58 | Administrasi obligasi; rapat 6 Oktober untuk mengganti trustee [D:441; 445–452]. | Belum ada perubahan pengendali perusahaan [D:445–452]. |\n| **VICO** | 15:07:39 | Cash dividend & koreksi substantif. Oposisi voting bukan bukti perebutan pengendalian [D:4455–4465]. | Denominator suara berbeda; tidak disimpulkan perebutan kendali [D:4478–4484]. |\n| **EURO** | 14:39:15 | Rights issue maksimal 2 miliar saham disetujui; perubahan pengurus [D:1424; 1428–1437]. | Harga pelaksanaan, penggunaan dana, dan pembeli siaga belum tersedia [D:1431–1435]. |\n| **MTFN** | 14:33:46 | Audit *qualified*; penjelasan opini disampaikan tetapi isi lampiran tidak berhasil diproses [D:2668; 2672–2709]. | Data auditor/opini tidak lengkap untuk analisis mendalam [D:2706–2709]. |\n| **INAF** | 14:25:42 | Rencana rapat 29 Oktober tanpa agenda spesifik [D:1856; 1860–1868]. | Tidak ada dasar menyimpulkan pendanaan atau restrukturisasi baru [D:1860–1868]. |\n| **PIPA** | 14:06:58 | Risiko dana dan perubahan nama; cadangan penurunan nilai Rp64,555 miliar [D:2875; 2879–2890]. | Prioritas pemeriksaan risiko; tidak membuktikan aset energi atau sponsor baru [D:2879–2890]. |\n| **BIRD** | 14:06:38 | Perubahan anggota komite audit [D:712; 716–724]. | Belum ada hubungan transaksi lintas emiten [D:716–724]. |\n| **WSKT** | 13:34:31 | Restrukturisasi obligasi efektif; tenor sampai 2034, kupon 5% + Kupon Standstill [D:4739–4764]. | Pembayaran pertama direncanakan 23 Desember 2026 [D:4761–4764]. |\n| **AYLS** | 13:33:30 | Menyangkal rencana corporate action atau perubahan pengendali dalam tiga bulan ke depan [D:652; 656–662]. | Tidak ada rencana baru yang diungkap [D:656–662]. |\n| **SMMA** | 13:32:11 | Setoran modal ke PT Dana Saham Bersama dan PT Summit Oto Finance [D:3571–3591]. | Dampak laba dan struktur grup belum jelas [D:3601–3602]. |\n| **PNLF** | 13:20:03 | Menyangkal rencana corporate action atau perubahan pengendali dalam tiga bulan ke depan [D:3106; 3110–3118]. | Tidak ada rencana baru yang diungkap [D:3110–3118]. |\n| **HEXA** | 11:21:27 | Target usaha dan dividen; update terakhir bukti iklan [D:1619–1620]. | Informasi operasional berasal dari public expose sebelumnya [D:1627–1655]. |\n| **PBSA** | 11:13:28 | Stock split rasio 1:2 disetujui rapat 18 September [D:2723; 2727–2736]. | Jadwal implementasi belum tersedia [D:2795–2797]. |\n| **FAST** | 10:42:37 | Rapat 14 Oktober membahas pengurus baru dan penyesuaian klasifikasi usaha [D:1533; 1537–1540]. | Penyesuaian klasifikasi disebut tidak mengubah bisnis inti [D:1540]. |\n| **SCNP** | 10:08:09 | Penunjukan auditor Mirawati Sensi Idris (sama dengan AMMN) [D:3461; 3465–3469]. | Kesamaan auditor tidak membuktikan pemilik bersama atau akuisisi [D:3465–3469]. |\n| **AVIA** | 10:06:36 | Penerima penghargaan keberlanjutan dan tata kelola [D:583; 587–595]. | Tidak ada dampak finansial yang diungkap [D:587–595]. |\n| **UCID** | 10:05:14 | Rapat 14 Oktober hanya menyebut penyesuaian klasifikasi usaha [D:4051–4056]. | Bukan perubahan bisnis besar [D:4056]. |\n| **MPXL** | 09:20:13 | Pembentukan anak usaha PT Auto Prime Indonesia (modal Rp1,65 miliar untuk 55%) [D:2486; 2490–2499]. | Perusahaan baru dibentuk, bukan pembelian bisnis matang [D:2490–2499]. |\n| **ADHI** | 00:44:08 | Tiga usulan bondholder meeting ditolak (>94% suara tidak setuju) [D:20; 24–32]. | Ini bukan persetujuan restrukturisasi; isi usulan tidak tersedia [D:24–32]. |\n\n### 2. Catatan Penting mengenai Batas Bukti\n*   **VISI, EURO, PPGL, MNCN, VICI** diidentifikasi sebagai prioritas pendalaman karena melibatkan rencana perubahan bisnis, pendanaan, atau akuisisi. Namun, dokumen menegaskan bahwa **belum ada rangkaian lengkap** yang membuktikan *backdoor listing* atau masuknya pengendali baru [D:4578–4584; 1428–1437; 3172–3179; 2408–2416; 4336–4350].\n*   **Konflik Data:** Terdapat beberapa inkonsistensi angka dalam digest (misalnya pada JSMR, CRAB, HEXA, MEDC) yang dicatat namun tidak diselesaikan tanpa dokumen asli [D:1997–2010; 1209–1223; 1635; 2310].\n*   **Dividen:** Dividend yield tidak dapat dihitung karena harga pasar terkini tidak disediakan dalam arsip [D:1111–1121].\n*   **Sumber Data:** Analisis ini didasarkan pada dua berkas (`idx-digest-ALL-COMPANIES-20260922-164244.txt` dan `Pasted markdown(20260922-094307).md`) dan tidak mencakup verifikasi eksternal [D:3–6].",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 114879,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00178936,
+        "prompt_tokens": 33540,
+        "completion_tokens": 2770,
+        "cached_tokens": 33408,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 23058,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 49757,
+        "selected_source_bytes": 107213,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "document_request": [
+          "D39"
+        ],
+        "terms": [
+          "KI — Corporate action, expansion, dan potensi perubahan bisnis · 22 September 2026"
+        ],
+        "documents_checked": 1,
+        "current_document": "D39",
+        "database_source_reads": 1
+      }
+    },
+    {
+      "id": "ki22_noyear",
+      "question": "summary dokumen keterbukaan informasi tanggal 22 september",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "docs_all": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "VISI",
+          "hit": true
+        },
+        {
+          "fact": "EURO",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "KI — Corporate action, expansion, dan potensi perubahan bisnis · 22 September 2026"
+      ],
+      "sources": [
+        "D39"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D39"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan dokumen arsip **D39** dengan tanggal analisis **22 September 2026**, berikut adalah rangkuman keterbukaan informasi (public disclosure) yang dipublikasikan atau memiliki pembaruan status pada tanggal tersebut.\n\n### 1. Ringkasan Eksekutif\nPada 22 September 2026, terdapat **14 emiten** yang memiliki pengumuman terbaru atau koreksi substantif dalam berkas digest. Fokus utama meliputi:\n*   **Corporate Action & Pendanaan:** EURO (persetujuan rights issue), VISI (rencana perubahan bisnis lengkap), PIPA (risiko dana), dan WSKT (restrukturisasi efektif).\n*   **Dividen & Saham:** CDIA (pengumuman dividen), PSSI (iklan distribusi treasury shares), VICO (koreksi data dividen), dan PBSA (stock split disetujui).\n*   **Risiko & Audit:** AKKU (opini qualified), MTFN (penjelasan audit), dan TRUE (laporan historis/risiko).\n*   **Pengurus & Administrasi:** HRUM (direktur baru), SCNP (auditor baru), BIRD (komite audit), UANG (komite audit), SDRA (direktur efektif), AVIA (penghargaan), BSDE (pembayaran kupon), KOPI/PGLI/PNLF/VAST (konfirmasi tidak ada rencana baru).\n\n### 2. Detail Pengumuman Emiten per Tanggal 22 September 2026\n\nBerikut adalah daftar emiten beserta detail pengumumannya berdasarkan timestamp atau status update terakhir di berkas D39:\n\n| Emiten | Kategori / Topik | Detail Pengumuman [D39] |\n| :--- | :--- | :--- |\n| **VICI** | Akuisisi | Rapat dijadwalkan 29 Oktober untuk penjajakan akuisisi brand; agenda belum diumumkan [D:4336–4350]. |\n| **CDIA** | Cash Dividend | Pengumuman dividen Rp1,422181/saham; cum-date 30 Sept, ex-date 1 Okt, pembayaran 22 Okt [D:1107; 1111–1118]. |\n| **HRUM** | Pengurus Baru | Stephanus E. D. Sutantio diangkat sebagai direktur; perubahan kegiatan usaha belum dirinci [D:1754; 1759–1767]. |\n| **AKKU** | Audit & Suspensi | Audit Juni beropini *qualified*; harapan pembukaan suspensi bukan keputusan Bursa [D:215; 225–230]. |\n| **ASGR** | Kepemilikan | Koreksi registrasi; pengendali dan *free float* dilaporkan tetap stabil [D:509; 514–534]. |\n| **PSSI** | Treasury Shares | Update terakhir berupa bukti iklan distribusi saham bonus (rasio 30:1); persetujuan regulator masih ditunggu [D:3291–3299]. |\n| **ARKO** | Administrasi Utang | Rapat 6 Oktober untuk mengganti trustee obligasi; belum ada perubahan pengendali [D:441; 445–452]. |\n| **VICO** | Cash Dividend | Update bukti iklan dividen; koreksi substantif pada pukul 15:05:32 mengenai jumlah saham/hak [D:4455–4465]. |\n| **EURO** | Rights Issue | Persetujuan rights issue maksimal 2 miliar saham baru; perubahan pengurus (Darren Nathaniel Tandra jadi Direktur) [D:1424; 1428–1437]. |\n| **MTFN** | Audit Qualified | Penjelasan opini *qualified* disampaikan, namun isi lampiran tidak berhasil diproses dalam digest [D:2668; 2672–2677]. |\n| **INAF** | Rencana Rapat | Rapat 29 Oktober dijadwalkan; belum ada dasar menyimpulkan pendanaan atau restrukturisasi spesifik [D:1856; 1860–1868]. |\n| **PIPA** | Risiko Dana | Koreksi penggunaan dana penawaran umum; cadangan penurunan nilai besar (Rp64,555 miliar) dan konflik sisa dana [D:2875; 2879–2890]. |\n| **BIRD** | Komite Audit | Dua anggota komite audit diganti, ketua tetap [D:712; 716–724]. |\n| **WSKT** | Restrukturisasi Utang | Koreksi perjanjian efektif 17 Sept; jatuh tempo obligasi diperpanjang ke 2034 dengan kupon 5% + Kupon Standstill [D:4739–4764]. |\n| **AYLS** | Konfirmasi Nihil | Jawaban volatilitas menyangkal adanya informasi material atau rencana corporate action dalam tiga bulan [D:652; 656–662]. |\n| **SMMA** | Setoran Modal | Setoran modal ke PT Dana Saham Bersama dan PT Summit Oto Finance terkait penggabungan PT Oto Multiartha [D:3571–3591]. |\n| **PNLF** | Konfirmasi Nihil | Jawaban volatilitas menyatakan tidak ada corporate action atau rencana pengendali baru dalam tiga bulan [D:3106; 3110–3118]. |\n| **HEXA** | Target Usaha | Update bukti iklan target usaha dan dividen; informasi operasional dari *public expose* sebelumnya [D:1619–1620]. |\n| **PBSA** | Stock Split | Stock split rasio 1:2 disetujui rapat 18 Sept; jadwal implementasi belum ditentukan [D:2723; 2727–2736]. |\n| **FAST** | Pengurus & Klasifikasi | Rapat 14 Okt dijadwalkan; penyesuaian klasifikasi usaha disebut tidak mengubah bisnis inti [D:1533; 1537–1540]. |\n| **SCNP** | Auditor Baru | Penunjukan auditor Mirawati Sensi Idris (sama dengan AMMN); tidak membuktikan pemilik bersama [D:3461; 3465–3469]. |\n| **AVIA** | Reputasi | Penghargaan keberlanjutan dan tata kelola; tidak ada dampak finansial yang diungkap [D:583; 587–595]. |\n| **UCID** | Klasifikasi Usaha | Rapat 14 Okt hanya membahas penyesuaian klasifikasi usaha administratif [D:4051–4056]. |\n| **MPXL** | Anak Usaha Baru | Pembentukan PT Auto Prime Indonesia (modal disetor Rp1,65 miliar untuk kepemilikan 55%) [D:2486; 2490–2499]. |\n| **ADHI** | Risiko Utang | Tiga usulan *bondholder meeting* ditolak oleh pemegang utang; update berupa bukti iklan [D:20; 24–32]. |\n\n### 3. Catatan Penting dari Analisis Dokumen\n*   **VISI** disebutkan sebagai emiten dengan kombinasi perubahan bisnis paling lengkap (private placement, perubahan usaha/domisili, penyertaan saham), namun transaksi belum terlaksana [D:4571; 4578–4584].\n*   **PPGL** memiliki risiko dilusi kepemilikan signifikan jika private placement 10% diterbitkan penuh kepada pihak lain, menurunkan kepemilikan pemegang utama di bawah 50% [D:3172–3179].\n*   **MNCN** telah menandatangani perjanjian definitif dengan PT Republik Media Anak Bangsa, namun *closing* dan nilai transaksi belum final [D:2404; 2408–2416].\n*   Tidak ada bukti *backdoor listing* atau masuknya pengendali baru yang dapat dikonfirmasi sepenuhnya dari pengumuman periode ini [D:1626].\n\n### 4. Batas Bukti\nAnalisis ini didasarkan semata-mata pada berkas `idx-digest-ALL-COMPANIES-20260922-164244.txt` dan `Pasted markdown(20260922-094307).md`. Data harga pasar, likuiditas, dan identitas pemodal akhir tidak tersedia dalam bahan ini untuk menghitung dampak ekonomi langsung dari pengumuman tersebut.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 114890,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00164776,
+        "prompt_tokens": 33536,
+        "completion_tokens": 2417,
+        "cached_tokens": 33408,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 20163,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 49757,
+        "selected_source_bytes": 107213,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "document_request": [
+          "D39"
+        ],
+        "terms": [
+          "KI — Corporate action, expansion, dan potensi perubahan bisnis · 22 September 2026"
+        ],
+        "documents_checked": 1,
+        "current_document": "D39",
+        "database_source_reads": 1
+      }
+    },
+    {
+      "id": "soci",
+      "question": "analisis soci",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true,
+        "docs_all": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "Sea Voyage|SVI",
+          "hit": true
+        },
+        {
+          "fact": "tanker",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "SOCI"
+      ],
+      "sources": [
+        "D49",
+        "D53",
+        "D23",
+        "D2",
+        "D0",
+        "D42",
+        "D12",
+        "D11"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D12",
+        "D11",
+        "D23",
+        "D0",
+        "D2",
+        "D49",
+        "D53"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berikut adalah analisis komprehensif mengenai PT Soechi Lines Tbk (SOCI) berdasarkan arsip yang tersedia, dipisahkan antara fakta korporasi, data kepemilikan, dan spekulasi pasar.\n\n### 1. Aksi Korporasi dan Ekspansi (Agustus 2026)\nArsip menunjukkan adanya dua aksi korporasi utama yang dilakukan SOCI pada periode Agustus 2026, yang mengindikasikan upaya ekspansi operasional [D12].\n\n*   **Pendirian Entitas Anak Baru:** SOCI mendirikan *Sea Voyage International Ltd* (SVI) di Marshall Islands dengan kepemilikan 100% dan modal disetor sebesar AS$500.000 [D11], [D12]. Tujuan pendirian ini adalah untuk mendukung kegiatan usaha pelayaran. Emiten menyatakan tidak ada dampak material terhadap kondisi keuangan maupun hukum dari pendirian ini [D11], [D12].\n*   **Transaksi Afiliasi (Jaminan Pinjaman):** SOCI memberikan jaminan perusahaan (*corporate guarantee*) dan jaminan kesanggupan kekurangan dana kas (*cash deficit guarantee*) kepada PT Bank Mandiri (Persero) Tbk, Singapore Branch. Jaminan ini ditujukan untuk fasilitas pinjaman berjangka (*term loan*) milik anak usaha, *Eternity Ocean Maritime Ltd* (EOM), dengan jumlah pokok hingga AS$54.900.000 [D12]. Transaksi ini bersifat afiliasi karena SOCI memegang 100% saham EOM [D12].\n\n**Risiko Material:** Pemberian jaminan senilai AS$54,9 juta meningkatkan eksposur kontinjensi SOCI. Jika EOM gagal memenuhi kewajiban, SOCI dapat dipanggil untuk membayar, yang berpotensi mempengaruhi likuiditas dan leverage perusahaan [D12]. Tidak ada rincian mengenai kondisi keuangan EOM atau jadwal pembayaran dalam arsip [D12].\n\n### 2. Struktur Kepemilikan dan Free Float (Periode September 2026)\nData registrasi pemegang efek per 31 Agustus 2026 (diumumkan awal September 2026) mencatat perubahan minor pada struktur modal dan basis investor [D23].\n\n*   **Kepemilikan Pengendali:** Tidak terjadi perubahan. PT Darma Pertiwi Raya dan PT Pilar Sukses Utama masing-masing masih memegang 35,05% saham, totaling 70,10% [D23].\n*   **Free Float:** Naik tipis dari 14,08% menjadi 14,09%. Jumlah saham free float meningkat 500.000 lembar, dari 994.184.000 menjadi 994.684.000 lembar [D23].\n*   **Jumlah Pemegang Saham:** Terjadi penurunan signifikan dari 14.588 menjadi 12.699 pemegang saham di KSEI (berkurang 1.889 orang) [D23]. Penurunan ini dikategorikan sebagai hipotesis analitis; bisa mengindikasikan konsolidasi kepemilikan atau pengurangan investor ritel, namun penyebab pastinya tidak dijelaskan dalam laporan resmi [D23].\n\n### 3. Laporan Keuangan dan Fundamental\nPada periode 5–7 September 2026, SOCI menyampaikan Laporan Keuangan Interim Auditan per 30 Juni 2026 [D23].\n\n*   **Keterbatasan Data:** Lampiran laporan keuangan (PDF/XLSX) gagal diekstraksi oleh sistem arsip. Akibatnya, angka keuangan, rasio profitabilitas, dan catatan penting tidak dapat diverifikasi atau dianalisis lebih lanjut [D23]. Analisis fundamental saat ini terbatas hanya pada data struktural dan kepemilikan.\n\n### 4. Sentimen Pasar dan Spekulasi (Stockbit)\nArsip media sosial Stockbit mencerminkan narasi spekulatif seputar SOCI, terutama terkait ekspansi armada dan potensi kenaikan harga.\n\n*   **Narasi Ekspansi:** Postingan pada Agustus 2026 menyebutkan penambahan kapal tanker dengan kontrak sewa, pinjaman US$54,9 juta, dan pembentukan anak usaha baru sebagai cerita ekspansi [D0], [D2]. Namun, penulis mengingatkan bahwa tambahan kapasitas hanya bernilai jika tarif sewa, pemakaian kapal, dan pembiayaannya mendukung keuntungan [D2].\n*   **Peringatan Analitis:** Pada 19 September 2026, pengguna [@primestockid] menekankan pentingnya memisahkan pendapatan dari kapal baru dengan keuntungan yang tidak berulang (*non-recurring*), mengingat laba juga mengandung pendapatan lain-lain [D49].\n*   **Indikator Spekulasi:** Indeks postingan Stockbit menunjukkan SOCI disebut dalam 3 dari 3 posting pilihan minggu ke-37 (13–14 September 2026), dengan porsi 0,2% dari total posting berpenanda ($) [D53]. Tag seperti `|BULL|`, `|NAIK|`, dan `|WINS|` muncul dalam beberapa postingan, menandakan sentimen optimis retail, namun tanpa dasar fundamental yang terverifikasi dalam arsip [D53].\n\n### Kesimpulan dan Batas Bukti\n1.  **Fakta Terkonfirmasi:** SOCI telah melakukan ekspansi melalui pendirian SVI dan peningkatan eksposur risiko via jaminan pinjaman EOM sebesar AS$54,9 juta [D12]. Struktur pengendali tetap stabil, namun jumlah pemegang saham menurun tajam [D23].\n2.  **Kekosongan Data:** Analisis kinerja keuangan interim Juni 2026 tidak dapat dilakukan karena dokumen gagal diekstraksi [D23]. Dampak operasional SVI dan kesehatan keuangan EOM belum terungkap [D12].\n3.  **Rekomendasi Monitoring:** Diperlukan pemeriksaan detail terhadap:\n    *   Laporan keuangan lengkap setelah lampiran berhasil diekstraksi atau diakses langsung [D23].\n    *   Perkembangan jumlah pemegang saham berikutnya untuk konfirmasi tren konsolidasi [D23].\n    *   Kinerja operasional EOM dan kemampuan bayar utang guna menilai realisasi risiko jaminan [D12].\n\n*Catatan: Ticker SOCI merujuk pada PT Soechi Lines Tbk sesuai konteks IDX dalam arsip. Jangan menyamakan penurunan jumlah pemegang saham dengan bukti konsolidasi kepemilikan mutlak tanpa data transaksi pendukung.*",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 30560,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00030161,
+        "prompt_tokens": 9127,
+        "completion_tokens": 1868,
+        "cached_tokens": 8960,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 27374,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3198147,
+        "selected_source_bytes": 25911,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "SOCI"
+        ],
+        "documents_checked": 8,
+        "current_document": "D11",
+        "database_source_reads": 8
+      }
+    },
+    {
+      "id": "lopi_pp",
+      "question": "lopi mau pp tapi blm dpt persetujuan di rupslb nya ga si?",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "LOPI"
+      ],
+      "sources": [
+        "D25",
+        "D44",
+        "D2",
+        "D1",
+        "D0",
+        "D14",
+        "D42",
+        "D5"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D0",
+        "D1",
+        "D25"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang tersedia, **tidak ada bukti** bahwa PT Logisticsplus International Tbk (LOPI) telah mengajukan permohonan Penerbitan Saham Baru (PP/SR) kepada Rapat Umum Pemegang Sahab (RUPS) atau mengalami penolakan persetujuan di RUPS.\n\nBerikut adalah pemisahan fakta berdasarkan dokumen:\n\n### 1. Fakta Dokumen: Belum Ada Pengajuan Resmi ke RUPS\n*   **Status Prospektus:** Arsip menyatakan secara eksplisit bahwa **\"belum ada prospektus resmi\"** untuk penerbitan saham tersebut [D0]. Tanpa prospektus efektif, proses legal menuju RUPS belum dapat dilakukan secara formal sesuai regulasi pasar modal.\n*   **Sumber Data:** Simulasi ekuitas yang beredar di media sosial (Stockbit) menggunakan **draf** dan **asumsi harga nominal**, bukan dokumen resmi emiten [D1], [D0].\n*   **Keterbatasan Model:** Penulis simulasi (@zulkifli) mengakui bahwa modelnya tidak memasukkan penerbitan kepada pihak tertentu dan hasilnya bersifat teoretis karena harga penawaran final belum ditetapkan [D0].\n\n### 2. Perhitungan Teoretis vs Realitas Korporasi\n*   Terdapat postingan pengguna yang melakukan simulasi dengan asumsi penerbitan 1,4 miliar saham baru pada harga Rp25, menghasilkan harga teoretis Rp47 [D0].\n*   Namun, arsip menekankan bahwa **\"Rp47 bukan harga akhir yang sudah ditetapkan\"** dan hasil model tersebut tidak lebih pasti daripada input asumsinya [D1].\n*   Tidak ditemukan pengumuman resmi dari LOPI mengenai jadwal RUPS atau agenda pembahasan penambahan modal dalam periode Agustus–September 2026.\n\n### 3. Rencana Pemegang Saham Pengendali (Alternatif Skenario)\n*   Alih-alih fokus pada PP yang ditolak, arsip terbaru (7–9 September 2026) mencatat pengakuan LOPI atas adanya **rencana tindakan korporasi** dalam waktu dekat (<3 bulan) yang dapat berdampak pada pencatatan saham [D25].\n*   LOPI juga mengonfirmasi rencana **PT Sentra Amanah Ventura** (pemegang saham pengendali, 67,13%) untuk **menjual sebagian sahamnya** guna mengurangi porsi kepemilikan, namun tetap mempertahankan status mayoritas [D25].\n*   Penjualan ini akan dilakukan di pasar sekunder, bukan melalui mekanisme penerbitan saham baru (PP).\n\n### Kesimpulan\nPernyataan \"LOPI mau PP tapi blm dpt persetujuan di RUPS\" **tidak didukung oleh bukti dalam arsip**.\n1.  Belum ada bukti pengajuan resmi ke RUPS karena prospektus belum diterbitkan.\n2.  Informasi yang beredar saat ini masih berupa **simulasi spekulatif** berbasis draf/asumsi [D1], [D0].\n3.  Fokus aksi korporasi yang dikonfirmasi oleh emiten hingga September 2026 adalah **potensi penjualan saham oleh pengendali** dan rencana korporasi lain yang belum dirinci, bukan kegagalan RUPS terkait PP [D25].\n\n**Dokumen yang perlu diperiksa untuk konfirmasi lebih lanjut:**\n*   Pengumuman resmi LOPI terkait pendaftaran prospektus di OJK (jika ada).\n*   Notulensi RUPS jika emiten benar-benar mengadakan rapat untuk membahas penambahan modal (saat ini tidak tercatat dalam digest).",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 40005,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00023812,
+        "prompt_tokens": 11793,
+        "completion_tokens": 1237,
+        "cached_tokens": 11520,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 22107,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 4377994,
+        "selected_source_bytes": 34780,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "LOPI"
+        ],
+        "documents_checked": 8,
+        "current_document": "D5",
+        "database_source_reads": 8
+      }
+    },
+    {
+      "id": "kdtn_huayou",
+      "question": "Kdtn di akuisisi oleh huayou",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true,
+        "docs_all": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "Huayou",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "KDTN"
+      ],
+      "sources": [
+        "D47",
+        "D46",
+        "D53",
+        "D52",
+        "D23",
+        "D44",
+        "D2",
+        "D1",
+        "D0",
+        "D42",
+        "D45"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D52",
+        "D1",
+        "D46",
+        "D2",
+        "D23"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diberikan, klaim bahwa **KDTN** diakuisisi oleh **Huayou** tidak dapat dikonfirmasi sebagai fakta. Dokumen menunjukkan adanya spekulasi pasar dan rencana transaksi dengan entitas lain (Ruby Mining) yang memiliki hubungan naratif dengan Huayou, namun status akuisisi tersebut masih berupa perjanjian bersyarat atau rumor tanpa bukti penyelesaian final.\n\nBerikut adalah pemisahan fakta berdasarkan sumber:\n\n### 1. Fakta Transaksi yang Terdaftar (Ruby Mining & Sherman Mineral)\nArsip mencatat adanya langkah-langkah korporasi nyata yang melibatkan KDTN, namun target utamanya bukan Huayou secara langsung, melainkan entitas perantara dan aset mineral lainnya.\n\n*   **Perjanjian Pembelian Saham (CSPA):** PT KDTN mengumumkan *Conditional Share Purchase Agreement* untuk pengambilalihan sekitar **86% saham** oleh **Ruby Mining Hongkong Limited** [D52]. Dokumen ini bersifat kondisional dan belum membuktikan transaksi telah efektif pada tanggal arsip [D52].\n*   **Akuisisi Aset Sherman:** KDTN berencana mengakuisisi **99% saham PT Sherman Mineral Indonesia (SMI)** dengan harga rencana sekitar **Rp93,061 miliar** [D52]. Data keuangan SMI (pendapatan Rp304,83 miliar, laba komprehensif Rp9,58 miliar) tersedia dalam dokumen perusahaan tanggal 13 Mei 2026 [D52], [D1].\n*   **Struktur Kepemilikan:** Pemegang langsung 100% perusahaan penjual di Singapura (Sherman Mineral Trading) adalah **Hsieh Wei Tong**. Hubungan afiliasi antara Hsieh Wei Tong dengan Ruby Mining atau Huayou tidak dibuktikan dalam arsip [D1].\n\n### 2. Status Hubungan dengan Huayou (Spekulasi vs Fakta)\nHubungan dengan Huayou dikategorikan sebagai narasi pasar (*market narrative*) dan spekulasi, bukan fakta transaksi yang terealisasi.\n\n*   **Mismatch Skala Aset:** Arsip secara eksplisit membedakan aset yang masuk ke KDTN (SMI) dengan aset sponsor-group yang jauh lebih besar, yaitu industri **Huayou**. Post menyebutkan bahwa SMI \"jauh lebih kecil dan secara operasional berbeda\" dari aset Huayou [D46].\n*   **Rumor Injection Aset:** Tesis investasi yang beredar di forum Stockbit berasumsi bahwa KDTN akan menjadi kendaraan (*listed vehicle*) untuk injeksi aset Huayou di masa depan. Namun, analisis arsip menegaskan bahwa tesis ini masih berada di kolom **\"speculation\"** dan **\"unconfirmed\"** [D46].\n*   **Penolakan Konfirmasi:** Penulis arsip menekankan bahwa \"gap antara aset kecil yang saat ini masuk ke KDTN dengan aset sponsor-group yang jauh lebih besar justru membuat kasus ini menarik, tetapi tidak boleh diperlakukan sebagai confirmed\" [D46]. Tidak ada dokumen resmi yang menyatakan Huayou telah membeli atau mengendalikan KDTN [D46], [D2].\n\n### 3. Perubahan Pengendali dan Struktur Saham\n*   **Pengendali Lama:** Per 31 Agustus 2026, pengendali lama **PT Puri Sentul Permai Tbk** masih memegang saham, meskipun persentasenya menurun dari 35,93% (Juli) menjadi 33,215% (Agustus) [D23].\n*   **Free Float:** Free float meningkat dari 14,61% menjadi 17,53%, mengindikasikan adanya penjualan saham di pasar sekunder, namun tidak ada konfirmasi resmi mengenai identitas pembeli baru selain rencana CSPA dengan Ruby Mining [D23].\n\n### Kesimpulan\nKlaim \"KDTN diakuisisi oleh Huayou\" adalah **tidak terbukti** berdasarkan arsip yang tersedia.\n\n*   **Yang terjadi:** Ada rencana akuisisi kendali oleh **Ruby Mining Hongkong Limited** (~86%) dan akuisisi aset oleh **PT Sherman Mineral Indonesia** (99%).\n*   **Yang belum terjadi:** Injeksi aset Huayou atau pengambilalihan langsung oleh Huayou masih berupa **spekulasi pasar** yang dipisahkan dari fakta disclosed [D46].\n*   **Rekomendasi Investigasi:** Untuk memverifikasi apakah ada hubungan kepemilikan manfaat (*beneficial ownership*) antara Ruby Mining/Hsieh Wei Tong dengan Huayou, diperlukan pemeriksaan dokumen afiliasi pihak berelasi (*related-party disclosure*) yang belum ditemukan dalam sampel arsip ini [D46], [D1].",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 103452,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.000386706,
+        "prompt_tokens": 31210,
+        "completion_tokens": 1491,
+        "cached_tokens": 30976,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 25208,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3023427,
+        "selected_source_bytes": 90927,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "KDTN"
+        ],
+        "documents_checked": 11,
+        "current_document": "D45",
+        "database_source_reads": 11
+      }
+    },
+    {
+      "id": "esta_owner",
+      "question": "Pemilik esta",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true,
+        "docs_all": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "90,77",
+          "hit": true
+        },
+        {
+          "fact": "9,23",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "ESTA"
+      ],
+      "sources": [
+        "D50",
+        "D49",
+        "D27",
+        "D4"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D27",
+        "D49",
+        "D4",
+        "D50"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah rincian kepemilikan saham PT Esta Multi Usaha Tbk (ESTA) dan analisis mengenai struktur pengendaliannya.\n\n### 1. Data Kepemilikan Saham Terkini\nData kepemilikan paling mutakhir dalam arsip adalah **Laporan Bulanan Registrasi Pemegang Efek per 31 Agustus 2026**, sebagaimana dikutip dalam dokumen **[D27]**. Struktur kepemilikan sangat terkonsentrasi dengan tiga pemegang saham utama menguasai lebih dari 90% saham beredar.\n\n| Pemegang Saham | Jumlah Saham (per 31 Agt 2026) | Persentase Kepemilikan | Keterangan |\n| :--- | :--- | :--- | :--- |\n| **PT Esta Utama Corpora** | 1.518.470.799 | 62,61% | Pemegang saham pengendali [D27]. |\n| **JPMorgan Chase Bank NA RE-JPMCB Singapore Branch** | 494.150.659 | 20,37% | Pemegang saham asing terbesar [D27]. |\n| **PT Esta Dana Ventura** | 188.762.050 | 7,78% | Pemegang saham >5% lainnya [D27]. |\n| **Total Pemegang >5%** | **2.201.383.508** | **90,77%** | Konsentrasi tinggi [D27]. |\n| **Pemegang <5% (Publik)** | 223.970.671 | 9,23% | Free float rendah [D27]. |\n\n*Catatan:* Total saham beredar tetap sebesar **2.425.354.179** saham tanpa perubahan sejak Januari 2026 **[D27]**.\n\n### 2. Analisis Pengendalian dan Jaringan Kepemilikan\nMeskipun **PT Esta Utama Corpora** secara hukum tercatat sebagai pemegang saham pengendali (62,61%), arsip menunjukkan kompleksitas jaringan kepemilikan yang memerlukan verifikasi lebih lanjut untuk menentukan *beneficial owner* (pihak yang benar-benar menikmati dan mengendalikan).\n\n#### A. Hubungan Entitas \"Esta\"\nDokumen **[D49]** mengutip postingan pengguna **@athira** yang menghubungkan beberapa entitas:\n*   **Esta Utama Corpora**: Pemilik 62,61%.\n*   **Esta Dana Ventura**: Pemilik 7,78%. Postingan tersebut menyebutkan adanya pengalihan saham dari Bank Sahabat Sampoerna ke Sampoerna Investama pada September 2025, namun hal ini belum diverifikasi dengan dokumen resmi di arsip ini.\n*   **Analisis Laporan**: Perhitungan sederhana menunjukkan bahwa kepemilikan tidak langsung melalui jalur Sampoerna Investama hanya sekitar **0,65%** dari total saham ESTA, bukan 8,32% seperti yang mungkin disalahartikan dari persentase kepemilikan antar perusahaan perantara **[D49]**.\n\n#### B. Peran JPMorgan Chase Bank\nPemegang saham kedua terbesar adalah **JPMorgan Chase Bank NA RE-JPMCB Singapore Branch** dengan 20,37% **[D27]**.\n*   Dalam konteks arsip **[D49]**, nama bank kustodian/nominee seperti JPMorgan **tidak membuktikan** siapa pemilik manfaat (*beneficial owner*) atau pengendali sebenarnya. Nama ini sering muncul dalam daftar pemegang saham karena fungsi penitipan aset, bukan sebagai indikator kontrol korporat.\n*   Tidak ada bukti dalam arsip bahwa JPMorgan memiliki hak kendali atas keputusan strategis ESTA.\n\n#### C. Inkonsistensi Data Historis (Agustus vs Juli 2026)\nDokumen **[D4]** (periode Agustus 2026, merujuk data Juli 2026) mencatat inkonsistensi antara dokumen utama dan lampiran terkait nama afiliasi pengendali:\n*   Dokumen utama menyebut **PT Esta Corpora Utama**.\n*   Lampiran menyebut **PT Esta Corpora Selatan** dan **PT Esta Corpora Barat** sebagai afiliasi, dengan persentase masing-masing 9,24%.\n*   Namun, laporan terbaru **[D27]** (Agustus 2026) hanya mencantumkan **PT Esta Utama Corpora** sebagai pengendali tunggal di atas 5%, bersama JPMCB dan PT Esta Dana Ventura. Hal ini menunjukkan kemungkinan penyederhanaan pelaporan atau koreksi struktural yang perlu dikonfirmasi dengan dokumen asli OJK/BEI.\n\n### 3. Status Rumor Akuisisi dan Spekulasi\nTerdapat spekulasi di pasar mengenai rencana akuisisi atau tender offer, namun hingga tanggal arsip (September 2026), hal ini belum terbukti sebagai fakta transaksi.\n\n*   **Rumor Penahanan**: Postingan di Stockbit oleh **@And170845** menduga ESTA ditahan agar harga akuisisi tidak tinggi. Ini dikategorikan sebagai rumor tanpa bukti perjanjian atau laporan kepemilikan resmi **[D50]**.\n*   **Kronologi 2025**: Postingan **@athira** mengangkat kembali diskusi potensi akuisisi yang pernah diumumkan pada **10 Oktober 2025**. Arsip menegaskan bahwa postingan September 2026 hanyalah pengulangan kisah tahun 2025, bukan konfirmasi transaksi baru terjadi **[D49]**.\n*   **Status Penelitian**: Tesis akuisisi melemah jika tidak ada tindak lanjut pengumuman resmi. Kehadiran ESTA dalam percakapan komunitas tidak sama dengan konfirmasi corporate action **[D49]**.\n\n### 4. Risiko Kepatuhan Free Float\nStruktur kepemilikan yang sangat terkonsentrasi menimbulkan risiko regulasi serius:\n*   **Free Float**: Hanya **9,23%** (di bawah batas minimum 40% yang biasanya dipersyaratkan BEI untuk kategori tertentu, meskipun aturan spesifik bisa bervariasi).\n*   **Hari Memenuhi Syarat**: **0 hari** sepanjang periode Januari–Agustus 2026 memenuhi syarat free float (minimal 300 pemegang <5% dan kepemilikan <5% minimal 40%) **[D27]**.\n*   Risiko utama adalah potensi sanksi dari Bursa Efek Indonesia atau OJK terkait ketidakpatuhan ketentuan free float.\n\n### Kesimpulan\nPemilik sah berdasarkan laporan resmi terakhir (**31 Agustus 2026**) adalah:\n1.  **PT Esta Utama Corpora** (62,61%) – Pengendali terdaftar.\n2.  **JPMorgan Chase Bank NA RE-JPMCB Singapore Branch** (20,37%) – Kustodian/Nominee asing.\n3.  **PT Esta Dana Ventura** (7,78%).\n\nIdentitas *beneficial owner* akhir dari PT Esta Utama Corpora dan hubungan pastinya dengan PT Esta Dana Ventura serta pihak asing (melalui JPMorgan) **belum dapat dipastikan** hanya dari arsip ini. Diperlukan pemeriksaan dokumen pendaftaran efek, laporan kepemilikan beneficial owner kepada OJK, dan pengumuman resmi emiten untuk mengonfirmasi apakah ada pihak ketiga yang mengendalikan entitas-entitas tersebut. Rumor akuisisi masih berupa spekulasi tanpa dasar transaksi tereksekusi.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 37889,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00034517,
+        "prompt_tokens": 11153,
+        "completion_tokens": 2090,
+        "cached_tokens": 10880,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 31126,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 1905233,
+        "selected_source_bytes": 33712,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "ESTA"
+        ],
+        "documents_checked": 4,
+        "current_document": "D4",
+        "database_source_reads": 4
+      }
+    },
+    {
+      "id": "nasi_naik",
+      "question": "analisakan semua dokumen yang berkaitan dengan NASI dan perkiraan alasan kenapa sahamnya naik banyak akhir-akhir ini",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true,
+        "terms_exclude": true,
+        "docs_all": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "807\\.400\\.000|789\\.112\\.018|22,73",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "NASI"
+      ],
+      "sources": [
+        "D50",
+        "D28",
+        "D25",
+        "D42"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D28",
+        "D25",
+        "D50"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang tersedia, berikut adalah analisis mengenai saham PT Wahana Inti Makmur Tbk (NASI) dan faktor pendorong kenaikan perhatiannya.\n\n### 1. Data Kepemilikan dan Struktur Saham (Per 31 Agustus 2026)\nArsip menunjukkan struktur kepemilikan yang sangat terkonsentrasi dengan likuiditas pasar bebas (*free float*) yang rendah.\n\n*   **Pemegang Saham Pengendali:** Piero Mustafa memegang 42,24% (341.016.000 saham).\n*   **Pemegang Saham Besar Lainnya:** PT Modis Cipta Kreasi (26,76%) dan Hartarto Ciputra (5,87%).\n*   **Total Konsentrasi Top 3:** 74,87% dari total saham beredar [D28].\n*   **Free Float:** Terkoreksi menjadi 22,73% (183.614.800 saham), turun tipis dari 22,79% di bulan sebelumnya [D28]. Angka ini berada di bawah ambang batas umum 25% untuk pencatatan utama, meskipun beberapa sumber menyebutkan statusnya masih memenuhi syarat minimum 20% [D25].\n*   **Inkonsistensi Data:** Terdapat perbedaan data antara laporan utama dan lampiran Biro Administrasi Efek (BAE). Laporan utama menyebutkan jumlah saham beredar turun drastis menjadi 789.112.018 lembar, sementara lampiran BAE menyatakan total saham tetap 807.400.000 lembar tanpa perubahan [D25]. Dokumen koreksi tanggal 10 September 2026 menegaskan total saham tetap 807.400.000 lembar [D28].\n\n### 2. Penurunan Drastis Jumlah Pemegang Saham\nFaktor struktural yang paling mencolok adalah penurunan jumlah pemegang saham tercatat (*registered shareholders*).\n\n*   **Penurunan SID:** Jumlah pemegang saham Single Investor Identification (SID) turun dari 4.736 pada Juli 2026 menjadi hanya 252 pada Agustus 2026 [D25], [D28].\n*   **Kenaikan Beneficial Owner:** Sebaliknya, jumlah pemilik manfaat (*beneficial owner*) naik dari 4.736 menjadi 4.988 [D28].\n*   **Interpretasi:** Arsip mencatat bahwa penyebab perubahan ini tidak dijelaskan secara eksplisit dalam dokumen resmi. Penurunan jumlah pemegang saham tercatat yang masif, disertai kenaikan pemilik manfaat, mengindikasikan kemungkinan konsolidasi kepemilikan atau perubahan metodologi pelaporan/administrasi oleh pihak ketiga (BAE/KSEI), bukan necessarily berarti saham telah dikonsolidasi ke tangan sedikit pihak secara fisik [D28], [D25]. Namun, hal ini mengurangi jumlah akun trading aktif yang terlihat di sistem bursa.\n\n### 3. Sentimen Pasar dan Pembahasan Media Sosial\nKenaikan perhatian terhadap NASI akhir-akhir ini didorong oleh dinamika perdagangan dan diskusi komunitas, bukan perubahan fundamental bisnis yang terungkap dalam laporan keuangan.\n\n*   **Lonjakan Diskusi Stockbit:** Pada periode 20–22 September 2026, NASI menjadi ticker yang paling banyak dibicarakan di Stockbit dengan total 38 postingan, terutama padat pada tanggal 21 September (33 postingan) [D50].\n*   **Topik Pembahasan Dominan:**\n    *   **Momentum Trading:** Percakapan berkisar pada kenaikan harian, peran broker tertentu, risiko penjualan setelah kenaikan, serta spekulasi status pengawasan atau suspensi [D50].\n    *   **Isu Rights Issue:** Ada pembahasan mengenai hak membeli saham baru (*rights issue*), dana exercise, dan potensi penurunan harga pasca-exercise. Beberapa pihak membandingkan potensi pergerakan beruntun dengan emiten lain seperti PACK, sementara pihak lain mempertanyakan siapa yang akan menyerap hak tersebut jika pemegang lama tidak mampu melakukan exercise [D50].\n    *   **Pemisahan Valuasi:** Diskusi yang dianggap \"paling berguna\" oleh pengguna adalah upaya memisahkan harga saham lama, nilai rights, kebutuhan modal tambahan, dan nilai aset yang diterima, menandakan adanya kebingungan atau spekulasi terkait aksi korporasi potensial [D50].\n\n### 4. Kesimpulan: Alasan Kenaikan Perhatian\nTidak ada bukti dalam arsip yang menunjukkan adanya perubahan fundamental bisnis, ekspansi, atau transaksi aset signifikan bagi NASI pada periode tersebut. Kenaikan minat terhadap saham ini dapat dijelaskan oleh kombinasi faktor berikut:\n\n1.  **Likuiditas Rendah dan Konsentrasi Tinggi:** Dengan *free float* sekitar 22,73% dan kepemilikan pengendali >42%, pergerakan harga dapat sangat sensitif terhadap volume perdagangan kecil. Penurunan drastis jumlah pemegang saham terdaftar (dari ribuan menjadi ratusan) mungkin memperketat likuiditas tersier, memicu volatilitas harga yang menarik trader spekulatif [D28], [D25].\n2.  **Spekulasi Aksi Korporasi:** Isu *rights issue* menjadi katalisator diskusi utama. Ketidakpastian mengenai pelaksanaan *rights issue*, penyerapan hak, dan dampaknya terhadap harga saham menciptakan narasi spekulatif di media sosial [D50].\n3.  **Efek Momentum dan Broker List:** Adanya pembicaraan mengenai \"broker tertentu\" dan seruan naik (*call*) di platform sosial menunjukkan adanya aktivitas trading teknis atau spekulatif yang mendorong volume dan perhatian, terlepas dari dasar fundamental [D50].\n\n**Catatan Penting:**\n*   Penurunan jumlah pemegang saham tidak otomatis membuktikan konsolidasi kepemilikan oleh satu entitas; bisa disebabkan faktor administratif [D28].\n*   Free float di bawah 25% berpotensi menimbulkan risiko kepatuhan regulasi bursa, namun status pasti papan pencatatannya perlu verifikasi lebih lanjut [D28].\n*   Tidak ada informasi mengenai kinerja operasional atau laba rugi perusahaan dalam arsip ini.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 27758,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.000292,
+        "prompt_tokens": 9084,
+        "completion_tokens": 1804,
+        "cached_tokens": 8960,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 34071,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3164718,
+        "selected_source_bytes": 23936,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "NASI"
+        ],
+        "documents_checked": 4,
+        "current_document": "D42",
+        "database_source_reads": 4
+      }
+    },
+    {
+      "id": "true_naik",
+      "question": "Analisa dokumen berhubungan TRUE yang bisa menjelaskan mengapa harga naik belakangan",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true,
+        "terms_exclude": true
+      },
+      "facts": [],
+      "terms": [
+        "TRUE"
+      ],
+      "sources": [
+        "D51",
+        "D50",
+        "D39",
+        "D49",
+        "D37",
+        "D35",
+        "D53",
+        "D26",
+        "D23",
+        "D2",
+        "D42",
+        "D4"
+      ],
+      "source_precision": 0.9166666666666666,
+      "citations": [
+        "D50",
+        "D51",
+        "D26",
+        "D4",
+        "D35",
+        "D37",
+        "D23"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diberikan, **tidak ditemukan bukti material** dalam dokumen resmi emiten atau laporan keuangan yang menjelaskan kenaikan harga saham TRUE secara fundamental. Kenaikan harga yang terindikasi dari volume percakapan tinggi didominasi oleh spekulasi pasar kecil (small-cap momentum) dan sentimen teknis, bukan perubahan bisnis substantif.\n\nBerikut adalah pemisahan fakta berdasarkan sumber:\n\n### 1. Faktor Spekulasi Pasar (Bukti Terkuat untuk \"Kenaikan\")\nArsip menunjukkan lonjakan minat ritel terhadap TRUE, yang merupakan indikator umum tekanan beli spekulatif, namun arsip secara eksplisit memperingatkan bahwa hal ini tidak menjamin nilai intrinsik.\n\n*   **Lonjakan Mention:** Volume pembicaraan tentang TRUE meningkat drastis di akhir September 2026. Pada 20–22 September 2026, TRUE mencatat 148 postingan, menjadi salah satu ticker paling ramai [D50]. Peringkat mention juga berada di posisi ke-6 dalam scan aksi korporasi tersembunyi pada 24 September 2026 [D51].\n*   **Sifat Pembahasan:** Analisis kualitatif menyebutkan bahwa banyak postingan hanya berisi target harga, ARA (Atas Rata-Rata), atau ARB (Bawah Rata-Rata), sehingga *information content*-nya rendah. Arsip menegaskan: \"**mention volume tinggi tidak sama dengan evidence tinggi**\" [D51].\n*   **Momentum Small-Cap:** TRUE masuk dalam daftar saham small-cap yang mendominasi chatter setelah IHSG/FORU, bersama BUMI dan DSSA. Pembahasan berkisar pada kenaikan harian, broker tertentu, dan risiko penjualan pasca-kenaikan [D50].\n*   **Peringatan Risiko:** Arsip menekankan bahwa frekuensi pembicaraan tidak membuktikan peluang keuntungan dan sering kali terkait dengan momentum sesaat而非 perubahan fundamental [D50].\n\n### 2. Kondisi Fundamental & Corporate Action (Tidak Ada Pemicu Positif Material)\nDokumen resmi emiten menunjukkan kondisi keuangan yang lemah dan tidak ada aksi korporasi baru yang dapat menjadi katalis fundamental positif.\n\n*   **Tidak Ada Aksi Korporasi Baru:** Tidak ada pengumuman rights issue, stock split, merger, atau akuisisi pada periode Agustus–September 2026 [D26], [D4].\n*   **Laporan Keuangan 2025 (Terbit Sept 2026):**\n    *   Rugi bersih membaik dari Rp58,29 miliar (2024) menjadi Rp35,22 miliar (2025), namun tetap rugi [D26].\n    *   Arus kas operasi negatif sebesar Rp48,93 miliar, ditutupi oleh utang pihak berelasi sebesar Rp49,96 miliar [D26], [D35].\n    *   Defisit saldo laba memburuk menjadi Rp76,50 miliar [D26].\n    *   Perusahaan tercatat di papan **Pemantauan Khusus (Watchlist)** BEI [D26].\n*   **Perubahan Proyek District East:** Terdapat amandemen perjanjian proyek District East pada 21 Agustus 2026 yang memperluas luas lahan dari 58.230 m² menjadi 264.899,5 m² (naik 4,55 kali) [D37]. Namun, arsip membatasi kesimpulan ini dengan menyatakan bahwa **revenue sharing bukan bukti kepemilikan penuh** atas lahan tersebut, dan pendanaan pengembangan belum jelas [D37]. Selain itu, angka progress proyek (2,69%) masih berbasis data per Desember 2025, bukan kondisi terkini September 2026 [D37].\n*   **Risiko Kepatuhan:** Saham sempat disuspensi pada Agustus 2026 karena keterlambatan penyampaian Laporan Keuangan Tahunan 2025, meskipun telah diterbitkan pada pertengahan September 2026 [D4], [D26].\n\n### 3. Kesimpulan Analitis\nKenaikan harga atau volatilitas TRUE yang terlihat dari data percakapan stokbit kemungkinan besar disebabkan oleh:\n1.  **Spekulasi Momentum:** Aliran dana ritel mengejar pergerakan harga harian tanpa dasar fundamental kuat [D50].\n2.  **Ekspektasi Asumsi:** Beberapa pihak mungkin mengasumsikan bahwa perluasan proyek District East akan meningkatkan pendapatan, namun arsip mencatat bahwa hal tersebut belum dibuktikan dengan bukti pendanaan atau transfer aset yang mengikat [D37].\n3.  **Faktor Teknis:** Pemulihan dari suspensi Agustus dan penerbitan laporan keuangan (meski rugi) mungkin memicu reaksi jangka pendek trader, tetapi struktur keuangan (kas negatif, utang pihak berelasi) tetap menjadi beban [D35].\n\n**Rekomendasi Pemeriksaan Lanjutan:**\nUntuk memverifikasi apakah ada katalis tersembunyi, perlu diperiksa:\n*   Dokumen asli amandemen perjanjian District East untuk melihat klausul pendanaan dan komitmen pembelian tanah yang benar-benar mengikat [D37].\n*   Identitas pemberi utang pihak berelasi sebesar Rp49,96 miliar untuk menilai potensi konflik kepentingan atau dukungan strategis [D35].\n*   Data transaksi blok besar (block trade) atau akumulasi saham oleh entitas tertentu yang tidak tercermin dalam laporan bulanan pemegang saham rutin [D23].",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 68569,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.0003572,
+        "prompt_tokens": 23076,
+        "completion_tokens": 1676,
+        "cached_tokens": 23040,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 32115,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 4711806,
+        "selected_source_bytes": 61615,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "TRUE"
+        ],
+        "documents_checked": 12,
+        "current_document": "D4",
+        "database_source_reads": 12
+      }
+    },
+    {
+      "id": "feg_xingye",
+      "question": "Ringkas keterbukaan Australia dalam arsip: apa perkembangan Far East Gold (FEG) dan Xingye? Jawab maksimal 70 kata dengan timeline singkat, hak suara, status dan sumber.",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_exclude": true,
+        "docs_all": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "34,57",
+          "hit": true
+        },
+        {
+          "fact": "3 November",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "Far East Gold",
+        "Xingye"
+      ],
+      "sources": [
+        "D3"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D3"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip [D3], Xingye mengajukan tawaran pengambilalihan Far East Gold (FEG) pada 27 Mei 2026, ditutup 29 Juli. Laporan 5 Agustus mencatat hak suara Xingye sebesar 34,57%, belum mayoritas. Pada 9 September, Xingye meminta pencopotan empat direktur dengan rapat dijadwalkkan 3 November; hasil rapat belum tersedia dalam bahan yang diperiksa.",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 4833,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.00011556,
+        "prompt_tokens": 1148,
+        "completion_tokens": 624,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 10972,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 12379,
+        "selected_source_bytes": 1306,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "Far East Gold",
+          "Xingye"
+        ],
+        "documents_checked": 1,
+        "current_document": "D3",
+        "database_source_reads": 1
+      }
+    },
+    {
+      "id": "enrg",
+      "question": "ada apa dengan ENRG",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "ENRG"
+      ],
+      "sources": [
+        "D53",
+        "D52",
+        "D2",
+        "D1",
+        "D0",
+        "D42",
+        "D10",
+        "D45",
+        "D6",
+        "D4"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D10",
+        "D42",
+        "D0",
+        "D2",
+        "D1",
+        "D6",
+        "D4",
+        "D52",
+        "D45",
+        "D53"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang tersedia, berikut adalah rangkuman fakta mengenai PT Energi Mega Persada Tbk (ENRG) per periode Agustus–September 2026.\n\n### 1. Klarifikasi Akuisisi dan Strategi Perusahaan\nPerusahaan secara resmi menyangkal adanya rencana akuisisi spesifik yang sedang berjalan pada pertengahan Agustus 2026.\n*   **Klarifikasi Resmi:** Pada 20 Agustus 2026, ENRG merespons permintaan penjelasan dari Bursa Efek Indonesia (BEI) terkait pemberitaan media massa tanggal 13 Agustus 2026 [D10]. Perusahaan menyatakan bahwa pernyataan dalam diskusi dengan BRI Danareksa Sekuritas hanyalah strategi pertumbuhan umum, bukan pengumuman akuisisi spesifik [D10].\n*   **Status Target:** Hingga tanggal surat klarifikasi, perusahaan belum menetapkan aset atau target akuisisi tertentu [D10].\n*   **Strategi:** Manajemen menegaskan strategi pertumbuhan organik (pengembangan aset, peningkatan produksi) dan non-organik (akuisisi aset baru sebagai bagian dari pertumbuhan), namun tidak ada indikasi waktu atau nilai transaksi spesifik [D10].\n\n### 2. Aksi Korporasi: Rights Issue dan Penambahan Modal\nTerdapat spekulasi dan pembahasan teknis mengenai aksi korporasi berupa penambahan modal (rights issue), namun jadwal pasti masih menjadi bahan perdebatan di kalangan investor.\n*   **Besaran Dana:** Postingan investor menyebutkan potensi dana sekitar Rp4,12 triliun dengan harga pelaksanaan Rp310 per saham [D42]. Namun, dokumen lain mencatat rencana penerbitan saham baru maksimal Rp4,12 triliun untuk program pengeboran hingga 2031 [D0].\n*   **Jadwal Tidak Pasti:** Terdapat kebingungan karena jadwal penerbitan saham menghilang dari aplikasi, namun hilangnya tampilan kalender belum membuktikan pembatalan transaksi [D2]. Beberapa postingan memperdebatkan penundaan, sehingga jadwal dalam arsip tidak seragam dan tidak dapat dipakai sebagai jadwal transaksi final [D42].\n*   **Simulasi Keuntungan:** Investor melakukan simulasi perhitungan hak membeli saham baru. Hasil keuntungan bergantung pada skenario harga pasar dan keberhasilan menjual hak, bukan keuntungan otomatis dari harga pelaksanaan rendah [D2], [D1].\n\n### 3. Struktur Kepemilikan dan Free Float\nData kepemilikan saham menunjukkan stabilitas relatif dengan beberapa perubahan minor pada struktur modal.\n*   **Kenaikan Modal Disetor:** Terjadi kenaikan modal disetor sebesar 218.313.500 saham pada Juni 2026 (dari 26.346.230.250 menjadi 26.564.543.750 saham). Penyebab kenaikan (apakah rights issue, konversi, atau lainnya) tidak dijelaskan rinciannya dalam laporan bulanan [D6], [D4].\n*   **Free Float:** Free float menurun tipis dari 41,2% (Juni 2026) menjadi 41,17% (Juli 2026) [D6], [D4].\n*   **Pemegang Saham Utama (≥5%) per Juli 2026:**\n    *   PT Shima Global Kapital: 17,548%\n    *   PT Trimegah Sekuritas Indonesia Tbk: 12,210%\n    *   PT CGS International Sekuritas Indonesia: 7,530%\n    *   PT Maybank Sekuritas Indonesia: 7,230%\n    *   Total gabungan keempat pemegang saham ini mencapai 44,517% [D6], [D4].\n*   **Inkonsistensi Data:** Laporan utama menyebut jumlah pemegang saham sebanyak 50 pihak, sedangkan lampiran 3 mencatat 66.007 pemegang saham. Inkonsistensi ini perlu diperiksa lebih lanjut [D6], [D4].\n\n### 4. Spekulasi Pasar dan Persepsi Investor\nDiskusi di platform Stockbit menunjukkan fokus kuat pada isu korporasi dan broker flow, meskipun bukti konkret terbatas.\n*   **Clue Broker II:** Ada spekulasi bahwa aktivitas broker II terkait dengan aksi korporasi Bakrie/ENRG. Namun, analisis mengingatkan bahwa kode broker bukan identitas beneficial owner dan aktivitas tersebut bisa berupa distribusi inventory lama, bukan akumulasi [D2], [D52].\n*   **Topik Pembahasan:** ENRG merupakan salah satu kode paling sering ditandai dalam arsip Agustus–September 2026, dengan ratusan postingan membahas rights issue, target produksi gas, dan dampak dilusi saham [D2], [D45], [D53].\n*   **Program Produksi:** Perusahaan menguraikan rencana pengeboran lebih dari 120 sumur serta target peningkatan produksi gas bertahap hingga 2030. Target masa depan perlu dipisahkan dari penjualan yang sudah tercatat [D2].\n\n### Kesimpulan dan Batas Bukti\n*   **Fakta Material:** ENRG telah mengklarifikasi tidak ada akuisisi spesifik yang ditetapkan per Agustus 2026 [D10]. Terdapat kenaikan modal disetor sebesar ~218 juta saham pada Juni 2026 tanpa rincian sumber dana/transaksi [D6].\n*   **Belum Diketahui:** Jadwal pasti pelaksanaan rights issue/penerbitan saham baru belum terkonfirmasi secara resmi dalam arsip ini [D42]. Identitas pengendali manfaat akhir dari struktur kepemilikan masih hipotetis berdasarkan data kepemilikan tidak langsung [D6].\n*   **Rekomendasi Pemeriksaan:** Perlu memeriksa laporan keuangan 30 Juni 2026 yang lampirannya tidak tersedia dalam arsip ini untuk memahami dampak material kenaikan modal [D6]. Juga perlu verifikasi inkonsistensi jumlah pemegang saham antara laporan utama dan lampiran [D6].\n\nArsip ini hanya mencakup periode Agustus–September 2026 dan tidak memberikan informasi terkini setelah tanggal tersebut.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 87396,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.000409926,
+        "prompt_tokens": 28124,
+        "completion_tokens": 1791,
+        "cached_tokens": 27776,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 29247,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3336505,
+        "selected_source_bytes": 76254,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "ENRG"
+        ],
+        "documents_checked": 10,
+        "current_document": "D4",
+        "database_source_reads": 10
+      }
+    },
+    {
+      "id": "blue",
+      "question": "analisi saham BLUE dari informasi dan dokumen yg tersedia, apa tujuannya dan bagaimana potensinya",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "BLUE"
+      ],
+      "sources": [
+        "D50",
+        "D25",
+        "D0",
+        "D42",
+        "D45",
+        "D4"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D50",
+        "D25",
+        "D4"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang tersedia, berikut adalah analisis mengenai saham **BLUE** (PT BLUE Berkah Perkasa Prima Tbk) mencakup tujuan transaksi, potensi perubahan struktur, dan batas bukti yang perlu diwaspadai.\n\n### 1. Konteks Pembahasan Pasar (Sentimen & Rumor)\nArsip Stockbit periode Agustus–September 2026 menunjukkan bahwa BLUE menjadi salah satu ticker dengan diskusi substantif terkait perubahan bisnis, meskipun frekuensi postingannya tidak sebanyak FORU atau TRUE [D50].\n\n*   **Rencana Perubahan Pengendali & Bisnis:** Pembahasan dominan berasal dari pengguna `@stockprimecoid` yang menyebutkan rencana akuisisi **99% PT Huaan Mining Engineering** seharga sekitar **Rp111,4 miliar**, masuknya entitas baru bernama **Dragonmine Mining** sebagai pengendali baru, serta pelepasan sebagian bisnis lama [D50].\n*   **Pergeseran Model Usaha:** Aktivitas historis perusahaan yang berfokus pada *printing* (percetakan) dinilai bergeser menuju jasa penunjang pertambangan melalui akuisisi tersebut [D50].\n*   **Keterbatasan Bukti Arsip:** Arsip secara eksplisit menyatakan bahwa nama pembeli (Dragonmine), target (Huaan), apakah transaksi berelasi, dan status *closing* belum terverifikasi. Tidak ada dasar untuk memastikan hubungan auditor atau identitas pemilik akhir kedua pihak hanya dari postingan forum [D50].\n\n### 2. Data Fundamental & Kepemilikan (Fakta Dokumen Resmi)\nDokumen laporan bulanan registrasi pemegang efek memberikan data struktural yang stabil namun memiliki indikasi ketidakpatuhan regulasi minor.\n\n*   **Stabilitas Struktur Modal:** Periode Agustus 2026 hingga September 2026, tidak ada aksi korporasi (dividen, rights issue, merger) yang dilaporkan dalam dokumen resmi emiten [D25], [D4].\n*   **Kepemilikan Pemegang Saham:**\n    *   **Pengendali (PT Berkah Perkasa Prima):** Menahan **24,52%** (102.500.000 saham) [D25].\n    *   **Direksi & Komisaris:** Menahan **28,22%** (117.943.900 saham) [D25].\n    *   **Free Float:** Terlaporkan sebesar **11,97%** (50.056.100 saham) pada laporan utama, atau **11,934%** pada lampiran [D25].\n*   **Inkonsistensi Data:** Terdapat perbedaan angka total saham antar lampiran:\n    *   Laporan Utama: 418.172.800 saham.\n    *   Lampiran Free Float/Lamp 2: 418.000.000 saham.\n    *   Lamp 3: 1.000.000.000 saham (mungkin termasuk saham treasuri atau definisi berbeda) [D25].\n*   **Status Kepatuhan BEI:** Free float **11,97%** berada di bawah ambang batas umum **12,5%** yang disyaratkan Bursa Efek Indonesia [D25]. Namun, dokumen tidak memuat pernyataan ketidakpatuhan atau sanksi, sehingga status kepatuhannya masih ambigu hingga ada klarifikasi lebih lanjut [D25].\n\n### 3. Analisis Tujuan dan Potensi\n\n#### A. Tujuan Transaksi (Berdasarkan Rumor vs Fakta)\n*   **Tujuan yang Diklaim oleh Pasar:** Mengubah profil usaha dari percetakan (*printing*) menjadi penyedia jasa pertambangan melalui akuisisi aset tambang (Huaan Mining) [D50]. Ini dianggap sebagai upaya \"refloat\" atau peningkatan nilai intrinsik melalui aset baru.\n*   **Realitas Dokumen:** Laporan resmi bulan Agustus-September 2026 **tidak mencatat** adanya akuisisi, penjualan aset, atau perubahan kegiatan usaha [D25]. Pernyataan tentang Dragonmine Mining dan Huaan Mining saat ini masih berupa spekulasi pasar yang belum dikonfirmasi oleh pengumuman resmi emiten dalam cakupan arsip ini.\n\n#### B. Potensi Investasi\n*   **Potensi Upside (Jika Transaksi Terealisasi):** Jika rencana akuisisi Huaan Mining benar dan *closing* terjadi, BLUE berpotensi mengalami revaluasi valuasi karena masuk sektor pertambangan yang biasanya memiliki multiple valuasi berbeda dari sektor percetakan. Masuknya pengendali baru (Dragonmine) juga bisa mengindikasikan adanya *backdoor listing* atau suntikan aset strategis [D50].\n*   **Risiko Likuiditas & Regulasi:** Dengan free float di bawah 12,5%, likuiditas saham mungkin terbatas. Selain itu, inkonsistensi data jumlah saham dalam laporan resmi menimbulkan risiko transparansi bagi investor institusi [D25].\n*   **Risiko Spekulasi:** Arsip menekankan bahwa frekuensi postingan tinggi tidak membuktikan peluang keuntungan. Banyak diskusi BLUE bercampur dengan candaan komunitas dan dugaan tanpa bukti kuat [D50].\n\n### 4. Kesimpulan dan Rekomendasi Pemeriksaan Lanjutan\n\n| Aspek | Status dalam Arsip | Keterangan |\n| :--- | :--- | :--- |\n| **Aksi Korporasi** | **Belum Terverifikasi** | Rumor akuisisi Huaan/Dragonmine ada di forum, tapi tidak ada di pengumuman resmi per Sept 2026 [D25], [D50]. |\n| **Struktur Modal** | **Stabil tapi Ambigu** | Pengendali tetap sama, namun ada inkonsistensi angka total saham antar lampiran [D25]. |\n| **Kepatuhan BEI** | **Di Bawah Standar** | Free float ~11,97% < 12,5%. Perlu cek apakah ada peringatan atau rencana pemenuhan [D25]. |\n| **Sinyal Pasar** | **Tertinggi untuk Riset** | BLUE disebut sebagai salah satu emiten \"jarang disebut\" namun dengan argumentasi bisnis paling spesifik untuk ditelusuri [D50]. |\n\n**Apa yang Belum Diketahui (Gap Analysis):**\n1.  **Identitas Pengendali Baru:** Siapa sebenarnya \"Dragonmine Mining\" dan apakah mereka terhubung dengan pengendali lama?\n2.  **Status Akuisisi:** Apakah perjanjian jual-beli bersyarat (SPA) untuk Huaan Mining sudah ditandatangani atau masih tahap negosiasi?\n3.  **Klarifikasi Data:** Mengapa terdapat tiga angka total saham yang berbeda dalam satu set laporan bulanan?\n\n**Rekomendasi:**\nInvestor disarankan menunggu pengumuman resmi dari emiten mengenai perubahan kegiatan usaha atau akuisisi aset sebelum mengambil keputusan berdasarkan rumor forum. Cek kembali ke situs resmi IDX/Emiten untuk memastikan apakah telah ada pengumuman material pasca-22 September 2026 yang tidak tercakup dalam arsip ini. Jangan menyamakan penurunan jumlah pemegang saham atau konsolidasi kepemilikan dengan bukti pengendalian penuh tanpa data lengkap [D50].",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 71447,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.000395586,
+        "prompt_tokens": 21460,
+        "completion_tokens": 2037,
+        "cached_tokens": 21376,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 34269,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3996521,
+        "selected_source_bytes": 61959,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "BLUE"
+        ],
+        "documents_checked": 6,
+        "current_document": "D4",
+        "database_source_reads": 6
+      }
+    },
+    {
+      "id": "adhi_mra",
+      "question": "apakah ada tentang \"Press Release \"ADHI Karya Masuki Tahap Implementasi Restrukturisasi melalui Penandatanganan Master Restructuring Agreement\" [ADHI ]\" ?",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "Master Restructuring Agreement|MRA",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "ADHI"
+      ],
+      "sources": [
+        "D50",
+        "D39",
+        "D37",
+        "D36",
+        "D34",
+        "D33",
+        "D53",
+        "D41",
+        "D32",
+        "D52",
+        "D25",
+        "D23",
+        "D44",
+        "D2",
+        "D1",
+        "D21",
+        "D20",
+        "D18",
+        "D16",
+        "D14",
+        "D13",
+        "D42",
+        "D12",
+        "D11",
+        "D7",
+        "D5",
+        "D4"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D39",
+        "D36",
+        "D32"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan pemeriksaan arsip yang diberikan, **tidak ditemukan** dokumen resmi atau *press release* dengan judul spesifik \"ADHI Karya Masuki Tahap Implementasi Restrukturisasi melalui Penandatanganan Master Restructuring Agreement\" [ADHI].\n\nBerikut adalah fakta yang tersedia dalam arsip terkait status penandatanganan MRA ADHI:\n\n1.  **Status Target, Bukan Realisasi:**\n    Dokumen D34 (15 September 2026) dan D33 (14–15 September 2026) mencatat bahwa manajemen mengonfirmasi adanya **target** penandatanganan Master Restructuring Agreement (MRA) pada September 2026 [D33; D34]. Namun, dokumen D39 (22 September 2026) menegaskan bahwa pengumuman terbaru hanya merupakan bukti iklan hasil rapat pemegang obligasi, dan usulan restrukturisasi justru **ditolak** oleh pemegang obligasi dengan suara sangat besar (99,57%, 99,48%, dan 94,73% tidak setuju) [D39].\n\n2.  **Tidak Ada Bukti Penandatanganan Terjadi:**\n    Tidak ada entri dalam arsip (D1–D53) yang melaporkan bahwa MRA telah ditandatangani atau bahwa tahap implementasi formal telah dimulai. Sebaliknya, dokumen D36 (18 September 2026) menyatakan secara eksplisit: \"restrukturisasi belum disepakati\" [D36]. Dokumen D39 juga menekankan bahwa penundaan pembayaran bukan berarti penghapusan utang atau persetujuan restrukturisasi final [D50; D39].\n\n3.  **Konteks Publik Expose:**\n    Informasi mengenai rencana MRA bersumber dari laporan *Public Expose* Tahunan yang dilaksanakan pada 9 September 2026 dan dilaporkan pada 14 September 2026 [D33; D32]. Dalam paparan tersebut, manajemen menyebutkan dukungan dari PT Danantara Asset Management sebagai pemegang saham mayoritas untuk proses restrukturisasi, namun hal ini bersifat rencana strategis, bukan konfirmasi eksekusi hukum [D32].\n\n**Kesimpulan:**\nJudul yang Anda tanyakan (\"Masuki Tahap Implementasi... melalui Penandatanganan\") **tidak didukung oleh bukti dalam arsip**. Arsip menunjukkan bahwa hingga akhir September 2026, restrukturisasi utang ADHI masih dalam tahap negosiasi yang mengalami penolakan signifikan dari kreditur obligasi, dan belum ada tanda-tanda penandatanganan MRA yang sah atau publikasi resmi mengenai penyelesaian restrukturisasi tersebut. Klaim tentang penandatanganan MRA mungkin merujuk pada rencana/target manajemen, bukan kejadian aktual yang terekam dalam pengumuman bursa pada periode arsip.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 162969,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00148552,
+        "prompt_tokens": 50084,
+        "completion_tokens": 1100,
+        "cached_tokens": 49536,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 12179,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 10868389,
+        "selected_source_bytes": 152145,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "ADHI"
+        ],
+        "documents_checked": 27,
+        "current_document": "D4",
+        "database_source_reads": 27
+      }
+    },
+    {
+      "id": "kbli",
+      "question": "emiten indonesia apa saja yang baru menambah KBLI",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "KBLI",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "KBLI"
+      ],
+      "sources": [
+        "D51",
+        "D40",
+        "D49",
+        "D37",
+        "D48",
+        "D36",
+        "D46",
+        "D38",
+        "D34",
+        "D33",
+        "D32",
+        "D52",
+        "D28",
+        "D26",
+        "D25",
+        "D23",
+        "D44",
+        "D2",
+        "D1",
+        "D21",
+        "D20",
+        "D18",
+        "D17",
+        "D16",
+        "D14",
+        "D13",
+        "D12",
+        "D11",
+        "D10",
+        "D9",
+        "D7",
+        "D6",
+        "D5",
+        "D4"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D28",
+        "D25",
+        "D23",
+        "D18",
+        "D14",
+        "D10",
+        "D13",
+        "D21",
+        "D20",
+        "D17",
+        "D40",
+        "D11"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang disediakan, berikut adalah emiten Indonesia yang secara eksplisit mengumumkan penambahan atau perluasan Kode Klasifikasi Baku Lapangan Usaha (KBLI) baru, bukan sekadar penyesuaian administratif untuk kepatuhan regulasi.\n\n### 1. PT NexAI Digital Infrastruktur Tbk (MGLV)\nEmiten ini melakukan transformasi bisnis substantif dari perdagangan besar peralatan rumah tangga menjadi penyedia infrastruktur komputasi/data center.\n*   **KBLI Baru Ditambahkan:** 70209 (Aktivitas Konsultasi Manajemen dan Bisnis Lainnya), 64210 (Aktivitas Perusahaan Induk), dan 63102 (Aktivitas Pemrosesan Informasi). [D28]\n*   **Status:** Disetujui dalam RUPS pada 7 September 2026. [D28]\n\n### 2. PT Krom Bank Indonesia Tbk (BBSI)\nPerluasan kegiatan usaha mencakup sektor jasa pembayaran dan perbankan umum.\n*   **KBLI Baru Ditambahkan:** 64141 (Jasa Penyedia Jasa Pembayaran) dan 64121 (Perbankan Umum Konvensional). [D25], [D23]\n*   **Status:** Disetujui dalam RUPSLB Kedua pada 3 September 2026. [D23]\n\n### 3. PT Cashlez Worldwide Indonesia Tbk (CASH)\nSebagai bagian dari restrukturisasi dan diversifikasi usaha, emiten menambahkan tiga kode KBLI baru.\n*   **KBLI Baru Ditambahkan:**\n    *   95101 (Reparasi Komputer dan Peralatan Komunikasi)\n    *   66199 (Aktivitas Penunjang Jasa Keuangan Lainnya)\n    *   77394 (Penyewaan dan Sewa Guna Usaha Mesin/Peralatan Kantor) [D18]\n*   **Status:** Menunggu persetujuan RUPSLB pada 8 Oktober 2026. [D18]\n\n### 4. PT Mitra Pedagang Indonesia Tbk (MPIX)\nEmiten berencana menambah bidang usaha baru sebagai komitmen pemenuhan Peraturan Bank Indonesia (PBI).\n*   **KBLI Baru Ditambahkan:** 66141 (Industri Penyediaan Jasa Pembayaran). [D23]\n*   **Status:** Rencana masih menunggu persetujuan Bank Indonesia. [D23]\n\n### 5. PT Tower Bersama Infrastructure Tbk (TBIG)\nAnak usaha PT Tower Bersama menambahkan aktivitas baru terkait konektivitas internet.\n*   **KBLI Baru Ditambahkan:** 61107 (Jasa Gerbang Akses Internet / Network Access Point). [D14]\n*   **Status:** Disetujui dalam RUPSLB pada 24 Agustus 2026. [D14]\n\n### 6. PT Menteng Heritage Realty Tbk (HRME)\nEmiten memperluas cakupan kegiatan usaha dengan menambahkan beberapa kode KBLI di sektor hospitality dan manajemen.\n*   **KBLI Baru Ditambahkan:**\n    *   55101 (Hotel Bintang Lima)\n    *   56101 (Penyediaan Makanan di Bangunan Tetap)\n    *   56301 (Aktivitas Bar)\n    *   56303 (Rumah Minum/Kafe)\n    *   64210 (Perusahaan Induk)\n    *   70209 (Konsultasi Manajemen) [D10]\n*   **Status:** Disetujui dalam RUPSLB pada 18 Agustus 2026. [D10]\n\n### 7. PT Satu Visi Putra Tbk (VISI)\nEmiten mengubah kegiatan usaha utama dari perdagangan besar menjadi perusahaan induk (holding company).\n*   **KBLI Baru Ditambahkan:** 64210 (Aktivitas Perusahaan Induk). [D13]\n*   **Status:** Direncanakan dalam RUPSLB/RUPS Independen pada 30 September 2026. [D13]\n\n### 8. PT Solusi Bangun Indonesia Tbk (SMCB)\nDalam penyesuaian Pasal 3 Anggaran Dasar, emiten merujuk pada perubahan kode KBLI spesifik yang mengindikasikan pergeseran atau pembaruan klasifikasi usaha logistik dan transportasi.\n*   **Contoh Perubahan Kode:** 49432 menjadi 49232, 50132 menjadi 52227, 52101 menjadi 52109, 23957 menjadi 23955, 46633 menjadi 46733. [D21]\n*   **Status:** Direncanakan dalam RUPSLB pada 25 September 2026. [D21]\n\n### Catatan Penting:\n*   Banyak emiten lain (seperti IGAR, SRTG, CITA, AKPI, dll.) hanya melakukan **penyesuaian administratif** untuk mematuhi Peraturan BPS No. 7 Tahun 2025 tanpa menambah jenis kegiatan usaha baru atau mengubah substansi bisnis. Dokumen-dokumen tersebut menegaskan bahwa perubahan tersebut \"bukan merupakan perubahan kegiatan usaha\" sesuai POJK 17/2020. [D20], [D23], [D17].\n*   Untuk emiten seperti BIKE dan MKNT, rencana penambahan KBLI bersifat strategis dan terintegrasi dengan akuisisi aset atau perubahan pengendali, namun detail kode spesifiknya sering kali belum diungkapkan secara lengkap dalam ringkasan digest awal. [D40], [D11].",
+      "usage": {
+        "calls": 14,
+        "input_bytes": 1043912,
+        "output_token_budget": 33500,
+        "known_cost_usd": 0.01906377,
+        "prompt_tokens": 318171,
+        "completion_tokens": 24087,
+        "cached_tokens": 130816,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 161705,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 11,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 12223234,
+        "selected_source_bytes": 762980,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "KBLI"
+        ],
+        "documents_checked": 34,
+        "current_document": "D4",
+        "database_source_reads": 34
+      }
+    },
+    {
+      "id": "broad",
+      "question": "Saham apa yang paling menarik",
+      "status": "error",
+      "error": "Topik terlalu luas untuk satu analisis. Pilih kode saham atau topik yang lebih spesifik.",
+      "pass": true,
+      "checks": {
+        "status": true
+      },
+      "facts": [],
+      "terms": [
+        "saham"
+      ],
+      "sources": [],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 381,
+        "output_token_budget": 300,
+        "known_cost_usd": 0.00000356,
+        "prompt_tokens": 84,
+        "completion_tokens": 8,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 2025,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 15346654,
+        "selected_source_bytes": 12824479,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "source_limits",
+        "terms": [
+          "saham"
+        ],
+        "documents_checked": 54,
+        "current_document": "D4",
+        "database_source_reads": 54
+      }
+    },
+    {
+      "id": "followup_buka",
+      "question": "Analisa lebih dalam gunakan lebih banyak dokumen",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "BUKA"
+      ],
+      "sources": [
+        "D53",
+        "D41",
+        "D32",
+        "D52",
+        "D27",
+        "D21",
+        "D42",
+        "D11"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D32",
+        "D41",
+        "D52",
+        "D21",
+        "D53"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berikut adalah analisis mendalam mengenai **BUKA (PT Bukalapak.com Tbk)** berdasarkan integrasi data dari arsip D11, D21, D27, D32, D41, D42, D52, dan D53. Analisis ini memisahkan fakta regulatoris, dinamika kepemilikan, sentimen pasar, dan risiko kepatuhan.\n\n### 1. Koreksi Administratif vs. Akumulasi Saham: Klarifikasi Fakta Material\nTerdapat kesenjangan antara narasi di media sosial dengan fakta dokumen resmi yang perlu diluruskan untuk menghindari misinterpretasi.\n\n*   **Fakta Dokumen Resmi (D32, D41):** Pengumuman tanggal 14 September 2026 adalah **koreksi LBRE periode Maret 2026**. Penurunan *free float* sebesar ~1,99 miliar saham terjadi karena reklasifikasi klasifikasi pemegang saham (dari \"non-warkat <5%\" menjadi kategori modal ventura/PE), bukan karena transaksi beli-jual baru di bulan September [D32], [D41]. Emiten menyatakan koreksi ini tidak mempengaruhi kewajiban *free float* [D32].\n*   **Narasi Media Sosial (D52):** Postingan di Stockbit pada 8–9 September 2026 menyebutkan \"Pengendali membeli ~803,3 juta saham\" dan \"Komisaris membeli ~635 juta saham\" [D52].\n    *   **Analisis Konflik:** Dokumen resmi D32 (LBRE Maret) dan D27 (LBRE Agustus) **tidak mencatat** perubahan signifikan pada kepemilikan Direksi/Komisaris/Pengendali yang sesuai dengan angka akumulasi besar tersebut dalam periode pelaporan bulanan standar.\n    *   **Kesimpulan:** Narasi pembelian massal di D52 kemungkinan merujuk pada aktivitas pasar sekunder (*secondary market*) yang belum terakumulasi penuh dalam laporan LBRE bulanan, atau merupakan spekulasi/rumor yang belum dikonfirmasi oleh pengumuman resmi emiten. Arsip D41 secara eksplisit memperingatkan agar data lama yang dikoreksi tidak disamakan dengan pengumpulan saham aktif di September [D41]. Tanpa bukti transaksi di Bappebti atau pengumuman khusus, klaim \"pembelian massal\" oleh pengendali/komisaris tetap sebagai **hipotesis tanpa konfirmasi regulatori** hingga saat ini.\n\n### 2. Dinamika Kepemilikan Pemegang Saham Pengendali\nBerdasarkan data LBRE Maret 2026 (yang dikoreksi di September) dan Agustus 2026, struktur pengendalian menunjukkan stabilitas relatif namun dengan pergeseran nominal antar entitas afiliasi.\n\n| Pemegang Saham Pengendali | Periode Maret 2026 (Setelah Koreksi) | Periode Agustus 2026 | Perubahan / Catatan |\n| :--- | :--- | :--- | :--- |\n| **PT Mahkota Karya Kreatif** | 46.321.746.385 saham (44,908%) | Tidak disebutkan spesifik di D27 (mungkin masuk kategori lain/afiliasi) | Data D27 menyebut \"PT Elang Kreatif Media\" memegang 44,9%. Kemungkinan ada rekonsiliasi nama entitas atau afiliasi. |\n| **PT Elang Media / Kreatif Media** | 10.988.390.907 saham (10,653%) | 10.821.706.040 saham (10,489%) *atau* 11.333.437.507 (10,986%) | Terdapat inkonsistensi penamaan antar dokumen. D32 mencatat kenaikan dari 10,457% ke 10,653%. D27 mencatat entitas berbeda dengan persentase serupa. Perlu verifikasi nama entitas legal yang tepat. |\n| **Geoffrey Wacher** | 10.821.706.040 saham (10,491%) | 16.805.130 saham (0,0163%) *sebagai Komisaris* | **Discrepansi Besar:** Di D32, Geoffrey Wacher adalah pengendali individu. Di D27, nama \"Geoffrey Wacher\" muncul sebagai Komisaris dengan kepemilikan sangat kecil. Ini mengindikasikan kemungkinan perubahan struktur holding atau kesalahan klasifikasi data antara periode Maret dan Agustus. |\n| **Victor Putra Lesmana** | 1.438.287.844 saham (1,3944%) | 772.585.501 saham (0,7489%) | Penurunan signifikan? Atau perbedaan antara saham pribadi vs. afilasi? D27 mencatat Victor sebagai Direksi dengan 0,7489%. |\n\n*Catatan:* Inkonsistensi data antara D32 (Maret) dan D27 (Agustus) mengenai nama entitas pengendali (Mahkota/Elang/Bukalapak.com) dan jumlah saham individu memerlukan pemeriksaan ulang terhadap daftar afiliasi resmi. Namun, secara agregat, kontrol masih berada di tangan segelintir pihak (>60% gabungan).\n\n### 3. Respons Regulator dan Volatilitas Harga (September 2026)\nArsip D21 mengungkap intervensi regulator yang serius sebelum periode koreksi data.\n\n*   **Surat BEI (2 Sept 2026):** Bursa Efek Indonesia (BEI) mengirimkan surat No. S-11196/BEI.PP2/09-2026 meminta penjelasan atas **volatilitas transaksi efek** [D21].\n*   **Jawaban Emiten:** PT BUKALAPAK.COM menyatakan tidak mengetahui informasi material yang mempengaruhi harga [D21]. Namun, pernyataan kunci adalah: *\"Pemegang saham utama berkomitmen mematuhi peraturan\"* dan merujuk pada aktivitas pemegang saham tertentu [D21].\n*   **Implikasi:** Permintaan penjelasan BEI biasanya dipicu oleh pergerakan harga/volume yang menyimpang dari rata-rata historis atau indikasi manipulasi pasar. Pernyataan emitent tentang komitmen pemegang saham utama mengisyaratkan bahwa volatilitas mungkin berasal dari transaksi besar oleh pengendali atau afiliasinya, yang sejalan dengan rumor pembelian di D52.\n\n### 4. Sentimen Pasar dan Spekulasi Retail (Stockbit)\nData dari D52 dan D53 menunjukkan minat tinggi terhadap BUKA di kalangan retail investor, didorong oleh faktor teknis dan spekulasi.\n\n*   **Topik Pembahasan Dominan:**\n    *   **\"Controller Accumulation\":** Postingan @Stockbit (Stream ID 35549417) pada 8 Sept menjadi salah satu top post, membahas akumulasi saham oleh pengendali [D52].\n    *   **Teknis Trading:** Banyak postingan menggunakan tag `|BUKA|` dengan kata kunci seperti `PACK`, `UANG`, `RAJA`, `IMJS` [D53]. Ini menunjukkan trader retail mencari momentum breakout atau koreksi.\n    *   **Hubungan Afiliasi:** Tag `|BBCA|BKSL|BPTR|BUKA|` dan `|BESS|BUKA|RAJA|` menunjukkan investor menghubungkan BUKA dengan bank-bank besar atau emiten media lain, mungkin dalam konteks valuasi sektor atau spekulasi merger/akuisisi [D53].\n*   **Volume Diskusi:** BUKA konsisten muncul di daftar \"Top Post\" harian (8-9 Sept) [D52], menandakan sentimen yang panas namun berisiko tinggi jika didominasi rumor tanpa dasar fundamental kuat.\n\n### 5. Risiko dan Ketidakpastian (Risk Assessment)\n\n1.  **Risiko Kepatuhan Free Float:** Meskipun koreksi Maret (D32) menyatakan free float 29,82% masih aman, penurunan drastis dari 31,75% ke 29,82% dalam satu laporan koreksi adalah sinyal merah bagi regulator. Jika terjadi lebih banyak reklasifikasi saham pengendali/afiliasi menjadi non-free float, emiten berisiko mendekati batas minimum 7,5% atau bahkan melanggar ketentuan papan pencatatan jika ada aturan internal yang lebih ketat [D32].\n2.  **Transparansi Data:** Inkonsistensi data kepemilikan antara laporan Maret (D32) dan Agustus (D27) mengenai nama entitas pengendali dan jumlah saham individu menciptakan ketidakjelasan mengenai struktur kontrol riil. Hal ini dapat mengurangi kepercayaan institusional.\n3.  **Volatilitas Tanpa Dasar Fundamental:** Interaksi BEI (D21) dan rumor pembelian massal di media sosial (D52) tanpa pengumuman resmi transaksi blok (*block trade*) atau akuisisi menciptakan lingkungan spekulatif. Investor harus waspada terhadap potensi *dumping* jika spekulasi akumulasi terbukti tidak benar.\n4.  **Perubahan Corporate Secretary:** Pengangkatan Victor Putra Lesmana (Direktur) sebagai Sekretaris Perusahaan efektif 21 Agustus 2026 (D11) menggabungkan fungsi operasional dan tata kelola. Meskipun dianggap administratif, hal ini dapat menimbulkan konflik kepentingan potensial dalam pengawasan keterbukaan informasi, terutama di tengah investigasi volatilitas oleh BEI.\n\n### Kesimpulan Akhir\nPeristiwa utama BUKA pada September 2026 adalah **koreksi administratif data kepemilikan Maret 2026** yang menurunkan *free float* menjadi 29,82%, bukan akumulasi saham baru [D32], [D41]. Namun, konteks ini diperumit oleh **permintaan penjelasan volatilitas dari BEI** pada awal September [D21] dan **rumor akumulasi saham oleh pengendali/komisaris** di media sosial [D52] yang belum dikonfirmasi oleh dokumen resmi LBRE terbaru.\n\nInvestor disarankan untuk:\n1.  Memverifikasi apakah \"pembelian\" yang dirumorikan di Stockbit telah dilaporkan sebagai transaksi blok atau pengendali kepada OJK/BEI.\n2.  Mengawasi apakah koreksi free float akan diikuti oleh reklasifikasi lebih lanjut yang dapat menekan persentase *free float* mendekati batas kritis.\n3.  Menyikapi sentimen positif di media sosial sebagai spekulasi jangka pendek, mengingat tidak ada katalis fundamental (seperti laba bersih atau aksi korporasi) yang mendukung kenaikan harga sustainer [D32].",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 50786,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00089042,
+        "prompt_tokens": 17478,
+        "completion_tokens": 2816,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 48992,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3022608,
+        "selected_source_bytes": 43720,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "BUKA"
+        ],
+        "documents_checked": 8,
+        "current_document": "D11",
+        "database_source_reads": 8
+      }
+    },
+    {
+      "id": "tanoko",
+      "question": "Tanoko?",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "docs_all": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "AVIA",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "Tanoko"
+      ],
+      "sources": [
+        "D25",
+        "D14"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D25",
+        "D14"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang tersedia, berikut adalah rincian mengenai individu bernama **Tanoko** dan entitas terkait dalam PT Avia Avian Tbk (AVIA):\n\n### 1. Identitas Individu Tanoko\nTerdapat tiga individu dengan nama keluarga Tanoko yang tercatat dalam struktur kepemilikan dan kepengurusan AVIA per 31 Agustus 2026:\n\n*   **Robert Wijono Tanoko**: Berposisi sebagai **Direksi**.\n    *   Kepemilikan saham: 1.428.906.300 saham (2,31% dari total saham beredar) [D25].\n*   **Tanoko Hermanto**: Berposisi sebagai **Komisaris**.\n    *   Kepemilikan saham: 22.674.971.000 saham (36,60% dari total saham beredar) [D25].\n    *   Catatan: Angka persentase di bagian \"Material changes\" tertulis 36,6%, sedangkan di \"Overview\" tertulis 36,60%. Data saham sama [D25].\n*   **Ruslan Tanoko**: Berposisi sebagai **Komisaris**.\n    *   Kepemilikan saham: 20.129.652.900 saham (32,49% dari total saham beredar) [D25].\n\n### 2. Entitas Pengendali Terkait Keluarga Tanoko\nKepemilikan saham pengendali AVIA didominasi oleh dua perusahaan yang dikendalikan oleh anggota keluarga Tanoko:\n\n*   **PT Tancorp Surya Sentosa**:\n    *   Pemegang saham: 22.674.971.000 saham (36,60%).\n    *   Diidentifikasi sebagai pemegang saham pengendali [D25].\n    *   Afiliasi: Memiliki hubungan dengan Tanoko Hermanto (Komisaris) karena jumlah saham yang dimiliki perusahaan tersebut sama persis dengan kepemilikan pribadi Tanoko Hermanto [D25].\n*   **PT Wahana Lancar Rejeki**:\n    *   Pemegang saham: 20.129.652.900 saham (32,49%).\n    *   Diidentifikasi sebagai pemegang saham pengendali [D25].\n    *   Afiliasi: Memiliki hubungan dengan Ruslan Tanoko (Komisaris) karena jumlah saham yang dimiliki perusahaan tersebut sama persis dengan kepemilikan pribadi Ruslan Tanoko [D25].\n\n**Total Kepemilikan Pengendali:**\nKedua entitas tersebut secara kolektif menguasai **69,09%** dari total saham beredar AVIA per 31 Agustus 2026 [D25].\n\n### 3. Perubahan Struktur dan Status\n*   **Tidak Ada Perubahan Material**: Tidak terdapat perubahan pada struktur kepemilikan saham pengendali, direksi, maupun komisaris berdasarkan Laporan Bulanan Registrasi Pemegang Efek (LBRE) periode Agustus 2026 yang disampaikan pada 9 September 2026 [D25].\n*   **Posisi Saat Ini**:\n    *   Robert Wijono Tanoko tetap sebagai Direksi [D25].\n    *   Tanoko Hermanto dan Ruslan Tanoko tetap sebagai Komisaris [D25].\n    *   Tidak ada perubahan susunan direksi atau komisaris yang teridentifikasi [D25].\n\n### 4. Batas Bukti dan Catatan Penting\n*   **Hubungan Kepemilikan**: Meskipun PT Tancorp Surya Sentosa dan PT Wahana Lancar Rejeki memiliki jumlah saham yang identik dengan kepemilikan pribadi Tanoko Hermanto dan Ruslan Tanoko, dokumen tidak secara eksplisit menyatakan bahwa mereka adalah pemilik manfaat tunggal atau satu-satunya pemilik. Namun, kesamaan angka ini menunjukkan kontrol yang sangat erat [D25].\n*   **Nama Lengkap**: Dokumen hanya menyebutkan nama belakang \"Tanoko\" untuk beberapa individu. Nama lengkap lain seperti Christian Sinanto dan Angelica Kurnia Tanisia juga disebutkan sebagai direksi/komisaris tetapi tidak memiliki afiliasi nama keluarga Tanoko [D25].\n*   **Sumber Data**: Semua data kepemilikan dan posisi jabatan bersumber dari LBRE periode Agustus 2026 yang diterbitkan pada 9 September 2026 [D25]. Siaran pers tanggal 26 Agustus 2026 tidak membahas detail kepemilikan saham individu Tanoko selain menyebutkan profil perusahaan dan strategi keberlanjutan [D14].",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 13355,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.00029581,
+        "prompt_tokens": 3395,
+        "completion_tokens": 1492,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 22166,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 2593070,
+        "selected_source_bytes": 9877,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "Tanoko"
+        ],
+        "documents_checked": 2,
+        "current_document": "D14",
+        "database_source_reads": 2
+      }
+    },
+    {
+      "id": "ipac_d41",
+      "question": "Fokus APAC Realty dan IPAC (PT ERA Graharealty Tbk). Periksa sumber D41: transaksi 11 September 2026 itu rencana, bukan selesai. Buat timeline singkat maksimal 100 kata: kepemilikan awal, rencana tender (persentase dan harga), target penyelesaian serta syaratnya. Cantumkan sumber.",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "docs_all": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "20 Oktober|go private|delisting",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "IPAC"
+      ],
+      "sources": [
+        "D30",
+        "D29",
+        "D20",
+        "D42"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D29",
+        "D30"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip D29 dan D30, berikut adalah timeline singkat mengenai rencana go private IPAC pada 11 September 2026:\n\n*   **Kepemilikan Awal:** APAC Investment 2 Pte. Ltd. menguasai 90,60% saham (860.562.600 lembar) [D29].\n*   **Rencana Tender:** Pengendali mengajukan Penawaran Tender Sukarela (VTO) untuk membeli sisa saham publik sebesar 9,402% (maksimal 89.305.900 lembar) dengan harga Rp250 per saham [D30].\n*   **Syarat:** Persetujuan RUPSLB pada 20 Oktober 2026 dan persetujuan OJK/BEI [D29].\n*   **Target Penyelesaian:** Delisting efektif diperkirakan pada 18 Maret 2027 [D30].\n\nTransaksi ini merupakan pengumuman rencana awal, bukan penyelesaian transaksi [D29].",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 28084,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00036415,
+        "prompt_tokens": 8923,
+        "completion_tokens": 742,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 11685,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 1575726,
+        "selected_source_bytes": 24213,
+        "excluded_dated_records": 1,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "IPAC"
+        ],
+        "documents_checked": 4,
+        "current_document": "D42",
+        "database_source_reads": 4
+      }
+    },
+    {
+      "id": "sgx_thematic",
+      "question": "simpulkan emiten indonesia yg berhubungan atau baru akuisisi dari singapur only dan urutkan timeline",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "IPAC|Graharealty",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "SGX",
+        "Singapura",
+        "Singapore",
+        "Singapur"
+      ],
+      "sources": [
+        "D51",
+        "D50",
+        "D43",
+        "D49",
+        "D48",
+        "D33",
+        "D53",
+        "D32",
+        "D3",
+        "D30",
+        "D29",
+        "D52",
+        "D28",
+        "D27",
+        "D26",
+        "D25",
+        "D23",
+        "D2",
+        "D1",
+        "D21",
+        "D20",
+        "D18",
+        "D17",
+        "D16",
+        "D15",
+        "D14",
+        "D12",
+        "D6",
+        "D5",
+        "D4"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D43",
+        "D3",
+        "D15",
+        "D17",
+        "D14",
+        "D5",
+        "D20",
+        "D28",
+        "D26",
+        "D50",
+        "D21",
+        "D16",
+        "D6",
+        "D12",
+        "D25",
+        "D27",
+        "D4",
+        "D23"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah tabel emiten Indonesia yang memiliki hubungan atau transaksi akuisisi dengan pihak Singapura. Daftar ini mencakup kepemilikan pengendali, akuisisi aset/minoritas oleh pihak asing, dan transaksi material lainnya.\n\n| Pihak Indonesia (Emiten BEI) | Status Emiten BEI | Pihak Asing / Entitas Terkait | Bursa Pihak Asing & Domisili | Jenis Hubungan | Status Transaksi/Tanggal | Sumber |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| **APAC Realty Ltd.** (melalui anak usaha PT ERA Graharealty Tbk) | Aktif (IDX) | APAC Realty Ltd. (Singapura) | SGX; Singapura | Pembelian kepentingan minoritas (tender) untuk delisting | Diumumkan 11 Sept 2026; Target selesai Maret 2027 [D43] |\n| **TerraCom** (ASX: TER) | Aktif (ASX)* | Orbit Marketing / Quantum Strategic Investments (Singapura) | ASX; Singapura | Pengendalian saham (Akuisisi tidak langsung via struktur Singapura) | Orbit memegang 45,84% per Feb 2026; Quantum beli Orbit Jan 2026 [D3] |\n| **PGAS** | Aktif (IDX) | Gunvor Singapore Pte. Ltd. | Tidak tercatat di bursa publik sebagai emiten utama dalam konteks ini; Singapura | Sengketa Arbitrase (Kewajiban pembayaran kompensasi) | Putusan LCIA No. 246358 diterima 26 Agu 2026 [D15], [D17] |\n| **MDLN** | Aktif (IDX) | Pengadilan Tinggi Singapura (Prosedural) | Singapura | Scheme of Arrangement (Restrukturisasi Utang Notes) | Persetujuan mayoritas pemegang Notes Agustus 2026; Tunggu sanction pengadilan [D14], [D5] |\n| **DOOH** | Aktif (IDX) | PT Sinergi Internasional Investama (SII) | Pencatatan bursa belum terbukti; Domisili tidak disebutkan secara eksplisit sebagai entitas SGX dalam teks ini, namun dikaitkan dengan transformasi pengendali baru pada Public Expose 4 Sept 2026 [D20]. *Catatan: Dokumen tidak secara eksplisit menyatakan SII berdomisili Singapura, hanya menyebut \"pengendali baru\". Namun dalam konteks pertanyaan \"akuisisi dari Singapura\", jika SII bukan entitas SGX, maka tidak masuk kriteria ketat \"dari Singapura\" kecuali ada bukti domisili. Berdasarkan instruksi, jangan mengarang. Jika SII tidak terbukti SGX, maka DOOH tidak masuk kategori \"akuisisi dari Singapura\" berdasarkan bukti eksplisit.* -> **Dieliminasi** karena tidak ada bukti domisili Singapura untuk SII dalam dokumen. |\n| **IPAC** | Aktif (IDX) | APAC Investama Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Pengendali (Statis) | Per 31 Agu 2026, APAC Investama memegang 90,598% [D20] |\n| **SQMI** | Aktif (IDX) | Wilton Resources Holdings Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Pengendali (Statis) | Per 31 Agu 2026, Wilton Resources memegang 53,50% [D28] |\n| **ITMG** | Aktif (IDX) | Banpu Minerals (Singapore) Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Pengendali (Statis) | Per 31 Agu 2026, Banpu Minerals memegang 65,143% [D26] |\n| **RATU** | Aktif (IDX) | Genting Oil Kasuri Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Parent Company Guarantee (Transaksi Afiliasi) | Penandatanganan 29 April 2026; Batas liabilitas US$11 juta [D26] |\n| **EDGE** | Aktif (IDX) | Digital Edge (Hong Kong) Limited (DEHK) | Pencatatan bursa belum terbukti; Hong Kong (bukan Singapura) | Pinjaman Antar Perusahaan (Intercompany Loan) | Transaksi 11 Sept 2026; DEHK adalah pemegang saham pengendali 59,47%. *Catatan: DEHK berdomisili Hong Kong, bukan Singapura. Dieliminasi dari daftar \"Singapura only\".* |\n| **SILO** | Aktif (IDX) | First REIT (Singapura) | SGX; Singapura | Akuisisi Properti (Target/Calon) | Agenda rapat 22 Sept 2026; Tahap awal Rp6,91 triliun. Belum closing [D50] |\n| **BMRI** | Aktif (IDX) | Investor Publik (Pencatatan SGX-ST) | SGX; Singapura | Penerbitan Efek (Perpetual Bond AT1) | Penyelesaian 10 Sept 2026; Nilai USD 750 juta [D28] |\n| **TLKM** | Aktif (IDX) | Ekspansi Data Center Singapura | Pencatatan bursa belum terbukti; Singapura | Ekspansi Operasional (Investasi Aset) | Rencana ekspansi DC Singapura [D21] |\n| **VTNY** | Aktif (IDX) | Venteny Pte. Ltd. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Anak Usaha (Tidak Diaudit) | Laporan keuangan Q2 2026; Opini WDP karena entitas anak Singapura tidak diaudit [D21] |\n| **CYBR** | Aktif (IDX) | ITSEC Services Asia Pte. Ltd. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Anak Usaha (100%) | Terdaftar sebagai anak usaha [D16] |\n| **ADMR** | Aktif (IDX) | Adaro International Singapore Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Pendapatan Pihak Berelasi | Pendapatan USD 208,654 ribu dari pihak berelasi Singapura [D16] |\n| **PSAB** | Aktif (IDX) | DBS Bank Limited (Singapore) | Pencatatan bursa belum terbukti; Singapura | Investasi (Currency Linked Investments) | Investasi pokok SGD/USD di DBS Singapore H1 2026 [D17] |\n| **WINS** | Aktif (IDX) | Fast Offshore Supply (FOS) / Galangan Singapura | Pencatatan bursa belum terbukti; Singapura | Akuisisi Anak Usaha (FOS & FOI) | Konfirmasi akuisisi penuh FOS/FOI; Galangan di Singapura [D5], [D6] |\n| **SOCI** | Aktif (IDX) | PT Bank Mandiri (Persero) Tbk, Singapore Branch | Pencatatan bursa belum terbukti; Singapura | Jaminan Fasilitas Pinjaman (Afiliasi) | Jaminan hingga AS$54,9 juta untuk anak usaha EOM [D12] |\n| **TPIA** | Aktif (IDX) | Changi Airport Fuel Hydrant Installation Pte. Ltd. (CAFHI) | Pencatatan bursa belum terbukti; Singapura | Akuisisi Saham (Melalui Aster) | Kesepakatan akuisisi saham di CAFHI; Masih menunggu persetujuan [D16] |\n| **NAYZ** | Aktif (IDX) | Saiko Consultancy Pte. Ltd. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Pengendali | Pemegang saham pengendali 29,41% [D25] |\n| **BISI** | Aktif (IDX) | Field/Valley/Vista/SJ BISI Holdings Pte. Ltd. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham Signifikan | Empat entitas Singapura memegang total ~22,86% [D27] |\n| **CPIN** | Aktif (IDX) | UBS AG Singapore Non-Treaty Omnibus Account | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>5%) | Pemegang saham >=5% sebesar 5,98% [D27] |\n| **ESTA** | Aktif (IDX) | JPMCB NA RE-JPMCB Singapore Branch | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>5%) | Pemegang saham >5% sebesar 20,37% [D27] |\n| **PYFA** | Aktif (IDX) | PT Rejuve Global Investment Pte. Ltd. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham & Waran | Pemegang saham utama >=5% (5,927%) dan 100% waran [D27], [D4] |\n| **ALII** | Aktif (IDX) | Julius Baer Singapore Ltd., Co. / Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham Signifikan | Total kepemilikan entitas Julius Baer Singapura ~42,6% [D25], [D4] |\n| **BABY** | Aktif (IDX) | Blooming Years Pte. Ltd. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Pengendali | Pengendali 92,35% [D25] |\n| **BAYU** | Aktif (IDX) | Julius Baer Bank (Singapore), Bank Bancaire (Singapore) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham Besar | Kombinasi kepemilikan >10% [D25] |\n| **BBLD** | Aktif (IDX) | PT Bank of Singapore Limited | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Afiliasi | Pemegang saham afiliasi 5,49% [D25] |\n| **BMAS** | Aktif (IDX) | Kasikorn Vision Financial Company Pte Ltd (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Pengendali | Pengendali 86,03% [D25], [D23] |\n| **BOGA** | Aktif (IDX) | Archipelago GX PTE. LTD. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Pengendali | Pengendali 100% (langsung/tidak langsung) [D25] |\n| **CNKO** | Aktif (IDX) | ANDERSON BAY PTE LTD (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>5%) | Pemegang saham >5% sebesar 46% [D25] |\n| **GJTL** | Aktif (IDX) | Denham Pte. Ltd. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Pengendali | Pengendali 49,5% [D25] |\n| **KKGI** | Aktif (IDX) | UBS AG Singapore, Collier International Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>5%) | Kombinasi kepemilikan >42% [D25] |\n| **MCAS** | Aktif (IDX) | Abell Technology Global Pte. Ltd., Bank of Singapore Limited | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>5%) | Kombinasi kepemilikan >20% [D25] |\n| **MDIY** | Aktif (IDX) | Suncoast Investments Pte. Ltd. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham Utama | Pemegang saham asing utama [D25] |\n| **NFCX** | Aktif (IDX) | Bank of Singapore Limited | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>5%) | Pemegang saham >5% sebesar 6,04% [D25] |\n| **NINE** | Aktif (IDX) | Poh Holdings Pte Ltd (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Pengendali | Pengendali 35,85% [D25] |\n| **OASA** | Aktif (IDX) | OCBC Securities Pte Ltd, UBS AG Singapore | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>1%) | Pemegang saham signifikan [D25] |\n| **PZZA** | Aktif (IDX) | DBS Bank Ltd S/A Pemberton Asian Opportunities Fund (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>5%) | Pemegang saham >5% sebesar 9,60% [D25] |\n| **SKLT** | Aktif (IDX) | Singapore Investments Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham | Pemegang saham dengan data inkonsisten [D25] |\n| **STAR** | Aktif (IDX) | Calculus Investment Pte. Ltd. (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>5%) | Pemegang saham >5% sebesar 32,19% [D25] |\n| **VICO** | Aktif (IDX) | UBS AG Singapore S/A Safire Capital Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (<5%) | Pemegang saham <5% sebesar 1,73% [D25], [D23] |\n| **VOKS** | Aktif (IDX) | DBS Vickers Securities (Singapore) Pte Ltd | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham (>5%) | Pemegang saham >5% sebesar 25,18% [D25] |\n| **APEX** | Aktif (IDX) | Standard Chartered Bank Singapore S/A Augusta Investments I Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham | Pemegang saham 6,73% (menurut BAE) [D23] |\n| **CASS** | Aktif (IDX) | SATS Aero Services Ltd (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Saham Utama | Pemegang saham utama 21,65% [D23] |\n| **FASW** | Aktif (IDX) | PT SCGP Solutions (Singapore) Pte. Ltd. | Pencatatan bursa belum terbukti; Singapura | Dominasi Kepemilikan | Pemegang saham 59,85% [D23] |\n| **GEMS** | Aktif (IDX) | BOS LTD S/A GOLDEN ENERGY AND RESOURCES LIMITED (Singapura) | Pencatatan bursa belum terbukti; Singapura | Kepemilikan Minoritas Besar | Pemegang saham 6,99% [D23] |\n\n*\\*Catatan: TerraCom tercatat di ASX, namun pengendalinya adalah entitas Singapura (Quantum/Orbit). Ini memenuhi kriteria \"hubungan lintas negara\" di mana emiten BEI (atau aset terkait) dikendalikan oleh pihak asing, meskipun ticker TER sendiri ada di ASX. Dalam konteks arsip, hubungan ini dianggap relevan.*\n\n**Pihak/Aset Privat Indonesia atau Kandidat Belum Pasti:**\n*   **BlackGold:** Ada perjanjian pendanaan investasi dari PT Rajawali Artha Global (kelompok investor Indo-Sing-Korea) untuk menyuntikkan modal dan memegang 85% BlackGold setelah restrukturisasi. Dokumen masih dalam tahap persiapan skema (per Ags 2026) [D43].\n*   **Asiaphos:** Menandatangani term sheet untuk membeli 51% DC Alliance (entitas pemilik pusat data di Australia). Meskipun targetnya Australia, transaksi melibatkan Asiaphos (SGX-listed) dan potensi keterkaitan regional. Namun, targetnya bukan emiten BEI secara langsung dalam konteks akuisisi aset BEI [D43].\n*   **TOTM Technologies:** Kerja sama rencana dengan KORIKA Indonesia melalui surat minat tidak mengikat. Tidak ada akuisisi kendali [D43].\n*   **Resources Global Development (V7R):** Anak usaha V7R menjual saham PT Singaraja Putra, lalu mengusulkan langganan saham baru tetapi akhirnya tidak ikut. Ini penataan kepemilikan, bukan akuisisi baru oleh pihak asing terhadap emiten BEI [D43].\n\n**Batas Cakupan:**\nDaftar ini memisahkan antara kepemilikan pasif (kustodian/bank) dan pengendalian aktif/akuisisi. Banyak entitas Singapura dalam daftar adalah bank kustodian (Julius Baer, UBS, HSBC) yang mewakili klien, bukan necessarily pengendali strategis tunggal. Dokumen juga tidak membuktikan beneficial owner akhir untuk semua entitas trust/investasi (misalnya Malacca Trust di BPII atau Julius Baer di ALII). Transaksi seperti SILO dan TPIA (CAFHI) masih dalam tahap kesepakatan/negosiasi dan belum closing.",
+      "usage": {
+        "calls": 8,
+        "input_bytes": 691752,
+        "output_token_budget": 22700,
+        "known_cost_usd": 0.020680706,
+        "prompt_tokens": 226859,
+        "completion_tokens": 17674,
+        "cached_tokens": 83200,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 115991,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 4,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 13309794,
+        "selected_source_bytes": 368155,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "thematic": "cross-market-v2",
+        "terms": [
+          "SGX",
+          "Singapura",
+          "Singapore",
+          "Singapur"
+        ],
+        "documents_checked": 30,
+        "current_document": "D4",
+        "database_source_reads": 30,
+        "candidates_found": 144,
+        "candidate_cache_hit": false,
+        "candidates_selected": 85,
+        "evidence_documents": 22
+      }
+    },
+    {
+      "id": "gtsi_lead",
+      "question": "analisa GTSI dan LEAD. coba bandingkan prospek masa depan perusahaan ini",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "GTSI",
+        "LEAD"
+      ],
+      "sources": [
+        "D53",
+        "D27",
+        "D25",
+        "D2",
+        "D42"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D25",
+        "D27",
+        "D2",
+        "D53",
+        "D42"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang tersedia, berikut adalah analisis perbandingan antara PT GTS Internasional Tbk (GTSI) dan PT LEAD (Samudramakmur Logindo Tbk.) dengan fokus pada struktur kepemilikan, likuiditas, dan sentimen pasar.\n\n**1. Struktur Kepemilikan dan Pengendalian**\n\n*   **GTSI:** Memiliki struktur kepemilikan yang sangat terkonsentrasi. PT Humpuss Maritim memegang 84,80% saham sebagai pengendali [D25]. Tidak ada pemegang saham lain dengan kepemilikan di atas 5%. Direksi dan komisaris tidak memiliki saham perusahaan [D25].\n*   **LEAD:** Struktur kepemilikan lebih tersebar dibandingkan GTSI namun tetap didominasi oleh pihak tertentu. Pemegang saham pengendali dan afiliasinya menguasai 62,6% saham [D27]. Terdapat tiga pemegang saham utama dengan kepemilikan >=5%: PT Jalan Terang Samudra (23,19%), Pacific Offshore Pte Ltd (22,64%), dan Manoj Pitamber Nanwani (5,22%) [D27]. Kepemilikan asing tercatat sebesar 30,08% [D27].\n\n**Perbedaan Kunci:** GTSI memiliki satu entitas pengendali tunggal yang dominan (>80%), sementara LEAD memiliki blok kepemilikan yang lebih terdistribusi di antara beberapa pemegang saham besar dan proporsi kepemilikan asing yang signifikan (~30%).\n\n**2. Likuiditas dan Free Float**\n\n*   **GTSI:** Free float tercatat sebesar 15,17% atau 2.400.000.000 lembar saham [D25]. Angka ini relatif rendah, yang mengindikasikan potensi keterbatasan likuiditas harian karena sebagian besar saham dikendalikan oleh pengendali.\n*   **LEAD:** Free float tercatat sebesar 37,4% atau 2.168.987.872 lembar saham [D27]. Proporsi free float ini jauh lebih tinggi dibandingkan GTSI, yang umumnya mendukung likuiditas perdagangan yang lebih baik di pasar sekunder.\n\n**Perbedaan Kunci:** LEAD memiliki likuiditas potensial yang lebih tinggi akibat free float hampir dua kali lipat dari GTSI (37,4% vs 15,17%).\n\n**3. Sentimen Pasar dan Aktivitas Publik**\n\n*   **GTSI:** Menunjukkan tingkat spekulasi dan perhatian publik yang lebih tinggi. Dalam periode Agustus–September 2026, GTSI muncul dalam 124 postingan dengan 98 penulis berbeda menurut data agregat [D2], serta menjadi topik dalam beberapa posting spesifik di Stockbit pada pertengahan September 2026 [D53].\n*   **LEAD:** Meskipun juga dibahas, frekuensi penyebutan tag $LEAD dalam sampel arsip Stockbit (Agustus 2026) tampak lebih sporadis dibandingkan GTSI [D42]. Data agregat khusus untuk LEAD tidak disediakan dalam lampiran perhitungan top 100 tanda saham [D2], namun presence-nya dalam digest emiten menunjukkan aktivitas rutin.\n\n**Perbedaan Kunci:** GTSI menarik minat ritel/spesulan yang lebih besar (terlihat dari volume postingan), yang mungkin menyebabkan volatilitas harga lebih tinggi. LEAD tampaknya lebih stabil secara naratif publik.\n\n**Analisis Prospek Masa Depan (Berdasarkan Batas Bukti Arsip)**\n\nArsip yang diberikan **tidak mengandung** proyeksi fundamental, laporan keuangan masa depan, atau rencana strategis operasional kedua emiten. Oleh karena itu, \"prospek\" hanya dapat dievaluasi berdasarkan dinamika struktur modal dan likuiditas:\n\n1.  **Stabilitas Harga vs Volatilitas:**\n    *   **GTSI:** Dengan free float rendah (15,17%) dan dominasi pengendali tunggal, pergerakan harga GTSI sangat sensitif terhadap volume perdagangan kecil. Sentimen positif di media sosial [D53] dapat memicu lonjakan harga, namun risiko likuiditas saat koreksi juga tinggi.\n    *   **LEAD:** Free float yang lebih sehat (37,4%) dan adanya kepemilikan asing (~30%) [D27] memberikan basis likuiditas yang lebih kuat. Perubahan kepemilikan asing yang turun sedikit (-4,2 juta lembar) [D27] menunjukkan stabilita, bukan perubahan drastis.\n\n2.  **Risiko Kepatuhan dan Transparansi:**\n    *   Kedua emiten melaporkan kepatuhan terhadap ketentuan free float IDX. Namun, analisis LEAD menyebutkan adanya ketidaksesuaian angka antara halaman 9 dan halaman 2 dalam laporan registrasi pemegang efek, yang memerlukan verifikasi lebih lanjut [D27]. Hal ini merupakan catatan risiko administratif yang perlu dipantau.\n    *   GTSI tidak mencatatkan perubahan material atau risiko kepatuhan dalam laporannya [D25].\n\n3.  **Kesimpulan Perbandingan:**\n    *   Jika prospek diartikan sebagai **potensi volatilitas dan daya tarik spekulatif**, GTSI memiliki profil yang lebih dinamis namun berisiko likuiditas.\n    *   Jika prospek diartikan sebagai **stabilitas likuiditas dan diversifikasi pemegang saham**, LEAD memiliki struktur yang lebih robust dengan free float yang memadai dan partisipasi investor asing.\n\n**Catatan Penting:**\nAnalisis ini terbatas pada data struktur pemegang saham dan sentimen media sosial hingga September 2026. Tidak ada informasi mengenai kinerja keuangan (laba/rugi), pertumbuhan pendapatan, atau nilai aset bersih kedua perusahaan dalam arsip ini. Untuk menilai prospek fundamental jangka panjang, diperlukan pemeriksaan laporan keuangan auditan terbaru yang tidak tersedia dalam bahan sumber ini.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 27273,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00028943,
+        "prompt_tokens": 9280,
+        "completion_tokens": 1739,
+        "cached_tokens": 8960,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 28575,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 4002708,
+        "selected_source_bytes": 23004,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "GTSI",
+          "LEAD"
+        ],
+        "documents_checked": 5,
+        "current_document": "D42",
+        "database_source_reads": 5
+      }
+    },
+    {
+      "id": "heli_lower",
+      "question": "Analisa heli dan semua dokumen",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "HELI"
+      ],
+      "sources": [
+        "D50",
+        "D39",
+        "D49",
+        "D37",
+        "D48",
+        "D47",
+        "D35",
+        "D38",
+        "D34",
+        "D53",
+        "D41",
+        "D2",
+        "D1",
+        "D20",
+        "D16",
+        "D0",
+        "D42"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D20",
+        "D16",
+        "D39",
+        "D41",
+        "D2",
+        "D47",
+        "D48",
+        "D38",
+        "D37",
+        "D1",
+        "D50"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berikut adalah analisis komprehensif mengenai PT Jaya Trishindo Tbk (HELI) berdasarkan arsip yang tersedia, dipisahkan antara fakta dokumen, klaim spekulatif, dan batas bukti.\n\n### 1. Fakta Dokumen Primer (Laporan Keuangan & Kepemilikan)\n\nData ini berasal dari pengumuman resmi emiten ke Bursa Efek Indonesia (IDX), bukan dari diskusi pasar.\n\n**A. Struktur Kepemilikan dan Perubahan Kontrol**\n*   **Pemegang Saham Pengendali:**\n    *   PT Startel Communication: ~35% (Agustus 2026) [D20].\n    *   PT Komala Tri Varia: ~25-26% (Agustus 2026) [D20].\n    *   PT Alta Internasional Indonesia: Muncul sebagai pemegang saham besar 16% pada Juni-Agustus 2026 [D16][D20].\n    *   PT Avia Nusantara Khatulistiwa: Penurunan signifikan dari 27,62% (Juni 2026) menjadi 8,43% (Agustus 2026) [D16][D20].\n*   **Perubahan Direksi/Komisaris (Per 30 Juni 2026):**\n    *   Komisaris Independen baru: Mohammad Raylan (menggantikan Andre Franklin Sahelangi) [D16].\n    *   Direktur Baru: Andre Franklin Sahelangi dan Yoel Alex Santoso [D16].\n    *   Direktur Utama: Edwin Widjaja/Wijaya kepemilikannya meningkat dari 0 menjadi 724.000 saham (0,09%) per Agustus 2026 [D16][D20].\n\n**B. Kondisi Keuangan & Risiko Material**\n*   **Going Concern:** Manajemen mengungkapkan ketidakpastian material atas kelangsungan usaha [D16].\n*   **Pelanggaran Kovenan:** Pelanggaran rasio lancar minimum 1,0 kali pada utang bank BNI; waiver belum diperoleh hingga akhir periode laporan [D16].\n*   **Likuiditas:** Kas dan bank menurun drastis dari Rp19,5 miliar (Des 2025) menjadi Rp7,3 miliar (Jun 2026) [D16].\n*   **Konsentrasi Pendapatan:** 90,79% pendapatan bersih berasal dari dua pelanggan utama (PT Arara Abadi dan PT Satria Perkasa Agung) [D16].\n\n### 2. Analisis Hubungan \"Cluster\" HELI-CAKK-BLES-MERI\n\nArsip secara konsisten mengevaluasi klaim bahwa HELI memiliki hubungan tersembunyi dengan CAKK, BLES, dan MERI melalui kesamaan auditor, notaris, atau pengurus. Berikut temuan faktualnya:\n\n**A. Auditor dan Biro Administrasi Efek**\n*   **Fakta:** Laporan keuangan interim HELI ditelaah terbatas oleh **KAP Teramihardja, Pradhono & Chandra** [D16].\n*   **Pemeriksaan Arsip:** Nama firma \"Teramihardja, Pradhono & Chandra\" serta nama-nama contoh lain dalam instruksi (Adimitra Jasa Korpora, Yoel Alex Santoso, Mohammad Raylan sebagai *penghubung bisnis*) **tidak ditemukan** sebagai indikator hubungan kepemilikan bersama di antara emiten lain dalam digest arsip [D39][D41][D2].\n*   **Kesimpulan:** Kesamaan auditor saja tidak membuktikan sponsor takeover atau pengendalian bersama tanpa bukti transaksi atau struktur kepemilikan yang tumpang tindih [D47][D48].\n\n**B. Pengurus (Yoel Alex Santoso & Mohammad Raylan)**\n*   **Fakta:** Kedua nama tersebut masuk susunan direksi/komisaris HELI per 30 Juni 2026 [D16].\n*   **Pemeriksaan Arsip:**\n    *   Arsip mencatat Yoel Alex Santoso dan Mohammad Raylan juga muncul di struktur entitas lain dalam catatan internal tertentu (misalnya cluster HELI ↔ MERI disebutkan memiliki orang sama) [D38].\n    *   Namun, arsip menegaskan bahwa **\"same person juga belum membuktikan common controller\"** [D38].\n    *   Tidak ada bukti dalam digest emiten IDX bahwa lima pengurus baru MKNT atau pengurus emiten lain mengisi posisi identik yang membuktikan afiliasi pengendalian [D37].\n    *   Nama \"Santoso\" saja tidak disamakan identitasnya dengan Santoso Widjojo tanpa verifikasi lebih lanjut [D37].\n\n### 3. Klaim Pasar dan Spekulasi (Stockbit)\n\nDiskusi di platform Stockbit sering mengaitkan HELI dengan skenario \"backdoor listing\" atau akumulasi saham oleh pihak tak dikenal (\"AI\").\n\n*   **Klaim Pembelian Pengendali:** Pengguna @arie28agustus mengklaim pengendali terus membeli saham setiap hari [D1][D2].\n    *   **Batas Bukti:** Klaim ini tidak disertai jumlah, tanggal transaksi, atau laporan kepemilikan resmi. Dianggap sebagai petunjuk lemah (*weak signal*) [D1][D2].\n*   **Identitas \"AI\":** Postingan menyebutkan pihak \"AI\" diminta mengeluarkan berita setelah dianggap banyak memegang saham [D48].\n    *   **Batas Bukti:** Identitas \"AI\" tidak jelas; tidak boleh diterjemahkan sebagai Artificial Intelligence atau orang spesifik tanpa bukti tambahan [D48].\n*   **Candaan/Isu Lain:** Ada postingan tentang \"Prabowo suka helikopter\" atau \"musim kemarau\" yang dikaitkan dengan bisnis HELI.\n    *   **Penilaian Arsip:** Ini dianggap candaan atau hipotesis kegiatan usaha, bukan bukti pesanan kontrak atau pengambilalihan [D1].\n\n### 4. Tabel Ringkasan Batas Bukti\n\n| Aspek Pemeriksaan | Temuan dalam Arsip | Status Kesimpulan |\n| :--- | :--- | :--- |\n| **Auditor Sama** | HELI menggunakan KAP Teramihardja. Nama ini tidak ditemukan sebagai pembeda hubungan dengan CAKK/BLES/MERI di digest emiten lain. | **Tidak Terbukti** [D39][D41] |\n| **Pengurus Sama** | Yoel Alex Santoso & Mohammad Raylan ada di HELI. Kemungkinan ada di entitas lain, tapi tidak membuktikan satu pengendali. | **Signal Lemah** [D38] |\n| **Akumulasi Saham** | Edwin Widjaja (Dirut) beli 724.000 saham. PT Avia naik kepemilikan. | **Fakta Transaksi** [D20] |\n| **Skema Takeover** | Tidak ditemukan rangkaian lengkap setara contoh Orbit/PANI di arsip ini. | **Tidak Ditemukan** [D47] |\n| **Verifikasi Operasional** | Tidak ada data AHU, izin lingkungan, atau daftar merek yang diverifikasi untuk HELI. | **Belum Diperiksa** [D50] |\n\n### 5. Kesimpulan dan Rekomendasi\n\n1.  **Status Kesehatan Finansial:** HELI menghadapi risiko likuiditas serius (*going concern*, pelanggaran kovenan bank). Ini adalah faktor fundamental dominan yang perlu dimonitor, bukan spekulasi korporasi.\n2.  **Hubungan Afiliasi:** Klaim bahwa HELI terhubung dengan CAKK, BLES, atau MERI melalui auditor atau pengurus **belum terbukti** secara material dalam arsip ini. Kesamaan nama pengurus (Raylan/Santoso) adalah sinyal yang perlu dipantau, namun saat ini hanya menunjukkan kemungkinan afiliasi profesional, bukan pengendalian ekonomi bersama.\n3.  **Aktivitas Pasar:** Pergerakan saham dan klaim \"pembelian pengendali\" di media sosial tidak didukung oleh data transaksi institusional yang transparan dalam arsip. Penurunan free float sebagian besar dapat dijelaskan oleh peningkatan kepemilikan direksi dan perubahan alokasi pemegang saham besar (Avia vs Alta), bukan akumulasi misterius oleh pihak ketiga yang teridentifikasi.\n\n**Dokumen yang Perlu Diperiksa Selanjutnya:**\nUntuk memverifikasi klaim afiliasi, diperlukan pemeriksaan langsung terhadap:\n*   Daftar pemegang saham historis lengkap untuk melacak asal-usul saham PT Alta International Indonesia.\n*   Dokumen akta perubahan anggaran dasar untuk memastikan apakah Yoel Alex Santoso dan Mohammad Raylan tercatat di emiten lain pada periode yang sama.\n*   Kontrak dengan PT Iter Aero Industri (IAI) terkait drone, untuk melihat apakah ada hubungan istimewa dengan pemegang saham atau direksi.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 55675,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00041277,
+        "prompt_tokens": 16801,
+        "completion_tokens": 2370,
+        "cached_tokens": 16640,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 38199,
+      "attempts": 2,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3013991,
+        "selected_source_bytes": 48254,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "HELI"
+        ],
+        "documents_checked": 17,
+        "current_document": "D42",
+        "database_source_reads": 17
+      }
+    },
+    {
+      "id": "aims_lower",
+      "question": "analisis aims dari semua dokumen",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "AIMS"
+      ],
+      "sources": [
+        "D39",
+        "D38",
+        "D41",
+        "D32",
+        "D25",
+        "D44",
+        "D21",
+        "D14",
+        "D4"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D32",
+        "D41",
+        "D25",
+        "D44",
+        "D39",
+        "D14",
+        "D38"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berikut adalah analisis komprehensif mengenai PT Artha Mahiya Investama Tbk (AIMS) berdasarkan arsip yang tersedia. Analisis ini memisahkan fakta pengumuman resmi, sinyal pasar, dan hipotesis manajemen.\n\n### 1. Status Transformasi Bisnis: Tahap Awal & Belum Konkret\nBerdasarkan dokumen terbaru (D39, D41), AIMS secara eksplisit menyatakan niat untuk bertransformasi dari perusahaan perdagangan batu bara menjadi *holding* investasi. Namun, bukti material transaksi masih nihil.\n\n*   **Roadmap Resmi:** Manajemen mengumumkan tiga fase transformasi: *Consolidate* (2026), *Transform* (2026–2027), dan *Grow* (2026 dan seterusnya) [D32].\n*   **Ketiadaan Target:** Hingga 14 September 2026, belum ada nama perusahaan target, penjual, harga, atau sumber pendanaan yang diumumkan [D41]. Dokumen merangkum hal ini sebagai \"niat perubahan usaha tanpa sasaran\" [D41].\n*   **Aktivitas Penjajakan:** AIMS mengakui sedang melakukan penjajakan, identifikasi, dan evaluasi terhadap beberapa perusahaan potensial. Namun, tidak ada detail nilai atau jadwal yang terungkap [D25].\n*   **Konfirmasi Tidak Ada Rencana Jangka Pendek:** Dalam tanggapan ke BEI, AIMS menyatakan tidak memiliki rencana korporasi final dalam 3 bulan ke depan [D25]. Ini bertentangan dengan spekulasi pasar tentang percepatan aksi korporasi.\n\n### 2. Volatilitas Harga dan Respons Regulasi\nTerdapat kesenjangan signifikan antara aktivitas pasar dan klarifikasi manajemen.\n\n*   **Lonjakan Transaksi:** Pada 1 September 2026, harga saham naik 25% dari Rp404 menjadi Rp505. Volume transaksi melonjak 11,85 kali lipat (dari 379.900 menjadi 4.503.600 saham) dan frekuensi transaksi naik 5,90 kali lipat [D25].\n*   **Respons BEI:** Bursa Efek Indonesia meminta penjelasan atas volatilitas tersebut [D25].\n*   **Klarifikasi Manajemen:** AIMS menyatakan tidak mengetahui informasi material yang mendasari lonjakan tersebut dan menegaskan bahwa mereka sendiri tidak memiliki rencana final dalam waktu dekat [D25].\n*   **Spekulasi Pasar:** Postingan di platform sosial (Stockbit) mengaitkan AIMS dengan ticker lain (LUCY, FLMC) dan menyebut \"konglo H\", namun identitas pemegang saham utama tidak jelas dan nilai klaimnya rendah [D44]. Catatan arsip menekankan bahwa penyebutan bersama ticker tidak membuktikan hubungan bisnis atau kepemilikan [Instruksi Umum].\n\n### 3. Struktur Kepemilikan dan Likuiditas\nStruktur modal AIMS stabil, namun konsentrasi kepemilikan tinggi membatasi likuiditas bebas (*free float*).\n\n*   **Total Saham Beredar:** 220.000.000 saham [D25].\n*   **Free Float:** 29,78% (sekitar 65,5 juta saham) per 31 Agustus 2026 [D25].\n*   **Pemegang Saham Besar:** Pemegang saham dengan kepemilikan ≥5% menguasai 67,37% saham [D25].\n*   **Masalah Komunikasi:** AIMS menyatakan ketidakmampuan untuk menghubungi pemegang saham utama untuk konfirmasi rencana kepemilikan saham [D25]. Hal ini menambah ketidakpastian mengenai apakah pergerakan harga didorong oleh pihak internal atau eksternal.\n\n### 4. Agenda Publik Expose dan RUPST\nDua acara besar dijadwalkan pada 17 September 2026, yang akan menjadi momen krusial untuk verifikasi narasi transformasi.\n\n*   **Public Expose Tahunan:** Dijadwalkan pukul 11.00 WIB. Agenda mencakup kinerja keuangan, rencana bisnis, dan analisis pergerakan harga saham [D32]. Materi yang disampaikan hanya bersifat kualitatif; tidak ada data keuangan kuantitatif, capex, atau angka revenue spesifik yang dikonfirmasi manajemen (angka Rp93 juta yang beredar berasal dari peserta tanya jawab, bukan konfirmasi eksplisit) [D39].\n*   **RUPST 2025:** Dijadwalkan pukul 10.00 WIB pada hari yang sama. Agenda meliputi pengesahan laporan keuangan 2025, penetapan laba rugi, dan penunjukan akuntan publik [D14]. Tidak ada agenda aksi korporasi khusus seperti dividen tunai atau rights issue yang diumumkan dalam pemanggilan awal [D14].\n\n### 5. Batas Bukti dan Hal yang Belum Diketahui\nAnalisis ini dibatasi oleh ketiadaan dokumen keuangan auditan terbaru dan rincian transaksi.\n\n*   **Belum Ada Kontrak/Aset:** Tidak ditemukan bukti adanya kontrak tambang/eksplorasi atau aset baru yang dimiliki AIMS [D39].\n*   **Sumber Dana Tidak Jelas:** Meskipun manajemen menyebut evaluasi peluang investasi, sumber pendanaan untuk akuisisi masa depan belum diungkapkan [D32].\n*   **Identitas Pemegang Saham Utama:** Identitas pemegang saham yang memicu volatilitas atau yang tidak dapat dihubungi oleh perseroan tidak teridentifikasi dalam arsip [D25].\n*   **Kinerja Keuangan Transisi:** Tidak ada angka pendapatan atau laba bersih yang disajikan untuk periode transisi, sehingga asumsi kinerja hanya berupa hipotesis bahwa pendapatan mungkin rendah [D32].\n\n### Kesimpulan\nAIMS berada dalam fase **\"Early Business-Intent Signal\"** [D38]. Narasi transformasi dari trading batu bara ke *holding* investasi telah dikomunikasikan secara strategis melalui Public Expose, namun secara fundamental dan operasional, emiten ini belum menunjukkan bukti konkret berupa target akuisisi, pendanaan, atau transaksi aset [D41]. Lonjakan harga pada awal September 2026 tampaknya didorong oleh spekulasi pasar yang tidak didukung oleh informasi material dari manajemen saat itu [D25]. Investor perlu menunggu hasil Public Expose pada 17 September 2026 untuk melihat apakah manajemen dapat memberikan detail kuantitatif atau nama target investasi yang lebih spesifik daripada pernyataan umum tentang \"penjajakan selektif\".",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 35536,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00030583,
+        "prompt_tokens": 9784,
+        "completion_tokens": 1867,
+        "cached_tokens": 9600,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 31370,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 5025616,
+        "selected_source_bytes": 30736,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "AIMS"
+        ],
+        "documents_checked": 9,
+        "current_document": "D4",
+        "database_source_reads": 9
+      }
+    },
+    {
+      "id": "buka_lower",
+      "question": "Analisa buka dan semua dokumen yang tersedia",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "BUKA"
+      ],
+      "sources": [
+        "D53",
+        "D41",
+        "D32",
+        "D52",
+        "D27",
+        "D21",
+        "D42",
+        "D11"
+      ],
+      "source_precision": 1,
+      "citations": [
+        "D21",
+        "D11",
+        "D32",
+        "D41",
+        "D27",
+        "D52",
+        "D53"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berikut adalah analisis komprehensif mengenai emiten **BUKA** (PT Bukalapak.com Tbk) berdasarkan arsip yang tersedia. Analisis ini memisahkan fakta resmi dari spekulasi pasar dan menyoroti ketidaksesuaian data antara periode pelaporan.\n\n### 1. Kronologi Aksi Korporasi & Regulasi (Agustus–September 2026)\n\nPeriode Agustus–September 2026 ditandai oleh respons emiten terhadap volatilitas harga, perubahan tata kelola administratif, dan koreksi data kepemilikan yang signifikan.\n\n*   **Permintaan Penjelasan BEI (2 September 2026):**\n    *   BEI meminta penjelasan atas volatilitas transaksi efek BUKA melalui surat No. S-11196/BEI.PP2/09-2026 [D21].\n    *   Perseroan menyatakan tidak mengetahui adanya informasi material yang mempengaruhi harga atau keputusan investasi [D21].\n    *   Perseroan merujuk pada laporan kepemilikan yang telah disampaikan dan menegaskan komitmen pemegang saham utama untuk mematuhi peraturan [D21].\n    *   Tidak ada rencana aksi korporasi spesifik yang diungkapkan dalam jangka waktu 3 bulan ke depan [D21].\n\n*   **Perubahan Corporate Secretary (21 Agustus 2026):**\n    *   Victor Putra Lesmana (Direktur) diangkat sebagai Sekretaris Perusahaan merangkap fungsi, menggantikan Cut Fika Lutfi [D11].\n    *   Perubahan bersifat administratif; tidak ada perubahan struktur modal atau transaksi aset [D11].\n\n*   **Koreksi LBRE Periode Maret 2026 (Pengumuman 14 September 2026):**\n    *   Emiten menyampaikan koreksi atas Laporan Bulanan Registrasi Pemegang Efek (LBRE) periode Maret 2026 [D32], [D41].\n    *   Koreksi dilakukan berdasarkan himbauan BEI tanggal 7 September 2026 untuk menelaah kembali penyampaian LBRE [D32].\n    *   **Isi Koreksi:**\n        *   Saham non-warkat milik perusahaan modal ventura/private equity (<5%) dikoreksi dari **0** menjadi **1.997.665.099** saham [D32].\n        *   Free float dikoreksi turun dari **31,75%** menjadi **29,82%** [D32].\n        *   Jumlah saham free float berkurang sebesar **1.997.665.099** saham [D32].\n    *   Perseroan menyatakan koreksi tidak bersifat substantif dan tidak mempengaruhi kewajiban free float karena masih di atas ambang batas minimum [D32].\n\n### 2. Analisis Struktur Kepemilikan & Data Kontradiktif\n\nTerdapat perbedaan data yang mencolok antara laporan bulanan Agustus 2026 dan koreksi LBRE Maret 2026, serta klaim di media sosial yang belum diverifikasi dengan dokumen resmi.\n\n#### A. Ketidaksesuaian Data Free Float\n*   **Laporan Agustus 2026 ([D27]):** Melaporkan free float sebesar **30,07%** (31.024.909.472 saham).\n*   **Koreksi Maret 2026 ([D32]):** Melaporkan free float sebesar **29,82%** (30.755.904.450 saham).\n*   **Analisis:** Penurunan free float terjadi secara bertahap atau akibat reklasifikasi. Namun, koreksi Maret menunjukkan pengurangan drastis pada kategori \"saham non-warkat <5%\" yang sebelumnya dilaporkan nol, namun ternyata merupakan bagian dari saham yang tidak termasuk free float (atau klasifikasinya salah). Dokumen [D41] menekankan bahwa perubahan klasifikasi ini harus dipisahkan dari perubahan kepemilikan aktual.\n\n#### B. Perubahan Kepemilikan Pengendali\n*   **PT Elang Media:**\n    *   Pada koreksi Maret 2026 ([D32]), kepemilikan PT Elang Media meningkat dari 10.785.956.900 saham (10,457%) menjadi 10.988.390.907 saham (10,653%).\n    *   Peningkatan ini sebesar **202.434.007 saham**.\n    *   Dokumen [D32] menyebutkan peningkatan ini kemungkinan berasal dari pembelian di pasar sekunder, namun tidak ada detail transaksi eksplisit.\n*   **Nama Entitas Pengendali:**\n    *   Dokumen [D32] (Maret 2026) menyebut: PT Mahkota Karya Kreatif, PT Elang Media, Geoffrey Wacher.\n    *   Dokumen [D27] (Agustus 2026) menyebut: PT Elang Kreatif Media, PT Mahkota Karya Teknologi, PT Bukalapak.com.\n    *   **Catatan Penting:** Terdapat inkonsistensi nama entitas antara dua dokumen digest. Diperlukan pemeriksaan dokumen asli LBRE untuk memastikan nama legal yang tepat. Jangan mengasumsikan konsolidasi kepemilikan hanya berdasarkan penurunan jumlah pemegang saham atau perubahan nama entitas tanpa bukti akuisisi [D41].\n\n#### C. Klaim Akumulasi Saham di Stockbit (Spekulasi vs Fakta)\nArsip Stockbit mencatat diskusi tentang akumulasi saham oleh pihak tertentu, namun ini adalah narasi komunitas, bukan fakta regulatori yang terverifikasi penuh dalam konteks waktu yang sama.\n\n*   **8 September 2026 ([D52]):** Postingan @Stockbit menyebutkan \"Pengendali PT Kreatif Media Karya membeli sekitar 803,3 juta saham.\"\n*   **9 September 2026 ([D52]):** Postingan @Stockbit menyebutkan \"Komisaris BUKA membeli sekitar 635 juta saham.\"\n*   **Evaluasi:** Angka akumulasi ini sangat besar dibandingkan dengan perubahan kepemilikan yang tercatat dalam LBRE Maret/Augustus (hanya selisih ~202 juta saham untuk PT Elang). Tidak ada konfirmasi resmi dari perseroan mengenai transaksi blok sebesar 803,3 juta atau 635 juta saham pada minggu tersebut. Klaim ini perlu diverifikasi dengan data perdagangan harian atau pengumuman khusus jika memang terjadi transaksi material. Tanpa pengumuman resmi, ini tetap berupa rumor/discorsi pasar [D52], [D53].\n\n### 3. Ringkasan Data Kunci (Per Maret 2026 - Setelah Koreksi)\n\n| Item | Nilai Sebelum Koreksi | Nilai Setelah Koreksi | Keterangan |\n| :--- | :--- | :--- | :--- |\n| **Free Float %** | 31,75% | 29,82% | Turun 1,93 poin [%] |\n| **Jumlah Saham FF** | 32.753.569.549 | 30.755.904.450 | Berkurang ~1,99 miliar saham |\n| **Saham Non-Warkat <5%** | 0 | 1.997.665.099 | Koreksi klasifikasi utama |\n| **Total Saham Beredar** | 103.148.706.067 | 103.148.706.067 | Tidak berubah |\n| **Pemegang Pengendali Utama** | PT Mahkota Karya Kreatif (44,908%) | PT Mahkota Karya Kreatif (44,908%) | Konsisten |\n| **PT Elang Media** | 10,457% (10,78 Miliar) | 10,653% (10,98 Miliar) | Naik ~202 Juta saham |\n\n*Sumber: [D32]*\n\n### 4. Risiko & Ketidakpastian\n\n1.  **Akurasi Pelaporan:** Koreksi LBRE Maret 2026 yang baru diumumkan pada September 2026 mengindikasikan kesalahan administratif atau klasifikasi awal yang signifikan. Hal ini dapat menimbulkan pertanyaan dari regulator mengenai kualitas tata kelola internal [D32], [D41].\n2.  **Likuiditas:** Penurunan free float menjadi 29,82% mengurangi likuiditas saham yang diperdagangkan bebas. Meskipun masih di atas batas umum (7,5%), tren penurunan perlu dimonitor [D32].\n3.  **Volatilitas Harga:** Respons BEI terhadap volatilitas transaksi pada awal September menunjukkan adanya aktivitas jual-beli yang tidak biasa atau spekulatif, yang mungkin terkait dengan rumor akumulasi saham di media sosial [D21], [D52].\n4.  **Inkonsistensi Nama Entitas:** Perbedaan nama \"PT Elang Media\" vs \"PT Elang Kreatif Media\" dan \"PT Mahkota Karya Kreatif\" vs \"PT Mahkota Karya Teknologi\" antara dokumen digest Agustus dan September memerlukan klarifikasi dokumen primer untuk menghindari kesalahpahaman struktur kepemilikan [D27], [D32].\n\n### 5. Kesimpulan\n\nFakta utama yang dapat dikonfirmasi dari arsip adalah **koreksi administratif** pada data kepemilikan saham BUKA periode Maret 2026 yang mengurangi free float sebesar hampir 2 miliar saham, serta **perubahan jabatan administratif** (Corporate Secretary). Klaim akumulasi saham masif oleh pengendali/komisaris di platform Stockbit pada pertengahan September 2026 **belum didukung oleh pengumuman resmi atau rekonsiliasi data kepemilikan publik** dalam dokumen yang diperiksa. Investor disarankan menunggu klarifikasi lebih lanjut mengenai inkonsistensi nama entitas pengendali dan verifikasi transaksi saham besar yang dirumorikan.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 49191,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00085765,
+        "prompt_tokens": 17014,
+        "completion_tokens": 2671,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 43294,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3022608,
+        "selected_source_bytes": 43720,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "BUKA"
+        ],
+        "documents_checked": 8,
+        "current_document": "D11",
+        "database_source_reads": 8
+      }
+    },
+    {
+      "id": "soci_date",
+      "question": "SOCI tanggal 17 September 2026",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "SOCI"
+      ],
+      "sources": [
+        "D49",
+        "D53",
+        "D23",
+        "D2",
+        "D0",
+        "D42",
+        "D12",
+        "D11"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D49",
+        "D53",
+        "D23"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan pemeriksaan arsip yang tersedia, **tidak ditemukan** informasi mengenai kejadian, pengumuman, atau aktivitas spesifik pada PT Soechi Lines Tbk (SOCI) untuk tanggal **17 September 2026**.\n\nBerikut adalah rincian temuan berdasarkan batasan bukti:\n\n**1. Tidak Ada Dokumen Pada Tanggal 17 September 2026**\n*   Arsip tidak mencantumkan pengumuman resmi, laporan keuangan, atau berita korporasi dari SOCI yang terjadi tepat pada 17 September 2026 [D49][D53].\n*   Periode pelaporan terdekat setelah tanggal tersebut adalah periode 5–7 September 2026, di mana SOCI menerbitkan tiga pengumuman rutin (laporan interim auditan dan LBRE) [D23].\n*   Postingan media sosial (Stockbit) terakhir yang tercatat dalam arsip terkait SOCI adalah pada 19 September 2026 [D49], yang merupakan dua hari *setelah* tanggal yang diminta.\n\n**2. Konteks Terkini Sebelum Tanggal 17 September 2026**\nMeskipun tidak ada kejadian pada 17 September, data terkini sebelum tanggal tersebut menunjukkan kondisi berikut:\n*   **Per 7 September 2026:** SOCI telah menyampaikan Laporan Keuangan Interim Auditan per 30 Juni 2026 dan Laporan Bulanan Registrasi Pemegang Efek (LBRE) per 31 Agustus 2026 [D23].\n*   **Struktur Kepemilikan (Agustus 2026):** Tidak ada perubahan struktur modal. PT Darma Pertiwi Raya dan PT Pilar Sukses Utama masing-masing memegang 35,05% saham [D23].\n*   **Free Float:** Naik tipis menjadi 14,09% dengan jumlah saham free float sebesar 994.684.000 saham [D23].\n*   **Jumlah Pemegang Saham:** Menurun signifikan dari 14.588 (Juli) menjadi 12.699 (Agustus) [D23]. Catatan ini menyatakan penurunan ini dapat mengindikasikan konsolidasi kepemilikan, namun penyebab pastinya tidak dijelaskan dalam laporan [D23].\n\n**3. Batas Bukti dan Rekomendasi**\n*   **Kekosongan Data:** Tidak dapat dikonfirmasi apakah terjadi transaksi pasar, pengumuman lisan, atau peristiwa material lainnya pada 17 September 2026 karena dokumen sumber tidak mencakup rentang tanggal tersebut.\n*   **Dokumen yang Perlu Diperiksa:** Untuk mendapatkan kepastian mengenai tanggal 17 September 2026, diperlukan pemeriksaan langsung terhadap:\n    1.  Database pengumuman resmi BEI/IDX untuk periode 17 September 2026 khusus emiten SOCI.\n    2.  Arsip harian Stockbit atau platform media sosial lainnya untuk tanggal 17 September 2026 yang mungkin belum terindeks dalam ringkasan bulanan saat ini.\n\nKesimpulan: Tidak ada bukti kejadian pada 17 September 2026 dalam arsip yang diperiksa.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 26624,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00037701,
+        "prompt_tokens": 7419,
+        "completion_tokens": 1188,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 19388,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 3198147,
+        "selected_source_bytes": 22257,
+        "excluded_dated_records": 6,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "SOCI"
+        ],
+        "documents_checked": 8,
+        "current_document": "D11",
+        "database_source_reads": 8
+      }
+    },
+    {
+      "id": "tanker",
+      "question": "apakah ada news terkait perkapalan / tanker?",
+      "status": "complete",
+      "pass": false,
+      "checks": {
+        "status": true,
+        "facts": false
+      },
+      "facts": [
+        {
+          "fact": "SOCI",
+          "hit": false
+        }
+      ],
+      "terms": [
+        "perkapalan",
+        "tanker"
+      ],
+      "sources": [
+        "D49",
+        "D47",
+        "D23",
+        "D21"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D23",
+        "D49",
+        "D21",
+        "D47"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diberikan, terdapat beberapa berita dan data terkait sektor perkapalan/tanker, khususnya untuk emiten **BLTA** (PT Berlian Laju Tanker Tbk), **BULL** (PT Buana Lintas Lautan Tbk), dan **SMDR** (PT Samudera Indonesia Tbk).\n\nBerikut adalah rincian temuan berdasarkan dokumen:\n\n### 1. PT Berlian Laju Tanker Tbk (BLTA)\n*   **Struktur Pemegang Saham:** Diterbitkan Laporan Bulanan Registrasi Pemegang Efek untuk periode Agustus 2026. Tidak ada perubahan material pada struktur pemegang saham, pengendali, atau *free float*.\n    *   Pemegang saham pengendali tetap **PT Tunggaladhi Baskara** dengan kepemilikan 17,4078% [D23].\n    *   Terdapat pergeseran kecil klasifikasi pemodal: pemodal asing turun 100.000 saham, pemodal nasional naik 100.000 saham. Total saham beredar tidak berubah (25,18 miliar saham) [D23].\n*   **Diskusi Pasar:** Dalam diskusi Stockbit tanggal 19 September 2026, disebutkan penambahan tanker baru. Namun, diingatkan untuk memisahkan pendapatan dari kapal baru dengan keuntungan yang tidak berulang (*non-recurring*) [D49].\n\n### 2. PT Buana Lintas Lautan Tbk (BULL)\n*   **Laporan Keuangan Interim (Jan–Jun 2026):**\n    *   **Kinerja:** Pendapatan usaha naik signifikan dari US$69,95 juta menjadi **US$128,73 juta**. Laba bersih naik dari US$8,10 juta menjadi **US$58,41 juta** [D21].\n    *   **Ekspansi Armada:** Penambahan aset tetap kapal sebesar **US$55,74 juta**. Belanja modal total untuk perolehan dan uang muka aset tetap mencapai US$31,58 juta [D21].\n    *   **Pendanaan:** Utang bank jangka panjang meningkat dari US$51,94 juta menjadi **US$108,41 juta**, mengindikasikan pendanaan ekspansi melalui pinjaman [D21].\n    *   **Risiko:** Auditor memberikan opini **Wajar Dengan Pengecualian** karena ketidakpastian material kelangsungan usaha (liabilitas jangka pendek melebihi aset lancar) dan piutang belum diselesaikan [D21].\n*   **Konsentrasi Pendapatan:** Pendapatan terbesar berasal dari **Galleon Tanker FZE** (US$54,29 juta), yang merupakan sekitar 42% dari pendapatan pihak ketiga utama, menimbulkan risiko ketergantungan pelanggan [D21].\n\n### 3. PT Samudera Indonesia Tbk (SMDR)\n*   **Penggunaan Dana Sukuk:**\n    *   Emiten menyampaikan koreksi laporan penggunaan dana hasil penawaran umum **Sukuk Ijarah Berkelanjutan I Tahap III Tahun 2026** (dana bersih Rp694,23 miliar) sebagai tindak lanjut penelaahan OJK [D21].\n    *   **Realisasi 0%:** Per 30 Juni 2026, realisasi penggunaan dana untuk proyek pembangunan 1 unit kapal container dan 2 unit kapal chemical tanker masih **0%** (seluruh dana tersisa di rekening giro dengan bunga 4,25%) [D21].\n    *   Hal ini menunjukkan potensi keterlambatan dalam eksekusi rencana ekspansi armada dibandingkan dengan jadwal efektif Mei 2026 [D21].\n\n### 4. Tema Diskusi Pasar (Stockbit)\n*   Pada 16–17 September 2026, tema dominan mencakup **rights issue** dan perubahan pengendali, dengan FORU paling menonjol dalam pembahasan struktur pendanaan, sementara LAPD, BUVA, BRNA, AHAP, dan IRSX dibahas terkait agenda penerbitan saham [D47].\n*   Analisis pasar menekankan pentingnya membedakan antara produsen minyak, jasa pengeboran, tanker, dan pemasok komponen, serta tidak menganggap kenaikan komoditas secara otomatis meningkatkan laba semua perusahaan bertema energi [D47].\n\n**Kesimpulan:**\nAda aktivitas signifikan di sektor perkapalan. BLTA stabil secara kepemilikan namun menambah armada. BULL mencatatkan pertumbuhan laba dan ekspansi armada yang didorong utang, namun disertai risiko likuiditas. SMDR memiliki rencana ekspansi besar melalui sukuk namun mengalami keterlambatan realisasi proyek hingga pertengahan 2026.",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 33376,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.00052515,
+        "prompt_tokens": 10901,
+        "completion_tokens": 1524,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 24644,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 2083004,
+        "selected_source_bytes": 29142,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "perkapalan",
+          "tanker"
+        ],
+        "documents_checked": 4,
+        "current_document": "D21",
+        "database_source_reads": 4
+      }
+    },
+    {
+      "id": "nego_gede",
+      "question": "apakah ada transaksi nego gede?",
+      "status": "error",
+      "error": "Belum ditemukan dokumen untuk “transaksi nego gede”.",
+      "pass": false,
+      "checks": {
+        "status": false,
+        "docs_any": false,
+        "facts": false
+      },
+      "facts": [
+        {
+          "fact": "negosiasi|crossing",
+          "hit": false
+        },
+        {
+          "fact": "MBSS|PSSI|POWR",
+          "hit": false
+        }
+      ],
+      "terms": [
+        "transaksi nego gede"
+      ],
+      "sources": [],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 383,
+        "output_token_budget": 300,
+        "known_cost_usd": 0.00000369,
+        "prompt_tokens": 84,
+        "completion_tokens": 9,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 1018,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "search_documents",
+        "terms": [
+          "transaksi nego gede"
+        ]
+      }
+    },
+    {
+      "id": "crossing",
+      "question": "ada info crossing saham?",
+      "status": "error",
+      "error": "Belum ditemukan dokumen untuk “crossing saham”.",
+      "pass": false,
+      "checks": {
+        "status": false,
+        "docs_any": false,
+        "facts": false
+      },
+      "facts": [
+        {
+          "fact": "MBSS|Wibowo",
+          "hit": false
+        }
+      ],
+      "terms": [
+        "crossing saham"
+      ],
+      "sources": [],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 376,
+        "output_token_budget": 300,
+        "known_cost_usd": 0.00000337,
+        "prompt_tokens": 82,
+        "completion_tokens": 7,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 544,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "search_documents",
+        "terms": [
+          "crossing saham"
+        ]
+      }
+    },
+    {
+      "id": "go_private",
+      "question": "emiten mana yang mau go private?",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "IPAC",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "go private"
+      ],
+      "sources": [
+        "D36",
+        "D35",
+        "D30",
+        "D29",
+        "D28",
+        "D26",
+        "D25",
+        "D21",
+        "D11",
+        "D7"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D30",
+        "D29",
+        "D28",
+        "D11",
+        "D35",
+        "D26",
+        "D7",
+        "D36"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah emiten yang berencana melakukan *go private* (perubahan status dari perusahaan terbuka menjadi tertutup) dan delisting:\n\n### 1. IPAC (PT Era Graharealty Tbk)\n*   **Status:** Merencanakan *go private* dan delisting [D30].\n*   **Mekanisme:** Penawaran Tender Sukarela (VTO) oleh pemegang saham pengendali, APAC Investment 2 Pte. Ltd. [D30].\n*   **Harga VTO:** Rp250 per saham [D30].\n*   **Jadwal:** RUPSLB pada 20 Oktober 2026; estimasi delisting efektif 18 Maret 2027 [D30].\n\n### 2. IBST (PT Inti Bangun Sejahtera Tbk)\n*   **Status:** Merencanakan *go private* melalui VTO dan delisting dari BEI [D29], [D28].\n*   **Pelaku VTO:** PT Iforte Solusi Infotek [D29].\n*   **Keterangan:** Rencana telah disetujui dalam RUPSLB tanggal 5 Juni 2026 [D29]. Harga VTO dan jadwal pelaksanaan belum diungkapkan dalam dokumen [D29].\n\n### 3. SUPR (PT Solusi Tunas Pratama Tbk)\n*   **Status:** Merencanakan *go private* dan delisting [D11], [D35].\n*   **Mekanisme:** Voluntary Tender Offer (VTO) oleh PT Profesional Telekomunikasi Indonesia (Protelindo) [D11].\n*   **Harga VTO:** Rp45.000 per saham [D11].\n*   **Catatan:** Dokumen KI menyebutkan SUPR sebagai pembanding yang melemahkan dugaan *backdoor listing* karena fokusnya adalah rencana *go private*, bukan injeksi aset baru [D35].\n\n### Catatan Penting Mengenai Emittan Lain:\n*   **EKAD:** Tidak berencana *go private*. EKAD sedang dalam proses akuisisi pengendalian oleh Fujian Youjia, namun manajemen menyatakan komitmen untuk mempertahankan status pencatatan di bursa [D26].\n*   **DOOH:** Pengendali baru (SII) secara tegas menegaskan **tidak ada rencana** *delisting* atau perubahan status menjadi perusahaan tertutup [D7].\n*   **MBSS:** Meskipun terjadi transisi kendali dan tender, dokumen tidak menyatakan rencana *go private* atau delisting. Justru dinyatakan bahwa pengendali belum merencanakan hal tersebut [D36].",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 97878,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.000323656,
+        "prompt_tokens": 29310,
+        "completion_tokens": 1090,
+        "cached_tokens": 29056,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 17279,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 5399394,
+        "selected_source_bytes": 91731,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "go private"
+        ],
+        "documents_checked": 10,
+        "current_document": "D7",
+        "database_source_reads": 10
+      }
+    },
+    {
+      "id": "tender_offer",
+      "question": "ada yang lagi tender offer ga?",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true
+      },
+      "facts": [],
+      "terms": [
+        "tender offer"
+      ],
+      "sources": [
+        "D51",
+        "D50",
+        "D49",
+        "D48",
+        "D36",
+        "D47",
+        "D35",
+        "D46",
+        "D34",
+        "D33",
+        "D30",
+        "D29",
+        "D52",
+        "D28",
+        "D26",
+        "D25",
+        "D23",
+        "D44",
+        "D16",
+        "D14",
+        "D11",
+        "D10",
+        "D7",
+        "D5"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D30",
+        "D29",
+        "D28",
+        "D26",
+        "D23",
+        "D14",
+        "D11",
+        "D7",
+        "D33",
+        "D44",
+        "D25",
+        "D16",
+        "D10",
+        "D52",
+        "D48",
+        "D36",
+        "D51",
+        "D50",
+        "D49"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diperiksa, terdapat beberapa emiten yang sedang atau baru saja mengumumkan pelaksanaan **Tender Offer** (baik Sukarela/VTO maupun Wajib/MTO) pada periode Agustus–September 2026.\n\nBerikut adalah rincian status tender offer berdasarkan dokumen:\n\n### 1. Tender Offer Sukarela (Voluntary Tender Offer - VTO)\nTujuan utama VTO dalam arsip ini umumnya terkait rencana *go private* dan delisting.\n\n| Emiten | Pengaju / Pihak Terkait | Harga Penawaran | Status & Keterangan | Sumber |\n| :--- | :--- | :--- | :--- | :--- |\n| **IPAC** | APAC Investment 2 Pte. Ltd. (Pengendali) | Rp250/saham | **Sedang Berjalan.** RUPSLB dijadwalkan 20 Oktober 2026. Perkiraan periode tender Desember 2026–Januari 2027. | [D30], [D29] |\n| **IBST** | PT Iforte Solusi Infotek | Belum diungkapkan | **Sedang Berjalan (Perpanjangan).** Masa VTO Periode II diperpanjang hingga 2 Oktober 2026. Hasil sementara menunjukkan partisipasi rendah. | [D28], [D26], [D23] |\n| **SUPR** | PT Profesional Telekomunikasi Indonesia (Protelindo) | Rp45.000/saham | **Sedang Berjalan (Perpanjangan).** Masa VTO diperpanjang hingga 23 September 2026. Partisipasi ~22,42% per 20 Agustus. | [D14], [D11] |\n| **EDGE** | Digital Edge (Hong Kong) Ltd (DEHK) | Rp11.500/saham | **Sedang Berjalan (Periode III).** Perpanjangan masa VTO hingga 22 September 2026. Partisipasi Periode II sangat rendah (0,24%). | [D14], [D7] |\n| **ASII** (atas AUTO) | PT Astra International Tbk | Rp3.600/saham | **Direncanakan.** Diumumkan dalam Public Expose 10 September 2026. Target tambahan kepemilikan 4,95%. Dana ±Rp858 miliar. | [D33], [D44] |\n\n### 2. Penawaran Tender Wajib (Mandatory Tender Offer - MTO/PTW)\nTerjadi akibat perubahan pengendalian atau akuisisi saham pengendali.\n\n| Emiten | Pengaju / Pihak Terkait | Harga Penawaran | Status & Keterangan | Sumber |\n| :--- | :--- | :--- | :--- | :--- |\n| **EKAD** | Fujian Youjia (Fujian Youyi) | **Belum ditetapkan** | **Akan Dilakukan.** Akuisisi 51% saham dari EIP dalam proses (target Q4 2026). Due diligence belum dimulai. Harga akan ditentukan setelah penilaian independen. | [D26], [D25] |\n| **DPUM** | PT Rama Indonesia | **Belum diungkapkan** | **Ditunda.** Jadwal baru: 24 September – 23 Oktober 2026. Penundaan karena kebutuhan dana pasca kebakaran pabrik Juni 2026. | [D16] |\n| **NAYZ** | PT Saiko Consultancy Grand (SCG) | **Belum diungkapkan** | **Akan Dilakukan.** Saiko menjadi pengendali baru sejak 19 Agustus 2026. SCG ditunjuk untuk melaksanakan tender wajib sesuai POJK 9/2018. | [D10] |\n| **BIKE** | PT Penajam Makmur Jaya (PMJ) | **Belum diungkapkan** | **Dalam Tahap Finalisasi.** PMJ menjadi pengendali baru. Rencana penyelesaian MTO dan persetujuan RUPS Independen masih berjalan. | [D7] |\n| **MBSS** | PT Wibowo Group Capital | Rp2.915/saham | **Diumumkan.** Pengalihan saham terjadi 31 Juli 2026. Mandatory tender offer sekitar 306,3 juta saham (17,5% publik) dengan nilai maks ±Rp892,7 miliar. | [D52], [D48], [D36] |\n| **ULTJ** | FrieslandCampina (melalui FFI) | Minimum Rp2.150/saham | **Menurut Post/Rumor.** Narasi Stockbit menyebutkan mekanisme inbreng dan adanya mandatory tender offer. Namun, dokumen resmi transaksi belum diverifikasi dalam arsip ini. Perlu verifikasi dokumen resmi. | [D51], [D50], [D49] |\n\n### Catatan Penting:\n1.  **Harga Tidak Jaminan Publik:** Harga tender offer (terutama VTO dan MTO) adalah harga khusus bagi peserta tender, bukan harga pasar reguler yang tersedia untuk semua investor setiap saat [D48].\n2.  **Verifikasi Dokumen:** Untuk kasus **ULTJ**, klaim tender offer berasal dari narasi pengguna Stockbit [@klinikporto] dan belum ada konfirmasi melalui dokumen resmi perusahaan (circular/tender document) dalam arsip ini [D51].\n3.  **Ketidakpastian Eksekusi:** Beberapa tender offer (seperti DPUM dan EKAD) menghadapi penundaan atau ketergantungan pada negosiasi harga dan persetujuan regulator (OJK/BEI) [D16], [D26].\n4.  **Delisting:** VTO pada IPAC, IBST, SUPR, dan EDGE bertujuan untuk *go private* dan delisting. Jika berhasil, likuiditas saham akan hilang bagi pemegang saham yang tidak menjual [D30], [D28], [D11], [D14].",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 187678,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.006287129999999999,
+        "prompt_tokens": 55625,
+        "completion_tokens": 1831,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 23826,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 8567473,
+        "selected_source_bytes": 176868,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "tender offer"
+        ],
+        "documents_checked": 24,
+        "current_document": "D5",
+        "database_source_reads": 24
+      }
+    },
+    {
+      "id": "stock_split",
+      "question": "ada yang mau stock split?",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true
+      },
+      "facts": [],
+      "terms": [
+        "stock split"
+      ],
+      "sources": [
+        "D51",
+        "D39",
+        "D48",
+        "D33",
+        "D32",
+        "D30",
+        "D29",
+        "D28",
+        "D27",
+        "D26",
+        "D25",
+        "D24",
+        "D23",
+        "D21",
+        "D20",
+        "D17",
+        "D16",
+        "D15",
+        "D14",
+        "D12",
+        "D11",
+        "D7",
+        "D5",
+        "D4"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D5",
+        "D14",
+        "D32",
+        "D28",
+        "D26",
+        "D33",
+        "D30",
+        "D29",
+        "D27",
+        "D25",
+        "D24",
+        "D23",
+        "D21",
+        "D20",
+        "D17",
+        "D16",
+        "D15",
+        "D12",
+        "D11",
+        "D7",
+        "D4"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah status rencana *stock split* (pemecahan saham) pada emiten IDX:\n\n### 1. Emiten dengan Rencana Stock Split Aktif\n**PT Paramita Bangun Sarana Tbk (PBSA)**\n*   **Status:** Memiliki rencana *stock split* yang menunggu persetujuan pemegang saham.\n*   **Detail Aksi:** Rasio 1:2, mengubah nilai nominal dari Rp50 menjadi Rp25 per saham. Jumlah saham diperkirakan meningkat dari 3.000.000.000 menjadi 6.000.000.000 lembar [D5].\n*   **Jadwal:** Rapat Umum Pemegang Saham Luar Biasa (RUPSLB) dijadwalkan pada **18 September 2026** [D14].\n*   **Catatan:** Persetujuan prinsip dari Bursa Efek Indonesia telah diperoleh pada 5 Agustus 2026, namun eksekusi masih bergantung pada hasil RUPSLB [D5].\n\n### 2. Emiten Lain yang Menyangkal atau Tidak Ada Rencana\nBerbagai emiten lain secara eksplisit menyatakan tidak ada rencana atau pelaksanaan *stock split* dalam periode pelaporan mereka:\n\n*   **PT Indominco Mandiri Tbk (ITMG):** Manajemen menyatakan belum ada rencana untuk melakukan *stock split* saat ini [D32].\n*   **PT Raharja Gas Tbk (RAJA):** Telah melakukan *stock split* rasio 1:5 pada **Juni 2026**. Dokumen terbaru hanya mencatat kejadian historis tersebut tanpa rencana baru [D28], [D26].\n*   **Emiten Lainnya:** Arsip menunjukkan ketiadaan aksi korporasi berupa *stock split* untuk emiten seperti DIGI, ANTM, GRIA, BEEF, PNGO, LABA, PPRE, TPMA, KONI, AMMN, BAJA, BBNI, KLBF, PYFA, RGAS, RISE, SWAT, TAMA, TINS, WEGE, ADMR, ASII, DSNG, GGRM, LEAD, MTLA, PDES, PTPP, SAMF, SKBM, SMLE, SOHO, ACST, BLTA, CINT, DEWI, DGWG, FITT, JAST, KDTN, LFLO, LIVE, MBSS, SDMU, SIPD, UDNG, ERAA (riwayat 2021), BALI, HOMI, SATU, WINE, CITA, GTRA, PTBA, SMBR, SSMS, UNTR, BSSR, HELI, MYOH, NZIA, OILS, ARCI, SRTG, CYBR, HBAT, SMMA, TRUK, WGSH, WOWS, AKRA, ASGR, ASLC, GTBO, LUCY, MBAP [D33], [D30], [D29], [D27], [D25], [D24], [D23], [D21], [D20], [D17], [D16], [D15], [D14], [D12], [D11], [D7], [D5], [D4].\n\n### Kesimpulan\nHanya **PBSA** yang memiliki agenda *stock split* aktif dalam arsip ini, dengan jadwal keputusan pada 18 September 2026. Tidak ada emiten lain yang mengumumkan rencana *stock split* baru; sebagian besar menegaskan tidak adanya aksi korporasi tersebut, dan satu emiten (RAJA) telah menyelesaikannya di bulan Juni 2026.",
+      "usage": {
+        "calls": 14,
+        "input_bytes": 1193101,
+        "output_token_budget": 28400,
+        "known_cost_usd": 0.029755168,
+        "prompt_tokens": 389499,
+        "completion_tokens": 14407,
+        "cached_tokens": 94848,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 107659,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 12,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 12412623,
+        "selected_source_bytes": 1108559,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "stock split"
+        ],
+        "documents_checked": 24,
+        "current_document": "D4",
+        "database_source_reads": 24
+      }
+    },
+    {
+      "id": "rights_issue",
+      "question": "siapa aja yang mau rights issue",
+      "status": "error",
+      "error": "Terlalu banyak bahan untuk satu analisis. Persempit topik.",
+      "pass": false,
+      "checks": {
+        "status": false
+      },
+      "facts": [],
+      "terms": [
+        "rights issue"
+      ],
+      "sources": [
+        "D51",
+        "D50",
+        "D39",
+        "D49",
+        "D37",
+        "D48",
+        "D36",
+        "D47",
+        "D35",
+        "D46",
+        "D38",
+        "D34",
+        "D33",
+        "D53",
+        "D32",
+        "D31",
+        "D30",
+        "D29",
+        "D52",
+        "D28",
+        "D27",
+        "D26",
+        "D25",
+        "D24",
+        "D23",
+        "D44",
+        "D21",
+        "D20",
+        "D19",
+        "D18",
+        "D17",
+        "D16",
+        "D15",
+        "D14",
+        "D12",
+        "D11",
+        "D10",
+        "D9",
+        "D7",
+        "D6",
+        "D5",
+        "D4"
+      ],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 383,
+        "output_token_budget": 300,
+        "known_cost_usd": 0.0000033,
+        "prompt_tokens": 84,
+        "completion_tokens": 6,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 1031,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 14050824,
+        "selected_source_bytes": 3321946,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "source_limits",
+        "terms": [
+          "rights issue"
+        ],
+        "documents_checked": 42,
+        "current_document": "D4",
+        "database_source_reads": 42
+      }
+    },
+    {
+      "id": "heldout_uma",
+      "question": "ada saham yg kena UMA ga?",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "docs_any": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "GRPH",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "UMA"
+      ],
+      "sources": [
+        "D46",
+        "D21",
+        "D20",
+        "D17"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D20",
+        "D17",
+        "D21",
+        "D46"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diberikan, terdapat tiga emiten yang disebutkan terkait dengan status atau pengumuman **Unusual Market Activity (UMA)**:\n\n1.  **GRPH (PT Griptha Putra Persada Tbk.)**\n    *   BEI mengeluarkan Surat Pengumuman UMA untuk GRPH pada tanggal **3 September 2026** (nomor surat: Peng-UMA-00277/BEI.WAS/09-2026) [D20].\n    *   Emiten menanggapi bahwa peningkatan harga saham adalah murni mekanisme pasar dan tidak ada dampak material terhadap operasional atau keuangan [D20].\n\n2.  **YPAS (Yudha Parama Sukses Tbk.)**\n    *   Dokumen menyebutkan adanya **UMA pada saham YPAS** dalam bagian *Listing / regulatory* [D17].\n    *   Manajemen YPAS menyatakan bahwa peningkatan harga saham merupakan mekanisme pasar dan mereka tidak mengetahui penyebab spesifiknya [D17].\n\n3.  **CRAB (PT Toba Surimi Industries Tbk.)**\n    *   Status UMA oleh BEI tercatat pada **Mei 2025** [D21]. Tidak ada informasi terbaru mengenai status UMA CRAB pada periode Agustus–September 2026 dalam arsip ini.\n\nSelain itu, arsip dari forum Stockbit juga mencatat bahwa keluhan mengenai aturan market seperti **UMA, suspension, FCA, dan ARA/ARB** adalah tema yang paling ramai dibicarakan pengguna pada **15 September 2026**, meskipun hal tersebut bersifat persepsi pengguna dan bukan bukti inkonsistensi penerapan aturan secara hukum [D46].",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 33180,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.000176166,
+        "prompt_tokens": 8989,
+        "completion_tokens": 864,
+        "cached_tokens": 8576,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 14353,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 1814858,
+        "selected_source_bytes": 28896,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "UMA"
+        ],
+        "documents_checked": 4,
+        "current_document": "D17",
+        "database_source_reads": 4
+      }
+    },
+    {
+      "id": "heldout_backdoor",
+      "question": "siapa aja yg dicurigai mau backdoor?",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true
+      },
+      "facts": [],
+      "terms": [
+        "backdoor"
+      ],
+      "sources": [
+        "D51",
+        "D40",
+        "D50",
+        "D39",
+        "D49",
+        "D37",
+        "D48",
+        "D36",
+        "D47",
+        "D35",
+        "D46",
+        "D38",
+        "D34",
+        "D52",
+        "D44",
+        "D1"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D51",
+        "D47",
+        "D44",
+        "D52",
+        "D49",
+        "D40",
+        "D37",
+        "D50",
+        "D39",
+        "D36",
+        "D35",
+        "D38",
+        "D34"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah daftar emiten yang dicurigai atau menjadi subjek spekulasi terkait *backdoor listing* atau perubahan pengendali/aset besar. Peringatan penting: sebagian besar kasus ini masih berupa **rumor**, **indikasi awal**, atau **aksi korporasi yang belum terbukti** sebagai *backdoor listing*.\n\n### 1. Kandidat dengan Bukti Terlemah (Hanya Rumor/Spekulasi)\nKasus-kasus ini disebutkan dalam forum diskusi namun tidak didukung oleh dokumen resmi, *chain of evidence*, atau fakta transaksi yang terkonfirmasi dalam arsip.\n\n| Ticker | Sumber Spekulasi | Alasan Curiga / Klaim | Status Bukti dalam Arsip |\n| :--- | :--- | :--- | :--- |\n| **FLMC** | [@KeefaSukaSaham] di Stockbit [D51] | Disebut masuk \"screener lapkeu backdoor\". | **Sangat tipis.** Tidak ada bukti *controller change*, *asset injection*, atau tautan sponsor. Hanya klaim pengguna [D51]. |\n| **INPS** | [@DennisBrata] di Stockbit [D47] | Dugaan *backdoor listing* melibatkan keluarga \"influencer AH\" dan *crossing* pasar negosiasi. | **Rumor keyakinan rendah.** Tidak ada nama entitas pembeli, nilai transaksi, atau bukti crossing yang ditampilkan [D47]. |\n| **PLAN** | [@Saharalan], [@karyajayalestari] di Stockbit [D44] | Diduga sebagai *shell* karena struktur kering, aset/liabilitas tertentu. Info dari karyawan anonim. | **Lemah.** Tidak ada sponsor jelas, target aset, atau transaksi [D44]. |\n| **IOTF** | [@yanthao3] di Stockbit [D52] | Pembelian saham agresif memicu pertanyaan potensi *backdoor*. | **Masih rumor.** Belum ada nama pengakuisisi, target aset, CSPA, atau tender offer [D52]. |\n| **KICI** | [@yosier] di Stockbit [D49] | Penulis menyebut *backdoor* dan akumulasi saham. | **Tidak ada detail.** Tidak ada nama *acquirer*, aset, atau terms [D49]. |\n| **PNGO** | [@AndreRibsa] di Stockbit [D52] | Pertanyaan mengenai *asset injection*. | **Nama spekulatif.** Perlu pembuktian lebih lanjut [D52]. |\n| **ENRG** | [@rendraadii] di Stockbit [D52] | Teori aksi korporasi berbasis *broker flow*. | **Teori spekulatif.** Belum terbukti [D52]. |\n\n### 2. Kandidat dengan Indikasi Aksi Korporasi (Belum Terbukti Backdoor)\nKasus-kasus ini memiliki elemen seperti perubahan pengurus, *private placement* besar, atau rencana akuisisi, namun analisis arsip menyatakan bahwa elemen-elemen tersebut **belum cukup** untuk dikategorikan sebagai *backdoor listing* yang terkonfirmasi.\n\n| Ticker | Mekanisme / Indikasi | Penilaian Analisis Arsip |\n| :--- | :--- | :--- |\n| **MKNT** | *Private placement* ekstrem (saham baru ~99,46% dari total), pergantian seluruh pengurus, potensi *controller reset* melalui PT Headwell Bintang Energi Hijau. | **Potensi *control-reset*.** Belum terlihat pergeseran tujuan bisnis (*business-purpose shift*) atau injeksi aset operasional. Status: Pantau sebagai kandidat, bukan *backdoor* terbukti [D40]. |\n| **ULTJ** | Rencana *rights issue* dengan inbreng saham PT Frisian Flag Indonesia (FCIH) senilai Rp14,57 triliun. FCIH disebut calon pengendali baru. | **Asset injection & perubahan kendali.** Lebih tepat disebut *asset injection with change of control* daripada *classic backdoor listing* karena ULTJ bukan perusahaan kosong. Transaksi masih tahap persetujuan [D37], [D50]. |\n| **BIKE** | Rencana pergeseran arah usaha (*business-pivot*), penjajakan akuisisi aset pertambangan. | **Major business-pivot candidate.** Belum terlihat transfer kontrol definitif atau pendanaan. Status: Pantau, *backdoor* belum terbukti [D40]. |\n| **VISI** | Kombinasi *private placement*, perubahan kegiatan usaha/domisili, dan penyertaan saham pada PT Hasna Medika Bakti. | **Perubahan bisnis lengkap.** Namun, identitas pemodal, valuasi target, dan dampak kepemilikan belum jelas. Pernyataan pemegang saham utama \"tidak menjual saham\" mengaburkan sinyal kontrol [D39]. |\n| **PPGL** | Pelepasan anak usaha besar (JAYA) secara nonkas, diikuti penjajakan kepemilikan oleh pemegang saham mayoritas. | **Kandidat tahap awal.** Bisa jadi persiapan perubahan arah atau penyederhanaan grup. Belum ada pembeli baru atau aset pengganti yang diumumkan [D36], [D37]. |\n| **IDEA** | Nawasena Nugra Investama menegosiasikan pembelian 66,58% saham dari pemegang saham lama. | **Transfer blok pengendali.** Sudah ada nama pembeli dan besaran, tetapi belum ada target aset baru atau rencana pendanaan emiten yang jelas. Bukan *backdoor* otomatis [D35]. |\n| **MGLV** | Akuisisi NAC/NGC, divestasi 13 anak usaha, perubahan bisnis ke data center, dan *rights issue*. | **Paling mendekati pola listed vehicle.** Ada pengendali baru dan pergantian aset. Namun, status hukum \"backdoor listing\" belum diverifikasi, dan valuasi/proforma keuangan belum tersedia [D35]. |\n| **FORU** | *Rights issue* sangat besar (dilusi 99,78%) dengan inbreng 49% PT Borneo Prima (tambang batu bara). | **Large asset injection / Business transformation.** Controller (IMR Asia Holding) **tidak berubah**. Oleh karena itu, arsip secara eksplisit menyatakan ini **bukan classic backdoor listing** karena ultimate controller tetap sama [D38], [D34]. |\n\n### 3. Catatan Penting tentang Interpretasi Arsip\n*   **Bukan Semua Perubahan Kendali adalah Backdoor:** Arsip menekankan bahwa *backdoor listing* memerlukan kombinasi elemen: transfer kontrol, pergeseran tujuan bisnis, injeksi aset operasional, dan reset modal. Banyak kasus di atas hanya memenuhi satu atau dua elemen [D40].\n*   **Risiko Rumor:** Emisen seperti FLMC, INPS, dan PLAN hanya memiliki jejak di media sosial tanpa dasar dokumen. Menganggapnya sebagai fakta investasi berisiko tinggi [D51], [D47], [D44].\n*   **Data Historis vs Kondisi Saat Ini:** Informasi tanggal 15–24 September 2026 bersifat historis dalam konteks arsip ini. Situasi dapat berubah jika ada pengungkapan baru yang tidak tercakup dalam bahan ini.\n\n**Kesimpulan:** Tidak ada emiten dalam arsip yang dinyatakan telah melakukan *backdoor listing* yang terbukti secara hukum dan finansial. Kasus paling dekat dengan pola transformasi bisnis melalui emiten tercatat adalah **MGLV** dan **FORU** (namun FORU tidak mengubah kontrol), sementara **MKNT** dan **ULTJ** adalah kandidat perubahan kendali/aset yang masih dalam proses verifikasi.",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 83154,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.00097547,
+        "prompt_tokens": 23186,
+        "completion_tokens": 2153,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 36240,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 937081,
+        "selected_source_bytes": 74236,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "backdoor"
+        ],
+        "documents_checked": 16,
+        "current_document": "D1",
+        "database_source_reads": 16
+      }
+    },
+    {
+      "id": "heldout_delist",
+      "question": "ada emiten yg mau cabut dari bursa?",
+      "status": "error",
+      "error": "Belum ditemukan dokumen untuk “cabut dari bursa”.",
+      "pass": false,
+      "checks": {
+        "status": false,
+        "facts": false
+      },
+      "facts": [
+        {
+          "fact": "IPAC|delisting|go private",
+          "hit": false
+        }
+      ],
+      "terms": [
+        "cabut dari bursa"
+      ],
+      "sources": [],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 387,
+        "output_token_budget": 300,
+        "known_cost_usd": 0.00000365,
+        "prompt_tokens": 87,
+        "completion_tokens": 8,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 532,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v4",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "search_documents",
+        "terms": [
+          "cabut dari bursa"
+        ]
+      }
+    }
+  ]
+}
