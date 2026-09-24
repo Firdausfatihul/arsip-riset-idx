@@ -51,7 +51,8 @@ export class CacheStore {
     if (found !== null) return {value:found, hit:true, shared:false};
     const id = kind + ':' + key;
     if (this.pending.has(id)) return {value:await this.pending.get(id), hit:true, shared:true};
-    const pending = Promise.resolve().then(compute).then(value => { this.put(kind, key, value, ttl); return value; });
+    // Answers cut at the length limit are shown once but never reused.
+    const pending = Promise.resolve().then(compute).then(value => { if (!value?.incomplete) this.put(kind, key, value, ttl); return value; });
     this.pending.set(id, pending);
     try { return {value:await pending, hit:false, shared:false}; }
     finally { this.pending.delete(id); }

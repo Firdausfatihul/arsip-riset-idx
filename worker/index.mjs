@@ -1,6 +1,6 @@
 import {SourceStore} from './source-store.mjs';
 import {DurableObject} from 'cloudflare:workers';
-import {Archive, CacheStore, hash, ChatError, OpenRouter, MODEL, LIMITS, validate, readLimited, converse} from './core.mjs';
+import {Archive, CacheStore, hash, ChatError, OpenRouter, MODEL, LIMITS, validate, readLimited, converse, rememberTurn} from './core.mjs';
 
 // Invalid configuration falls back to a finite limit, never unlimited admission.
 const limit = (env, key, fallback) => {
@@ -96,10 +96,9 @@ export class ArchiveChat extends DurableObject {
     if (!row || row.turns >= 20) throw new ChatError('Percakapan berakhir atau jaringan berubah. Pilih Percakapan baru.');
     return {turns:row.turns, history:JSON.parse(row.history)};
   }
-  remember(client, conversation, question, answer) {
+  remember(client, conversation, question, result) {
     const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), n => n.toString(16).padStart(2, '0')).join('');
-    const history = [...conversation.history, {role:'user', content:question},
-      {role:'assistant', content:answer.slice(0, 1500)}].slice(-6);
+    const history = rememberTurn(conversation.history, question, result);
     // Short-lived, server-authored history. No client can supply assistant/system messages.
     this.ctx.storage.transactionSync(() => {
       const sql = this.ctx.storage.sql;
@@ -185,7 +184,9 @@ export class ArchiveChat extends DurableObject {
         const result = await converse(this.archive, model, body.question, conversation.history, emit, controller.signal,
           {cache:this.cache,client,metrics:retrieval});
         controller.signal.throwIfAborted();
-        const context = this.remember(client, conversation, body.question, result.answer);
+        // An answer cut at the length limit does not become history; the previous context stays valid.
+        const context = result.incomplete && body.context ? body.context
+          : this.remember(client, conversation, body.question, result.incomplete ? {...result, answer:'(jawaban terpotong)'} : result);
         await emit({type:'done', documents:result.documents, batches:result.batches, model:MODEL, context,
           usage:model.usage(),cache_hit:!!result.cache_hit,clarification:!!result.clarification});
         outcome = result.clarification ? 'clarification' : 'complete';

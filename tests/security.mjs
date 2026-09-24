@@ -98,7 +98,7 @@ test('hourly, daily and model expenditure limits survive object restart', () => 
 });
 test('opaque history token: forged, expired, other client; SQL injection stays data', () => {
   const {object,db}=fixture(), malicious="'; DROP TABLE conversations; --";
-  const token=object.remember('client',{turns:0,history:[]},malicious,'answer'.repeat(1000));
+  const token=object.remember('client',{turns:0,history:[]},malicious,{answer:'answer'.repeat(1000)});
   const c=object.conversation(token,'client');
   assert.equal(c.history[0].content,malicious); assert.equal(c.history[1].content.length,1500);
   assert.throws(()=>object.conversation(token,'another'),ChatError);

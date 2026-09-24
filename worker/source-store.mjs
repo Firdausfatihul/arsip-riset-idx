@@ -1,5 +1,6 @@
 // Durable, lossless source index. Populated by the private sync endpoint, never by a model.
 import {hash} from './cache.mjs';
+import {pattern} from './retrieval.mjs';
 export const SOURCE_SCHEMA = 'sources-v1';
 const keyOf = (doc, version) => [SOURCE_SCHEMA,version,doc.document_id,doc.document_hash].join(':');
 const quote = text => '"' + text.replaceAll('"','""') + '"';
@@ -41,9 +42,13 @@ export class SourceStore {
   }
   search(index,terms) {
     if(this.status(index).pending.length)return null;
-    const query=terms.filter(t=>/[\p{L}\p{N}]/u.test(t)).map(quote).join(' OR ');
-    if(!query)return [];
-    const keys=new Set(this.sql.exec('SELECT DISTINCT p.doc_key FROM source_fts f JOIN source_passages p ON p.id=f.rowid WHERE source_fts MATCH ?',query).toArray().map(r=>r.doc_key));
+    const tickers=new Set(index.tickers),keys=new Set();
+    for(const term of terms.filter(t=>/[\p{L}\p{N}]/u.test(t))) {
+      // FTS5 folds case, so ticker hits are re-checked against the exact capitalised code.
+      const exact=tickers.has(term)?pattern(term,tickers):null;
+      const rows=this.sql.exec(`SELECT DISTINCT p.doc_key${exact?', f.content':''} FROM source_fts f JOIN source_passages p ON p.id=f.rowid WHERE source_fts MATCH ?`,quote(term)).toArray();
+      for(const r of rows)if(!exact || exact.test(r.content))keys.add(r.doc_key);
+    }
     return index.docs.filter(d=>keys.has(keyOf(d,index.retrieval_version))).sort((a,b)=>b.end.localeCompare(a.end)||b.name.localeCompare(a.name));
   }
 }

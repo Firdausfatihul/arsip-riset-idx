@@ -1,0 +1,65 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {DatabaseSync} from 'node:sqlite';
+import {Archive, OpenRouter, converse, directTickers, rememberTurn} from '../worker/core.mjs';
+import {dateQuery, documentRequest} from '../worker/retrieval.mjs';
+import {SourceStore} from '../worker/source-store.mjs';
+
+const read = name => readFile(new URL('../worker/.assets/' + name, import.meta.url), 'utf8').then(JSON.parse);
+const manifest = await read('manifest.json');
+
+test('word-like tickers need capitals or a cue; real codes in any case still work', () => {
+  const t = q => directTickers(q, manifest);
+  assert.deepEqual(t('analisakan dokumen NASI dan alasan kenapa sahamnya naik banyak'), ['NASI']);
+  assert.deepEqual(t('Ringkas perkembangan Far East Gold (FEG) dan Xingye'), []);
+  assert.deepEqual(t('Analisa buka dan semua dokumen yang tersedia'), ['BUKA']);
+  assert.deepEqual(t('ship'), ['SHIP']);
+  assert.deepEqual(t('analisis soci'), ['SOCI']);
+  assert.deepEqual(t('analisa GTSI dan LEAD. coba bandingkan'), ['GTSI', 'LEAD']);
+});
+
+test('ticker search is case-sensitive in SQLite and in the asset fallback', async () => {
+  const db = new DatabaseSync(':memory:');
+  const sql = {exec(q, ...a) { const s = db.prepare(q), rows = s.columns().length ? s.all(...a) : (s.run(...a), []); return {toArray:() => rows}; }};
+  const store = new SourceStore({storage:{sql, transactionSync:fn => fn()}});
+  for (const doc of manifest.docs) await store.importDocument(manifest, doc, await read(doc.evidence_asset));
+  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
+  for (const archive of [new Archive(assets, store), new Archive(assets)]) {
+    const docs = await archive.search(['NAIK']);
+    for (const doc of docs) assert.match((await archive.read(doc.asset)).search, /(?<![\p{L}\p{N}_])NAIK(?![\p{L}\p{N}_])/u);
+    assert.ok(docs.length < 10, 'lowercase "naik" must not match the ticker: ' + docs.length);
+  }
+  db.close();
+});
+
+test('whole-document requests resolve by category and date, including a missing year', () => {
+  const years = [...new Set(manifest.docs.map(d => +d.end.slice(0, 4)))];
+  const scope = dateQuery('summary dokumen keterbukaan informasi tanggal 22 september', [], years);
+  assert.equal(scope.date, '2026-09-22');
+  assert.deepEqual(documentRequest('summary dokumen keterbukaan informasi tanggal 22 september', scope, manifest).map(d => d.name), ['ki_22092026.md']);
+  assert.equal(documentRequest('SOCI tanggal 17 September 2026', dateQuery('SOCI tanggal 17 September 2026'), manifest), null);
+  assert.ok(dateQuery('SOCI tanggal 17', [], years).clarification, 'day without month still asks');
+});
+
+test('an answer cut at the length limit is kept and marked incomplete, not discarded', async () => {
+  const model = new OpenRouter('test', null, async () => new Response([
+    {choices:[{delta:{content:'Sebagian jawaban [D1].'}}]}, {choices:[{finish_reason:'length'}]}
+  ].map(e => 'data: ' + JSON.stringify(e) + '\n\n').join('')));
+  assert.equal(await model.answer([], () => {}), 'Sebagian jawaban [D1].');
+  assert.equal(model.truncated, true);
+});
+
+test('invalid citations become a notice; follow-up terms are reused from the stored turn', async () => {
+  const doc = manifest.docs.find(d => d.name === 'ki_22092026.md');
+  const archive = {manifest:async () => manifest, search:async () => [doc], read:name => read(name)};
+  const asked = [];
+  const model = {complete:async m => { asked.push(m); return '{"terms":["salah"]}'; },
+    answer:async (m, emit) => { const text = 'Ringkasan [' + doc.source_id + '] dan [D999].'; await emit({type:'delta', text}); return text; }};
+  const first = await converse(archive, model, 'analisis VISI', [], () => {});
+  assert.match(first.answer, /D999.*tidak termasuk sumber/s);
+  const history = rememberTurn([], 'analisis VISI', first);
+  const second = await converse(archive, model, 'Analisa lebih dalam gunakan lebih banyak dokumen', history, () => {});
+  assert.deepEqual(second.terms, ['VISI']);
+  assert.equal(asked.length, 0, 'no model call needed to re-guess the search terms');
+});

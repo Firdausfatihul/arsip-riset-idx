@@ -193,6 +193,15 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
 - Pencarian menemukan **semua dokumen** yang cocok dengan ticker/kata utuh; tidak memakai top-3/top-5.
   Pertanyaan tanpa ticker memakai satu panggilan kecil untuk menentukan istilah dari konteks percakapan.
   Pertanyaan hubungan Indonesia–ASX/SGX memakai variasi nama negara/bursa yang dikenali langsung, tanpa panggilan penentu istilah.
+- Kode saham dicocokkan **peka huruf besar**: kata biasa "naik", "gold", "true" bukan ticker NAIK/GOLD/TRUE.
+  Kode yang juga kata umum (`WORD_TICKERS` di `tools/chat_archive.py`) dalam huruf kecil hanya dibaca sebagai
+  ticker setelah kata petunjuk (analisa, saham, emiten, dokumen, …) atau bila pertanyaan hanya berisi kode itu ("ship").
+  Kode lain tetap dikenali dalam huruf kecil ("analisis soci").
+- Permintaan satu dokumen ("ringkas keterbukaan informasi 22 September", "stockbit terbaru") membaca dokumen itu
+  secara utuh berdasarkan kategori dan tanggal katalog, bukan mencari frasa di seluruh arsip. Tahun boleh dihilangkan
+  bila seluruh arsip berada dalam satu tahun.
+- Pertanyaan lanjutan tanpa objek baru ("analisa lebih dalam", "semua dokumen") memakai istilah pencarian giliran
+  sebelumnya yang disimpan bersama riwayat server, tanpa menebak ulang.
 - `tools/evidence_index.py` membagi sumber secara deterministik saat build, tanpa API berbayar.
   Heading emiten dipertahankan sebagai bagian utuh; baris tabel membawa header, artikel HTML tetap utuh,
   dan skrip/data HTML tetap menjadi bagian sumber. Gabungan `content` seluruh bagian harus sama persis
@@ -210,16 +219,17 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   rentang tanggal, dan bahan dengan tanggal relevan lain tetap dipertahankan. “Tanggal 17” tanpa
   bulan/tahun meminta penjelasan tanpa panggilan model; tanggal lengkap dari pertanyaan sebelumnya
   dapat menjadi konteks. Filter ini konservatif, bukan jaminan seluruh tanggal telah dikenali.
-- Bahan pendek langsung masuk ke satu panggilan jawaban. Bahan di atas 64 KB memakai catatan
-  sumber bersama untuk unit di atas 24 KB, maksimal dua pembaca bersamaan. Catatan membahas
-  bukti emiten tanpa pertanyaan atau riwayat pengguna. Permintaan detail/kutipan memakai teks asli
-  langsung jika muat. Jika model menyatakan catatan belum cukup, satu pemeriksaan tambahan atas
+- Bahan sampai 350 KB (±100 ribu token) dibaca model sebagai teks asli dalam satu panggilan jawaban.
+  Bahan di atas itu memakai catatan sumber bersama untuk unit di atas 24 KB, maksimal dua pembaca bersamaan.
+  Catatan membahas bukti emiten tanpa pertanyaan atau riwayat pengguna. Jika model menyatakan catatan belum cukup, satu pemeriksaan tambahan atas
   maksimal dua dokumen lengkap diperbolehkan; seluruh batas biaya/koneksi tetap berlaku.
 - Catatan ringkas dapat melewatkan detail. Model tidak boleh menganggap tidak tercatat berarti tidak
   ada dalam dokumen. Fakta, rumor/pernyataan penulis, angka, tanggal dan ketidakpastian tetap dibedakan.
   Jawaban memakai rujukan `[D…]` yang ditautkan ke arsip, bukan URL hasil karangan model.
-- Pembacaan gagal/terpotong tidak masuk cache. Retry pemotongan hanya satu kali dan tetap memakai
-  anggaran. Jawaban parsial ditandai belum selesai dan tidak menjadi riwayat percakapan.
+- Pembacaan gagal/terpotong tidak masuk cache. Retry pemotongan catatan hanya satu kali dan tetap memakai
+  anggaran. Jawaban akhir yang mencapai batas panjang tetap ditampilkan dengan tanda terpotong, tidak masuk
+  cache jawaban dan tidak menjadi riwayat percakapan. Rujukan `[D…]` di luar sumber yang diperiksa tidak
+  menggagalkan jawaban; jawaban diberi catatan agar rujukan itu diabaikan.
 - Tombol Hentikan memutus koneksi. Server menghentikan pekerjaan setelah mendeteksi pemutusan;
   provider masih dapat mengenakan biaya untuk pekerjaan yang sudah dikirim.
 
@@ -294,6 +304,7 @@ nol. Batas anggaran byte/token tetap dicadangkan sebelum panggilan dan terpisah 
 Rincian biaya permintaan tersedia pada bagian yang dapat dibuka di bawah jawaban.
 
 ```bash
+node tools/eval_chat.mjs --label nama      # uji akurasi 24 pertanyaan nyata (tests/eval/cases.json), API nyata, batas US$2
 node tools/compare_chat_costs.mjs           # simulasi offline, tidak memanggil provider
 node tools/compare_chat_costs.mjs --live    # perbandingan API nyata, batas cadangan konservatif US$1
 python3 tools/chat_metrics.py --days 7 --out reports/private/chat-metrics.json --html reports/private/chat-statistics.html
@@ -566,6 +577,7 @@ Membuka `site/index.html` langsung dengan dobel klik (`file://`) juga bisa, tapi
 
 | Gejala | Penyebab / solusi |
 |---|---|
+| Chat tidak menemukan dokumen baru, padahal tampil di situs | Worker belum diperbarui: `build.py --out docs` hanya memperbarui situs. Jalankan `python3 tools/publish_chat.py`. |
 | Dokumen masuk "Lainnya" | Nama file tidak cocok `prefixes`/`keywords`. Ganti nama file atau tambah kata kunci di `CATEGORIES`. |
 | Tanggal salah / hari ini | Tidak ada pola tanggal di nama file, jadi dipakai mtime. Tambahkan `YYYYMMDD` ke nama. |
 | Dokumen tampil sebagai teks mentah | CDN `cdnjs.cloudflare.com` diblokir / offline. Tunggu koneksi, atau ganti URL `LIBS` di `build.py`. |

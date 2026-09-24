@@ -67,7 +67,7 @@ test('question changes reuse expensive source notes; document hash and client hi
  const {db,cache}=cacheFixture();let hash='h1';
  const doc={source_id:'D47',asset:'raw',evidence_asset:'evidence',title:'SOCI',path:'files/soci.md',label:'2026',name:'soci',end:'2026',sizes:[95000],document_id:'stable'};
  const large={manifest:async()=>({retrieval_version:'v1',version:hash,system:'Data only.',tickers:['SOCI'],commonWords:[]}),
-  search:async()=>[{...doc,document_hash:hash}],read:async()=>({version:'v1',document_hash:hash,coverage:'full-source-partition',records:[{section_id:'s',kind:'issuer_section',context:'SOCI',tickers:['SOCI'],content:'SOCI '+'Bukti tentang kapal. '.repeat(5000)}]})};
+  search:async()=>[{...doc,document_hash:hash}],read:async()=>({version:'v1',document_hash:hash,coverage:'full-source-partition',records:[{section_id:'s',kind:'issuer_section',context:'SOCI',tickers:['SOCI'],content:'SOCI '+'Bukti tentang kapal. '.repeat(20000)}]})};
  const m1=new Fake(),stats={};await converse(large,m1,'SOCI',[],()=>{},null,{cache,metrics:stats});assert.ok(stats.note_reads>0);
  const m2=new Fake(),stats2={};await converse(large,m2,'SOCI risikonya?',[],()=>{},null,{cache,metrics:stats2});assert.equal(stats2.note_reads,0);assert.ok(stats2.note_cache_hits>0);
  const noteRequests=m1.calls.filter(m=>m.at(-1).content.includes('Buat catatan'));assert.ok(noteRequests.every(m=>!m.some(v=>v.role==='assistant')));
@@ -96,7 +96,7 @@ test('insufficient shared notes trigger one bounded original-document check with
  const doc={source_id:'D47',asset:'raw',evidence_asset:'evidence',title:'SOCI',path:'files/soci.md',label:'2026',name:'soci',end:'2026',sizes:[95000],document_id:'d',document_hash:'h'};
  const a={manifest:async()=>({retrieval_version:'v',version:'v',system:'Data only.',tickers:['SOCI'],commonWords:[]}),search:async()=>[doc],
  read:async name=>name==='raw'?{parts:[{source_id:'D47',part:1,text:'SOCI: exact detail retained in original.'}]}:
- {version:'v',document_hash:'h',coverage:'full-source-partition',records:[{section_id:'s',kind:'issuer_section',context:'SOCI',tickers:['SOCI'],content:'SOCI '+'Bukti tentang kapal. '.repeat(5000)}]}};
+ {version:'v',document_hash:'h',coverage:'full-source-partition',records:[{section_id:'s',kind:'issuer_section',context:'SOCI',tickers:['SOCI'],content:'SOCI '+'Bukti tentang kapal. '.repeat(20000)}]}};
  let answers=0;const events=[],stats={};
  const m={complete:async()=> 'Catatan [D1].',answer:async(messages,emit)=>{
   answers++;const text=answers===1?'[[SUMBER:D47]]':'Exact detail from original [D47].';

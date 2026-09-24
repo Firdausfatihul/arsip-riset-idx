@@ -651,7 +651,7 @@ a.chip:hover{outline:1px solid var(--c)}
 .prose pre{overflow-x:auto;padding:14px;background:var(--surface);border:1px solid var(--line);font:13px/1.55 var(--mono)}
 .prose pre code{background:none;padding:0}
 .prose blockquote{margin:0 0 16px;padding-left:14px;border-left:3px solid var(--line-strong);color:var(--muted)}
-.prose table{display:block;overflow-x:auto;border-collapse:collapse;margin:0 0 18px;font-size:16px}
+.prose table{display:block;overflow-x:auto;border-collapse:collapse;margin:0 0 18px;font-size:16px;overflow-wrap:break-word}
 .prose th,.prose td{padding:7px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}
 .prose th{background:var(--c-soft)}
 .prose img{max-width:100%}

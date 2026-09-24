@@ -4,7 +4,7 @@ import html
 from html.parser import HTMLParser
 import re
 
-VERSION = 'issuer-passages-v1'
+VERSION = 'issuer-passages-v2'
 WORD = re.compile(r'\w+', re.UNICODE)
 
 
@@ -96,7 +96,8 @@ def make_evidence(doc, tickers):
             table_header = text.strip()
         if '</table' in text.lower():
             table_header = ''
-        codes = sorted(set(w.upper() for w in WORD.findall(html.unescape(text))) & tickers)
+        # Tickers are tagged only when written in capitals: NAIK, TRUE, GOLD are also ordinary words.
+        codes = sorted(set(w for w in WORD.findall(html.unescape(text)) if w.isupper()) & tickers)
         plain = html.unescape(re.sub('<[^>]+>', ' ', text)) if doc['kind'] == 'html' else text
         # Only an ISO date at the beginning of a record is classified as its event date.
         # Other dates are mentions, never mistaken for an event/publication date.

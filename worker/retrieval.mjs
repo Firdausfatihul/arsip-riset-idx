@@ -5,7 +5,7 @@ function validDate(y,m,d) {
   const parsed = new Date(date + 'T00:00:00Z');
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0,10) === date ? date : null;
 }
-export function dateQuery(question, history = []) {
+export function dateQuery(question, history = [], years = []) {
   const full = text => {
     let m = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
     if (m) return validDate(+m[1],+m[2],+m[3]);
@@ -34,15 +34,23 @@ export function dateQuery(question, history = []) {
     const value = validDate(+inherited.slice(0,4),+inherited.slice(5,7),+short[1]);
     if (value) return {date:value, filter:!range, inherited:true};
   }
+  // Day and month without a year are unambiguous when the whole archive lies in one year.
+  const dayMonth = question.match(new RegExp('\\b(\\d{1,2})\\s+(' + monthNames + ')\\b(?!\\s+20\\d{2})','i'));
+  if (dayMonth && years.length === 1) {
+    const value = validDate(years[0],months[dayMonth[2].toLowerCase()],+dayMonth[1]);
+    if (value) return {date:value, filter:!range, inferredYear:true};
+  }
   return {clarification:`Tanggal ${short[1]} bulan dan tahun berapa? Contoh: “tanggal ${short[1]} September 2026”.`, filter:false};
 }
 
-const pattern = term => new RegExp('(?<![\\p{L}\\p{N}_])' + term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+') + '(?![\\p{L}\\p{N}_])','iu');
-export function selectRecords(data, terms) {
-  const patterns = terms.map(pattern), selected = new Set(), rows = data.records;
+// Ticker codes match case-sensitively: "naik" in prose is not the ticker NAIK.
+export const pattern = (term, tickers = new Set()) => new RegExp('(?<![\\p{L}\\p{N}_])' + term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+') + '(?![\\p{L}\\p{N}_])',
+  tickers.has(term) ? 'u' : 'iu');
+export function selectRecords(data, terms, tickers = new Set()) {
+  const patterns = terms.map(t => pattern(t,tickers)), selected = new Set(), rows = data.records;
   for (let i=0;i<rows.length;i++) {
     const row = rows[i];
-    if (terms.some(t => row.tickers.includes(t.toUpperCase())) || patterns.some(p => p.test(row.content))) {
+    if (terms.some(t => tickers.has(t) && row.tickers.includes(t)) || patterns.some(p => p.test(row.content))) {
       selected.add(i);
       // Untitled prose can carry supporting detail into the adjacent paragraph.
       if (row.kind === 'context' && !row.content.trim().startsWith('|')) {
@@ -65,6 +73,28 @@ export function filterRecords(rows, scope) {
   return {rows:kept, excluded:rows.length-kept.length};
 }
 
+// "Ringkas keterbukaan informasi 22 September" names a document, not a topic inside documents.
+// Category words plus a date (or "terbaru") select whole documents by their catalog date.
+const CATEGORY_WORDS = [
+  [/\b(asx|australia)\b/i,'keterbukaan-australia'], [/\b(sgx|singapura|singapore)\b/i,'keterbukaan-singapura'],
+  [/\b(keterbukaan|ki)\b/i,'keterbukaan-informasi'], [/\bstockbit\b/i,'stockbit'], [/\bdigest\b/i,'digest-emiten']];
+export function documentRequest(question, scope, index) {
+  const cats = [];
+  for (const [re,cat] of CATEGORY_WORDS) if (re.test(question) && !(cat==='keterbukaan-informasi' && cats.length)) cats.push(cat);
+  const wantsDoc = /\b(dokumen|laporan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|isi|keterbukaan|stockbit|digest)\b/i.test(question);
+  if (!wantsDoc || (!scope.date && !/\b(terbaru|terakhir|latest|paling baru)\b/i.test(question))) return null;
+  let docs = index.docs.filter(d => !cats.length || cats.includes(d.cat));
+  if (scope.date) {
+    docs = docs.filter(d => d.start && d.start <= scope.date && scope.date <= d.end);
+    // Without a category, only single-day documents are an unambiguous match for a date.
+    if (!cats.length) docs = docs.filter(d => d.start === d.end);
+  } else {
+    const latest = docs.reduce((m,d) => d.end > m ? d.end : m, '');
+    docs = docs.filter(d => d.end === latest);
+  }
+  return docs.length && docs.length <= 3 ? docs : null;
+}
+
 // A small explicit vocabulary handles the current cross-market screening use case.
 // These are search candidates, never inferred ownership relationships.
 export function crossMarketQuery(question) {
@@ -76,7 +106,7 @@ export function crossMarketQuery(question) {
 }
 
 export function thematicPassages(data, terms) {
-  const selected=selectRecords(data,terms), patterns=terms.map(pattern), output=[];
+  const selected=selectRecords(data,terms), patterns=terms.map(t=>pattern(t)), output=[];
   // Keep whole small records. Large issuer sections retain matching paragraphs, neighbors,
   // headings and explicit caveats. Every retained character is original source text.
   for(const row of selected) {

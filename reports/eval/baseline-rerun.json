@@ -1,0 +1,207 @@
+{
+  "summary": {
+    "label": "baseline-rerun",
+    "impl": "/private/tmp/claude-501/-Users-macbookair-Documents-project-archivescrapingweb/47393bc8-1aad-4460-8634-6398337bdc0d/scratchpad/baseline/worker",
+    "archive_version": "9f9676f5770b0068",
+    "created_at": "2026-09-24T00:57:06.697Z",
+    "cases": 2,
+    "passed": 1,
+    "completed": 1,
+    "errors": 1,
+    "facts_hit": 1,
+    "facts_total": 2,
+    "mean_source_precision": null,
+    "invalid_citations": 0,
+    "cost_usd": 0.014914274,
+    "provider_calls": 18
+  },
+  "results": [
+    {
+      "id": "adhi_mra",
+      "question": "apakah ada tentang \"Press Release \"ADHI Karya Masuki Tahap Implementasi Restrukturisasi melalui Penandatanganan Master Restructuring Agreement\" [ADHI ]\" ?",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "Master Restructuring Agreement|MRA",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "ADHI"
+      ],
+      "sources": [
+        "D49",
+        "D39",
+        "D37",
+        "D36",
+        "D34",
+        "D33",
+        "D51",
+        "D40",
+        "D32",
+        "D30",
+        "D29",
+        "D50",
+        "D28",
+        "D27",
+        "D25",
+        "D23",
+        "D43",
+        "D2",
+        "D1",
+        "D21",
+        "D20",
+        "D18",
+        "D17",
+        "D16",
+        "D14",
+        "D13",
+        "D41",
+        "D12",
+        "D11",
+        "D7",
+        "D5",
+        "D4"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D39",
+        "D49",
+        "D36",
+        "D33"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "Berdasarkan pemeriksaan arsip yang diberikan, **tidak ditemukan** dokumen atau pengumuman resmi yang berjudul \"Press Release ADHI Karya Masuki Tahap Implementasi Restrukturisasi melalui Penandatanganan Master Restructuring Agreement\" atau bukti bahwa penandatanganan tersebut telah terjadi.\n\nBerikut adalah fakta yang tercantum dalam arsip terkait status *Master Restructuring Agreement* (MRA) ADHI:\n\n1.  **Status MRA Masih Dalam Proses/Target:**\n    *   Pada periode 14–15 September 2026, manajemen ADHI mengumumkan target penandatanganan MRA pada **September 2026**, namun hingga akhir bulan tersebut, restrukturisasi belum disepakati secara final [D34; D36].\n    *   Pengumuman 22 September 2026 hanya merupakan bukti iklan hasil rapat pemegang obligasi (RUPO) tanggal 11 September, di mana usulan-usulan terkait utang ditolak oleh pemegang obligasi dengan suara sangat besar (99,57%, 99,48%, dan 94,73% tidak setuju). Ini bukan persetujuan restrukturisasi [D39].\n    *   Arsip menegaskan bahwa \"Penundaan pembayaran bukan penghapusan utang\" dan postingan media sosial mengenai restrukturisasi tidak boleh dianggap sebagai bukti konversi utang menjadi ekuitas atau masuknya pengendali baru [D49].\n\n2.  **Ketidakpastian Eksekusi:**\n    *   Dokumen mencatat bahwa \"Restrukturisasi menyeluruh dan divestasi aset masih berproses\" dan \"Belum ada pembeli utang atau konversi saham seperti contoh BUVA\" [D36].\n    *   Batas kesimpulan yang dipertahankan adalah adanya ketegangan antara upaya manajemen merestrukturisasi kewajiban dan penolakan kreditur, yang meningkatkan ketidakpastian likuiditas [D33].\n\n3.  **Tidak Ada Bukti Penandatanganan Final:**\n    *   Tidak ada entri dalam arsip (hingga 22 September 2026) yang mengonfirmasi bahwa MRA telah ditandatangani. Sebaliknya, arsip berulang kali menyatakan bahwa isi usulan yang ditolak tidak tersedia, sehingga detail skema restrukturisasi (termasuk apakah melibatkan MRA yang disetujui) tidak dapat dikonfirmasi [D39].\n\n**Kesimpulan:**\nKlaim tentang \"masuki tahap implementasi... melalui penandatanganan MRA\" **tidak didukung oleh bukti dalam arsip**. Arsip menunjukkan bahwa proses restrukturisasi masih menghadapi hambatan signifikan akibat penolakan pemegang obligasi pada RUPO 11 September 2026, dan target penandatanganan MRA pada September 2026 belum terbukti terealisasi dalam dokumen yang diperiksa.\n\n[[SUMBER:D33,D36]]",
+      "usage": {
+        "calls": 3,
+        "input_bytes": 293792,
+        "output_token_budget": 8600,
+        "known_cost_usd": 0.008503736,
+        "prompt_tokens": 90374,
+        "completion_tokens": 4350,
+        "cached_tokens": 7936,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 38967,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v3",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 2,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 13328334,
+        "selected_source_bytes": 268122,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "ADHI"
+        ],
+        "documents_checked": 32,
+        "current_document": "D4",
+        "database_source_reads": 32
+      }
+    },
+    {
+      "id": "kbli",
+      "question": "emiten indonesia apa saja yang baru menambah KBLI",
+      "status": "error",
+      "error": "Batas analisis tercapai. Persempit topik atau kode saham.",
+      "pass": false,
+      "checks": {
+        "status": false,
+        "facts": false
+      },
+      "facts": [
+        {
+          "fact": "KBLI",
+          "hit": false
+        }
+      ],
+      "terms": [
+        "KBLI"
+      ],
+      "sources": [
+        "D48",
+        "D37",
+        "D47",
+        "D36",
+        "D45",
+        "D38",
+        "D34",
+        "D33",
+        "D32",
+        "D50",
+        "D28",
+        "D26",
+        "D25",
+        "D23",
+        "D43",
+        "D2",
+        "D1",
+        "D21",
+        "D20",
+        "D18",
+        "D17",
+        "D16",
+        "D14",
+        "D13",
+        "D12",
+        "D11",
+        "D10",
+        "D9",
+        "D7",
+        "D6",
+        "D5",
+        "D4"
+      ],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "answer": "",
+      "usage": {
+        "calls": 15,
+        "input_bytes": 768158,
+        "output_token_budget": 34200,
+        "known_cost_usd": 0.006410538,
+        "prompt_tokens": 230578,
+        "completion_tokens": 25965,
+        "cached_tokens": 199424,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 157271,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v3",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 11,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 12163704,
+        "selected_source_bytes": 757560,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "source_limits",
+        "terms": [
+          "KBLI"
+        ],
+        "documents_checked": 32,
+        "current_document": "D4",
+        "database_source_reads": 32
+      }
+    }
+  ]
+}
