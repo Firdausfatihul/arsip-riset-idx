@@ -121,3 +121,25 @@ test('the agent stops at the round and call limits', async () => {
     fetcher:async () => Response.json({sections:[]}), stats});
   assert.ok(steps <= AGENT.rounds); assert.ok(stats.agent_tool_calls <= AGENT.calls, stats.agent_tool_calls);
 });
+
+test('a provider rate limit is retried; an unrecoverable step still answers from gathered evidence', async () => {
+  const {OpenRouter, ChatError} = await import('../worker/core.mjs');
+  let sent = 0;
+  const fetcher = async () => ++sent < 3
+    ? new Response('busy', {status:429, headers:{'Retry-After':'0.01'}})
+    : Response.json({choices:[{finish_reason:'stop', message:{content:'SIAP'}}]});
+  const model = new OpenRouter('KEY', null, fetcher);
+  assert.equal((await model.step([{role:'user', content:'x'}], TOOLS, 50)).message.content, 'SIAP');
+  assert.equal(sent, 3); assert.equal(model.usage().calls, 1, 'retries share one reservation');
+
+  let steps = 0;
+  const flaky = {step:async () => {
+      if (++steps === 1) return {message:{tool_calls:[{id:'a', type:'function', function:{name:'datacat_cari', arguments:'{"q":"Soechi"}'}}]}};
+      throw new ChatError('Layanan AI sedang membatasi permintaan. Coba beberapa saat lagi.');
+    },
+    answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
+  const stats = {};
+  const result = await agentic({archive:new Archive(assets), model:flaky, question:'Soechi', emit:async () => {}, env:{DATACAT_API_KEY:'KEY'},
+    fetcher:async () => Response.json({sections:[]}), stats});
+  assert.equal(result.answer, 'ok'); assert.match(stats.step_failed, /membatasi/);
+});

@@ -97,6 +97,11 @@ export class ArchiveChat extends DurableObject {
         throw new ChatError('Kuota mode agen hari ini (' + limit(this.env, 'CHAT_AGENTIC_DAILY', 10) + ' pertanyaan untuk seluruh situs) sudah habis. Mode biasa tetap bisa dipakai.');
       sql.exec('INSERT INTO agentic_requests VALUES (?)', now);
     });
+    return now;
+  }
+  // A question lost to the AI provider (rate limit, outage) gives its quota back; one the user stopped does not.
+  refundAgentic(stamp) {
+    this.ctx.storage.sql.exec('DELETE FROM agentic_requests WHERE rowid IN (SELECT rowid FROM agentic_requests WHERE stamp = ? LIMIT 1)', stamp);
   }
   spend(bytes, tokens) {
     const day = Math.floor(Date.now() / 86400000), sql = this.ctx.storage.sql;
@@ -201,12 +206,13 @@ export class ArchiveChat extends DurableObject {
     writer.closed.catch(() => controller.abort());
     const model = new OpenRouter(this.env.OPENROUTER_API_KEY, controller.signal, undefined, (bytes,tokens) => this.spend(bytes,tokens));
     const retrieval = {};
+    let agenticStamp = null;
     const run = async () => {
       let outcome = 'error';
       try {
         const result = body.mode === 'agentic'
           ? await agentic({archive:this.archive, model, question:body.question, history:conversation.history, emit, signal:controller.signal,
-              cache:this.cache, env:this.env, client, stats:retrieval, reserveQuota:() => this.reserveAgentic()})
+              cache:this.cache, env:this.env, client, stats:retrieval, reserveQuota:() => { agenticStamp = this.reserveAgentic(); }})
           : await converse(this.archive, model, body.question, conversation.history, emit, controller.signal,
               {cache:this.cache,client,metrics:retrieval});
         controller.signal.throwIfAborted();
@@ -226,6 +232,9 @@ export class ArchiveChat extends DurableObject {
           : /(?:network|fetch|connection)/i.test(message) ? 'network_error'
           : error instanceof ChatError ? 'handled' : 'unexpected';
         if (!(error instanceof ChatError)) console.error('Chat failure:', retrieval.error_name, retrieval.error_kind, retrieval.stage);
+        if (agenticStamp && !controller.signal.aborted && /membatasi|belum berhasil|belum menyelesaikan|terputus|Koneksi/.test(message)) {
+          this.refundAgentic(agenticStamp); retrieval.agentic_refunded = true;
+        }
         const text = retrieval.error_kind === 'subrequest_limit' ? 'Pencarian melampaui kapasitas pembacaan arsip. Persempit topik atau coba lagi setelah indeks diperbarui.'
           : error instanceof ChatError ? error.message : 'Koneksi atau proses analisis terhenti. Silakan coba lagi.';
         try { await write({type:'error', text}); } catch {}

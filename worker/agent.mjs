@@ -341,7 +341,13 @@ export async function agentic({archive, model, question, history = [], emit, sig
     signal?.throwIfAborted();
     stats.agent_rounds = round + 1;
     await emit({type:'activity', text:round ? `Menelusuri data lanjutan (langkah ${round + 1})…` : 'Merencanakan penelusuran…'});
-    const choice = await model.step(markCache(messages), TOOLS, AGENT.stepTokens);
+    let choice;
+    // A failed search step after retries ends the search; the evidence already gathered is still answered.
+    try { choice = await model.step(markCache(messages), TOOLS, AGENT.stepTokens); }
+    catch (error) {
+      if (signal?.aborted || !(error instanceof ChatError) || !evidence.length || !/membatasi|belum berhasil|belum menyelesaikan/.test(error.message)) throw error;
+      stats.step_failed = error.message; break;
+    }
     const toolCalls = (choice.message?.tool_calls || []).filter(c => c?.type === 'function' || c?.function);
     if (!toolCalls.length) break;
     const allowed = toolCalls.slice(0, Math.max(0, AGENT.calls - calls));

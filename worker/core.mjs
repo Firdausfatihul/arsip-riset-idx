@@ -256,13 +256,27 @@ export class OpenRouter {
     if (jsonMode) payload.response_format = {type:'json_object'};
     // Only agentic mode passes tools, and only the fixed server-side list in agent.mjs.
     if (tools) { payload.tools = tools; payload.tool_choice = toolChoice; payload.parallel_tool_calls = true; }
-    const response = await this.fetcher('https://openrouter.ai/api/v1/chat/completions', {
+    const send = () => this.fetcher('https://openrouter.ai/api/v1/chat/completions', {
       method:'POST', signal:AbortSignal.any([this.signal || new AbortController().signal, AbortSignal.timeout(180000)]),
       headers:{Authorization:'Bearer ' + this.key, 'Content-Type':'application/json',
         ...(this.options.responseCache === false ? {'X-OpenRouter-Cache':'false'} : {'X-OpenRouter-Cache':'true','X-OpenRouter-Cache-TTL':'900'}),
         'HTTP-Referer':'https://arsip.seekingomega.capital/', 'X-OpenRouter-Title':'Arsip Riset IDX'},
       body:JSON.stringify(payload)
     });
+    // Provider rate limits and brief outages are common and short: wait and resend twice. A refused
+    // request is not billed, so the reservation above covers the retries.
+    let response = await send();
+    for (let attempt = 0; attempt < 2 && [429, 502, 503].includes(response.status); attempt++) {
+      response.body?.cancel().catch(() => {});
+      const wait = Math.min(10, Number(response.headers.get('Retry-After')) || (attempt ? 5 : 2)) * 1000;
+      await new Promise((ok, fail) => {
+        const timer = setTimeout(ok, wait);
+        this.signal?.addEventListener('abort', () => { clearTimeout(timer); fail(this.signal.reason); }, {once:true});
+      });
+      this.signal?.throwIfAborted();
+      receipt.retries = attempt + 1;
+      response = await send();
+    }
     this.responses.set(response, receipt);
     receipt.response_cache = response.headers.get('X-OpenRouter-Cache-Status');
     if (!response.ok) {

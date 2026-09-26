@@ -20,10 +20,13 @@
     agenticInput.disabled = left <= 0;
     if (left <= 0) agenticInput.checked = false;
   }
-  fetch(endpoint + '/config').then(function(r){ return r.ok ? r.json() : null; }).then(function(config){
-    if (!config || !config.agentic || !config.agentic.enabled) return;
-    agenticLimit = config.agentic.limit || 10; modeBox.hidden = false; showLeft(config.agentic.left);
-  }).catch(function(){});
+  function loadConfig(){
+    fetch(endpoint + '/config').then(function(r){ return r.ok ? r.json() : null; }).then(function(config){
+      if (!config || !config.agentic || !config.agentic.enabled) return;
+      agenticLimit = config.agentic.limit || 10; modeBox.hidden = false; showLeft(config.agentic.left);
+    }).catch(function(){});
+  }
+  loadConfig();
   function countInput(){ count.textContent = input.value.length + ' / 600 karakter'; }
   input.addEventListener('input', countInput);
   var knownPaths = new Set(data.docs.map(function(d){ return d.path; }));
@@ -213,6 +216,7 @@
         input.value = question; form.requestSubmit();
       });
       reply.block.appendChild(retry); status.textContent = description;
+      if (agentic) loadConfig(); // a failed question may have been refunded
     } finally {
       clearTimeout(timeout); clearInterval(ticker); controller = null; busy(false); countInput();
       if (agenticLeft.textContent.indexOf('Sisa 0 ') === 0) agenticInput.disabled = true;
