@@ -71,7 +71,9 @@ test('datacat calls use the fixed host, the server key, no redirects, and the sh
   const second = await fetchDatacat({key:'KEY', cache, fetcher}, datacatRequest('datacat_detail', {jenis:'emiten', id:'SOCI'}));
   assert.equal(seen.length, 1); assert.equal(first.cached, false); assert.equal(second.cached, true);
   assert.equal(new URL(seen[0].url).origin, 'https://quant.renr.ai');
-  assert.equal(seen[0].init.headers.Authorization, 'Api-Key KEY'); assert.equal(seen[0].init.redirect, 'error');
+  assert.equal(seen[0].init.headers.Authorization, 'Api-Key KEY'); assert.equal(seen[0].init.redirect, 'manual');
+  await assert.rejects(fetchDatacat({key:'KEY', fetcher:async () => new Response(null, {status:302, headers:{Location:'https://evil.example/'}})},
+    datacatRequest('datacat_cari', {q:'redirect'})), /mengalihkan/);
   db.close();
 });
 

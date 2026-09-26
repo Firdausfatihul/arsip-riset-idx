@@ -8,7 +8,7 @@ import {wrongNames, nameNotice} from './screening.mjs';
 // Input tokens are most of the cost: every round resends instructions, tools and earlier results.
 // Internal prompts and tool results are therefore terse; only the answer to the user is normal prose.
 export const AGENT = Object.freeze({rounds:7, calls:16, resultBytes:6000, totalBytes:70000,
-  stepTokens:500, dataTtl:6 * 3600000, answerTtl:6 * 3600000, version:'agent-v2',
+  stepTokens:500, dataTtl:6 * 3600000, answerTtl:6 * 3600000, version:'agent-v3',
   caps:{datacat_cari:3, dokumen_teks:2}});
 const DATACAT = 'https://quant.renr.ai';
 
@@ -209,8 +209,10 @@ export async function fetchDatacat({key, cache, signal, fetcher = fetch}, {path,
   const cacheKey = await hash([AGENT.version, url.pathname + url.search]);
   const saved = cache?.get('datacat', cacheKey);
   if (saved) return {data:saved, cached:true};
-  const response = await fetcher(url.toString(), {headers:{Authorization:'Api-Key ' + key, Accept:'application/json'}, redirect:'error',
+  // Workers support only "follow" and "manual" redirects; a redirect is refused below instead of followed.
+  const response = await fetcher(url.toString(), {headers:{Authorization:'Api-Key ' + key, Accept:'application/json'}, redirect:'manual',
     signal:AbortSignal.any([signal || new AbortController().signal, AbortSignal.timeout(20000)])});
+  if (response.status >= 300 && response.status < 400) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat mengalihkan permintaan; tidak diikuti'); }
   if (response.status === 404) { response.body?.cancel().catch(() => {}); return {data:{error:'tidak ditemukan'}, cached:false}; }
   if (response.status === 429) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat sedang membatasi permintaan; lanjutkan dengan bukti yang ada'); }
   if (!response.ok) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat gagal (' + response.status + ')'); }
@@ -326,7 +328,8 @@ export async function agentic({archive, model, question, history = [], emit, sig
         result = compact(data, refs, {long:args.jenis === 'dokumen_teks' || args.jenis === 'analisis_teks'});
       }
     } catch (error) {
-      if (!(error instanceof ToolError)) { if (signal?.aborted) throw error; record.error = 'unexpected'; }
+      // The message is recorded for the private stats; it never contains the key.
+      if (!(error instanceof ToolError)) { if (signal?.aborted) throw error; record.error = String(error?.name) + ': ' + String(error?.message).slice(0, 160); }
       result = 'KESALAHAN: ' + (error instanceof ToolError ? error.message : 'alat gagal; lanjutkan dengan bukti yang ada');
     }
     record.bytes = result.length;
