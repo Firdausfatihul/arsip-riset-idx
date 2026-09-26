@@ -203,8 +203,8 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   Kode yang juga kata umum (`WORD_TICKERS` di `tools/chat_archive.py`) dalam huruf kecil hanya dibaca sebagai
   ticker setelah kata petunjuk (analisa, saham, emiten, dokumen, …) atau bila pertanyaan hanya berisi kode itu ("ship").
   Kode lain tetap dikenali dalam huruf kecil ("analisis soci").
-- Nama pengguna Stockbit yang ditulis penanya ("Primestockid", "@athira") selalu dicari persis, walaupun model
-  menebak istilah lain. Daftar `handles` di manifest dibuat saat build dari nama yang di arsip kebanyakan ditulis dengan `@`
+- Nama pengguna Stockbit yang ditulis penanya ("Primestockid", "@athira", juga yang salah eja seperti "zeinfahrozi") dicari oleh kode, walaupun model
+  menebak istilah lain atau tidak memberi istilah sama sekali. Daftar `handles` di manifest dibuat saat build dari nama yang di arsip kebanyakan ditulis dengan `@`
   (kata biasa seperti "media" tidak termasuk).
 - Jika pencarian tidak menemukan apa pun, ejaan terdekat di indeks kata dicoba dulu tanpa panggilan model
   ("Zeinfahrozi" → zeinihzafahrozi): hanya huruf yang hilang atau satu salah ketik, huruf pertama sama.

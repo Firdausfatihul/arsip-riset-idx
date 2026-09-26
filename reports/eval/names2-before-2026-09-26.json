@@ -1,0 +1,384 @@
+{
+  "summary": {
+    "label": "names2-before-2026-09-26",
+    "impl": "/private/tmp/claude-501/-Users-macbookair-Documents-project-archivescrapingweb/7c66f0e4-2449-48f4-9067-187e22413b6b/scratchpad/worker-head",
+    "archive_version": "295f2d1ae8fea20d",
+    "created_at": "2026-09-26T14:36:26.853Z",
+    "cases": 5,
+    "passed": 4,
+    "completed": 4,
+    "errors": 1,
+    "facts_hit": 2,
+    "facts_total": 3,
+    "mean_source_precision": null,
+    "invalid_citations": 0,
+    "flagged_numbers": 0,
+    "wrong_names": 0,
+    "cost_usd": 0.002243352,
+    "provider_calls": 10
+  },
+  "results": [
+    {
+      "id": "name_typo_zein",
+      "question": "Zeinfahrozi banyak ngomongin soal apa sih? Apa sp dia",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "docs_any": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "zeinihzafahrozi",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "zeinihzafahrozi"
+      ],
+      "sources": [
+        "D53",
+        "D52",
+        "D47",
+        "D2",
+        "D1",
+        "D0",
+        "D43"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D52",
+        "D53",
+        "D0",
+        "D2",
+        "D1",
+        "D47",
+        "D43"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Koreksi ejaan: Nama pengguna dalam arsip adalah “zeinihzafrozi”, bukan “Zeinfahrozi”.\n\nBerdasarkan arsip yang tersedia, aktivitas pengguna **@zeinihzafahrozi** berfokus pada spekulasi pasar modal terkait beberapa emiten IDX, khususnya PACK, NATO, dan BBCA. Pengguna ini sering menggunakan bahasa kiasan, kode, atau pertanyaan retoris yang diinterpretasikan oleh analis sebagai indikasi spekulasi *corporate action* (seperti akuisisi, pengambilalihan, atau utang), namun tidak disertai bukti dokumen resmi.\n\nBerikut adalah rincian topik yang banyak dibicarakan oleh @zeinihzafahrozi berdasarkan sumber arsip:\n\n### 1. Emiten PACK (PT Abadi Nusantara Hijau Investama Tbk)\nPengguna ini secara konsisten mengaitkan PACK dengan potensi aksi korporasi atau transaksi pihak ketiga, meskipun tidak ada konfirmasi berita.\n\n*   **Spekulasi Pengambilalihan/Utang:** Pada 24 September 2026, pengguna bertanya, “tagih utang atau mau take over?” [@zeinihzafahrozi · 36060384]. Ini diidentifikasi sebagai spekulasi murni tentang kemungkinan kontrol kreditur atau pengambilalihan [D52].\n*   **Hubungan dengan GNI:** Pada 25 September 2026, pengguna menyebutkan PACK dikaitkan dengan GNI. Namun, pengguna sendiri mengakui “belum ada news nya” [@zeinihzafahrozi · 25/09 02:47 · 36101153]. Analisis arsip menyatakan bahwa klaim “fix” dari pengguna bertentangan dengan pengakuannya sendiri bahwa belum ada berita, sehingga statusnya tetap rumor [D53].\n*   **Isyarat Saudara/Keluarga:** Pada 31 Agustus 2026, pengguna menyebut PACK dengan frasa “next brother” dan “pergijo” (kemungkinan merujuk ke PGJO). Tafsir aman adalah adanya isyarat saham saudara atau afiliasi, namun identitas pasti tidak ditetapkan oleh tulisan tersebut [D0].\n\n### 2. Emiten NATO (PT Olympus Strategic Indonesia Tbk)\nFokus pembicaraan mengenai NATO bersifat sangat tersamar dan ekslusif, tanpa penjelasan struktur bisnis yang jelas.\n\n*   **Bahasa Eksklusif:** Pada 20 Agustus 2026, pengguna menulis “hanya dua orang yang tahu” terkait NATO [D2]. Interpretasi arsip adalah bahasa eksklusif untuk menyiratkan aksi pada waktu tertentu, tetapi batas buktinya lemah karena tidak ada hubungan dengan entitas lain seperti Orbit, Bixbite, atau TerraCom yang disebutkan dalam konteks terpisah [D2].\n*   **Antisipasi Harga:** Frasa “gebyar sebentar lagi” juga digunakan oleh pengguna untuk NATO pada tanggal yang sama. Ini dibaca sebagai antisipasi perubahan harga tanpa mekanisme korporasi yang jelas, dengan kualitas bukti “sangat lemah” [D1].\n*   **Konteks Audit & TerraCom:** Pada 25 September 2026, NATO disebut bersama kata audit dan TerraCom, tetapi tanpa rangkaian struktur Orbit. Empat tag NATO dalam postingan tersebut tidak menyediakan pembuktian baru atas contoh sebelumnya [D53].\n\n### 3. Emiten Lainnya (BBCA, SAFE, MGLV)\n*   **BBCA (PT Bank Central Asia Tbk):** BBCA dibicarakan dalam konteks kemungkinan akuisisi oleh pihak lain (dikaitkan dengan PACK dalam narasi rumor), namun hal ini tetap diberi label sebagai rumor karena banyaknya pengulangan dan nada yakin tanpa bukti [D53].\n*   **SAFE (PT Steady Safe Tbk):** Pada 15 September 2026, pengguna menulis “selamat datang CNGR” terkait SAFE. Ini diinterpretasikan sebagai petunjuk strategis pihak ketiga, namun belum jelas maknanya [D47].\n*   **MGLV (PT NexAI Digital Infrastruktur Tbk):** Hanya tercatat dalam indeks posting pada 20 Agustus 2026 tanpa detail konten spesifik yang dianalisis lebih lanjut dalam ringkasan [D43].\n\n### Kesimpulan Status Bukti\nSemua pernyataan atau kode yang dikeluarkan oleh @zeinihzafahrozi terhadap emiten-emiten di atas **tidak memiliki dasar fakta dokumenter** dalam arsip yang diperiksa. Tidak ada pengumuman resmi dari emiten, laporan keuangan, atau dokumen hukum yang mendukung klaim spekulatif mengenai *take over*, utang, atau *corporate action*.\n\n| Emiten | Topik Spekulasi @zeinihzafahrozi | Status Bukti dalam Arsip | Sumber Utama |\n| :--- | :--- | :--- | :--- |\n| **PACK** | Tagih utang / Take over / Hubungan dengan GNI & PGJO | Rumor / Spekulasi Tanpa Berita | [D52], [D53], [D0] |\n| **NATO** | \"Hanya dua orang tahu\" / \"Gebyar sebentar lagi\" / Audit | Sangat Lemah / Kode Tersamar | [D2], [D1], [D53] |\n| **BBCA** | Konteks Akuisisi (bersama PACK) | Rumor | [D53] |\n| **SAFE** | Kedatangan pihak strategis (CNGR) | Petunjuk Belum Jelas | [D47] |\n\n**Rekomendasi Pemeriksaan Lanjutan:**\nUntuk memverifikasi apakah spekulasi ini memiliki dasar fundamental, perlu diperiksa:\n1.  Pengumuman resmi Bursa Efek Indonesia (IDX) terkait PACK, NATO, dan BBCA pada periode Agustus–September 2026.\n2.  Laporan kepemilikan saham besar (*major shareholder*) untuk melihat perubahan signifikan yang mungkin mengindikasikan pengambilalihan.\n3.  Dokumen lintas entitas jika benar ada hubungan antara NATO dengan TerraCom atau Orbit sebagaimana disinggung dalam komentar pengguna.",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 14722,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.000272376,
+        "prompt_tokens": 4608,
+        "completion_tokens": 1788,
+        "cached_tokens": 4096,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 26724,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 1184550,
+        "selected_source_bytes": 8503,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "zeinihzafahrozi"
+        ],
+        "spelling": {
+          "Zeinfahrozi": "zeinihzafahrozi"
+        },
+        "documents_checked": 7,
+        "current_document": "D43",
+        "database_source_reads": 7
+      }
+    },
+    {
+      "id": "handle_primestock",
+      "question": "Primestockid banyak ngomongin apa si? Scr singkat",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true,
+        "facts": true
+      },
+      "facts": [
+        {
+          "fact": "primestockid",
+          "hit": true
+        }
+      ],
+      "terms": [
+        "primestockid",
+        "PT Primestock Indonesia"
+      ],
+      "sources": [
+        "D53",
+        "D52",
+        "D51",
+        "D50",
+        "D49",
+        "D47",
+        "D55",
+        "D54",
+        "D45",
+        "D2",
+        "D1",
+        "D0",
+        "D43",
+        "D46"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D53",
+        "D2",
+        "D1",
+        "D50",
+        "D46",
+        "D51",
+        "D52",
+        "D0",
+        "D43",
+        "D45"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah rangkasan topik yang banyak dibahas oleh pengguna **@primestockid**:\n\n**1. Transaksi Akuisisi dan Perubahan Pengendali (Klaim vs Fakta)**\n@primestockid secara konsisten menyoroti transaksi besar namun menekankan bahwa bukti fisik (dokumen resmi) masih perlu diverifikasi atau belum lengkap.\n*   **ULTJ:** Mengklaim ULTJ berencana membeli 100% Frisian Flag Indonesia sekitar Rp14,57 triliun melalui rights issue, dengan FrieslandCampina sebagai pengendali baru. Arsip mencatat ini sebagai **klaim arsip** karena isi pengumuman resmi tidak berhasil diperiksa sepenuhnya [D53].\n*   **MAPI:** Membahas perubahan pengendali dan ekspansi gerai, namun menegaskan bahwa pembayaran akuisisi saham lama kepada penjual **bukan** uang tunai baru bagi perusahaan [D2], [D1].\n*   **SILO:** Rencana pengambilalihan 14 perusahaan properti rumah sakit. Penulis mengingatkan bahwa ini bukan otomatis penambahan 14 rumah sakit operasional baru; perlu dicek utang dan penghematan sewa [D50], [D46].\n*   **MGLV:** Rights issue hingga Rp2,53 triliun, akuisisi entitas NAC/NGC, pelepasan 13 anak usaha, dan pengembangan data center. Penjualan saham oleh Nextier Datamate Center dipisahkan dari pendanaan perusahaan [D51].\n\n**2. Ekspansi Operasional vs Spekulasi Backdoor**\nPenulis sering memisahkan antara ekspansi bisnis nyata (kapasitas, kontrak) dengan spekulasi \"backdoor listing\" atau perubahan kontrol.\n*   **UVCR:** Rencana private placement maksimal 200 juta saham. Statusnya hanya klaim rencana pendanaan; belum ada dasar menyimpulkan sponsor baru atau backdoor [D53], [D50].\n*   **WMPP:** Klaim ekspansi dan rights issue hingga 8,5 miliar saham. Dianggap sebagai klaim ekspansi, bukan bukti backdoor [D53].\n*   **MARK & JPFA:** Fokus pada pertanyaan fundamental bisnis: apakah kapasitas tambahan terserap pesanan dengan margin layak (MARK), serta biaya pakan dan utilisasi (JPFA) [D53].\n*   **PTRO:** Akuisisi PT Sejahtera Terminal Logistik dikategorikan sebagai *business-chain extension* (mining ke logistics/port), bukan shell/backdoor story [D52].\n\n**3. Analisis Kualitas Laba dan Arus Kas**\n@primestockid sering mengingatkan pemisahannya antara laba non-kas, dividen, atau penilaian aset dengan kinerja operasi berulang.\n*   **LUCY:** Kenaikan kepemilikan oleh HP Capital Resources tujuan pembelian belum dijelaskan, tidak langsung dianggap persiapan aksi korporasi [D2], [D0].\n*   **PTPS:** Kenaiban laba ditopang juga oleh perubahan nilai aset biologis, sementara pabrik pengolahan masih dibangun. Perlu dipisahkan dari pertumbuhan operasi [D2], [D43].\n*   **MMIX:** Pabrik popok mulai beroperasi, tetapi dampak belum tampak di hasil semester pertama. Target tahunan menuntut percepatan penjualan [D2], [D43].\n*   **CGAS:** Pertumbuhan pendapatan dan laba diikuti kas operasi positif, namun kenaikan liabilitas tetap dicatat agar pertumbuhan tidak dinilai dari laba saja [D2], [D43].\n\n**4. Kontrak dan Proyek Baru**\n*   **SUNI:** Kontrak baru Pertamina EP senilai sekitar US$3,19 juta. Ditegaskan bahwa nilai kontrak tidak sama dengan laba bersih [D45], [D2].\n*   **SOLA:** Pabrik aspal membran Tuban dengan target commissioning. Progres fisik dan pendanaan perlu diperiksa [D50].\n*   **FUTR:** Pengembangan geothermal Baturaden dan pembangkit surya. Potensi sumber daya berbeda dengan tahap operasi komersial [D50].\n\n**Kesimpulan Singkat:**\n@primestockid fokus pada **pembedaan status klaim**. Topik utamanya adalah mengidentifikasi transaksi corporate action (rights issue, akuisisi, private placement) yang sering muncul di media sosial, lalu memberikan peringatan keras bahwa **klaim tersebut belum terbukti menjadi fakta operasional atau perubahan pengendali** tanpa dokumen pendukung (struktur modal pasca-transaksi, persetujuan pemegang saham, realisasi dana). Penulis cenderung skeptis terhadap narasi \"backdoor\" dan lebih mendorong analisis fundamental seperti utilisasi kapasitas, kualitas arus kas, dan dilusi saham.",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 122543,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.00147516,
+        "prompt_tokens": 39434,
+        "completion_tokens": 1491,
+        "cached_tokens": 38016,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 13572,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 2062049,
+        "selected_source_bytes": 102287,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "handles": [
+          "primestockid"
+        ],
+        "terms": [
+          "primestockid",
+          "PT Primestock Indonesia"
+        ],
+        "documents_checked": 14,
+        "current_document": "D46",
+        "database_source_reads": 14
+      }
+    },
+    {
+      "id": "handle_athira",
+      "question": "berikan list saham dari stockbit athira",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "athira"
+      ],
+      "sources": [
+        "D52",
+        "D50",
+        "D55",
+        "D45"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D52",
+        "D50",
+        "D55",
+        "D45"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah daftar saham yang disebutkan atau dianalisis oleh akun **@athira** di Stockbit.\n\n### Daftar Saham dan Konteks Analisis @athira\n\n| Kode Saham | Nama Emiten (Menurut Arsip) | Tanggal Arsip | Sumber ID | Ringkasan Aktivitas/Analisis @athira |\n| :--- | :--- | :--- | :--- | :--- |\n| **INTD** | PT Inter-Delta Tbk | 23 Sept 2026 | [D52] | Menghitung kepemilikan Peak Aim Development setelah konversi utang dan stock split; estimasi kebutuhan pelepasan saham untuk memenuhi free float. |\n| **ESTA** | PT Esta Multi Usaha Tbk | 18 Sept 2026 | [D50] | Menelusuri jaringan kepemilikan berlapis (Esta Utama Corpora, Esta Dana Ventura, Sampoerna Investama, Bank Sahabat Sampoerna); mengklarifikasi kronologi transfer tahun 2025 dan potensi akuisisi. |\n| **BESS** | PT Batulicin Nusantara Maritim Tbk | 14 Sept 2026 | [D55] | Menghubungkan Bina Indo Raya, kapal BESS, dan pengurus RAJA; menyebutkan Sentosa Bersama Mitra memiliki 20%. |\n| **LCKM** | PT LCK Global Kedaton Tbk | 13 Sept 2026 | [D55] | Membandingkan perusahaan jaringan yang diakuisisi; menyebut LCKM sebagai kandidat tersisa dalam dugaan konsolidasi industri telekomunikasi. |\n| **CCSI** | PT Communication Cable Systems Indonesia Tbk | 13 Sept 2026 | [D55] | Disebut bersama LCKM sebagai kandidat tersisa; analisis pemegang saham, kapasitas, pesanan, dan calon pembeli nyata. |\n| **RAJA** | PT Rukun Raharja Tbk | 14 Sept 2026 | [D55] | Disebut dalam konteks hubungan pengurus dengan BESS dan Bina Indo Raya. |\n| **ALKA** | PT Alakasa Industrindo Tbk | 14 Sept 2026 | [D55] | Dibandingkan dengan TGUK dalam contoh hipotetis kenaikan persentase (bukan target harga). |\n| **NAIK** | PT Adiwarna Anugerah Abadi Tbk | 14 Sept 2026 | [D55] | Disebut bersama ALKA dan TGUK dalam contoh hipotetis. |\n| **BUKA** | PT Bukalapak.com Tbk / PT BUKALAPAK.COM Tbk | 13 Sept 2026 | [D55] | Disebut dalam konteks kode/ticker bersama CCSI, GOLD, INET, KETR, LCKM pada postingan 13 September. |\n| **GOLD** | PT Visi Telekomunikasi Infrastruktur Tbk | 13 Sept 2026 | [D55] | Disebut dalam konteks kode/ticker bersama CCSI, LCKM, dll. |\n| **INET** | PT Sinergi Inti Andalan Prima Tbk | 13 Sept 2026 | [D55] | Disebut dalam konteks kode/ticker bersama CCSI, LCKM, dll. |\n| **KETR** | PT Ketrosden Triasmitra Tbk | 13 Sept 2026 | [D55] | Disebut dalam konteks kode/ticker bersama CCSI, LCKM, dll. |\n| **TGUK** | (Tidak ada nama emiten spesifik di tabel nama, namun disebut dalam teks) | 14 Sept 2026 | [D55] | Dibandingkan dengan ALKA dalam contoh hipotetis. |\n| **ASPI** | PT Andalan Sakti Primaindo Tbk | 2 Sept 2026 | [D45] | Kandidat layak diperiksa terkait hubungan pemilik pembeli dengan MBSS. |\n| **MBSS** | PT Mitrabahtera Segara Sejati Tbk | 2 Sept 2026 | [D45] | Pembeli yang dihubungkan dengan ASPI dalam spekulasi hubungan kepemilikan. |\n\n### Catatan Penting Berdasarkan Arsip:\n\n1.  **Status Bukti:** Sebagian besar analisis @athira bersifat **hipotesis atau petunjuk penelitian**, bukan konfirmasi transaksi.\n    *   Untuk **ESTA**, arsip menegaskan bahwa pengumuman diskusi akuisisi tahun 2025 belum dibuktikan dengan tindak lanjut transaksi di 2026 [D50].\n    *   Untuk **BESS**, hubungan operasional dan jabatan silang tidak membuktikan kepemilikan saham atau kesepakatan akuisisi [D55].\n    *   Untuk **LCKM** dan **CCSI**, klaim mengenai konsolidasi industri masih berupa dugaan/analogi tanpa bukti minat pembeli yang konkret [D55].\n    *   Untuk **ASPI** dan **MBSS**, statusnya adalah spekulasi hubungan yang belum mencapai kesimpulan [D45].\n2.  **Perhitungan vs Fakta:** Perhitungan kepemilikan tidak langsung (seperti pada kasus ESTA di mana 8,32% × 7,78% = 0,65%) adalah asumsi proporsional dan bukan kesimpulan pengendalian [D50].\n3.  **Ticker Bersama:** Penyebutan ticker seperti BACH, CCSI, GOLD, INET, KETR, LCKM, NAIK, TGUK, BUKA bersama-sama dalam satu postingan hanya membuktikan penyebutan bersama, bukan hubungan bisnis atau investasi otomatis [D55].\n\n### Dokumen Referensi Utama:\n*   [D52]: Stockbit — Hidden Corporate Action & Speculation Scan (24 Sept 2026)\n*   [D50]: Stockbit — corporate action, expansion, dan petunjuk spekulasi (19 Sept 2026)\n*   [D55]: Aksi korporasi, hubungan perusahaan, dan spekulasi dalam arsip Stockbit (13–14 Sept 2026)\n*   [D45]: Analisis Stockbit — 1–5 September 2026",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 28740,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.00030627000000000003,
+        "prompt_tokens": 9278,
+        "completion_tokens": 1869,
+        "cached_tokens": 8960,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 21783,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 693291,
+        "selected_source_bytes": 21955,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "handles": [
+          "athira"
+        ],
+        "terms": [
+          "athira"
+        ],
+        "documents_checked": 4,
+        "current_document": "D45",
+        "database_source_reads": 4
+      }
+    },
+    {
+      "id": "name_hakimson",
+      "question": "Carikan data hakimson growth capital",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true
+      },
+      "facts": [],
+      "terms": [
+        "hakimson"
+      ],
+      "sources": [
+        "D41"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D41"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah fakta terkait **Hakimson Capital Growth**:\n\n**1. Identitas dan Peran dalam Transaksi TRUK**\n*   **Nama:** Hakimson Capital Growth [D41].\n*   **Peran:** Muncul sebagai nama pembeli dalam rencana tender offer untuk saham PT Guna Timur Raya Tbk (TRUK) [D41].\n*   **Status Hukum:** Pembeli tersebut didirikan pada 1 Agustus 2025 dengan status sebagai *holding* dan konsultan manajemen [D41].\n*   **Rencana Transaksi:**\n    *   Membeli maksimal 65.250.000 saham TRUK [D41].\n    *   Harga tender: Rp740 per saham [D41].\n    *   Periode tender: 6 November – 7 Desember 2026 [D41].\n    *   Pembayaran: 15 Desember 2026 [D41].\n    *   Dampak kepemilikan: Kepemilikan naik dari 15% menjadi 30% [D41].\n*   **Pernyataan Bisnis:** Pembeli menyatakan tidak merencanakan *go-private*, perubahan manajemen, atau perubahan kegiatan usaha emiten [D41].\n\n**2. Batas Informasi Pemilik Manfaat**\n*   Dokumen secara eksplisit menyatakan bahwa **pemilik manfaat pembeli (Hakimson Capital Growth) tidak dijelaskan** dalam arsip yang tersedia [D41].\n*   Tidak ada struktur kepemilikan yang menghubungkan Hakimson Capital Growth dengan pihak lain dalam file yang diperiksa [D41].\n\n**3. Hubungan dengan INPS (PT Indah Prakasa Sentosa Tbk)**\n*   Terdapat catatan mengenai kemiripan nama antara \"Hakimson\" di dokumen TRUK dan \"Andry Hakim\" di dokumen INPS [D41].\n*   Namun, analisis dalam arsip menegaskan bahwa kesamaan kata ini **bukanlah bukti afiliasi** atau hubungan terbukti [D41]. Hal ini hanya dianggap sebagai calon titik penelusuran (*potential lead*) tanpa dukungan data struktur kepemilikan yang menghubungkan keduanya [D41].\n\n**Kesimpulan Data yang Belum Diketahui**\nArsip tidak menyediakan informasi mengenai:\n*   Nama pemilik manfaat (*beneficial owner*) sebenarnya dari Hakimson Capital Growth [D41].\n*   Struktur pendanaan transaksi tender tersebut [D41].\n*   Bukti hubungan bisnis atau kepemilikan antara Hakimson Capital Growth dengan Andry Hakim/INPS [D41].\n\nUntuk melengkapi data, diperlukan pemeriksaan lebih lanjut terhadap identitas pemilik manfaat pembeli, struktur pendanaan, pernyataan efektif tender, serta rekonsiliasi tabel pemegang saham [D41].",
+      "usage": {
+        "calls": 3,
+        "input_bytes": 8309,
+        "output_token_budget": 7100,
+        "known_cost_usd": 0.000179786,
+        "prompt_tokens": 1891,
+        "completion_tokens": 1112,
+        "cached_tokens": 896,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 15062,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 79372,
+        "selected_source_bytes": 2374,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "hakimson"
+        ],
+        "term_retry": {
+          "failed": [
+            "Hakimson Growth Capital"
+          ],
+          "retry": [],
+          "literal": [
+            "hakimson"
+          ]
+        },
+        "documents_checked": 1,
+        "current_document": "D41",
+        "database_source_reads": 1
+      }
+    },
+    {
+      "id": "name_typo_lower",
+      "question": "user zeinfahrozi suka ngomgin apa sih? sp nya apa aja, singkat padat, jelas",
+      "status": "error",
+      "error": "Sebutkan saham atau topik, misalnya “analisis SOCI”.",
+      "pass": false,
+      "checks": {
+        "status": false,
+        "docs_any": false,
+        "facts": false
+      },
+      "facts": [
+        {
+          "fact": "zeinihzafahrozi",
+          "hit": false
+        }
+      ],
+      "terms": [],
+      "sources": [],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 1289,
+        "output_token_budget": 300,
+        "known_cost_usd": 0.00000976,
+        "prompt_tokens": 308,
+        "completion_tokens": 4,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 1152,
+      "attempts": 2,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "search_terms",
+        "terms": []
+      }
+    }
+  ]
+}

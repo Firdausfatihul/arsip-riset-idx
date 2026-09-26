@@ -180,12 +180,12 @@ function editDistance(a, b, limit) {
   return prev[b.length];
 }
 const subsequence = (short, long) => { let i = 0; for (const c of long) if (c === short[i]) i++; return i === short.length; };
-export function nearestWord(term, index) {
+export function nearestWord(term, index, candidates = Object.keys(index.postings)) {
   const w = term.toLowerCase().replace(/^@/, '').replace(/\s+/g, '');
   if (w.length < 5 || !/^[\p{L}\p{N}_]+$/u.test(w) || Object.hasOwn(index.postings, w)) return null;
   const common = new Set(index.commonWords);
   let best = null;
-  for (const key of Object.keys(index.postings)) {
+  for (const key of candidates) {
     if (key[0] !== w[0] || Math.abs(key.length - w.length) > Math.ceil(w.length / 2) || common.has(key)) continue;
     const limit = Math.floor(Math.max(w.length, key.length) * 0.3), d = editDistance(w, key, limit);
     // Users drop letters from long names; extra letters ("kurniawanto") more often mean a different name.
@@ -542,9 +542,18 @@ export async function converse(archive, model, question, history, emit, signal, 
   // A Stockbit username the user wrote is always searched; so is a capitalised word that
   // occurs in only a few documents.
   const handles = new Set(index.handles || []);
-  const named = fromModel ? [...new Set((question.match(/@?[\p{L}\p{N}_]{4,}/gu) || []).map(w => w.replace(/^@/, '').toLowerCase()).filter(w => handles.has(w)))] : [];
+  // Found by code, not left to the model: it returned no terms at all for "user zeinfahrozi … singkat padat, jelas".
+  // A word missing from the archive that is close to a username ("zeinfahrozi") is that username.
+  const named = [], common = new Set(index.commonWords);
+  if (fromModel) for (const raw of new Set(question.match(/@?[\p{L}\p{N}_]{4,}/gu) || [])) {
+    const w = raw.replace(/^@/, '').toLowerCase();
+    if (handles.has(w)) { if (!named.includes(w)) named.push(w); continue; }
+    if (w.length < 5 || common.has(w) || Object.hasOwn(index.postings, w)) continue;
+    const near = nearestWord(w, index, index.handles || []);
+    if (near && !named.includes(near)) { named.push(near); (stats.spelling ||= {})[raw] = near; }
+  }
   if (fromModel && (terms.length || named.length)) {
-    const words = question.match(/[\p{L}\p{N}]+/gu) || [], common = new Set(index.commonWords), own = [];
+    const words = question.match(/[\p{L}\p{N}]+/gu) || [], own = [];
     for (const [i, word] of words.entries()) {
       if (!/^\p{Lu}[\p{Ll}\p{N}]{3,}$/u.test(word) || (i === 0 && words.length > 2) || common.has(word.toLowerCase())) continue;
       if (named.includes(word.toLowerCase()) || terms.some(t => t.toLowerCase().includes(word.toLowerCase()))) continue;

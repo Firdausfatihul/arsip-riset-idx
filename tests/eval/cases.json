@@ -548,6 +548,17 @@
   {
    "id": "name_hakimson",
    "question": "Carikan data hakimson growth capital"
+  },
+  {
+   "id": "name_typo_lower",
+   "question": "user zeinfahrozi suka ngomgin apa sih? sp nya apa aja, singkat padat, jelas",
+   "docs_any": [
+    "stockbit_25092026.md",
+    "stockbit_24092026.md"
+   ],
+   "facts": [
+    "zeinihzafahrozi"
+   ]
   }
  ]
 }

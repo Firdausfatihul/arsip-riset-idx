@@ -89,6 +89,15 @@ test('misspelled names reach the archive spelling; unknown names are not forced 
   for (const w of ['media', 'stockbit']) assert.ok(!manifest.handles.includes(w), w);
 });
 
+test('a username in the question is searched even when the model returns no terms', async () => {
+  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
+  const model = {complete:async () => '{"terms":[]}',
+    answer:async (m, emit) => { await emit({type:'delta', text:'Ringkasan.'}); return 'Ringkasan.'; }};
+  const result = await converse(new Archive(assets), model, 'user zeinfahrozi suka ngomgin apa sih? sp nya apa aja, singkat padat, jelas', [], async () => {});
+  assert.deepEqual(result.terms, ['zeinihzafahrozi']);
+  assert.ok(result.documents > 0);
+});
+
 test('an answer cut at the length limit is kept and marked incomplete, not discarded', async () => {
   const model = new OpenRouter('test', null, async () => new Response([
     {choices:[{delta:{content:'Sebagian jawaban [D1].'}}]}, {choices:[{finish_reason:'length'}]}
