@@ -44,6 +44,40 @@ test('whole-document requests resolve by category and date, including a missing 
   assert.ok(dateQuery('SOCI tanggal 17', [], years).clarification, 'day without month still asks');
 });
 
+test('each date in a request is paired with the source named in its own clause', () => {
+  const years = [...new Set(manifest.docs.map(d => +d.end.slice(0, 4)))];
+  const q = 'coba baca arsip 25 september di stream stockbit dan 26 september di keterbukaan indonesia, apa yg plg hidden gems';
+  const names = documentRequest(q, dateQuery(q, [], years), manifest).map(d => d.name).sort();
+  assert.deepEqual(names, ['ki_26092026.md', 'stockbit_25092026.md']);
+});
+
+test('document requests: every date, range, numeric date, pasted title and per-source "terbaru"', () => {
+  const years = [...new Set(manifest.docs.map(d => +d.end.slice(0, 4)))];
+  // Real questions from the log plus phrasings written afterwards; [] = not a document request.
+  const cases = {
+    'coba baca arsip 25-26 september di stream stockbit dan keterbukaan indonesia, apa yg plg hidden gems': ['stockbit_25092026.md', 'ki_26092026.md'],
+    'Simpulkan 21 september 2026': ['stockbit_22092026.md'],
+    'Simpulkan tanggal 23 september 2026 dari stockbit summary dan bei keterbukaan informasi': ['ki_24092026.md', 'stockbit_24092026.md'],
+    'simpulkan postingan stockbit dari 23-24 sept': ['stockbit_24092026.md'],
+    'Stockbit — 20–22 September 2026 jelaskan kesimpulan': ['stockbit_22092026.md'],
+    'ada loh itu disini Keterbukaan Informasi · 22 September 2026': ['ki_22092026.md'],
+    'stockbit 22 dan 25 september ada apa aja': ['stockbit_22092026.md', 'stockbit_25092026.md'],
+    'bandingkan ki 18 september dengan ki 19 september': ['ki_18092026.md', 'ki_19092026.md'],
+    'keterbukaan terbaru sama stockbit terbaru, mana yang paling menarik': ['ki_26092026.md', 'stockbit_25092026.md'],
+    'KI 26/9 ada corporate action apa': ['ki_26092026.md'],
+    'stockbit 24/9 sama KI 24/9 bandingin': ['stockbit_24092026.md', 'ki_24092026.md'],
+    'apa yang dibahas di stockbit 20 sampai 22 september': ['stockbit_22092026.md'],
+    'ringkas semua dokumen tanggal 22 september': ['ki_22092026.md', 'ki_24092026.md', 'stockbit_22092026.md'],
+    'rights issue september siapa aja': [], 'ada berita apa soal emiten nikel minggu ini': [],
+    'siapa yang beli saham di pasar nego tanggal 22 september 2026': [],
+  };
+  for (const [q, need] of Object.entries(cases)) {
+    const names = (documentRequest(q, dateQuery(q, [], years), manifest) || []).map(d => d.name);
+    if (need.length) assert.ok(need.every(n => names.includes(n)), q + ' -> ' + names.join());
+    else assert.deepEqual(names, [], q);
+  }
+});
+
 test('an answer cut at the length limit is kept and marked incomplete, not discarded', async () => {
   const model = new OpenRouter('test', null, async () => new Response([
     {choices:[{delta:{content:'Sebagian jawaban [D1].'}}]}, {choices:[{finish_reason:'length'}]}

@@ -90,22 +90,57 @@ export function filterRecords(rows, scope) {
 const CATEGORY_WORDS = [
   [/\b(asx|australia)\b/i,'keterbukaan-australia'], [/\b(sgx|singapura|singapore)\b/i,'keterbukaan-singapura'],
   [/\b(keterbukaan|ki)\b/i,'keterbukaan-informasi'], [/\bstockbit\b/i,'stockbit'], [/\bdigest\b/i,'digest-emiten']];
-export function documentRequest(question, scope, index) {
+function categories(text) {
   const cats = [];
-  for (const [re,cat] of CATEGORY_WORDS) if (re.test(question) && !(cat==='keterbukaan-informasi' && cats.length)) cats.push(cat);
-  const wantsDoc = /\b(dokumen|laporan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|isi|keterbukaan|stockbit|digest)\b/i.test(question);
-  if (!wantsDoc || (!scope.date && !/\b(terbaru|terakhir|latest|paling baru)\b/i.test(question))) return null;
-  let docs = index.docs.filter(d => !cats.length || cats.includes(d.cat));
-  if (scope.date) {
-    // covers = periode yang dibahas (mis. laporan 24 Sep tentang 23–24 Sep); dokumen lama tanpa covers memakai tanggal katalog.
-    docs = docs.filter(d => { const [s,e] = d.covers || [d.start,d.end]; return s && s <= scope.date && scope.date <= e; });
-    // Without a category, only single-day documents are an unambiguous match for a date.
-    if (!cats.length) docs = docs.filter(d => d.start === d.end);
-  } else {
-    const latest = docs.reduce((m,d) => d.end > m ? d.end : m, '');
-    docs = docs.filter(d => d.end === latest);
+  for (const [re,cat] of CATEGORY_WORDS) if (re.test(text) && !(cat==='keterbukaan-informasi' && cats.length)) cats.push(cat);
+  return cats;
+}
+const span = d => d.covers || [d.start,d.end];
+// Every date the user wrote: "25 september", "22 dan 25 sept", "23-24 sept" (range), "26/9", "2026-09-26".
+export function requestedDates(question, year) {
+  const out = [], add = (y,m,d) => { const v = validDate(+y,+m,+d); if (v) out.push({from:v, to:v}); };
+  for (const m of question.matchAll(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/g)) add(m[1],m[2],m[3]);
+  for (const m of question.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(20\d{2}))?\b/g)) if (m[3] || year) add(m[3] || year,m[2],m[1]);
+  const list = new RegExp('\\b(\\d{1,2})((?:\\s*(?:,|&|dan|-|–|sampai|hingga|s/d)\\s*\\d{1,2})*)\\s+(' + monthNames + ')\\b(?:\\s+(20\\d{2}))?','gi');
+  for (const m of question.matchAll(list)) {
+    const y = m[4] || year, mo = months[m[3].toLowerCase()];
+    if (!y) continue;
+    const rest = [...m[2].matchAll(/(,|&|dan|-|–|sampai|hingga|s\/d)\s*(\d{1,2})/gi)];
+    if (rest.length === 1 && /^(-|–|sampai|hingga|s\/d)$/i.test(rest[0][1])) {
+      const from = validDate(+y,mo,+m[1]), to = validDate(+y,mo,+rest[0][2]);
+      if (from && to && from <= to) out.push({from, to});
+    } else for (const d of [m[1], ...rest.map(r => r[2])]) add(y,mo,d);
   }
-  return docs.length && docs.length <= 3 ? docs : null;
+  return out;
+}
+// A pasted document title ("Stockbit — 20–22 September 2026 jelaskan") names that document.
+const fold = t => t.toLowerCase().replace(/[–—-]/g,'-').replace(/\s+/g,' ').trim();
+function titledDocuments(question, index) {
+  const q = fold(question);
+  return index.docs.filter(d => d.title.length >= 12 && q.includes(fold(d.title)));
+}
+const SUMMARY_WORDS = /\b(dokumen|laporan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|isi|simpulkan|kesimpulan|baca|keterbukaan|stockbit|digest)\b/i;
+export function documentRequest(question, scope, index) {
+  const titled = titledDocuments(question, index);
+  if (titled.length && titled.length <= 6) return titled;
+  const cats = categories(question);
+  const latest = /\b(terbaru|terakhir|latest|paling baru)\b/i.test(question);
+  // Naming a source ("ki 18 september", "KI 26/9") asks for its document, like a summary verb does.
+  if (!cats.length && !SUMMARY_WORDS.test(question)) return null;
+  const dates = requestedDates(question, scope.date?.slice(0,4) || (index.docs[0]?.end || '').slice(0,4));
+  let docs = index.docs.filter(d => !cats.length || cats.includes(d.cat));
+  if (dates.length) {
+    // covers = periode yang dibahas (mis. laporan 24 Sep tentang 23–24 Sep); dokumen lama tanpa covers memakai tanggal katalog.
+    docs = docs.filter(d => { const [s,e] = span(d); return s && dates.some(r => s <= r.to && r.from <= e); });
+    // Without a category, a date alone is a document request only with a summary verb.
+    if (!cats.length && !/\b(ringkas|ringkasan|rangkum|rangkuman|summary|summarize|simpulkan|kesimpulan|baca|isi)\b/i.test(question)) return null;
+  } else if (latest) {
+    // "keterbukaan terbaru sama stockbit terbaru": the newest document of each named source.
+    const newest = {};
+    for (const d of docs) if (!newest[d.cat] || d.end > newest[d.cat]) newest[d.cat] = d.end;
+    docs = docs.filter(d => d.end === newest[d.cat] && (cats.length || d.end === Object.values(newest).sort().at(-1)));
+  } else return null;
+  return docs.length && docs.length <= 6 ? docs : null;
 }
 
 // A small explicit vocabulary handles the current cross-market screening use case.

@@ -1,0 +1,573 @@
+{
+  "summary": {
+    "label": "e2e-baseline-2026-09-26",
+    "impl": "/Users/macbookair/Documents/project/archivescrapingweb/worker",
+    "archive_version": "295f2d1ae8fea20d",
+    "created_at": "2026-09-26T08:41:51.129Z",
+    "cases": 7,
+    "passed": 3,
+    "completed": 6,
+    "errors": 1,
+    "facts_hit": 0,
+    "facts_total": 0,
+    "mean_source_precision": null,
+    "invalid_citations": 0,
+    "flagged_numbers": 1,
+    "wrong_names": 0,
+    "cost_usd": 0.02950081,
+    "provider_calls": 8
+  },
+  "results": [
+    {
+      "id": "two_docs_gems",
+      "question": "coba baca arsip 25 september di stream stockbit dan 26 september di keterbukaan indonesia, apa yg plg hidden gems, singkat padat, hidden gems ya bkn membelalak depan mata",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "docs_all": true
+      },
+      "facts": [],
+      "terms": [
+        "Stockbit — Corporate actions, ekspansi, dan petunjuk yang perlu diuji · 25 September 2026",
+        "KI — Analisis corporate action, expansion, dan kemungkinan perubahan bisnis · 26 September 2026"
+      ],
+      "sources": [
+        "D53",
+        "D41"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D53",
+        "D41"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Berdasarkan arsip **D53** (25 September 2026) dan **D41** (26 September 2026), berikut adalah identifikasi \"hidden gems\" atau peluang riset yang tidak terlihat mencolok di permukaan harga, melainkan tersembunyi dalam struktur dokumen dan narasi spesifik.\n\n### 1. CNKO: Konversi Utang sebagai Jalur Masuk Pemilik [D53]\n*   **Status:** Sangat awal/Usulan.\n*   **Potensi Hidden Gem:** Alih-alui spekulasi *backdoor listing*, fokus pada hipotesis konversi utang usaha menjadi ekuitas. Arsip menyebutkan kreditur utama berasal dari grup besar (BIB/Sinarmas). Jika utang dikonversi, struktur kepemilikan berubah drastis tanpa kas keluar.\n*   **Batas Bukti:** Belum ada perjanjian konversi, harga konversi, atau persetujuan kreditur. Ini adalah \"sinyal\" struktur, bukan transaksi selesai [D53].\n\n### 2. FLMC: Sinyal Screener Tanpa Isi [D53]\n*   **Status:** Minim bukti.\n*   **Potensi Hidden Gem:** Disebut masuk screener *backdoor* sejak awal September. Namun, tidak ada parameter keuangan, sponsor, atau target aset yang diungkap.\n*   **Batas Bukti:** Hanya klaim pengguna. Tidak ada dasar untuk mengonfirmasi apakah ini benar-benar *backdoor* atau sekadar koreksi laporan. Perlu pencarian dokumen sponsor [D53].\n\n### 3. TEBE: Dugaan Injeksi Aset Spesifik [D53]\n*   **Status:** Spekulasi pengguna.\n*   **Potensi Hidden Gem:** Ada dugaan injeksi aset jasa tambang, hauling, dan pelabuhan dari pihak berinisial JLB. Berbeda dengan rumor umum, jenis asetnya spesifik.\n*   **Batas Bukti:** Penulis sendiri menyebutnya \"perasaan\". Identitas badan hukum JLB dan bentuk transaksi belum diverifikasi [D53].\n\n### 4. VKTR: Persiapan Rights Issue dari Surat Audit [D41]\n*   **Status:** Sinyal administratif.\n*   **Potensi Hidden Gem:** Surat pengantar audit (25 Sept 2026) secara eksplisit menyatakan tujuan audit adalah memenuhi persyaratan *rights issue*. Ini lebih langsung daripada menebak berdasarkan auditor baru.\n*   **Batas Bukti:** Belum ada jumlah saham, rasio, atau pemodal. Gross margin juga turun (bukan naik seperti klaim digest awal), menunjukkan tekanan operasional sebelum pendanaan [D41].\n\n### 5. POOL & IBOS: Pembenahan Administratif Pra-Transaksi [D41]\n*   **Status:** Persiapan struktur.\n*   **Potensi Hidden Gem:**\n    *   **POOL:** Mengganti pengurus dan auditor atas usulan **PT Prodana Indo Investa**. Kombinasi ini layak ditelusuri sebagai calon sponsor.\n    *   **IBOS:** Menggabungkan agenda revisi laporan, perubahan kegiatan usaha, dan penegasan modal/pemegang saham dalam satu rapat. Perubahan pemegang saham bisa jadi sekadar formalisasi, tapi perlu dicek pasal anggaran dasar.\n*   **Batas Bukti:** Belum ada identitas aset atau pembeli yang terbukti. Persiapan administratif ≠ transaksi selesai [D41].\n\n### 6. NINE: Holding Baru Bermodal Kecil [D41]\n*   **Status:** Struktur penampung.\n*   **Potensi Hidden Gem:** Pembentukan **PT Sembilan Investasi Indonesia** sebagai holding dengan modal Rp1 miliar (99% dimiliki NINE). Ini bisa menjadi kendaraan akuisisi atau penampung aset.\n*   **Batas Bukti:** Belum ada aset yang ditampung atau target akuisisi. Porsi 1% milik Yulius Sugiyanto tidak membuktikan nominee [D41].\n\n### Kesimpulan Riset\nHidden gems terbesar terletak pada **struktur persiapan** yang belum matang:\n1.  **CNKO** (jalur kreditur-ekuitas).\n2.  **VKTR** (surat audit untuk rights issue).\n3.  **POOL/IBOS/NINE** (pembenahan pengurus/holding untuk transaksi masa depan).\n\nSementara itu, emiten seperti **ULTJ**, **MGLV**, dan **BIKE** sudah memiliki struktur transaksi yang lebih jelas (\"melihat mata\"), sehingga risikonya lebih terukur namun kompleksitasnya lebih tinggi [D41].",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 357764,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.0111522,
+        "prompt_tokens": 105610,
+        "completion_tokens": 1478,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 24977,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 151931,
+        "selected_source_bytes": 331353,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "document_request": [
+          "D53",
+          "D41"
+        ],
+        "terms": [
+          "Stockbit — Corporate actions, ekspansi, dan petunjuk yang perlu diuji · 25 September 2026",
+          "KI — Analisis corporate action, expansion, dan kemungkinan perubahan bisnis · 26 September 2026"
+        ],
+        "documents_checked": 2,
+        "current_document": "D41",
+        "database_source_reads": 2,
+        "document_facts": true
+      }
+    },
+    {
+      "id": "stockbit_two_dates",
+      "question": "stockbit 22 dan 25 september ada apa aja",
+      "status": "complete",
+      "pass": false,
+      "checks": {
+        "status": true,
+        "docs_all": false
+      },
+      "facts": [],
+      "terms": [
+        "Stockbit — Corporate actions, ekspansi, dan petunjuk yang perlu diuji · 25 September 2026"
+      ],
+      "sources": [
+        "D53"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D53"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [
+        "142 postingan"
+      ],
+      "wrong_names": [],
+      "answer": "Berdasarkan dokumen arsip **D53** (tanggal laporan 25 September 2026), berikut adalah ringkasan isi arsip yang mencakup periode **24–25 September 2026**. Arsip ini merupakan analisis percakapan di platform Stockbit, bukan laporan transaksi pasar.\n\n### 1. Cakupan Data\n*   **Periode:** 24–25 September 2026.\n*   **Volume:** 2.617 record dengan Stream ID berbeda diproses dari 1.823 penulis unik [D53].\n*   **Keterbatasan:** Tidak ada data harga terkini, volume transaksi riil, atau bukti penyelesaian transaksi. Gambar dan lampiran tidak tersedia dalam teks.\n\n### 2. Topik Pembahasan Utama\nPercakapan terfokus pada empat tema: kerugian posisi/rebound, rights issue FORU, ketidakpastian aturan perdagangan (FCA), serta cerita ekspansi/akuisisi [D53].\n\n#### A. FORU (PT Fortune Indonesia Tbk) – Fokus Terbesar\nFORU menjadi topik paling ramai dengan total 142 postingan (gabungan tag FORU dan FORU-R). Percakapan bergeser dari spekulasi ke pelaksanaan teknis rights issue [D53].\n*   **Struktur Transaksi:** Pengendali menyetor aset (49% saham Borneo Prima) senilai Rp20,82 T, bukan uang tunai. Dokumen prospektus menunjukkan FORU memegang Seri A tanpa hak suara penuh jika dibandingkan struktur kontrol kompleks [D53].\n*   **Jadwal Distribusi:** Terdapat koreksi terhadap klaim pengguna. Jadwal emiten menyatakan penyerahan saham hasil exercise terjadi antara **28 September–8 Oktober 2026**, bukan segera setelah ex-rights [D53].\n*   **Debat Teknis:** Pengguna [@Mirzal] menekankan perbedaan antara settlement rights (T+0) dan distribusi saham fisik. Pengguna [@Abe27] memperingatkan bahwa instrumen FORU berbeda dengan PACK, sehingga analogi dampak suplai saham tidak otomatis sama [D53].\n\n#### B. Corporate Action & Akuisisi (Petunjuk Awal)\nBerbagai emiten dibahas sebagai kandidat corporate action, namun statusnya masih berupa spekulasi atau usulan tanpa bukti penutupan transaksi [D53]:\n*   **CNKO:** Usulan konversi utang usaha kepada kreditur (BIB/Sinarmas) menjadi saham. Masih sebatas hipotesis [D53].\n*   **TEBE:** Dugaan injeksi aset jasa tambang, hauling, dan pelabuhan dari pihak berinisial JLB. Penulis mengakui ini sebagai \"perasaan\" [D53].\n*   **FLMC:** Disebut masuk screener backdoor, namun tidak ada parameter atau target aset yang teridentifikasi [D53].\n*   **ULTJ:** Rencana pembelian 100% Frisian Flag Indonesia (FFI) melalui rights issue. Potensi perubahan pengendali pada ULTJ, namun rincian dokumen belum diverifikasi [D53].\n*   **SILO & LPKR:** Akuisisi perusahaan pemilik properti rumah sakit dari First REIT (asing). Perbedaan objek hukum antara kepemilikan entitas vs hak properti perlu ditelusuri lebih lanjut [D53].\n*   **BIKE vs MENN:** Perbandingan struktur pengendalian oleh inisial PMJ. Kekhawatiran tata kelola dari pengalaman MENN tetap relevan meskipun porsi kontrol BIKE terkonsentrasi [D53].\n*   **MGLV:** Ekspansi data center dengan fasilitas pinjaman besar. Penekanan pada utilisasi dan cash flow, bukan sekadar kapasitas MW [D53].\n*   **BEST:** Analisis nilai tanah versus kecepatan monetisasi. Indikator kunci adalah munculnya uang muka penjualan tanah baru [D53].\n\n#### C. Ketidakpastian Regulasi & Pasar\n*   **Full Call Auction (FCA):** Narasi pengguna berubah cepat. Pagi hari harapan keluar FCA, sore hari kekecewaan atas kabar penundaan. Status resmi aturan belum dikonfirmasi dokumen regulator [D53].\n*   **Rumor Lainnya:**\n    *   **BUVA, KETR, IDEA:** Ketidakpastian jadwal, syarat pembayaran, dan identitas pembeli. Harga hijau atau bagan proses tidak dianggap bukti closing [D53].\n    *   **BBCA:** Rumor akuisisi yang tidak dikonfirmasi [D53].\n    *   **PACK-GNI:** Rumor konversi yang dibantah oleh ketiadaan berita resmi [D53].\n\n#### D. Kode dan Bahasa Samar\n*   **\"Tape Moci Puding Oreo\":** Kode jelas untuk ticker **TMPO** (PT Tempo Inti Media Tbk). Tidak membuktikan siapa pembeli atau arah harga [D53].\n*   **Broker Summary:** Penyebutan kode broker (AK, BK, dll.) hanya menunjukkan nama broker, bukan identitas pemilik manfaat [D53].\n\n### 3. Kesimpulan Analitis Laporan\n*   **Kualitas Bukti:** Temuan paling berguna berasal dari pembahasan mekanisme (seperti FORU) daripada sekadar menyebutkan ticker. Namun, semua klaim bersifat \"klaim arsip\" atau \"spekulasi pengguna\" hingga diverifikasi dengan dokumen primer [D53].\n*   **Rekomendasi Riset:** Prioritas pemeriksaan adalah menyelesaikan struktur/jadwal FORU, lalu menguji CNKO dan TEBE karena memiliki unsur pihak/objek spesifik. FLMC memerlukan dasar screener sebelum dikembangkan [D53].\n*   **Peringatan:** Tidak ada keuntungan yang terbukti dari arsip ini. Selisih harga rights, tender offer, atau konversi utang memerlukan pemeriksaan syarat, likuiditas, dan status dokumen yang lengkap [D53].\n\n*Pemeriksaan angka otomatis: 142 postingan tidak ditemukan persis di bahan sumber (bisa hasil hitung, pembulatan, atau salah salin). Cek dokumen sumber sebelum dipakai.*",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 168747,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.0058571,
+        "prompt_tokens": 51599,
+        "completion_tokens": 1743,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 21630,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 72559,
+        "selected_source_bytes": 155809,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "document_request": [
+          "D53"
+        ],
+        "terms": [
+          "Stockbit — Corporate actions, ekspansi, dan petunjuk yang perlu diuji · 25 September 2026"
+        ],
+        "documents_checked": 1,
+        "current_document": "D53",
+        "database_source_reads": 1,
+        "document_facts": true,
+        "unverified_numbers": [
+          "142 postingan"
+        ]
+      }
+    },
+    {
+      "id": "ki_numeric_date",
+      "question": "KI 26/9 ada corporate action apa",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "docs_all": true
+      },
+      "facts": [],
+      "terms": [
+        "corporate action"
+      ],
+      "sources": [
+        "D41",
+        "D53",
+        "D52",
+        "D40",
+        "D51",
+        "D39",
+        "D50",
+        "D37",
+        "D49",
+        "D36",
+        "D48",
+        "D35",
+        "D47",
+        "D38",
+        "D34",
+        "D54",
+        "D45",
+        "D17",
+        "D5"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D41"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Berdasarkan arsip **D41** (KI — Analisis corporate action, expansion, dan kemungkinan perubahan bisnis) yang diterbitkan pada **26 September 2026**, berikut adalah temuan terkait corporate action:\n\n### 1. Sinyal Persiapan Pendanaan (VKTR)\n*   **Emiten:** VKTR (PT VKTR Teknologi Mobilitas Tbk).\n*   **Temuan:** Surat pengantar audit menyatakan tujuan persiapan *rights issue*.\n*   **Catatan Penting:** Ringkasan *corporate action* dalam dokumen tidak merinci penerbitan saham secara eksplisit, namun sinyal persiapan pendanaan teridentifikasi [D41].\n\n### 2. Emiten dengan Status Rutin (Tidak Ada Corporate Action Baru)\nArsip mencatat beberapa emiten yang tidak mengungkap rencana *corporate action* baru atau perubahan kepemilikan utama dalam periode analisis tersebut:\n*   **EMMI:** Tidak ada rencana *corporate action* tiga bulan atau perubahan kepemilikan utama. Penyebab volatilitas belum diketahui [D41].\n*   **MPXL:** Tidak ada informasi material baru atau rencana *corporate action* tiga bulan. Penyebab volatilitas belum dijelaskan [D41].\n*   **PRAY:** Tidak ada data pendanaan atau perubahan pengendali baru [D41].\n*   **TRUE:** Tidak ada *corporate action* baru. Kemiripan nama dengan TRIN tidak membuktikan afiliasi [D41].\n\n### Batas Bukti\n*   Analisis ini hanya mencakup 86 emiten dan 120 pengumuman sebagaimana dihitung dari digest [D41].\n*   Untuk VKTR, detail mekanisme *rights issue* (rasio, harga, target aset) belum tersedia dalam ringkasan arsip ini; bukti lebih lanjut perlu diperiksa pada dokumen resmi pengumuman BEI atau prospektus jika sudah keluar setelah tanggal 25 September 2026.",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 128042,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.00414056,
+        "prompt_tokens": 37907,
+        "completion_tokens": 931,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 9811,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 2776150,
+        "selected_source_bytes": 111538,
+        "excluded_dated_records": 0,
+        "fallback_documents": 1,
+        "stage": "answer",
+        "terms": [
+          "corporate action"
+        ],
+        "documents_checked": 20,
+        "current_document": "D5",
+        "database_source_reads": 20,
+        "negated_only_documents": 1
+      }
+    },
+    {
+      "id": "latest_both",
+      "question": "keterbukaan terbaru sama stockbit terbaru, mana yang paling menarik",
+      "status": "complete",
+      "pass": false,
+      "checks": {
+        "status": true,
+        "docs_all": false
+      },
+      "facts": [],
+      "terms": [
+        "KI — Analisis corporate action, expansion, dan kemungkinan perubahan bisnis · 26 September 2026"
+      ],
+      "sources": [
+        "D41"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D41"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Berdasarkan dokumen **D41** (26 September 2026), berikut adalah ringkasan analisis corporate action, ekspansi, dan perubahan bisnis dari 86 emiten yang menjadi cakupan. Analisis ini memisahkan fakta dalam digest dari interpretasi risiko dan kebutuhan verifikasi lebih lanjut.\n\n### 1. Temuan Utama: Struktur Transaksi Kompleks\nDokumen mengidentifikasi beberapa emiten dengan struktur transaksi yang paling eksplisit atau signifikan secara fundamental:\n\n*   **ULTJ (PT Ultrajaya Milk Industry & Trading Company Tbk):** Dianggap paling dekat dengan struktur *backdoor listing* atau *asset injection* lengkap. Rencana mencakup rights issue, inbreng aset oleh FrieslandCampina (FCIH/BWG/BWI), penunjukan pengendali baru, dan tender offer. Semua langkah saling terkait namun masih bersyarat. Jadwal indikatif meliputi rapat Oktober 2026 hingga tender Februari-Maret 2027 [D41].\n*   **MKNT (PT Mitra Komunikasi Nusantara Tbk):** Perubahan bisnis terlihat jelas pada laporan keuangan semester I 2026 melalui konsolidasi anak usaha baja (*PT Citra Baru Steel*). Pendapatan baja menyumbang 92,26% total pendapatan, dan kenaikan aset tetap bruto hampir seluruhnya berasal dari anak usaha baru. Namun, ekuitas masih negatif dan arus kas operasi negatif [D41].\n*   **MGLV (PT NexAI Digital Infrastruktur Tbk):** Memiliki fasilitas pinjaman sangat besar (Rp10,754 triliun) untuk proyek data center (JababekaDC dan BatangDC). Fasilitas ini jauh melebihi tambahan modal tunai (Rp98 miliar), menunjukkan leverage tinggi. Risiko utama terletak pada kemampuan menarik dana, kontrak pelanggan, dan corporate guarantee induk [D41].\n*   **TGRA (PT Terregra Asia Energy Tbk):** Telah memiliki perjanjian investasi dengan konsorsium (PT Adidaya Mandiri Sejahtera dan PT Hilal Arkan Energi) setelah due diligence. Tujuannya menyelesaikan pembangkit listrik tenaga minihidro, bukan necessarily asset injection sponsor baru. Saham masih disuspensi dan valuasi akhir belum disepakati [D41].\n*   **TRUK (PT Guna Timur Raya Tbk):** Rencana pergantian pengendali melalui tender offer maksimal 15% saham pada harga Rp740. Pembeli menyatakan tidak ada rencana go-private atau perubahan kegiatan usaha. Tidak ada bukti *asset injection* pasca-tender [D41].\n*   **INPS (PT Indah Prakasa Sentosa Tbk):** Recapitalisasi oleh pengendali lama (PT Graha Inti Guna Persada) sebesar Rp125 miliar. Ini menyebabkan dilusi ekstrem sekitar 65,79% bagi pemegang saham lama. Ekuitas berubah dari negatif ke positif secara proforma, tetapi ini adalah transfer dari pengendali lama, bukan masuknya investor baru [D41].\n*   **VKTR (PT VKTR Teknologi Mobilitas Tbk):** Surat pengantar audit secara eksplisit menyebutkan tujuan persiapan rights issue. Gross margin tercatat turun dari 20,36% menjadi 18,67%, dan arus kas operasi sangat bergantung pada pengembalian pajak [D41].\n*   **SRAJ (PT Sejahteraraya Anugrahjaya Tbk):** Lima penambahan modal anak usaha totaling Rp265,58 miliar (sekitar 24,34% ekuitas induk). Transaksi ini perlu dibaca sebagai satu penggunaan modal ekonomis yang besar, meskipun secara hukum mungkin dipisah [D41].\n\n### 2. Kategori Emiten Lainnya\n\n**A. Persiapan Administratif/Struktur (Belum Ada Transaksi Final)**\nEmiten seperti **POOL**, **IBOS**, dan **NINE** melakukan pembenahan pengurus, auditor, atau pembentukan holding baru. Dokumen menekankan bahwa ini adalah persiapan administratif; identitas aset target atau pembeli belum terbukti [D41].\n\n**B. Ekspansi dan Diversifikasi Terukur**\n*   **BIKE:** Rencana akuisisi lintas bidang dan lahan tambang masih dikaji; rapat ditunda karena permintaan penjelasan otoritas. Belum ada pendanaan atau izin lengkap [D41].\n*   **ENRG:** Rights issue efektif Rp4,1175 triliun. Saham bertambah 50%, dilusi 33,33%. Ada kesepakatan pengendalian antara Shima, BKI, dan BCI [D41].\n*   **MBMA:** Laba dan arus kas operasional meningkat signifikan, dengan proyek pembangunan USD610,64 juta. Pertumbuhan laba induk sekitar 830%, namun keberlanjutan margin perlu dipantau [D41].\n*   **SILO:** Pengambilalihan lima perusahaan properti rumah sakit senilai Rp3,47 triliun. Tahap kedua masih menunggu opsi [D41].\n\n**C. Pendanaan dan Buyback**\n*   **AHAP, APEX, HRTA, MDKA:** Berbagai rencana rights issue, private placement, dan konversi utang. Banyak di antaranya belum memiliki harga, pemodal, atau efektivitas penuh [D41].\n*   **HRUM, PRDA, EPAC, UVCR:** Rencana buyback atau kombinasi rights issue/buyback. Untuk HRUM, buyback hanya batas anggaran 0,82% modal, bukan realisasi pembelian [D41].\n\n**D. Risiko Kualitas Laporan dan Keuangan**\nEmitten dengan kategori \"Risiko\" memerlukan kewaspadaan tinggi:\n*   **MERK:** Impairment Rp87 miliar dan berakhirnya kontrak P&G pada Desember 2027. Nilai buku awal tidak pasti [D41].\n*   **PIPA:** Penggunaan dana IPO sebagian besar (68,85%) terserap dalam cadangan kerugian penurunan nilai. Jejak kas awal tidak jelas [D41].\n*   **WIKA:** Default rating pada dua seri sukuk (pokok Rp316 miliar). Ini bukan kepailitan perusahaan, tapi sinyal distress likuiditas spesifik [D41].\n*   **WSBP:** Restrukturisasi utang dan potensi penundaan kupon. Penambahan ekuitas non-tunai tidak menjamin pemulihan arus kas [D41].\n*   **SWAT:** Opini audit dengan pengecualian, lemahnya arus kas, dan ketidaksesuaian angka aset tetap [D41].\n*   **APII & BCIC:** Inkonsistensi angka utang/liabilitas dan kepemilikan saham (>100% pada BCIC) dalam digest [D41].\n\n### 3. Hubungan Antarperusahaan\nAnalisis hubungan menemukan beberapa titik temu namun dengan batasan kuat:\n*   **SILO ↔ LPKR ↔ First REIT:** Transaksi terkait counterparty nyata, namun nilainya bukan pendapatan gabungan [D41].\n*   **BYAN ↔ JARR ↔ Jhonlin Baratama:** Afiliasi pemilik manfaat ada, namun keterlibatan JARR dalam pendanaan BYAN disangkal [D41].\n*   **ENRG ↔ VKTR:** Sama-sama menggunakan firma audit Y. Santosa & Rekan, namun periode berbeda dan tidak membuktikan koordinasi transaksi [D41].\n*   **TRUK ↔ INPS:** Kesamaan nama \"Hakimson/Andry Hakim\" hanya calon titik penelusuran, bukan hubungan terbukti [D41].\n\n### 4. Kalender Pemeriksaan Penting (Pasca 26 Sept 2026)\nBeberapa tanggal krusial yang perlu dipantau berdasarkan jadwal digest:\n*   **8 Oktober:** Pelaksanaan rights issue ENRG; public expose MERK [D41].\n*   **9 Oktober:** Public expose MKNT mengenai kondisi pasca-private placement [D41].\n*   **12-16 Oktober:** Rapat-rat penting untuk EPAC, INPS, HRTA, IBOS [D41].\n*   **27 Oktober:** Rapat ULTJ dan UVCR [D41].\n*   **6 November - 7 Desember:** Periode tender TRUK [D41].\n*   **Desember 2026 - Maret 2027:** Target efektivitas dan pelaksanaan rights issue/tender ULTJ [D41].\n\n### Kesimpulan\nDokumen D41 tidak memberikan rekomendasi beli/jual, melainkan peta risiko dan peluang. **ULTJ** menawarkan struktur transaksi paling lengkap namun kompleks. **MKNT** menunjukkan perubahan fundamental pada angka keuangan. **MGLV** menawarkan skala ekspansi besar dengan risiko leverage tinggi. Sementara itu, banyak emiten lain masih berada pada tahap perencanaan, administrasi, atau menghadapi risiko kualitas laporan yang signifikan. Keuntungan investasi hanya dapat dinilai setelah harga pasar mencerminkan informasi tersebut, dilusi, dan keberhasilan penyelesaian transaksi.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 192479,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.006424,
+        "prompt_tokens": 54756,
+        "completion_tokens": 2371,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 22388,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 79372,
+        "selected_source_bytes": 175544,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "document_request": [
+          "D41"
+        ],
+        "terms": [
+          "KI — Analisis corporate action, expansion, dan kemungkinan perubahan bisnis · 26 September 2026"
+        ],
+        "documents_checked": 1,
+        "current_document": "D41",
+        "database_source_reads": 1,
+        "document_facts": true
+      }
+    },
+    {
+      "id": "real_21sep",
+      "question": "Simpulkan 21 september 2026",
+      "status": "error",
+      "error": "Sebutkan saham atau topik, misalnya “analisis SOCI”.",
+      "pass": false,
+      "checks": {
+        "status": false,
+        "docs_all": false
+      },
+      "facts": [],
+      "terms": [],
+      "sources": [],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 1241,
+        "output_token_budget": 300,
+        "known_cost_usd": 0.0000094,
+        "prompt_tokens": 296,
+        "completion_tokens": 4,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 673,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "search_terms",
+        "terms": []
+      }
+    },
+    {
+      "id": "real_range_2src",
+      "question": "coba baca arsip 25-26 september di stream stockbit dan keterbukaan indonesia, apa yg plg hidden gems, singkat padat, hidden gems ya bkn membelalak depan mata",
+      "status": "complete",
+      "pass": false,
+      "checks": {
+        "status": true,
+        "docs_all": false
+      },
+      "facts": [],
+      "terms": [
+        "KI — Analisis corporate action, expansion, dan kemungkinan perubahan bisnis · 26 September 2026"
+      ],
+      "sources": [
+        "D41"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D41"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Berdasarkan dokumen **D41** (26 September 2026), berikut adalah ringkasan analisis *corporate action* dan potensi perubahan bisnis pada 86 emiten. Fokus \"hidden gems\" di sini didefinisikan sebagai sinyal struktur transaksi yang paling lengkap atau perubahan fundamental yang sudah tercermin dalam angka, namun belum menjadi harga pasar yang pasti.\n\n### 1. Top Kandidat \"Hidden Gems\" (Struktur Transaksi Paling Eksplisit)\n\nAnalisis mengidentifikasi tiga emiten dengan struktur perubahan bisnis/pengendali yang paling jelas secara dokumen, meskipun belum selesai:\n\n*   **ULTJ (Ultrajaya):** Paling dekat dengan definisi *backdoor listing* atau *asset injection* besar.\n    *   **Fakta:** Rencana *rights issue*, *inbreng* aset, penunjukan pengendali baru (FCIH/FrieslandCampina), dan *tender offer* saling terhubung [D41].\n    *   **Sinyal:** Pengalihan hak *rights issue* oleh 6 pemegang saham lama ke pihak FCIH/BWG/BWI. FCIH akan menjadi pengendali setelah *inbreng*.\n    *   **Status:** Masih bersyarat; jadwal indikatif rapat akhir Oktober 2026, eksekusi *rights issue* Januari 2027, dan *tender offer* Februari-Maret 2027 [D41].\n*   **MKNT (Mitra Komunikasi Nusantara):** Perubahan bisnis sudah terlihat di laporan keuangan.\n    *   **Fakta:** Anak usaha baja (**PT Citra Baru Steel**) menyumbang **92,26% pendapatan** dan hampir seluruh kenaikan aset tetap bruto (dari Rp0,30 miliar ke Rp780,38 miliar) [D41].\n    *   **Sinyal:** Agenda *public expose* 9 Oktober 2026 untuk menjelaskan kondisi pasca-*private placement*.\n    *   **Risiko:** Ekuitas masih negatif (-Rp13,66 miliar) dan arus kas operasional negatif. Belum terbukti *reverse takeover* karena identitas penjual dan struktur kepemilikan akhir belum lengkap [D41].\n*   **TGRA (Terregra Asia Energy):** Pemulihan perusahaan bermasalah dengan investor baru.\n    *   **Fakta:** Ada perjanjian investasi tunai dengan konsorsium (PT Adidaya Mandiri Sejahtera & PT Hilal Arkan Energi) setelah *due diligence* panjang [D41].\n    *   **Sinyal:** Tujuan menyelesaikan pembangkit listrik tenaga minihidro. Jadwal pencatatan indikatif Januari 2027.\n    *   **Risiko:** Saham masih disuspensi, valuasi final 0%, dan identitas pemilik manfaat konsorsium belum terbuka [D41].\n\n### 2. Sinyal Ekspansi & Perubahan Pengendali Lainnya\n\n*   **MGLV (NexAI Digital Infrastruktur):** Ekspansi data center masif.\n    *   **Fakta:** Fasilitas pinjaman **Rp10,754 triliun** dari BNI untuk proyek JababekaDC dan BatangDC (target total 102 MW).\n    *   **Catatan:** Ini adalah fasilitas (limit), bukan kas yang sudah ditarik. Rasio fasilitas terhadap modal tambahan anak usaha sangat tinggi (~109x), menunjukkan leverage besar [D41].\n*   **TRUK (Guna Timur Raya):** Pergantian pengendali melalui *tender offer*.\n    *   **Fakta:** Rencana pembelian maksimal 15% saham pada harga **Rp740**. Pembeli (holding baru) menyatakan tidak ada rencana *go-private* atau perubahan bisnis.\n    *   **Catatan:** Tidak ada bukti *asset injection*. Harga tender bukan jaminan harga pasar [D41].\n*   **INPS (Indah Prakasa Sentosa):** *Recapitalization* oleh pengendali lama.\n    *   **Fakta:** Setoran tunai **Rp125 miliar** oleh PT Graha Inti Guna Persada.\n    *   **Dampak:** Dilusi bagi pemegang saham lama mencapai **65,79%**. Mengubah ekuitas negatif menjadi positif, tetapi ini bukan pergantian pengendali baru [D41].\n\n### 3. Sinyal Tersembunyi (Perlu Agregasi Data)\n\n*   **VKTR (Teknologi Mobilitas):** Surat pengantar audit tanggal 25 September 2026 secara eksplisit menyatakan tujuan persiapan *rights issue*. Ini sinyal pendanaan yang sering terlewat jika hanya melihat headline corporate action [D41].\n*   **SRAJ (Sejahteraraya Anugrahjaya):** Lima pengumuman penambahan modal anak usaha secara agregat bernilai **Rp265,58 miliar** (sekitar 24,34% ekuitas induk). Perlu dibaca sebagai satu penggunaan modal besar, bukan kejadian terpisah [D41].\n\n### 4. Emisen dengan Risiko Tinggi / Data Konfusional\n\nDokumen menyoroti beberapa emiten dengan masalah kualitas data atau risiko finansial yang menonjol, sehingga klaim \"gem\" sulit dibuktikan tanpa verifikasi lebih lanjut:\n*   **MERK:** Impairment Rp87 miliar dan berakhirnya kontrak P&G pada Desember 2027 [D41].\n*   **PIPA:** Penggunaan dana IPO yang mencurigakan (cadangan penurunan nilai ~68,85% dari dana bersih IPO) [D41].\n*   **WIKA & WSBP:** Default rating/sukuk dan restrukturisasi utang [D41].\n*   **PRDA:** Inkonsistensi data buyback (jumlah saham dan biaya tidak rekonsiliasi) [D41].\n\n### Kesimpulan Analisis D41\n\nTidak ada emiten yang dapat diklaim sebagai *backdoor listing* yang sudah selesai. Namun, **ULTJ** memiliki struktur transaksi (pengendali baru + asset injection + tender) yang paling komprehensif di arsip. **MKNT** adalah kasus unik di mana perubahan bisnis (baja) sudah nyata di angka keuangan, meski neracanya masih lemah. **TGRA** menawarkan jalur masuk investor baru untuk pemulihan aset fisik.\n\nKeuntungan investasi baru dapat dinilai setelah harga pasar, rasio dilusi, dan keberhasilan penyelesaian transaksi memiliki dasar yang memadai. Saat ini, semua transaksi tersebut masih dalam tahap perencanaan atau persetujuan [D41].",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 192569,
+        "output_token_budget": 6500,
+        "known_cost_usd": 0.00190558,
+        "prompt_tokens": 54783,
+        "completion_tokens": 1897,
+        "cached_tokens": 54144,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 15937,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 79372,
+        "selected_source_bytes": 175544,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "document_request": [
+          "D41"
+        ],
+        "terms": [
+          "KI — Analisis corporate action, expansion, dan kemungkinan perubahan bisnis · 26 September 2026"
+        ],
+        "documents_checked": 1,
+        "current_document": "D41",
+        "database_source_reads": 1,
+        "document_facts": true
+      }
+    },
+    {
+      "id": "real_date_topic",
+      "question": "apakah ada perubahan kepemilikikan saham yang terjadi di tanggal 21 september 2026, sebutkan 2 emiten yang memiliki perubahaan yg signifikan",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true
+      },
+      "facts": [],
+      "terms": [
+        "perubahan kepemilikan",
+        "pemegang saham",
+        "pengawas",
+        "direksi"
+      ],
+      "sources": [
+        "D41",
+        "D53",
+        "D52",
+        "D40",
+        "D51",
+        "D39",
+        "D44",
+        "D50",
+        "D37",
+        "D49",
+        "D36",
+        "D48",
+        "D35",
+        "D38",
+        "D33",
+        "D55",
+        "D42",
+        "D32",
+        "D31",
+        "D3",
+        "D30",
+        "D29",
+        "D54",
+        "D28",
+        "D27",
+        "D26",
+        "D25",
+        "D24",
+        "D23",
+        "D22",
+        "D45",
+        "D2",
+        "D1",
+        "D21",
+        "D20",
+        "D19",
+        "D18",
+        "D17",
+        "D16",
+        "D0",
+        "D15",
+        "D14",
+        "D13",
+        "D43",
+        "D12",
+        "D11",
+        "D10",
+        "D9",
+        "D46",
+        "D7",
+        "D8",
+        "D6",
+        "D5",
+        "D4"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D51",
+        "D50",
+        "D49",
+        "D33",
+        "D32",
+        "D25",
+        "D52",
+        "D48",
+        "D28",
+        "D26",
+        "D24",
+        "D23",
+        "D22",
+        "D53",
+        "D37",
+        "D39",
+        "D55",
+        "D2",
+        "D42",
+        "D30",
+        "D31",
+        "D29",
+        "D27",
+        "D21",
+        "D38",
+        "D17",
+        "D45",
+        "D14",
+        "D12",
+        "D41",
+        "D7",
+        "D36",
+        "D35",
+        "D16",
+        "D54",
+        "D11",
+        "D15",
+        "D13",
+        "D20",
+        "D1",
+        "D40",
+        "D9",
+        "D10"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "list",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Topik “perubahan kepemilikan, pemegang saham, pengawas, direksi” terlalu luas untuk dibaca utuh (54 dokumen, 11.4 MB bahan). Di bawah ini 847 emiten yang menyebut topik tersebut, disusun sistem dari pencocokan kata tanpa AI. Disebut belum berarti melakukan hal tersebut.\n\n| Emiten | Dokumen | Terakhir | Sumber |\n|---|---|---|---|\n| FORU | 11 | 2026-09-22 | [D51] [D50] [D49] |\n| ADHI | 11 | 2026-09-15 | [D33] [D32] [D25] |\n| MGLV | 9 | 2026-09-24 | [D52] [D51] [D33] |\n| LAPD | 9 | 2026-09-18 | [D49] [D48] [D33] |\n| KETR | 8 | 2026-09-22 | [D51] [D49] [D33] |\n| RATU | 8 | 2026-09-15 | [D33] [D28] [D26] |\n| ELSA | 8 | 2026-09-10 | [D28] [D26] [D25] |\n| HATM | 8 | 2026-09-08 | [D24] [D23] [D22] |\n| BAJA | 7 | 2026-09-25 | [D53] [D37] [D25] |\n| JSMR | 7 | 2026-09-22 | [D39] [D32] [D25] |\n| KOTA | 7 | 2026-09-14 | [D55] [D25] [D2] |\n| MEDC | 7 | 2026-09-14 | [D42] [D32] [D30] |\n| SWAT | 7 | 2026-09-14 | [D31] [D30] [D29] |\n| TOWR | 7 | 2026-09-12 | [D30] [D29] [D28] |\n| DOOH | 7 | 2026-09-10 | [D27] [D23] [D21] |\n| NAYZ | 7 | 2026-09-10 | [D27] [D26] [D25] |\n| BIKE | 6 | 2026-09-25 | [D53] [D26] [D23] |\n| APEX | 6 | 2026-09-19 | [D37] [D33] [D23] |\n| HEXA | 6 | 2026-09-19 | [D37] [D23] [D21] |\n| MKNT | 6 | 2026-09-19 | [D37] [D38] [D42] |\n| TLKM | 6 | 2026-09-19 | [D50] [D37] [D25] |\n| BBTN | 6 | 2026-09-15 | [D33] [D28] [D23] |\n| BNBA | 6 | 2026-09-15 | [D33] [D27] [D21] |\n| RANS | 6 | 2026-09-14 | [D32] [D30] [D29] |\n| UANG | 6 | 2026-09-14 | [D32] [D25] [D23] |\n| PRDA | 6 | 2026-09-12 | [D30] [D29] [D25] |\n| BUMI | 6 | 2026-09-10 | [D28] [D26] [D2] |\n| WIFI | 6 | 2026-09-10 | [D26] [D23] [D17] |\n| CBRE | 6 | 2026-09-09 | [D25] [D45] [D2] |\n| MEJA | 6 | 2026-09-09 | [D25] [D14] [D12] |\n| BCIC | 5 | 2026-09-26 | [D41] [D30] [D29] |\n| TRUK | 5 | 2026-09-26 | [D41] [D25] [D7] |\n| ULTJ | 5 | 2026-09-26 | [D41] [D53] [D50] |\n| BYAN | 5 | 2026-09-19 | [D50] [D49] [D36] |\n| PPGL | 5 | 2026-09-19 | [D37] [D48] [D35] |\n| AMAR | 5 | 2026-09-18 | [D36] [D25] [D17] |\n| EDGE | 5 | 2026-09-15 | [D33] [D26] [D25] |\n| GIAA | 5 | 2026-09-15 | [D33] [D25] [D17] |\n| IATA | 5 | 2026-09-15 | [D33] [D27] [D16] |\n| VICI | 5 | 2026-09-15 | [D33] [D30] [D29] |\n| BUKA | 5 | 2026-09-14 | [D42] [D32] [D27] |\n| DGWG | 5 | 2026-09-14 | [D32] [D25] [D23] |\n| MDLA | 5 | 2026-09-14 | [D32] [D30] [D29] |\n| ABDA | 5 | 2026-09-12 | [D30] [D29] [D28] |\n| ACST | 5 | 2026-09-12 | [D30] [D29] [D23] |\n| AKRA | 5 | 2026-09-12 | [D30] [D29] [D54] |\n| ASBI | 5 | 2026-09-12 | [D30] [D29] [D21] |\n| NICE | 5 | 2026-09-12 | [D30] [D29] [D28] |\n| SOHO | 5 | 2026-09-12 | [D30] [D29] [D27] |\n| DMAS | 5 | 2026-09-10 | [D27] [D17] [D11] |\n| EKAD | 5 | 2026-09-10 | [D26] [D25] [D23] |\n| EMAS | 5 | 2026-09-10 | [D28] [D15] [D12] |\n| ISAT | 5 | 2026-09-10 | [D28] [D17] [D7] |\n| KRYA | 5 | 2026-09-10 | [D26] [D25] [D21] |\n| MBMA | 5 | 2026-09-10 | [D28] [D25] [D14] |\n| TUGU | 5 | 2026-09-10 | [D26] [D25] [D23] |\n| ARKO | 5 | 2026-09-09 | [D25] [D23] [D13] |\n| PIPA | 5 | 2026-09-08 | [D24] [D23] [D20] |\n| PADI | 5 | 2026-09-05 | [D2] [D1] [D12] |\n| ABMM | 4 | 2026-09-26 | [D41] [D25] [D21] |\n| IBOS | 4 | 2026-09-26 | [D41] [D28] [D25] |\n| POOL | 4 | 2026-09-26 | [D41] [D26] [D17] |\n| BBRI | 4 | 2026-09-24 | [D40] [D26] [D17] |\n| VISI | 4 | 2026-09-22 | [D39] [D2] [D1] |\n| SILO | 4 | 2026-09-19 | [D50] [D27] [D9] |\n| TRUE | 4 | 2026-09-19 | [D37] [D35] [D23] |\n| KKGI | 4 | 2026-09-18 | [D36] [D25] [D12] |\n| MBSS | 4 | 2026-09-18 | [D36] [D23] [D14] |\n| IDEA | 4 | 2026-09-17 | [D35] [D28] [D25] |\n| IRSX | 4 | 2026-09-17 | [D48] [D25] [D10] |\n| AGRO | 4 | 2026-09-15 | [D33] [D25] [D21] |\n| KPIG | 4 | 2026-09-15 | [D33] [D28] [D21] |\n| TINS | 4 | 2026-09-15 | [D33] [D25] [D14] |\n| BBCA | 4 | 2026-09-14 | [D42] [D17] [D14] |\n| CCSI | 4 | 2026-09-14 | [D55] [D32] [D27] |\n| GRPH | 4 | 2026-09-14 | [D42] [D26] [D25] |\n| NINE | 4 | 2026-09-14 | [D55] [D25] [D1] |\n| VICO | 4 | 2026-09-14 | [D32] [D25] [D23] |\n| WGSH | 4 | 2026-09-14 | [D42] [D32] [D25] |\n| WSKT | 4 | 2026-09-14 | [D42] [D24] [D23] |\n\n767 emiten lain: DOID, DSSA, HAIS, INRU, KING, PALM, SMGA, SMGR, SMMT, TAXI, ASMI, BACH, BKDP, BMSR, CANI, EURO, KDTN, NZIA, OBMD, PSAB, RLCO, ZATA, AIMS, BMAS, BPII, ENAK, GOTO, HUMI, IPCC, JARR, MUTU, PNIN, SDRA, TAMA, VKTR, MCOR, ANTM, INTP, LMPI, SDMU, SFAN, TAPG, HELI, BPTR, CTBN, INPS, WSBP, NATO, PSSI, ESTA, SOFA, LCKM, LPCK, PTSN, SMDR, CASA, CMRY, LION, LTLS, MMLP, NASA, RODA, UNSP, UVCR, ATIC, ERAL, GRIA, IPAC, PKPK, SGER, AADI, ASII, BLTZ, BRMS, BTPN, DKFT, DPUM, ERAA, FUTR, GGRM, GTBO, HDFA, HITS, ICON, MBAP, MEDS, MYTX, NICL, NOBU, OKAS, PGEO, PLAN, PORT, PYFA, SCPI, SIMP, SMLE, SQMI, SSMS, SUPR, VTNY, WMPP, AGAR, ARTO, BAUT, BDMN, BEKS, BMRI, BOBA, CYBR, DEWI, FAST, IKPM, IPCM, JPFA, KMDS, LOPI, LPKR, MAYA, MDIY, NFCX, PART, PNGO, PRDL, PZZA, SRSN, TFCO, WEGE, CASH, KLBF, YPAS, CRAB, CRSN, DOSS, IMAS, INCO, SMBR, SMCB, TAYS, TNCA, WTON, BSSR, CNMA, INKP, TSPC, ARCI, ENRG, EMMI, CARE, FLMC, BAPA, BTPS, TRJA, ASPI, BKSL, MAHA, NISP, BOSS, PTRO, BBRM, BMBL, CBUT, EPAC, GSMF, IDPR, MEGA, PPRO, PURI, RAFI, RSGK, SRAJ, AKSI, ARGO, BESS, INDO, INTD, KOCI, MGNA, MKAP, NIRO, SIDO, ASSA, BUVA, DIVA, HRTA, PACK, RDTX, TIRA, YELO, ALMI, ASGR, ASLC, AUTO, AWAN, AYAM, BBYB, BEEF, BMHS, BRIS, BRRC, BTEK, CITY, CLAY, CSMI, CTRA, DKHH, DPNS, ELTY, GTRA, HAJJ, HALO, HEAL, INDY, INTA, IRRA, JGLE, JIHD, KOBX, LAJU, LUCY, MANG, MARK, MAXI, MDKA, MDLN, MFMI, MITI, MSIE, MTEL, MTLA, MYOH, NASI, OLIV, PDES, PEHA, POLI, PRAY, PTPP, PTSP, RISE, RONY, RSCH, RUIS, RUNS, SAMF, SCNP, SKBM, SLIS, SURI, SWID, TBMS, TFAS, TIRT, TMPO, TOOL, TPIA, TRIS, UNVR, VRNA, WAPO, YUPI, AGRS, AHAP, AISA, ALII, ALTO, AMIN, AMMN, AMOR, APLI, APLN, AREA, ASLI, ASRI, BBLD, BBNI, BELI, BEST, BLUE, BNBR, BNGA, BNII, BOLA, BRNA, BTEL, BUKK, CBMF, CENT, COAL, COCO, COIN, CSIS, CUAN, DAYA, DNAR, EMTK, GDST, GWSA, HERO, IFSH, IIKP, INET, INPP, IOTF, KLAS, KOKA, LABS, LIFE, LPGI, MDKI, MKTR, MLPL, MORA, MPPA, MREI, NETV, PANS, PEGE, PICO, PJHB, PNSE, PSGO, PTBA, PUDP, RALS, REAL, RMKO, SAFE, SAPX, SKRN, SMAR, SMKM, SMMA, SONA, SRTG, STTP, SUPA, TOTO, UFOE, UNIC, UNTR, WIRG, BGTG, JAWA, KUAS, LPIN, NIKL, PGUN, SOLA, TRUS, AEGS, AYLS, BINA, BPFI, BUDI, BVIC, CITA, CMNT, CSAP, DAAZ, DART, FITT, FPNI, GGRP, HGII, IMJS, INDS, KSIX, MINE, MOLI, MPXL, NAIK, POSA, RGAS, SDPC, SIPD, SOCI, SUNI, TCPI, TOTL, TRON, WBSA, WIDI, AKPI, LABA, PJAA, POLY, PPRE, SBMA, AGII, CARS, CBDK, GMFI, HRUM, IKBI, PGJO, RAJA, ADMR, ARTI, BBSI, BWPT, BEER, PBSA, MRAT, SINI, BBMD, OILS, PNBS, MMIX, PWON, BOLT, DIGI, KBLM, MIKA, ABBA, ADCP, ADMF, AKKU, ALDO, ARII, ARNA, ASHA, ASPR, BABP, BCAP, BHIT, BIPI, BISI, BSDE, BSML, BULL, CDIA, CHEM, CPIN, DEFI, DILD, DLTA, DSNG, DUTI, ELIT, EPMT, FIRE, GDYR, GPRA, GPSO, ICBP, IKAI, INAF, INAI, INDF, ITMG, JELI, JRPT, KBLI, KIJA, KJEN, LEAD, LINK, LMSH, LSIP, MAPA, MAPB, MERI, MERK, MINA, MPOW, MSIN, MSJA, MTDL, OBAT, OCAP, PDPP, PMJS, PNLF, PRIM, PTIS, RELF, SAGE, SMDM, TAMU, TBIG, TIFA, TYRE, VERN, WEHA, ZINC, AALI, AMMS, ANDI, ARKA, ARTA, ASDM, ATAP, AVIA, BABY, BANK, BATA, BATR, BAYU, BBHI, BBKP, BDKR, BEBS, BELL, BIKA, BINO, BIRD, BJBR, BKSW, BLOG, BOGA, BRAM, BRPT, BSBK, BSIM, BTON, BUAH, CAKK, CBPE, CEKA, CHEK, CHIP, CMNP, CNKO, CPRI, CPRO, CTTH, DATA, DFAM, DMMX, DVLA, DWGL, EAST, ELPI, EMDE, ENZO, FILM, FIMP, FOOD, FORE, GEMA, GHON, GJTL, GOLD, GTSI, GZCO, HBAT, HYGN, IBFN, IGAR, IMPC, INCI, INPC, ISAP, JECC, JMAS, JSPT, JTPE, KAEF, KAQI, KBAG, KBLV, KEJU, KIAS, KICI, KIOS, KKES, KLIN, KMTR, KOIN, KREN, LPPF, LPPS, LRNA, MAIN, MAPI, MARI, MASB, MBTO, MCAS, MDIA, MDRN, MGRO, MHKI, MICE, MLBI, MLPT, MSTI, MTMH, MTPS, MYOR, NCKL, NSSS, OASA, PANR, PEVE, PGAS, PGLI, POWR, PPRI, PSAT, PTPS, ROCK, ROTI, SCMA, SHID, SKLT, SMKL, SMRA, SOUL, SPMA, SPRE, SPTO, STAA, STAR, TALF, TECH, TGKA, TGRA, TOBA, URBN, VAST, VIVA, VOKS, WICO, WINS, WOWS, ZONE, BREN, CLPI, ESTI, GMTD, JECX, NRCA, NTBK, ACRO, AMAN, AMFG, AMRT, ANJT, ARMY, ASRM, BIMA, BLES, BLTA, BNLI, BOAT, BSWD, CAMP, CASS, CFIN, CINT, CSRA, DEWA, DGNS, DRMA, ESIP, EXCL, FAPA, FASW, FISH, FMII, FOLK, GRPM, GULA, GUNA, HADE, HOME, HRME, IBST, IFII, ISEA, ITMA, JAST, JATI, JAYA, KINO, KONI, KOPI, LIVE, LPLI, MCOL, MKPI, MPRO, MTSM, NANO, NEST, PADA, PMMP, POLA, POLU, PTMP, PTMR, PURA, RCCC, RELI, SAME, SICO, SOSS, SOTS, SURE, TLDN, TMAS, TRIM, TRIN, TRST, UDNG, WIIM, WOOD, YULE, ZYRX, APII, BAPI, CGAS, DYAN, NELY, PNBN, PSKT, TBLA, BACA, BALI, BFIN, CMPP, GLVA, HOMI, IPOL, LAND, MIDI, MTWI, PANI, PLIN, SATU, TKIM, VINS, WIKA, WINE, TCID, MTFN, OPMS, ACES, DMND, FWCT, SMSM, BMTR, BAIK, HDIT, NPGF, TPMA, KARW, SKYB, BBSS, DGIK, LUCK, WOMF, ATLA, DCII, HOPE, IPTV, KEEN, MABA, META, MSKY, POLL, RMKE, STRK, WINR, YOII.\n\nUntuk analisis, tanyakan satu kode, misalnya “analisis FORU perubahan kepemilikan”.",
+      "usage": {
+        "calls": 1,
+        "input_bytes": 1354,
+        "output_token_budget": 300,
+        "known_cost_usd": 0.00001197,
+        "prompt_tokens": 321,
+        "completion_tokens": 18,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 2314,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 15430817,
+        "selected_source_bytes": 11443562,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "source_limits",
+        "terms": [
+          "perubahan kepemilikan",
+          "pemegang saham",
+          "pengawas",
+          "direksi"
+        ],
+        "documents_checked": 54,
+        "current_document": "D4",
+        "database_source_reads": 54,
+        "overview": {
+          "issuers": 847
+        }
+      }
+    }
+  ]
+}

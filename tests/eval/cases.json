@@ -451,6 +451,71 @@
   {
    "id": "pp_screen",
    "question": "siapa aja yang mau private placement?"
+  },
+  {
+   "id": "two_docs_gems",
+   "question": "coba baca arsip 25 september di stream stockbit dan 26 september di keterbukaan indonesia, apa yg plg hidden gems, singkat padat, hidden gems ya bkn membelalak depan mata",
+   "docs_all": [
+    "stockbit_25092026.md",
+    "ki_26092026.md"
+   ]
+  },
+  {
+   "id": "stockbit_two_dates",
+   "question": "stockbit 22 dan 25 september ada apa aja",
+   "docs_all": [
+    "stockbit_22092026.md",
+    "stockbit_25092026.md"
+   ]
+  },
+  {
+   "id": "ki_numeric_date",
+   "question": "KI 26/9 ada corporate action apa",
+   "docs_all": [
+    "ki_26092026.md"
+   ]
+  },
+  {
+   "id": "latest_both",
+   "question": "keterbukaan terbaru sama stockbit terbaru, mana yang paling menarik",
+   "docs_all": [
+    "ki_26092026.md",
+    "stockbit_25092026.md"
+   ]
+  },
+  {
+   "id": "real_21sep",
+   "question": "Simpulkan 21 september 2026",
+   "docs_all": [
+    "stockbit_22092026.md"
+   ]
+  },
+  {
+   "id": "real_title_paste",
+   "question": "Stockbit — 20–22 September 2026 jelaskan kesimpulan",
+   "docs_all": [
+    "stockbit_22092026.md"
+   ]
+  },
+  {
+   "id": "real_range_2src",
+   "question": "coba baca arsip 25-26 september di stream stockbit dan keterbukaan indonesia, apa yg plg hidden gems, singkat padat, hidden gems ya bkn membelalak depan mata",
+   "docs_all": [
+    "stockbit_25092026.md",
+    "ki_26092026.md"
+   ]
+  },
+  {
+   "id": "real_23sep_2src",
+   "question": "Simpulkan tanggal 23 september 2026 dari stockbit summary dan bei keterbukaan informasi",
+   "docs_all": [
+    "ki_24092026.md",
+    "stockbit_24092026.md"
+   ]
+  },
+  {
+   "id": "real_date_topic",
+   "question": "apakah ada perubahan kepemilikikan saham yang terjadi di tanggal 21 september 2026, sebutkan 2 emiten yang memiliki perubahaan yg signifikan"
   }
  ]
 }
