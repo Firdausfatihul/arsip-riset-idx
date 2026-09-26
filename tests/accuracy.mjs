@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
-import {Archive, OpenRouter, converse, directTickers, rememberTurn} from '../worker/core.mjs';
+import {Archive, OpenRouter, converse, directTickers, nearestWord, rememberTurn} from '../worker/core.mjs';
 import {dateQuery, documentRequest} from '../worker/retrieval.mjs';
 import {SourceStore} from '../worker/source-store.mjs';
 
@@ -76,6 +76,17 @@ test('document requests: every date, range, numeric date, pasted title and per-s
     if (need.length) assert.ok(need.every(n => names.includes(n)), q + ' -> ' + names.join());
     else assert.deepEqual(names, [], q);
   }
+});
+
+test('misspelled names reach the archive spelling; unknown names are not forced onto another word', () => {
+  assert.equal(nearestWord('Zeinfahrozi', manifest), 'zeinihzafahrozi');   // letters dropped from a username
+  assert.equal(nearestWord('Zein Fahrozi', manifest), 'zeinihzafahrozi');
+  assert.equal(nearestWord('Mirzall', manifest), 'mirzal');                 // one extra letter
+  for (const unknown of ['Budiman', 'kurniawanto', 'budisantoso']) assert.equal(nearestWord(unknown, manifest), null, unknown);
+  assert.equal(nearestWord('Tanoko', manifest), null, 'an existing word is not corrected');
+  // Usernames are searched as written; words the archive mostly uses as words are not usernames.
+  for (const h of ['primestockid', 'athira', 'zeinihzafahrozi']) assert.ok(manifest.handles.includes(h), h);
+  for (const w of ['media', 'stockbit']) assert.ok(!manifest.handles.includes(w), w);
 });
 
 test('an answer cut at the length limit is kept and marked incomplete, not discarded', async () => {

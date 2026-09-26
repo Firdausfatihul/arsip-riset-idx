@@ -516,6 +516,38 @@
   {
    "id": "real_date_topic",
    "question": "apakah ada perubahan kepemilikikan saham yang terjadi di tanggal 21 september 2026, sebutkan 2 emiten yang memiliki perubahaan yg signifikan"
+  },
+  {
+   "id": "name_typo_zein",
+   "question": "Zeinfahrozi banyak ngomongin soal apa sih? Apa sp dia",
+   "docs_any": [
+    "stockbit_25092026.md",
+    "stockbit_24092026.md"
+   ],
+   "facts": [
+    "zeinihzafahrozi"
+   ]
+  },
+  {
+   "id": "handle_primestock",
+   "question": "Primestockid banyak ngomongin apa si? Scr singkat",
+   "terms_include": [
+    "PRIMESTOCKID"
+   ],
+   "facts": [
+    "primestockid"
+   ]
+  },
+  {
+   "id": "handle_athira",
+   "question": "berikan list saham dari stockbit athira",
+   "terms_include": [
+    "ATHIRA"
+   ]
+  },
+  {
+   "id": "name_hakimson",
+   "question": "Carikan data hakimson growth capital"
   }
  ]
 }

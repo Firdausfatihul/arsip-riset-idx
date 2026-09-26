@@ -1,0 +1,286 @@
+{
+  "summary": {
+    "label": "names-before-2026-09-26",
+    "impl": "/private/tmp/claude-501/-Users-macbookair-Documents-project-archivescrapingweb/7c66f0e4-2449-48f4-9067-187e22413b6b/scratchpad/worker-head",
+    "archive_version": "295f2d1ae8fea20d",
+    "created_at": "2026-09-26T14:30:41.008Z",
+    "cases": 4,
+    "passed": 2,
+    "completed": 2,
+    "errors": 2,
+    "facts_hit": 0,
+    "facts_total": 2,
+    "mean_source_precision": null,
+    "invalid_citations": 0,
+    "flagged_numbers": 0,
+    "wrong_names": 0,
+    "cost_usd": 0.00070952,
+    "provider_calls": 9
+  },
+  "results": [
+    {
+      "id": "name_typo_zein",
+      "question": "Zeinfahrozi banyak ngomongin soal apa sih? Apa sp dia",
+      "status": "error",
+      "error": "Belum ditemukan dokumen untuk “Zeinfahrozi”.",
+      "pass": false,
+      "checks": {
+        "status": false,
+        "docs_any": false,
+        "facts": false
+      },
+      "facts": [
+        {
+          "fact": "zeinihzafahrozi",
+          "hit": false
+        }
+      ],
+      "terms": [
+        "Zeinfahrozi"
+      ],
+      "sources": [],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 2703,
+        "output_token_budget": 600,
+        "known_cost_usd": 0.00002098,
+        "prompt_tokens": 643,
+        "completion_tokens": 13,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 2108,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "search_documents",
+        "terms": [
+          "Zeinfahrozi"
+        ],
+        "term_retry": {
+          "failed": [
+            "Zeinfahrozi"
+          ],
+          "retry": [],
+          "literal": []
+        }
+      }
+    },
+    {
+      "id": "handle_primestock",
+      "question": "Primestockid banyak ngomongin apa si? Scr singkat",
+      "status": "error",
+      "error": "Belum ditemukan dokumen untuk “PT Primestock Indonesia”.",
+      "pass": false,
+      "checks": {
+        "status": false,
+        "terms_include": false,
+        "facts": false
+      },
+      "facts": [
+        {
+          "fact": "primestockid",
+          "hit": false
+        }
+      ],
+      "terms": [
+        "PT Primestock Indonesia"
+      ],
+      "sources": [],
+      "source_precision": null,
+      "citations": [],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 2707,
+        "output_token_budget": 600,
+        "known_cost_usd": 0.00002145,
+        "prompt_tokens": 637,
+        "completion_tokens": 18,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 2201,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 0,
+        "selected_source_bytes": 0,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "search_documents",
+        "terms": [
+          "PT Primestock Indonesia"
+        ],
+        "term_retry": {
+          "failed": [
+            "PT Primestock Indonesia"
+          ],
+          "retry": [],
+          "literal": []
+        }
+      }
+    },
+    {
+      "id": "handle_athira",
+      "question": "berikan list saham dari stockbit athira",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true,
+        "terms_include": true
+      },
+      "facts": [],
+      "terms": [
+        "Athira"
+      ],
+      "sources": [
+        "D52",
+        "D50",
+        "D55",
+        "D45"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D50",
+        "D52",
+        "D55",
+        "D45"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah daftar saham yang disebutkan atau dianalisis oleh pengguna **@athira** di Stockbit. Daftar ini dipisahkan berdasarkan konteks klaim dalam dokumen (fakta vs hipotesis/rumor).\n\n### 1. Saham dengan Analisis Struktur Kepemilikan & Hubungan Perusahaan\nSaham-saham ini memiliki analisis mendalam mengenai jaringan pemegang saham, hubungan korporasi, atau potensi akuisisi oleh @athira.\n\n| Kode | Nama Emiten | Konteks Analisis @athira | Status Bukti dalam Arsip |\n| :--- | :--- | :--- | :--- |\n| **ESTA** | PT Esta Multi Usaha Tbk | Penelusuran kepemilikan berlapis (Esta Utama Corpora, Esta Dana Ventura, Sampoerna Investama) dan kronologi transfer tahun 2025. | Petunjuk penelitian struktur; bukan akuisisi terkonfirmasi [D50]. |\n| **INTD** | PT Inter-Delta Tbk | Perhitungan *free-float* setelah konversi utang (*debt conversion*) dan stock split untuk estimasi supply event. | Arithmetic spekulatif; bukan bukti deal [D52]. |\n| **BESS** | PT Batulicin Nusantara Maritim Tbk | Hubungan orang/perusahaan antara Bina Indo Raya, kapal BESS, dan pengurus RAJA; menyebut Sentosa Bersama Mitra memiliki 20%. | Diperkuat sebagian; hubungan operasional tidak sama dengan kesepakatan akuisisi [D55]. |\n| **ASPI** | PT Andalan Sakti Primaindo Tbk | Kandidat potensial terkait hubungan pemilik pembeli ASPI dengan pembeli MBSS (berdasarkan postingan lain). | Spekulasi hubungan; belum kesimpulan [D45]. |\n\n### 2. Saham dalam Hipotesis Konsolidasi Industri\nSaham-saham ini disebut dalam konteks dugaan konsolidasi industri atau sebagai kandidat tersisa dalam suatu jaringan bisnis tertentu.\n\n| Kode | Nama Emiten | Konteks Analisis @athira | Status Bukti dalam Arsip |\n| :--- | :--- | :--- | :--- |\n| **LCKM** | PT LCK Global Kedaton Tbk | Disebut bersama CCSI sebagai kandidat tersisa dalam jaringan telekomunikasi pasca-akuisisi perusahaan jaringan lainnya. | Rumor atau analogi; tidak menyebut pembeli spesifik [D55]. |\n| **CCSI** | PT Communication Cable Systems Indonesia Tbk | Disebut bersama LCKM sebagai kandidat tersisa; deskripsi usaha resmi produsen kabel optik. | Diperkuat sebagian; kesamaan industri tidak membuktikan model bisnis/pembeli sama [D55]. |\n\n### 3. Saham dalam Contoh Hipotetis/Perbandingan\nSaham ini disebut hanya sebagai contoh numerik atau perbandingan kenaikan harga, bukan target investasi aktif.\n\n| Kode | Nama Emiten | Konteks Analisis @athira | Status Bukti dalam Arsip |\n| :--- | :--- | :--- | :--- |\n| **ALKA** | PT Alakasa Industrindo Tbk | Bagian dari perbandingan kenaikan sepuluh kali secara persentase sebagai contoh hipotetis. | Tidak boleh diubah menjadi target harga [D55]. |\n| **NAIK** | PT Adiwarna Anugerah Abadi Tbk | Disebut bersama ALKA dalam konteks perbandingan hipotetis yang sama. | Tidak boleh diubah menjadi target harga [D55]. |\n\n### Catatan Penting Mengenai Data:\n1.  **Sumber Utama:** Sebagian besar analisis ini berasal dari postingan @athira pada tanggal 13–19 September 2026 dan 1–5 September 2026 [D45], [D50], [D52], [D55].\n2.  **Batas Klaim:** Dokumen secara eksplisit menyatakan bahwa penyebutan saham-saham tersebut (khususnya ESTA, BESS, LCKM, CCSI, ASPI) merupakan **petunjuk penelitian, hipotesis, atau spekulasi**, bukan konfirmasi transaksi atau akuisisi yang telah terjadi [D50], [D55].\n3.  **Tidak Ada Instruksi Beli:** Analisis ini bertujuan untuk identifikasi struktur kepemilikan atau \"hidden corporate action\", bukan rekomendasi trading langsung.\n4.  **Emiten Lain:** Meskipun ticker seperti PGAS, VKTR, SBMA, dll., muncul dalam ringkasan \"Top 10 Postingan\" di arsip D45, mereka dikaitkan dengan penulis lain (@Stockbit, @ROVIDI, @Adnugraa), bukan @athira. Oleh karena itu, tidak dimasukkan ke dalam list khusus @athira kecuali disebutkan secara spesifik dalam teks analisisnya.",
+      "usage": {
+        "calls": 2,
+        "input_bytes": 28740,
+        "output_token_budget": 6800,
+        "known_cost_usd": 0.00047516,
+        "prompt_tokens": 9278,
+        "completion_tokens": 1514,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 19509,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 693291,
+        "selected_source_bytes": 21955,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "Athira"
+        ],
+        "documents_checked": 4,
+        "current_document": "D45",
+        "database_source_reads": 4
+      }
+    },
+    {
+      "id": "name_hakimson",
+      "question": "Carikan data hakimson growth capital",
+      "status": "complete",
+      "pass": true,
+      "checks": {
+        "status": true
+      },
+      "facts": [],
+      "terms": [
+        "hakimson"
+      ],
+      "sources": [
+        "D41"
+      ],
+      "source_precision": null,
+      "citations": [
+        "D41"
+      ],
+      "invalid_citations": [],
+      "incomplete": false,
+      "path": "text",
+      "unverified_numbers": [],
+      "wrong_names": [],
+      "answer": "Berdasarkan arsip yang diberikan, berikut adalah data terkait **Hakimson Capital Growth** dan keterkaitannya dengan emiten TRUK:\n\n**1. Identitas dan Peran dalam Transaksi TRUK**\n*   **Peran:** Hakimson Capital Growth disebut sebagai entitas yang berencana melakukan tender offer pada saham PT Guna Timur Raya Tbk (TRUK).\n*   **Tujuan Transaksi:** Membeli maksimal 65.250.000 saham TRUK dengan harga Rp740 per saham.\n*   **Dampak Kepemilikan:** Jika berhasil, kepemilikan Hakimson Capital Growth di TRUK diperkirakan naik dari 15% menjadi 30%.\n*   **Status Entitas:** Pembeli (yang diasosiasikan dengan nama tersebut) didirikan pada 1 Agustus 2025 sebagai holding dan konsultan manajemen [D41].\n*   **Pernyataan Bisnis:** Pembeli menyatakan tidak merencanakan *go-private*, perubahan manajemen, atau perubahan kegiatan usaha emiten [D41].\n\n**2. Batas Informasi dan Ketidakpastian**\n*   **Identitas Pemilik Manfaat:** Dokumen secara eksplisit menyatakan bahwa **pemilik manfaat pembeli tidak dijelaskan**. Nama \"Hakimson Capital Growth\" muncul dalam tabel setelah tender, namun tidak ada rincian siapa pemilik sebenarnya dari entitas ini [D41].\n*   **Hubungan dengan INPS:** Terdapat catatan mengenai kemiripan nama antara \"Hakimson Capital Growth\" (pada dokumen TRUK) dan \"Andry Hakim\" (pada dokumen PT Indah Prakasa Sentosa Tbk/INPS). Namun, analisis arsip menegaskan bahwa kesamaan kata ini **bukanlah bukti afiliasi** atau hubungan kepemilikan. Tidak ada struktur kepemilikan yang menghubungkan keduanya dalam file yang diperiksa [D41].\n*   **Sumber Data:** Informasi ini bersumber dari digest corporate action yang diterbitkan pada 26 September 2026 [D41].\n\n**Kesimpulan**\nArsip hanya mencatat **Hakimson Capital Growth** sebagai pihak yang terlibat dalam rencana tender offer untuk pengalihan pengendalian TRUK. Data spesifik mengenai profil lengkap, struktur kepemilikan, atau identitas pemilik manfaat dari Hakimson Capital Growth **tidak tersedia** dalam bahan arsip yang diperiksa. Klaim hubungan dengan Andry Hakim (INPS) dianggap sebagai titik penelusuran awal saja, bukan fakta terbukti [D41].",
+      "usage": {
+        "calls": 3,
+        "input_bytes": 8309,
+        "output_token_budget": 7100,
+        "known_cost_usd": 0.00019193,
+        "prompt_tokens": 1891,
+        "completion_tokens": 1040,
+        "cached_tokens": 0,
+        "cache_write_tokens": 0,
+        "missing_usage_calls": 0
+      },
+      "elapsed_ms": 14568,
+      "attempts": 1,
+      "retrieval": {
+        "pipeline": "issuer-cache-v5",
+        "source_cache_hits": 0,
+        "note_cache_hits": 0,
+        "note_reads": 0,
+        "shared_reads": 0,
+        "answer_cache_hit": false,
+        "baseline_source_bytes": 79372,
+        "selected_source_bytes": 2374,
+        "excluded_dated_records": 0,
+        "fallback_documents": 0,
+        "stage": "answer",
+        "terms": [
+          "hakimson"
+        ],
+        "term_retry": {
+          "failed": [
+            "Hakimson Growth Capital"
+          ],
+          "retry": [],
+          "literal": [
+            "hakimson"
+          ]
+        },
+        "documents_checked": 1,
+        "current_document": "D41",
+        "database_source_reads": 1
+      }
+    }
+  ]
+}

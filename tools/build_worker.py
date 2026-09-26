@@ -35,6 +35,20 @@ def covers(doc):
     return [doc['start'], doc['end']]
 
 
+def stockbit_handles(docs):
+    """Stockbit usernames ("@primestockid"), so a question naming one is always searched.
+    A name counts only when the archive mostly writes it with @: "media" and "stockbit" are words."""
+    at, plain = {}, {}
+    for doc in docs:
+        text = doc['search_body']
+        for h in re.findall(r'(?<![\w@])@([A-Za-z][A-Za-z0-9_]{3,29})\b', text):
+            at[h.lower()] = at.get(h.lower(), 0) + 1
+        for w in re.findall(r'\w+', text.lower()):
+            if w in at or len(w) >= 4:
+                plain[w] = plain.get(w, 0) + 1
+    return sorted(h for h, n in at.items() if n * 2 >= plain.get(h, 0) and h not in COMMON_WORDS)
+
+
 def build(directory, out):
     docs, tickers = read_archive(directory)
     out = check_output(out, ROOT, [ROOT / "needtobeindexed", directory], kind="worker")
@@ -64,6 +78,7 @@ def build(directory, out):
         for word in set(re.findall(r'\w+', (doc['title'] + '\n' + doc['search_body']).lower())):
             postings.setdefault(word, []).append(source_id)
     manifest = {'version': digest.hexdigest()[:16], 'retrieval_version': VERSION, 'docs': metadata, 'tickers': sorted(tickers),
+                'handles': stockbit_handles(docs),
                 'postings': postings, 'system': SYSTEM, 'commonWords': sorted(COMMON_WORDS),
                 'wordTickers': sorted(t for t in tickers if t.lower() in WORD_TICKERS),
                 'termTickers': term_tickers(tickers)}
