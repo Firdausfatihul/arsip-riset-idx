@@ -273,7 +273,7 @@ Kotak centang **Mode agen** membuat model memanggil alat baca-saja: `cari_arsip`
 (`quant.renr.ai`, data terstruktur keterbukaan informasi BEI: kepemilikan, pemegang saham, RUPS, pengurus,
 transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di `worker/agent.mjs`.
 
-- Kuota: `CHAT_AGENTIC_DAILY` pertanyaan per hari UTC untuk seluruh situs (bawaan 10). Jawaban tersimpan tidak memakai kuota.
+- Kuota: `CHAT_AGENTIC_DAILY` pertanyaan per hari UTC untuk seluruh situs (produksi 50 di `worker/wrangler.jsonc`; tanpa nilai 10). Jawaban tersimpan tidak memakai kuota.
 - Key datacat disimpan sebagai secret Worker `DATACAT_API_KEY` (lokal di `.env.chat`), tidak pernah ke browser.
   Host, path, dan parameter ditetapkan kode; argumen alat divalidasi; endpoint tulis API tidak tersedia sebagai alat.
 - Batas per pertanyaan: 7 langkah, 16 panggilan alat, 6 KB per hasil, 70 KB bahan; maks 3 pencarian nama dan 2 pembacaan teks dokumen.

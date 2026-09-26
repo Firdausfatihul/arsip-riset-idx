@@ -4,6 +4,7 @@ import argparse
 import html
 from datetime import datetime, timezone
 import json
+import re
 from pathlib import Path
 import urllib.request
 
@@ -41,6 +42,9 @@ if args.html:
         rows.append([datetime.fromtimestamp(q['stamp']/1000,timezone.utc).isoformat(timespec='seconds'),'Agen' if q.get('mode')=='agentic' else 'Biasa',q['question'],q['status'],q['user_key'][:12],', '.join(q['terms']),usage.get('prompt_tokens',0),usage.get('completion_tokens',0),f"{usage.get('known_cost_usd',0):.6f}"+(' (belum lengkap)' if usage.get('missing_usage_calls') else ''),'Ya' if retrieval.get('answer_cache_hit') else 'Tidak'])
     detail=table(['Waktu UTC','Mode','Pertanyaan asli','Status','Klien anonim','Topik','Input token','Output token','USD diketahui','Cache jawaban'],rows)
     modes={m['mode']:m for m in data.get('by_mode',[])}
+    # Daily agentic cap as deployed (worker/wrangler.jsonc), so the worst-case line matches production.
+    cap_match=re.search(r'"CHAT_AGENTIC_DAILY"\s*:\s*"(\d+)"',(ROOT/'worker/wrangler.jsonc').read_text())
+    agentic_cap=int(cap_match.group(1)) if cap_match else 10
     names={'archive':'Biasa','agentic':'Agen'}
     def per(m,key): return m[key]/m['inputs'] if m.get('inputs') else 0
     mode_rows=[(names.get(m['mode'],m['mode']),m['inputs'],m['completed'],m['failed'],f"{m['known_cost_usd']:.6f}",f"{per(m,'known_cost_usd'):.6f}",
@@ -49,16 +53,16 @@ if args.html:
     mode_table=table(['Mode','Pertanyaan','Selesai','Gagal/ditolak','Biaya USD','Rata-rata/pertanyaan','Termahal','Panggilan AI','Panggilan alat (datacat/arsip)','Input token','Output token','Jawaban dari cache','Datacat dari cache','Biaya belum tercatat'],mode_rows)
     days_seen=sorted({d['day'] for d in data.get('daily_by_mode',[])})
     cell={(d['day'],d['mode']):d for d in data.get('daily_by_mode',[])}
-    daily_mode=table(['Tanggal UTC','Biasa: input','Biasa: USD','Agen: input (kuota 10/hari)','Agen: USD'],
+    daily_mode=table(['Tanggal UTC','Biasa: input','Biasa: USD',f'Agen: input (kuota {agentic_cap}/hari)','Agen: USD'],
       [(day,cell.get((day,'archive'),{}).get('inputs',0),f"{cell.get((day,'archive'),{}).get('known_cost_usd',0):.6f}",
         cell.get((day,'agentic'),{}).get('inputs',0),f"{cell.get((day,'agentic'),{}).get('known_cost_usd',0):.6f}") for day in days_seen])
     agent=modes.get('agentic')
     if agent and agent['inputs']:
         agent_days=len({d['day'] for d in data.get('daily_by_mode',[]) if d['mode']=='agentic'}) or 1
-        ceiling=10*agent['max_cost_usd']
+        ceiling=agentic_cap*agent['max_cost_usd']
         verdict=(f"Mode agen: {agent['inputs']} pertanyaan, US${agent['known_cost_usd']:.4f} dalam {agent_days} hari aktif "
                  f"(rata-rata US${agent['known_cost_usd']/agent_days:.4f}/hari, US${per(agent,'known_cost_usd'):.4f}/pertanyaan). "
-                 f"Batas atas harian dengan kuota 10 × pertanyaan termahal: US${ceiling:.4f}. "
+                 f"Batas atas harian dengan kuota {agentic_cap} × pertanyaan termahal: US${ceiling:.4f}. "
                  + ("Terkendali: biaya dibatasi kuota harian." if ceiling < 1 else "Perlu dicek: batas atas harian di atas US$1."))
     else:
         verdict='Mode agen belum dipakai dalam periode ini.'

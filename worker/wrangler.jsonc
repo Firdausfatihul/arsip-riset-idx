@@ -10,6 +10,7 @@
   "vars": {
     "CHAT_ALLOWED_ORIGINS": "https://arsip.seekingomega.capital",
     "CHAT_DAILY_REQUESTS": "3000",
+    "CHAT_AGENTIC_DAILY": "50",
     "CHAT_HOURLY_PER_IP": "120",
     "CHAT_CONCURRENT_REQUESTS": "10",
     "CHAT_CONCURRENT_PER_IP": "5"
