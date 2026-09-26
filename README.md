@@ -267,6 +267,25 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
 - Tombol Hentikan memutus koneksi. Server menghentikan pekerjaan setelah mendeteksi pemutusan;
   provider masih dapat mengenakan biaya untuk pekerjaan yang sudah dikirim.
 
+### Mode agen (datacat)
+
+Kotak centang **Mode agen** membuat model memanggil alat baca-saja: `cari_arsip` (arsip ini) dan datacat
+(`quant.renr.ai`, data terstruktur keterbukaan informasi BEI: kepemilikan, pemegang saham, RUPS, pengurus,
+transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di `worker/agent.mjs`.
+
+- Kuota: `CHAT_AGENTIC_DAILY` pertanyaan per hari UTC untuk seluruh situs (bawaan 10). Jawaban tersimpan tidak memakai kuota.
+- Key datacat disimpan sebagai secret Worker `DATACAT_API_KEY` (lokal di `.env.chat`), tidak pernah ke browser.
+  Host, path, dan parameter ditetapkan kode; argumen alat divalidasi; endpoint tulis API tidak tersedia sebagai alat.
+- Batas per pertanyaan: 7 langkah, 16 panggilan alat, 6 KB per hasil, 70 KB bahan; maks 3 pencarian nama dan 2 pembacaan teks dokumen.
+- Hemat: hasil datacat dipangkas dan ditulis ringkas (tanpa tanda kutip JSON), objek berulang jadi rujukan `K1`;
+  respons datacat di-cache 6 jam, jawaban identik 6 jam. Akhir tiap prompt diberi `cache_control` sehingga
+  langkah berikutnya dan jawaban akhir membaca awalan dari cache provider (±77% input dari cache pada uji).
+  Instruksi jawaban dikirim sebagai hasil alat: pesan user/system baru membuat template menulis ulang giliran alat dan cache hilang.
+- Pihak baru (pembeli, pelapor kepemilikan, direksi/komisaris baru) diperiksa silang lewat profil pihak di datacat.
+- Rujukan `[D..]` ke arsip, `[K..]` ke halaman datacat; nama emiten diambil dari arsip dan diperiksa setelah jawaban.
+- Uji: `node --test tests/agent.mjs` (tanpa jaringan) dan `node tools/eval_agentic.mjs --label nama` (API nyata, 13 pertanyaan, ±US$0,006).
+- Statistik privat (`tools/chat_metrics.py --html`) memisahkan mode biasa dan mode agen: biaya, rata-rata, termahal, panggilan alat, cache.
+
 ### Cache bersama dan invalidasi
 
 SQLite Durable Object menyimpan `evidence_cache` dengan tiga jenis: `source` (bagian teks asli),
@@ -378,7 +397,7 @@ Batas backend tetap berlaku walaupun JavaScript browser diubah:
 | Koneksi | 4 unggahan, 10 analisis (maksimal 5/IP), batas keseluruhan 8 menit, pembaca lambat diputus setelah 10 detik |
 
 Alokasi keluaran memakai batas maksimum, bukan tagihan aktual. Model, endpoint, dan
-parameter tidak bisa dipilih pengguna. Pemeriksaan ulang sumber hanya memakai ID dokumen yang ditemukan server. Tidak ada tools/function calling, eksekusi shell,
+parameter tidak bisa dipilih pengguna. Pemeriksaan ulang sumber hanya memakai ID dokumen yang ditemukan server. Mode biasa tanpa tools/function calling; mode agen hanya memakai alat baca-saja yang ditetapkan server. Tidak ada eksekusi shell
 atau pengambilan URL pengguna. HTML jawaban memakai allowlist tag sederhana; style,
 form, media, SVG, event handler, dan URL di luar sumber terverifikasi dibuang sebelum
 dipasang ke DOM. DOMPurify 3.4.15 dan marked memakai versi serta hash SRI terkunci.

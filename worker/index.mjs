@@ -1,6 +1,7 @@
 import {SourceStore} from './source-store.mjs';
 import {DurableObject} from 'cloudflare:workers';
 import {Archive, CacheStore, hash, ChatError, OpenRouter, MODEL, LIMITS, validate, readLimited, converse, rememberTurn} from './core.mjs';
+import {agentic} from './agent.mjs';
 
 // Invalid configuration falls back to a finite limit, never unlimited admission.
 const limit = (env, key, fallback) => {
@@ -33,8 +34,9 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, {status:204, headers:{
       ...headers(request, 'text/plain'), 'Access-Control-Allow-Methods':'POST, GET, OPTIONS',
       'Access-Control-Allow-Headers':'Content-Type', 'Access-Control-Max-Age':'600'}});
+    // The agentic quota lives in the Durable Object, so configuration is answered there.
     if (request.method === 'GET' && path === '/api/chat/config')
-      return json(request, {ready:!!env.OPENROUTER_API_KEY, model:MODEL});
+      return env.CHAT.get(env.CHAT.idFromName('archive-global-v1')).fetch(request);
     if (request.method !== 'POST' || path !== '/api/chat') return new Response('Method not allowed', {status:405});
     if (!env.OPENROUTER_API_KEY) return json(request, {error:'Percakapan belum diaktifkan pengelola.'}, 503);
     // A single named object makes limits and concurrent slots consistent across locations.
@@ -54,6 +56,7 @@ export class ArchiveChat extends DurableObject {
     sql.exec('CREATE TABLE IF NOT EXISTS ingress (stamp INTEGER, client TEXT)');
     sql.exec('CREATE TABLE IF NOT EXISTS budget (day INTEGER PRIMARY KEY, bytes INTEGER, tokens INTEGER)');
     sql.exec('CREATE TABLE IF NOT EXISTS conversations (token TEXT PRIMARY KEY, client TEXT, expires INTEGER, turns INTEGER, history TEXT)');
+    sql.exec('CREATE TABLE IF NOT EXISTS agentic_requests (stamp INTEGER)');
     this.cache = new CacheStore(sql);
   }
   admit(client) {
@@ -76,6 +79,23 @@ export class ArchiveChat extends DurableObject {
       if (total >= limit(this.env, 'CHAT_DAILY_REQUESTS', 3000) || own >= limit(this.env, 'CHAT_HOURLY_PER_IP', 120))
         throw new ChatError('Batas percakapan sementara sudah tercapai. Silakan coba lagi nanti.');
       sql.exec('INSERT INTO requests VALUES (?, ?)', now, client);
+    });
+  }
+  // Agentic mode is a site-wide trial: CHAT_AGENTIC_DAILY questions per UTC day (default 10).
+  // Answers served from cache do not use the quota.
+  agenticLeft() {
+    const day = Math.floor(Date.now() / 86400000) * 86400;
+    const used = this.ctx.storage.sql.exec('SELECT COUNT(*) AS n FROM agentic_requests WHERE stamp >= ?', day).one().n;
+    return Math.max(0, limit(this.env, 'CHAT_AGENTIC_DAILY', 10) - used);
+  }
+  reserveAgentic() {
+    const now = Math.floor(Date.now() / 1000), day = Math.floor(now / 86400) * 86400;
+    this.ctx.storage.transactionSync(() => {
+      const sql = this.ctx.storage.sql;
+      sql.exec('DELETE FROM agentic_requests WHERE stamp < ?', day);
+      if (this.agenticLeft() <= 0)
+        throw new ChatError('Kuota mode agen hari ini (' + limit(this.env, 'CHAT_AGENTIC_DAILY', 10) + ' pertanyaan untuk seluruh situs) sudah habis. Mode biasa tetap bisa dipakai.');
+      sql.exec('INSERT INTO agentic_requests VALUES (?)', now);
     });
   }
   spend(bytes, tokens) {
@@ -108,6 +128,9 @@ export class ArchiveChat extends DurableObject {
     return token;
   }
   async fetch(request) {
+    if (new URL(request.url).pathname === '/api/chat/config')
+      return json(request, {ready:!!this.env.OPENROUTER_API_KEY, model:MODEL,
+        agentic:{enabled:!!(this.env.OPENROUTER_API_KEY && this.env.DATACAT_API_KEY), limit:limit(this.env, 'CHAT_AGENTIC_DAILY', 10), left:this.agenticLeft()}});
     if (new URL(request.url).pathname === '/api/chat/index') {
       if (!this.env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + this.env.CHAT_METRICS_TOKEN)
         return json(request,{error:'Tidak diizinkan.'},403);
@@ -144,7 +167,7 @@ export class ArchiveChat extends DurableObject {
         throw new ChatError('Gunakan pertanyaan singkat dalam format yang tersedia.');
       const incoming = JSON.parse(await readLimited(request.body, LIMITS.body, 5000, request.signal));
       body = validate(incoming);
-      this.cache.question(analysisId,await hash([client,this.env.CHAT_METRICS_TOKEN || 'local']),incoming.question,body.question);
+      this.cache.question(analysisId,await hash([client,this.env.CHAT_METRICS_TOKEN || 'local']),incoming.question,body.question,body.mode);
       conversation = this.conversation(body.context, client);
     } catch (error) {
       if(body)this.cache.finishQuestion(analysisId,'invalid_context');
@@ -181,14 +204,18 @@ export class ArchiveChat extends DurableObject {
     const run = async () => {
       let outcome = 'error';
       try {
-        const result = await converse(this.archive, model, body.question, conversation.history, emit, controller.signal,
-          {cache:this.cache,client,metrics:retrieval});
+        const result = body.mode === 'agentic'
+          ? await agentic({archive:this.archive, model, question:body.question, history:conversation.history, emit, signal:controller.signal,
+              cache:this.cache, env:this.env, client, stats:retrieval, reserveQuota:() => this.reserveAgentic()})
+          : await converse(this.archive, model, body.question, conversation.history, emit, controller.signal,
+              {cache:this.cache,client,metrics:retrieval});
         controller.signal.throwIfAborted();
         // An answer cut at the length limit does not become history; the previous context stays valid.
         const context = result.incomplete && body.context ? body.context
           : this.remember(client, conversation, body.question, result.incomplete ? {...result, answer:'(jawaban terpotong)'} : result);
         await emit({type:'done', documents:result.documents, batches:result.batches, model:MODEL, context,
-          usage:model.usage(),cache_hit:!!result.cache_hit,clarification:!!result.clarification});
+          usage:model.usage(),cache_hit:!!result.cache_hit,clarification:!!result.clarification,
+          ...(body.mode === 'agentic' ? {agentic_left:this.agenticLeft()} : {})});
         outcome = result.clarification ? 'clarification' : 'complete';
       } catch (error) {
         retrieval.error_name = error.name;

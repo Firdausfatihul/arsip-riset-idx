@@ -527,6 +527,10 @@ a.chip:hover{outline:1px solid var(--c)}
 .chat button[type="submit"]{background:var(--c);color:var(--surface)}
 .chat button:disabled{opacity:.55;cursor:default}
 .chat-actions{display:flex;flex-wrap:wrap;gap:8px}
+.chat-mode{display:flex;align-items:flex-start;gap:10px;margin:10px 0 0;font:16px/1.5 var(--sans);cursor:pointer}
+.chat-mode[hidden]{display:none}
+.chat-mode input{width:22px;height:22px;margin:2px 0 0;flex:none;accent-color:var(--c)}
+#chat-agentic-left{color:var(--muted)}
 .chat-message{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:4px;min-width:0;overflow-wrap:anywhere}
 .chat-message.user{background:var(--ground)}
 .chat-message h3{margin:0 0 8px;font:600 16px/1.4 var(--sans)}
@@ -2160,6 +2164,8 @@ def build_page(docs, by_cat, own=None):
             '<div id="chat-history" role="log" aria-label="Percakapan tentang arsip" aria-live="polite"></div>'
             '<form id="chat-form" class="chat-form"><textarea id="chat-question" rows="2" maxlength="600" aria-describedby="chat-count" required aria-label="Pertanyaan tentang arsip" placeholder="Contoh: Analisis SOCI dari semua dokumen yang tersedia"></textarea>'
             '<div class="chat-actions"><button id="chat-send" type="submit">Tanyakan</button><button id="chat-stop" type="button" hidden>Hentikan</button></div></form>'
+            '<label id="chat-mode" class="chat-mode" hidden><input id="chat-agentic" type="checkbox"> <span><strong>Mode agen</strong>: telusuri juga data resmi BEI (kepemilikan, RUPS, pengurus, transaksi) lewat datacat. '
+            '<span id="chat-agentic-left"></span></span></label>'
             '<p id="chat-count" class="chat-count">0 / 600 karakter</p>'
             '<p class="chat-count">Pertanyaan dan pemakaian dicatat secara privat oleh pengelola untuk evaluasi layanan.</p>'
             '<div id="chat-progress" class="chat-progress" hidden><div class="chat-working"><span class="chat-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="chat-activity">Asisten mulai bekerja…</span><span id="chat-elapsed"></span></div><progress id="chat-meter" aria-label="Progres pembacaan dokumen"></progress></div>'

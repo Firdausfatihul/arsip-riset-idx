@@ -14,7 +14,8 @@ export const LIMITS = Object.freeze({question:600, body:4096, terms:4, archive:4
   batch:384000, message:480000, input:8000000, output:36000, calls:20});
 
 export function validate(body) {
-  if (!body || Array.isArray(body) || Object.keys(body).some(k => !['question','context'].includes(k)) ||
+  if (!body || Array.isArray(body) || Object.keys(body).some(k => !['question','context','mode'].includes(k)) ||
+      (body.mode !== undefined && body.mode !== 'agentic') ||
       typeof body.question !== 'string' || body.question.length > LIMITS.question)
     throw new ChatError('Tuliskan pertanyaan, maksimal 600 karakter. Muat ulang halaman jika perlu.');
   const question = body.question.normalize('NFKC').replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '').trim();
@@ -22,7 +23,7 @@ export function validate(body) {
     throw new ChatError('Tuliskan pertanyaan, maksimal 600 karakter.');
   if (body.context !== undefined && (typeof body.context !== 'string' || !/^[a-f0-9]{64}$/.test(body.context)))
     throw new ChatError('Konteks percakapan tidak valid. Pilih Percakapan baru.');
-  return {question, context:body.context};
+  return {question, context:body.context, mode:body.mode === 'agentic' ? 'agentic' : 'archive'};
 }
 
 // Transport limits are enforced before decoding/parsing, including chunked/slow requests.
@@ -239,7 +240,7 @@ export class OpenRouter {
     record.cache_write_tokens = number(usage.prompt_tokens_details?.cache_write_tokens);
   }
   cancel() { this.controller.abort(); }
-  async request(messages, {stream = false, jsonMode = false, maxTokens = 1800, reasoning = false} = {}) {
+  async request(messages, {stream = false, jsonMode = false, maxTokens = 1800, reasoning = false, tools, toolChoice = 'auto'} = {}) {
     this.signal?.throwIfAborted();
     const bytes = size(messages);
     if (bytes > LIMITS.message || this.input + bytes > LIMITS.input ||
@@ -253,6 +254,8 @@ export class OpenRouter {
     const payload = {model:MODEL, messages, stream, max_tokens:maxTokens, temperature:0.2,
       reasoning:reasoning ? {max_tokens:reasoning === 2048 ? 2048 : 512, exclude:true} : {enabled:false}};
     if (jsonMode) payload.response_format = {type:'json_object'};
+    // Only agentic mode passes tools, and only the fixed server-side list in agent.mjs.
+    if (tools) { payload.tools = tools; payload.tool_choice = toolChoice; payload.parallel_tool_calls = true; }
     const response = await this.fetcher('https://openrouter.ai/api/v1/chat/completions', {
       method:'POST', signal:AbortSignal.any([this.signal || new AbortController().signal, AbortSignal.timeout(180000)]),
       headers:{Authorization:'Bearer ' + this.key, 'Content-Type':'application/json',
@@ -287,6 +290,15 @@ export class OpenRouter {
       return choice.message.content;
     }
     throw new ChatError('Pembacaan mencapai batas jawaban. Persempit pertanyaan lalu coba lagi.');
+  }
+  // One non-streamed agent step: either tool calls or a short "SIAP" when evidence is sufficient.
+  async step(messages, tools, maxTokens) {
+    const response = await this.request(messages, {maxTokens, tools});
+    const event = JSON.parse(await readLimited(response.body, 400000, 180000, this.signal));
+    this.account(response, event);
+    const choice = event.choices?.[0];
+    if (!choice?.message) throw new ChatError('Layanan AI belum menyelesaikan langkah penelusuran. Silakan coba lagi.');
+    return choice;
   }
   async stream(messages, options, receiveText) {
     const response = await this.request(messages, {...options, stream:true});
@@ -339,7 +351,10 @@ export class OpenRouter {
   }
   async answer(messages, emit, options = {}) {
     this.truncated = false;
-    return this.stream(messages, {maxTokens:ANSWER_TOKENS, allowPartial:true, reasoning:options.reasoningTokens === 2048 ? 2048 : true}, text => emit({type:'delta', text}));
+    // Agentic answers pass the same tools (tool_choice none) so the whole transcript stays a cached prefix.
+    // Agentic steps run without reasoning; the template renders earlier tool turns differently with it on, so the answer matches them.
+    return this.stream(messages, {maxTokens:ANSWER_TOKENS, allowPartial:true, reasoning:options.reasoning === false ? false : options.reasoningTokens === 2048 ? 2048 : true,
+      ...(options.tools ? {tools:options.tools, toolChoice:options.toolChoice || 'none'} : {})}, text => emit({type:'delta', text}));
   }
 }
 

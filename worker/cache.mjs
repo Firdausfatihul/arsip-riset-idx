@@ -25,6 +25,8 @@ export class CacheStore {
     sql.exec('CREATE TABLE IF NOT EXISTS question_events (id TEXT PRIMARY KEY, stamp INTEGER, user_key TEXT, question TEXT, normalized TEXT, status TEXT, terms TEXT)');
     sql.exec('CREATE INDEX IF NOT EXISTS question_stamp ON question_events(stamp)');
     sql.exec('CREATE INDEX IF NOT EXISTS question_normalized ON question_events(normalized)');
+    // Added with agentic mode; rows from before carry no mode and count as normal use.
+    try { sql.exec('ALTER TABLE question_events ADD COLUMN mode TEXT'); } catch { /* column exists */ }
   }
   get(kind, key) {
     const row = this.sql.exec('SELECT content FROM evidence_cache WHERE kind = ? AND cache_key = ? AND expires > ?', kind, key, Date.now()).toArray()[0];
@@ -63,10 +65,11 @@ export class CacheStore {
     this.sql.exec('INSERT OR REPLACE INTO analysis_usage VALUES (?, ?, ?, ?)', id, now, result, JSON.stringify(metrics));
     this.finishQuestion(id,result,metrics.retrieval?.terms || []);
   }
-  question(id, userKey, text, normalized=text) {
+  question(id, userKey, text, normalized=text, mode='archive') {
     const now=Date.now();
     this.sql.exec('DELETE FROM question_events WHERE stamp < ?',now-365*86400000);
-    this.sql.exec('INSERT INTO question_events VALUES (?, ?, ?, ?, ?, ?, ?)',id,now,userKey,text,normalized.toLowerCase().replace(/\s+/g,' ').trim(),'received','[]');
+    this.sql.exec('INSERT INTO question_events (id,stamp,user_key,question,normalized,status,terms,mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      id,now,userKey,text,normalized.toLowerCase().replace(/\s+/g,' ').trim(),'received','[]',mode === 'agentic' ? 'agentic' : 'archive');
   }
   finishQuestion(id,status,terms=[]) {
     this.sql.exec('UPDATE question_events SET status = ?, terms = ? WHERE id = ?',status,JSON.stringify(terms),id);
@@ -80,7 +83,23 @@ export class CacheStore {
     const sums=Object.entries(fields).map(([name,path])=>`COALESCE(SUM(json_extract(metrics,'$.${path}')),0) AS ${name}`).join(',');
     const total=this.sql.exec('SELECT COUNT(*) AS requests,'+sums+' FROM analysis_usage WHERE stamp >= ?',since).toArray()[0];
     const input=this.sql.exec('SELECT COUNT(*) AS inputs, COUNT(DISTINCT user_key) AS anonymous_clients FROM question_events WHERE stamp >= ?',since).toArray()[0];
-    const questions=this.sql.exec(`SELECT q.id,q.stamp,q.user_key,q.question,q.status,q.terms,a.metrics
+    // Normal and agentic use side by side, so agentic cost can be watched on its own.
+    const cost="COALESCE(json_extract(a.metrics,'$.usage.known_cost_usd'),0)";
+    const by_mode=this.sql.exec(`SELECT COALESCE(q.mode,'archive') AS mode,COUNT(*) AS inputs,
+      SUM(q.status='complete') AS completed,SUM(q.status NOT IN ('complete','clarification','running','received')) AS failed,
+      COALESCE(SUM(${cost}),0) AS known_cost_usd,COALESCE(MAX(${cost}),0) AS max_cost_usd,
+      COALESCE(SUM(json_extract(a.metrics,'$.usage.calls')),0) AS provider_calls,
+      COALESCE(SUM(json_extract(a.metrics,'$.usage.prompt_tokens')),0) AS prompt_tokens,
+      COALESCE(SUM(json_extract(a.metrics,'$.usage.completion_tokens')),0) AS completion_tokens,
+      COALESCE(SUM(json_extract(a.metrics,'$.usage.missing_usage_calls')),0) AS missing_usage_calls,
+      COALESCE(SUM(json_extract(a.metrics,'$.retrieval.answer_cache_hit')),0) AS answer_cache_hits,
+      COALESCE(SUM(json_extract(a.metrics,'$.retrieval.agent_tool_calls')),0) AS tool_calls,
+      COALESCE(SUM(json_extract(a.metrics,'$.retrieval.datacat_cache_hits')),0) AS datacat_cache_hits
+      FROM question_events q LEFT JOIN analysis_usage a ON a.id=q.id WHERE q.stamp >= ? GROUP BY 1 ORDER BY 1`,since).toArray();
+    const daily_by_mode=this.sql.exec(`SELECT strftime('%Y-%m-%d',q.stamp/1000,'unixepoch') AS day,COALESCE(q.mode,'archive') AS mode,
+      COUNT(*) AS inputs,COALESCE(SUM(${cost}),0) AS known_cost_usd
+      FROM question_events q LEFT JOIN analysis_usage a ON a.id=q.id WHERE q.stamp >= ? GROUP BY 1,2 ORDER BY 1,2`,since).toArray();
+    const questions=this.sql.exec(`SELECT q.id,q.stamp,q.user_key,q.question,q.status,q.terms,COALESCE(q.mode,'archive') AS mode,a.metrics
       FROM question_events q LEFT JOIN analysis_usage a ON a.id=q.id WHERE q.stamp >= ? ORDER BY q.stamp DESC LIMIT ? OFFSET ?`,since,limit,offset).toArray()
       .map(r=>({...r,terms:JSON.parse(r.terms),metrics:r.metrics?JSON.parse(r.metrics):null}));
     const top_questions=this.sql.exec(`SELECT q.normalized AS question,COUNT(*) AS count,
@@ -97,7 +116,7 @@ export class CacheStore {
     const daily=this.sql.exec(`SELECT strftime('%Y-%m-%d',q.stamp/1000,'unixepoch') AS day,COUNT(*) AS inputs,
       COALESCE(SUM(json_extract(a.metrics,'$.usage.known_cost_usd')),0) AS known_cost_usd
       FROM question_events q LEFT JOIN analysis_usage a ON a.id=q.id WHERE q.stamp >= ? GROUP BY day ORDER BY day`,since).toArray();
-    return {days,total:{...total,...input},top_questions,expensive_questions,top_terms,outcomes,daily,
+    return {days,total:{...total,...input},by_mode,daily_by_mode,top_questions,expensive_questions,top_terms,outcomes,daily,
       pagination:{limit,offset,total:input.inputs},questions,records};
   }
 }

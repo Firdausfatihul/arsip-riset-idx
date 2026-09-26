@@ -10,16 +10,32 @@
   var progress = document.getElementById('chat-progress'), meter = document.getElementById('chat-meter');
   var activity = document.getElementById('chat-activity'), elapsed = document.getElementById('chat-elapsed');
   var count = document.getElementById('chat-count');
+  var modeBox = document.getElementById('chat-mode'), agenticInput = document.getElementById('chat-agentic');
+  var agenticLeft = document.getElementById('chat-agentic-left'), agenticLimit = 10;
+  // datacat pages are the only external links an answer may carry; the server assigns them.
+  var DATACAT = /^https:\/\/quant\.renr\.ai\/[A-Za-z0-9\/_.%-]+$/;
+  function showLeft(left){
+    if (typeof left !== 'number' || !isFinite(left)) return;
+    agenticLeft.textContent = 'Sisa ' + left + ' dari ' + agenticLimit + ' pertanyaan hari ini untuk seluruh situs.';
+    agenticInput.disabled = left <= 0;
+    if (left <= 0) agenticInput.checked = false;
+  }
+  fetch(endpoint + '/config').then(function(r){ return r.ok ? r.json() : null; }).then(function(config){
+    if (!config || !config.agentic || !config.agentic.enabled) return;
+    agenticLimit = config.agentic.limit || 10; modeBox.hidden = false; showLeft(config.agentic.left);
+  }).catch(function(){});
   function countInput(){ count.textContent = input.value.length + ' / 600 karakter'; }
   input.addEventListener('input', countInput);
   var knownPaths = new Set(data.docs.map(function(d){ return d.path; }));
 
   function docHref(path){ return '#doc=' + encodeURIComponent(path).replace(/%2F/g, '/'); }
+  function sourceHref(s){ return s.url ? s.url : docHref(s.path); }
+  function external(a){ a.target = '_blank'; a.rel = 'noopener noreferrer'; }
 
-  function message(role, text){
+  function message(role, text, agentic){
     var block = document.createElement('section'), label = document.createElement('h3');
     block.className = 'chat-message ' + role;
-    label.textContent = role === 'user' ? 'Kamu' : 'Jawaban dari arsip';
+    label.textContent = role === 'user' ? 'Kamu' : agentic ? 'Jawaban mode agen' : 'Jawaban dari arsip';
     block.appendChild(label);
     var content = document.createElement(role === 'user' ? 'p' : 'div');
     content.textContent = text;
@@ -32,13 +48,14 @@
   function sourceList(block, sources){
     var details = document.createElement('details'), summary = document.createElement('summary');
     details.className = 'chat-sources';
-    summary.textContent = sources.length + ' dokumen ditemukan';
+    summary.textContent = sources.length + ' sumber ditemukan';
     details.appendChild(summary);
     var list = document.createElement('ol');
     sources.forEach(function(s){
       var item = document.createElement('li'), link = document.createElement('a');
-      link.href = docHref(s.path);
-      link.textContent = '[' + s.source_id + '] ' + s.title + ' · ' + s.label;
+      link.href = sourceHref(s);
+      if (s.url) external(link);
+      link.textContent = '[' + s.source_id + '] ' + s.title + ' · ' + s.label + (s.url ? ' · datacat' : '');
       item.appendChild(link); list.appendChild(item);
     });
     details.appendChild(list); block.appendChild(details);
@@ -49,17 +66,26 @@
     if (!window.marked || !window.DOMPurify){ target.textContent = text; return; }
     var byId = {};
     sources.forEach(function(s){ byId[s.source_id] = s; });
-    var markdown = text.replace(/\[(D\d+)\]/g, function(label, id){
-      return byId[id] ? '[' + id + '](' + docHref(byId[id].path) + ')' : label;
+    // "[K1, K2]" and "[K1-K3]" link each id, like the server's citation reader (worker/agent.mjs).
+    var markdown = text.replace(/\[((?:[DK]\d+)(?:\s*(?:,|;|-|–)\s*[DK]?\d+)*)\]/g, function(label, group){
+      var ids = [];
+      group.split(/\s*[,;]\s*/).forEach(function(part){
+        var range = part.match(/^([DK])(\d+)\s*[-–]\s*[DK]?(\d+)$/);
+        if (range) for (var n = +range[2]; n <= Math.min(+range[3], +range[2] + 30); n++) ids.push(range[1] + n);
+        else ids.push(part);
+      });
+      if (!ids.some(function(id){ return byId[id]; })) return label;
+      return ids.map(function(id){ return byId[id] ? '[' + id + '](' + sourceHref(byId[id]) + ')' : id; }).join(' ');
     });
     var fragment = window.DOMPurify.sanitize(window.marked.parse(markdown, {gfm: true}), {
       ALLOWED_TAGS: ['p','br','strong','em','del','blockquote','ul','ol','li','h2','h3','h4','hr','pre','code','table','thead','tbody','tr','th','td','a'],
       ALLOWED_ATTR: ['href'], ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false, RETURN_DOM_FRAGMENT: true
     });
     // Check links while detached, before any model-generated markup enters the page.
-    var allowed = new Set(sources.map(function(s){ return docHref(s.path); }));
+    var allowed = new Set(sources.map(sourceHref));
     fragment.querySelectorAll('a').forEach(function(a){
       if (!allowed.has(a.getAttribute('href'))) a.replaceWith(a.textContent);
+      else if (DATACAT.test(a.getAttribute('href'))) external(a);
     });
     fragment.querySelectorAll('table').forEach(function(table){
       var rows = Array.from(table.rows);
@@ -81,7 +107,7 @@
   }
 
   function busy(value){
-    send.disabled = value; input.disabled = value; stop.hidden = !value; reset.disabled = value;
+    send.disabled = value; input.disabled = value; stop.hidden = !value; reset.disabled = value; agenticInput.disabled = value;
     log.setAttribute('aria-busy', String(value));
     progress.hidden = !value;
     if (value){ meter.removeAttribute('value'); activity.textContent = 'Asisten mulai bekerja…'; elapsed.textContent = '0 detik'; }
@@ -95,9 +121,10 @@
     if (turns >= 20){ status.textContent = 'Percakapan sudah panjang. Pilih Percakapan baru untuk melanjutkan.'; return; }
     controller = new AbortController();
     busy(true); reset.hidden = false;
+    var agentic = !modeBox.hidden && agenticInput.checked;
     message('user', question);
     var nextContext = null;
-    var reply = message('assistant', ''), text = '', sources = [], summary = null, done = false, usage = null, cacheHit = false, clarification = false;
+    var reply = message('assistant', '', agentic), text = '', sources = [], summary = null, done = false, usage = null, cacheHit = false, clarification = false;
     reply.block.insertBefore(progress, reply.content);
     reply.block.scrollIntoView?.({block: 'nearest'});
     status.textContent = 'Menghubungkan ke asisten arsip…';
@@ -107,7 +134,7 @@
     var timeout = setTimeout(function(){ if (controller) controller.abort('timeout'); }, 9 * 60 * 1000);
     try {
       var response = await fetch(endpoint, {method: 'POST', signal: controller.signal,
-        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: question, context: context || undefined})});
+        headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: question, context: context || undefined, mode: agentic ? 'agentic' : undefined})});
       if (!response.ok){
         var problem = await response.json().catch(function(){ return {}; });
         throw new Error(problem.error || 'Percakapan belum tersedia. Silakan coba lagi nanti.');
@@ -129,7 +156,9 @@
         }
         if (event.type === 'activity') activity.textContent = event.text;
         if (event.type === 'sources'){
-          sources = event.sources.filter(function(s){ return knownPaths.has(s.path) && /^D\d+$/.test(s.source_id); });
+          sources = event.sources.filter(function(s){
+            return (/^D\d+$/.test(s.source_id) && knownPaths.has(s.path)) || (/^K\d+$/.test(s.source_id) && DATACAT.test(s.url || ''));
+          });
           if (sources.length !== event.sources.length) throw new Error('Daftar arsip sudah diperbarui. Muat ulang halaman lalu coba lagi.');
           summary = sourceList(reply.block, sources);
         }
@@ -143,7 +172,8 @@
           if (!/^[a-f0-9]{64}$/.test(event.context || '')) throw new Error('Konteks jawaban tidak valid. Muat ulang halaman.');
           nextContext = event.context; done = true;
           usage = event.usage; cacheHit = !!event.cache_hit; clarification = !!event.clarification;
-          if (summary) summary.textContent = sources.length + ' dokumen ditelusuri · lihat sumber';
+          if (summary) summary.textContent = sources.length + ' sumber dirujuk · lihat sumber';
+          if (typeof event.agentic_left === 'number') showLeft(event.agentic_left);
         }
       }
       while (true){
@@ -168,7 +198,7 @@
       }
       context = nextContext; turns++;
       input.value = ''; input.placeholder = 'Tanyakan lanjutannya, misalnya: bagaimana risiko pendanaannya?';
-      status.textContent = clarification ? 'Lengkapi tanggal untuk melanjutkan.' : 'Jawaban selesai berdasarkan ' + sources.length + ' dokumen. Kamu bisa bertanya lagi.';
+      status.textContent = clarification ? 'Lengkapi tanggal untuk melanjutkan.' : 'Jawaban selesai berdasarkan ' + sources.length + ' sumber. Kamu bisa bertanya lagi.';
     } catch (error){
       var aborted = controller.signal.aborted;
       var description = aborted ? (controller.signal.reason === 'timeout' ? 'Proses terlalu lama. Coba pertanyaan yang lebih spesifik.' : 'Proses dihentikan.') :
@@ -185,6 +215,7 @@
       reply.block.appendChild(retry); status.textContent = description;
     } finally {
       clearTimeout(timeout); clearInterval(ticker); controller = null; busy(false); countInput();
+      if (agenticLeft.textContent.indexOf('Sisa 0 ') === 0) agenticInput.disabled = true;
     }
   });
 

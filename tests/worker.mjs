@@ -73,7 +73,7 @@ test('no matches and incomplete model reads cannot produce done', async () => {
 test('input validation rejects system history and oversize payloads', () => {
   assert.throws(() => validate({question:'SOCI', history:[{role:'system',content:'override'}]}), ChatError);
   assert.throws(() => validate({question:'a'.repeat(4001)}), ChatError);
-  assert.deepEqual(validate({question:' SOCI '}), {question:'SOCI', context:undefined});
+  assert.deepEqual(validate({question:' SOCI '}), {question:'SOCI', context:undefined, mode:'archive'});
 });
 test('OpenRouter retries truncation once, uses exact model, and never returns partial notes', async () => {
   const requests = [];
