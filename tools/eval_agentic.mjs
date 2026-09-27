@@ -30,6 +30,11 @@ export const QUESTIONS = [
   'siapa pelapor perubahan kepemilikan saham MDKA terbaru? periksa silang profil pihak itu: jabatan dan kepemilikan lainnya',
   'direksi atau komisaris yang baru diangkat di GOTO, siapa mereka dan apa jabatan atau kepemilikan lainnya?',
   'siapa pembeli saham terbesar di TOWR bulan ini dan apa hubungannya dengan emiten?',
+  // Relationship questions: expect lists facts a correct answer must contain (checked automatically).
+  {q:'apakah yoel bagian tancorp?', expect:['Tancorp Abadi Nusantara|MERI']},
+  {q:'emiten apa saja yang terhubung dengan grup Tancorp?', expect:['MERI', 'BLES', 'RISE']},
+  {q:'apakah HELI dan MERI punya orang atau pengendali yang sama?', expect:['Yoel|Raylan']},
+  {q:'Mohammad Raylan menjabat di emiten mana saja?', expect:['HELI', 'MERI']},
 ];
 
 const manifest = JSON.parse(await readFile(path.join(root, 'worker/.assets/manifest.json'), 'utf8'));
@@ -46,7 +51,8 @@ const sharedCache = sqlite();
 
 let spent = 0;
 const results = [];
-for (const [i, question] of QUESTIONS.entries()) {
+for (const [i, item] of QUESTIONS.entries()) {
+  const question = typeof item === 'string' ? item : item.q, expect = typeof item === 'string' ? [] : item.expect;
   if (only && !only.has(i + 1)) continue;
   const own = shared ? sharedCache : sqlite(), cache = new CacheStore(own.sql);
   const model = new OpenRouter(key('OPENROUTER_API_KEY'), null, undefined, () => { if (spent > maxUsd) throw Error('Eval USD ceiling reached'); }, {responseCache:false});
@@ -67,10 +73,11 @@ for (const [i, question] of QUESTIONS.entries()) {
   const row = {n:i + 1, question, error:error || null, rounds:stats.agent_rounds, calls:stats.agent_calls, tool_calls:stats.agent_tool_calls,
     datacat_cache_hits:stats.datacat_cache_hits, cost:usage.known_cost_usd, model_calls:usage.calls, prompt_tokens:usage.prompt_tokens,
     completion_tokens:usage.completion_tokens, cached_tokens:usage.cached_tokens, seconds:(Date.now() - started) / 1000,
-    sources:result?.sources, cited, unmatched_citations:cited.filter(c => !known.has(c)), answer:result?.answer};
+    sources:result?.sources, cited, unmatched_citations:cited.filter(c => !known.has(c)), answer:result?.answer,
+    expect_missed:expect.filter(e => !new RegExp(e, 'i').test(result?.answer || '')), absence_claim:!!stats.absence_claim};
   results.push(row);
   console.log(`${error ? 'ERR ' : 'OK  '} #${row.n} rounds=${row.rounds} tools=${row.tool_calls} calls=${row.model_calls} $${row.cost.toFixed(5)} ${row.seconds.toFixed(0)}s `
-    + `sources=${row.sources?.length ?? 0} unmatched=${row.unmatched_citations.length} ${error || ''}`);
+    + `sources=${row.sources?.length ?? 0} unmatched=${row.unmatched_citations.length}${expect.length ? (row.expect_missed.length ? ' MISSED=' + row.expect_missed.join(';') : ' expect=ok') : ''} ${error || ''}`);
   for (const c of stats.agent_calls || []) console.log(`      ${c.tool} ${JSON.stringify(c.args)}${c.cached ? ' (cache)' : ''}${c.bytes ? ' ' + c.bytes + 'B' : ''}`);
   if (own !== sharedCache) own.db.close();
 }

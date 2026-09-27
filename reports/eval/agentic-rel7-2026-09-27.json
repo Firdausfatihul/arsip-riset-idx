@@ -1,0 +1,2767 @@
+{
+  "summary": {
+    "label": "rel7-2026-09-27",
+    "created_at": "2026-09-27T08:55:10.234Z",
+    "questions": 17,
+    "ok": 17,
+    "total_usd": 0.008633626,
+    "mean_usd": 0.0005078603529411765,
+    "max_usd": 0.000918203,
+    "mean_tool_calls": 8.294117647058824,
+    "mean_seconds": 19.666058823529415
+  },
+  "results": [
+    {
+      "n": 1,
+      "question": "siapa pemegang saham terbesar SOCI dan apakah ada perubahan kepemilikan terbaru?",
+      "error": null,
+      "rounds": 3,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "SOCI"
+            ]
+          },
+          "bytes": 4939,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "SOCI"
+          },
+          "bytes": 256,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "ticker": "SOCI",
+            "min_pct": 1
+          },
+          "cached": false,
+          "bytes": 1537
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "ticker": "SOCI"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "3230"
+          },
+          "cached": false,
+          "bytes": 1569
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "3228"
+          },
+          "cached": false,
+          "bytes": 1570
+        }
+      ],
+      "tool_calls": 6,
+      "datacat_cache_hits": 0,
+      "cost": 0.0003367,
+      "model_calls": 4,
+      "prompt_tokens": 19712,
+      "completion_tokens": 470,
+      "cached_tokens": 13520,
+      "seconds": 15.246,
+      "sources": [
+        {
+          "source_id": "O1",
+          "title": "Kepemilikan SOCI · SOECHI LINES Tbk",
+          "url": "#kepemilikan=SOCI",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "K1",
+          "title": "SOCI",
+          "url": "https://quant.renr.ai/issuer/SOCI/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K2",
+          "title": "PT Pilar Sukses Utama",
+          "url": "https://quant.renr.ai/account/3230/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K1",
+        "K2"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data KSEI per 31 Agustus 2026, pemegang saham terbesar PT Soechi Lines Tbk (SOCI) adalah **PT Pilar Sukses Utama** dan **PT Darma Pertiwi Raya**, yang masing-masing memegang **35,05%** saham emiten tersebut [K1] [K2].\n\nSelain kedua pemegang saham utama di atas, terdapat pemegang saham lain dengan kepemilikan di atas 1% yaitu:\n*   PT Dana Cipta Indonusa: 4,92%\n*   PT Investama Pradana Usaha: 4,6%\n*   PT Gema Indah Hutama: 4,6%\n*   Hartono Utomo: 1,64% [O1]\n\n**Perubahan Kepemilikan Terbaru:**\nTidak ada perubahan kepemilikan terbaru yang tercatat untuk SOCI hingga tanggal 27 September 2026. Data resmi BEI menunjukkan jumlah hasil pencarian untuk \"perubahan_kepemilikan\" pada ticker SOCI adalah 0 [datacat_daftar]. Selain itu, riwayat kepemilikan bulanan dari Juni hingga Agustus 2026 menunjukkan persentase saham PT Pilar Sukses Utama dan PT Darma Pertiwi Raya tetap stabil di angka 35,05% tanpa adanya fluktuasi [K1] [K2].",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 2,
+      "question": "RUPS tahunan BBCA 2026 memutuskan apa saja? termasuk dividen",
+      "error": null,
+      "rounds": 7,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "BBCA"
+            ]
+          },
+          "bytes": 4014,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "BBCA"
+          },
+          "bytes": 219,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "rups",
+            "ticker": "BBCA",
+            "q": "tahunan 2026"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "rups",
+            "ticker": "BBCA"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengumuman",
+            "ticker": "BBCA",
+            "q": "RUPS 2026"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengumuman",
+            "ticker": "BBCA",
+            "q": "RUPS tahunan"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "dokumen",
+            "ticker": "BBCA",
+            "q": "RUPS 2026"
+          },
+          "cached": false,
+          "bytes": 3013
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "dokumen",
+            "ticker": "BBCA",
+            "q": "RUPS 2025"
+          },
+          "cached": false,
+          "bytes": 2966
+        }
+      ],
+      "tool_calls": 9,
+      "datacat_cache_hits": 0,
+      "cost": 0.00042623100000000006,
+      "model_calls": 8,
+      "prompt_tokens": 31821,
+      "completion_tokens": 647,
+      "cached_tokens": 24759,
+      "seconds": 15.057,
+      "sources": [
+        {
+          "source_id": "K1",
+          "title": "20260909_BBCA_Public Expose_32146465_lamp5.pdf",
+          "url": "https://quant.renr.ai/document/1329493/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K2",
+          "title": "Laporan Hasil Public Expose - Tahunan",
+          "url": "https://quant.renr.ai/announcement/20260914185457-017/CSG-IVR/2026_id-id/",
+          "label": "2026-09-14"
+        },
+        {
+          "source_id": "K11",
+          "title": "20240318_BBCA_Ringkasan Risalah//Risalah RUPS_31607244.pdf",
+          "url": "https://quant.renr.ai/document/946425/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K1",
+        "K2",
+        "K11"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data resmi BEI yang tersedia hingga 27 September 2026, **belum ditemukan** pengumuman atau risalah mengenai RUPS Tahunan BBCA 2026. Pencarian pada jenis data `rups` dan `pengumuman` dengan kata kunci terkait RUPS tahunan 2026 untuk emiten BBCA menghasilkan hasil kosong (count:0), yang mengindikasikan bahwa acara tersebut belum diproses atau belum diumumkan ke publik melalui kanal resmi BEI.\n\nData terbaru yang tercatat adalah:\n1.  **Public Expose Tahunan**: Diumumkan pada 14 September 2026 (ref: K2), yang membahas kinerja dan strategi perusahaan, namun bukan keputusan formal RUPS [K1] [K2].\n2.  **RUPS Terakhir**: Risalah RUPS Tahunan terakhir yang terekam adalah untuk tahun 2024, yang diadakan pada 18 Maret 2024 (ref: K12) [K11].\n\nSehingga, tidak ada bukti resmi mengenai keputusan RUPS Tahunan BBCA 2026, termasuk pengesahan laporan keuangan, pembagian dividen, atau pemilihan direksi/komisaris untuk periode tersebut. Informasi ini kemungkinan akan tersedia setelah RUPS dilaksanakan dan rislasnya diunggah oleh emiten.",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 3,
+      "question": "siapa yang menambah kepemilikan saham di BBCA selama 2024?",
+      "error": null,
+      "rounds": 5,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "BBCA",
+              "menambah",
+              "selama"
+            ]
+          },
+          "bytes": 4030,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "BBCA"
+          },
+          "bytes": 219,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "ticker": "BBCA",
+            "dari": "2024-01-01",
+            "sampai": "2024-12-31",
+            "limit": 25
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "ticker": "BBCA",
+            "min_pct": 1,
+            "dari": "2024-01-01",
+            "sampai": "2024-12-31",
+            "limit": 25
+          },
+          "cached": false,
+          "bytes": 1873
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "ticker": "BBCA",
+            "dari": "2024-01-01",
+            "sampai": "2026-12-31",
+            "limit": 25
+          },
+          "cached": false,
+          "bytes": 3935
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "ticker": "BBCA",
+            "dari": "2024-01-01",
+            "sampai": "2025-12-31",
+            "limit": 25
+          },
+          "cached": false,
+          "bytes": 20
+        }
+      ],
+      "tool_calls": 6,
+      "datacat_cache_hits": 0,
+      "cost": 0.0004286969999999999,
+      "model_calls": 6,
+      "prompt_tokens": 29832,
+      "completion_tokens": 772,
+      "cached_tokens": 22997,
+      "seconds": 38.579,
+      "sources": [
+        {
+          "source_id": "D53",
+          "title": "Stockbit — Corporate actions, ekspansi, dan petunjuk yang perlu diuji",
+          "path": "files/stockbit/2026-09-25/stockbit_25092026.md",
+          "label": "25 September 2026"
+        },
+        {
+          "source_id": "D50",
+          "title": "Stockbit — corporate action, expansion, dan petunjuk spekulasi",
+          "path": "files/stockbit/2026-09-19/stockbit_19092026.md",
+          "label": "19 September 2026"
+        },
+        {
+          "source_id": "D48",
+          "title": "Stockbit — 16–17 September 2026",
+          "path": "files/stockbit/2026-09-17/stockbit_17092026.md",
+          "label": "17 September 2026"
+        },
+        {
+          "source_id": "K1",
+          "title": "PT Bank Central Asia Tbk",
+          "url": "https://quant.renr.ai/issuer/BBCA/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K2",
+          "title": "Pihak Afiliasi Pengendali",
+          "url": "https://quant.renr.ai/account/7633/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K3",
+          "title": "Dwimuria Investama",
+          "url": "https://quant.renr.ai/account/4275/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K3",
+        "K2",
+        "D53",
+        "D50",
+        "D48"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data resmi BEI, **tidak ada** pengungkapan perubahan kepemilikan saham (pembelian/penjualan) yang dilaporkan untuk emiten BBCA selama tahun 2024. Data *perubahan_kepemilikan* untuk periode tersebut menunjukkan hasil kosong [K1-K3].\n\nSelain itu, data pemegang saham >1% per akhir tahun 2024 menunjukkan posisi yang stabil tanpa perubahan signifikan:\n*   **Dwimuria Investama**: 54,942% [K3]\n*   **Pihak Afiliasi Pengendali**: 2,455% [K2]\n\nArsip riset juga tidak mencatat adanya aksi korporasi atau spekulasi terkait penambahan kepemilikan di BBCA pada periode tersebut, dengan fokus pembahasan lebih banyak pada rumor akuisisi dan mekanisme pasar [D53] [D50] [D48].",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 4,
+      "question": "perubahan direksi atau komisaris GOTO dalam setahun terakhir",
+      "error": null,
+      "rounds": 7,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "GOTO",
+              "setahun terakhir"
+            ]
+          },
+          "bytes": 5923,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "GOTO"
+          },
+          "bytes": 845,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_pengurus",
+            "ticker": "GOTO"
+          },
+          "cached": false,
+          "bytes": 3302
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "perubahan_pengurus",
+            "id": "289"
+          },
+          "bytes": 50
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pengurus",
+            "id": "289"
+          },
+          "bytes": 40
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen",
+            "id": "167162"
+          },
+          "cached": false,
+          "bytes": 3813
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen_teks",
+            "id": "167162",
+            "halaman_dari": 1,
+            "halaman_sampai": 5
+          },
+          "cached": false,
+          "bytes": 4672
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen_teks",
+            "id": "167162",
+            "halaman_dari": 5,
+            "halaman_sampai": 10
+          },
+          "cached": false,
+          "bytes": 4672
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen_teks",
+            "id": "167162",
+            "halaman_dari": 10,
+            "halaman_sampai": 15
+          },
+          "cached": false,
+          "bytes": 4672
+        }
+      ],
+      "tool_calls": 9,
+      "datacat_cache_hits": 0,
+      "cost": 0.0006598,
+      "model_calls": 8,
+      "prompt_tokens": 54474,
+      "completion_tokens": 795,
+      "cached_tokens": 43230,
+      "seconds": 17.781,
+      "sources": [
+        {
+          "source_id": "D16",
+          "title": "Digest emiten IDX · 27–31 Agustus 2026",
+          "path": "files/digest-emiten/2026-08-27/digest_2026-08-27_2026-08-31.md",
+          "label": "27–31 Agustus 2026"
+        },
+        {
+          "source_id": "K1",
+          "title": "Ade Mulyana",
+          "url": "https://quant.renr.ai/account/12117/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K3",
+          "title": "BOARD_CHANGE 167162",
+          "url": "https://quant.renr.ai/document/167162/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K4",
+          "title": "Sugito Walujo",
+          "url": "https://quant.renr.ai/account/6582/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K5",
+          "title": "WINATO KARTONO",
+          "url": "https://quant.renr.ai/account/381/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K6",
+          "title": "PABLO MALAY",
+          "url": "https://quant.renr.ai/account/7945/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K7",
+          "title": "HANS PATUWO",
+          "url": "https://quant.renr.ai/account/6842/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K8",
+          "title": "Santoso Kartono",
+          "url": "https://quant.renr.ai/account/1215/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K9",
+          "title": "ANDRE SOELISTYO",
+          "url": "https://quant.renr.ai/account/9954/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K3",
+        "K4",
+        "D16",
+        "K1",
+        "K5",
+        "K6",
+        "K7",
+        "K9",
+        "K8"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data resmi BEI dan dokumen emiten, berikut perubahan direksi/komisaris PT GoTo Gojek Tokopedia Tbk (GOTO) dalam setahun terakhir:\n\n**1. Perubahan Direksi dan Komisaris Massal (17 Desember 2025)**\nBerdasarkan Laporan Informasi Fakta Material (dokumen id_dokumen: 167162), RUPSLB pada 17 Desember 2025 menyetujui perubahan kepengurusan yang efektif pada tanggal yang sama [K3]:\n\n*Pengunduran Diri:*\n- **Sugito Walujo**: Mundur dari jabatan Direktur Utama [K4] [D16].\n- **Ade Mulyana**: Mundur dari jabatan Direktur [K1] [D16].\n- **Winato Kartono**: Mundur dari jabatan Komisaris [K5] [D16].\n- **Pablo Malay**: Mundur dari jabatan Komisaris [K6] [D16].\n\n*Pengangkatan:*\n- **Hans Patuwo**: Diangkat sebagai Direktur Utama [K7] [D16].\n- **Andre Soelistyo**: Diangkat sebagai Komisaris [K9] [D16].\n- **Santoso Kartono**: Diangkat sebagai Komisaris [K8] [D16].\n\n**2. Pengunduran Diri Wakil Direktur Utama (Agustus 2026)**\nEmiten mengumumkan pengunduran diri **Catherine Hindra Sutjahyo** dari jabatan Wakil Direktur Utama, dengan alasan pribadi/keluarga. Pengunduran ini efektif setelah persetujuan RUPSLB yang dijadwalkan pada 14 Oktober 2026 [D16]. Emiten menyatakan tidak ada dampak merugikan terhadap operasional, hukum, keuangan, dan kelangsungan usaha, serta tidak ada informasi mengenai pengganti [D16].",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 5,
+      "question": "transaksi material atau afiliasi TLKM tahun 2026",
+      "error": null,
+      "rounds": 3,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "TLKM"
+            ]
+          },
+          "bytes": 5878,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "TLKM"
+          },
+          "bytes": 1128,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "transaksi",
+            "ticker": "TLKM"
+          },
+          "cached": false,
+          "bytes": 2968
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "transaksi",
+            "ticker": "TLKM",
+            "dari": "2026-01-01",
+            "sampai": "2026-09-27"
+          },
+          "cached": false,
+          "bytes": 20
+        }
+      ],
+      "tool_calls": 4,
+      "datacat_cache_hits": 0,
+      "cost": 0.00033810299999999997,
+      "model_calls": 4,
+      "prompt_tokens": 18708,
+      "completion_tokens": 676,
+      "cached_tokens": 13155,
+      "seconds": 14.524,
+      "sources": [
+        {
+          "source_id": "D51",
+          "title": "Stockbit — 20–22 September 2026",
+          "path": "files/stockbit/2026-09-22/stockbit_22092026.md",
+          "label": "22 September 2026"
+        },
+        {
+          "source_id": "D50",
+          "title": "Stockbit — corporate action, expansion, dan petunjuk spekulasi",
+          "path": "files/stockbit/2026-09-19/stockbit_19092026.md",
+          "label": "19 September 2026"
+        },
+        {
+          "source_id": "D49",
+          "title": "Stockbit — corporate actions, ekspansi, dan petunjuk yang perlu diperiksa",
+          "path": "files/stockbit/2026-09-18/stockbit_18092026.md",
+          "label": "18 September 2026"
+        },
+        {
+          "source_id": "O1",
+          "title": "Kepemilikan TLKM · PT Telkom Indonesia (Persero) Tbk",
+          "url": "#kepemilikan=TLKM",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "K1",
+          "title": "TLKM",
+          "url": "https://quant.renr.ai/issuer/TLKM/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K2",
+          "title": "PT Telkom Infrastruktur Indonesia",
+          "url": "https://quant.renr.ai/account/306/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K3",
+          "title": "ASSET_TRANSACTION 13577",
+          "url": "https://quant.renr.ai/document/13577/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K4",
+          "title": "ASSET_TRANSACTION 206243",
+          "url": "https://quant.renr.ai/document/206243/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K5",
+          "title": "ASSET_TRANSACTION 179016",
+          "url": "https://quant.renr.ai/document/179016/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K6",
+          "title": "ASSET_TRANSACTION 170755",
+          "url": "https://quant.renr.ai/document/170755/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K7",
+          "title": "ASSET_TRANSACTION 170044",
+          "url": "https://quant.renr.ai/document/170044/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K1",
+        "D50",
+        "D51",
+        "D49"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data resmi BEI dan arsip riset, berikut temuan transaksi material atau afiliasi TLKM pada tahun 2026 (hingga 27 September 2026):\n\n**Transaksi Material Resmi**\nTidak ada transaksi material atau afiliasi yang tercatat secara resmi di BEI untuk TLKM sejak 1 Januari 2026 hingga 27 September 2026 [K1-K7]. Data terbaru yang tercatat adalah transaksi aset dengan PT Telkom Infrastruktur Indonesia (Anak Perusahaan) senilai Rp35,78 triliun (22,02% ekuitas) yang terjadi pada 18 Desember 2025 [K4-K7].\n\n**Indikasi Transaksi Masa Depan**\nTerdapat pengumuman rencana transaksi material yang akan dilaksanakan pada 30 September 2026, berupa \"Pemisahan Segmen\" dengan nilai estimasi Rp49,858 triliun (33% ekuitas), melibatkan PT Telkom Infrastruktur Indonesia sebagai pihak terkait [K1].\n\n**Isu Kepemilikan & Afiliasi (Arsip Stockbit)**\nDalam periode 13–22 September 2026, terdapat narasi spekulatif mengenai restrukturisasi internal TLKM. Isu utama menyebutkan bahwa TLKM berencana memegang langsung 100% saham PT Telkom Data Ekosistem (TDE) melalui pembelian dari Telkomsigma, yang dikaitkan dengan persiapan *strategic partnership* bersama NeutraDC [D50] [D51]. Narasi ini juga menghubungkan TLKM dengan KETR, INET, dan CCSI dalam tema infrastruktur kabel laut, namun dugaan afiliasi tersebut belum terbukti secara kepemilikan resmi [D49].\n\n**Struktur Kepemilikan Saat Ini**\nPemegang saham >1% terbesar adalah PT Danantara Asset Management (51,57%), diikuti The Bank of New York Mellon (6,31%) [O1]. Komisaris Rizal Mallarangeng dan direksi Dian Siswarini tercatat sebagai pihak berafiliasi dengan kepemilikan sangat kecil (<0,01%) [O1].",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 6,
+      "question": "PT Soechi Group punya saham di emiten apa saja?",
+      "error": null,
+      "rounds": 1,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "Soechi"
+            ]
+          },
+          "bytes": 2130,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "nama": "Soechi"
+          },
+          "bytes": 99,
+          "auto": true
+        },
+        {
+          "tool": "datacat_cari",
+          "args": {
+            "q": "Soechi"
+          },
+          "cached": true,
+          "bytes": 3054,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "8586"
+          },
+          "cached": false,
+          "bytes": 1329,
+          "auto": true
+        }
+      ],
+      "tool_calls": 4,
+      "datacat_cache_hits": 1,
+      "cost": 0.00021595400000000003,
+      "model_calls": 2,
+      "prompt_tokens": 8594,
+      "completion_tokens": 255,
+      "cached_tokens": 4104,
+      "seconds": 7.905,
+      "sources": [
+        {
+          "source_id": "D12",
+          "title": "Digest emiten IDX · 21–24 Agustus 2026",
+          "path": "files/digest-emiten/2026-08-21/digest_2026-08-21_2026-08-24.md",
+          "label": "21–24 Agustus 2026"
+        },
+        {
+          "source_id": "K1",
+          "title": "PT Soechi Group",
+          "url": "https://quant.renr.ai/account/8586/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K28",
+          "title": "Penyampaian Laporan Tahunan & Keberlanjutan dan ESG",
+          "url": "https://quant.renr.ai/document/357913/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K29",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/954480/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K30",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/1052321/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K31",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/1052320/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K32",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/1052319/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K33",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/1052313/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K34",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/1052312/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K35",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/1052311/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K1",
+        "K28",
+        "K29",
+        "K30",
+        "K31",
+        "K32",
+        "K33",
+        "K34",
+        "K35",
+        "D12"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data kepemilikan resmi, PT Soechi Group tercatat sebagai pemegang saham di emiten berikut:\n\n**1. SOCI (PT Soechi Lines Tbk)**\n*   **Status Pemegang:** Pemegang saham >1% [K1] [K28].\n*   **Posisi Saham:** Data KSEI per 31 Maret 2025 mencatat persentase kepemilikan sebesar 0% [K1] [K28].\n*   **Jejak Dokumen:** Teridentifikasi dalam Laporan Tahunan & Keberlanjutan dan ESG tanggal 29 April 2025 pada halaman 39 [K28], serta beberapa Laporan Bulanan Registrasi Pemegang Efek (LBRE) pada awal tahun 2024 [K29] [K30] [K31] [K32] [K33] [K34] [K35].\n\n**Pemeriksaan Silang**\n*   **Emiten Lain:** Pencarian melalui data KSEI untuk nama \"Soechi\" tidak menemukan entitas lain yang memiliki kepemilikan saham >1% atau tercatat dalam daftar laporan emiten lainnya [D12].",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 7,
+      "question": "analisis ENRG: rights issue dan perubahan pengendali, gabungkan arsip dan data resmi",
+      "error": null,
+      "rounds": 7,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "ENRG"
+            ]
+          },
+          "bytes": 6079,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "ENRG"
+          },
+          "bytes": 1269,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_pengurus",
+            "ticker": "ENRG"
+          },
+          "cached": false,
+          "bytes": 1820
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengumuman",
+            "q": "rights issue ENRG"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "q": "ENRG pengendali"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengumuman",
+            "ticker": "ENRG"
+          },
+          "cached": false,
+          "bytes": 3041
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pengumuman",
+            "id": "20260925135358-316/EMP.DIR/1070/09-26/E_id-id"
+          },
+          "cached": false,
+          "bytes": 2068
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen_teks",
+            "id": "1331307"
+          },
+          "cached": false,
+          "bytes": 4756
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen_teks",
+            "id": "1331306"
+          },
+          "cached": false,
+          "bytes": 1861
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen_teks",
+            "id": "1331305"
+          },
+          "cached": false,
+          "bytes": 4623
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengumuman",
+            "q": "ENRG pengendali Shima BKI BCI"
+          },
+          "cached": false,
+          "bytes": 20
+        }
+      ],
+      "tool_calls": 11,
+      "datacat_cache_hits": 0,
+      "cost": 0.0007163409999999999,
+      "model_calls": 8,
+      "prompt_tokens": 64481,
+      "completion_tokens": 922,
+      "cached_tokens": 52951,
+      "seconds": 30.008,
+      "sources": [
+        {
+          "source_id": "D41",
+          "title": "KI — Analisis corporate action, expansion, dan kemungkinan perubahan bisnis",
+          "path": "files/keterbukaan-informasi/2026-09-26/ki_26092026.md",
+          "label": "26 September 2026"
+        },
+        {
+          "source_id": "D53",
+          "title": "Stockbit — Corporate actions, ekspansi, dan petunjuk yang perlu diuji",
+          "path": "files/stockbit/2026-09-25/stockbit_25092026.md",
+          "label": "25 September 2026"
+        },
+        {
+          "source_id": "D54",
+          "title": "Stockbit Ideas Review — 5–10 September 2026",
+          "path": "files/stockbit/2026-09-05/stockbit_ki_review_2026-09-05_2026-09-10.md",
+          "label": "5–10 September 2026"
+        },
+        {
+          "source_id": "O1",
+          "title": "Kepemilikan ENRG · Energi Mega Persada Tbk",
+          "url": "#kepemilikan=ENRG",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "K9",
+          "title": "Perubahan dan/atau Tambahan Informasi atas PMHMETD IV Perseroan",
+          "url": "https://quant.renr.ai/announcement/20260925135358-316/EMP.DIR/1070/09-26/E_id-id/",
+          "label": "2026-09-25"
+        },
+        {
+          "source_id": "K10",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/announcement/20260910174224-282/EMP.DIR/1070/09-26/E_id-id/",
+          "label": "2026-09-10"
+        },
+        {
+          "source_id": "K11",
+          "title": "LAPORAN KEPEMILIKAN ATAU SETIAP PERUBAHAN KEPEMILIKAN SAHAM PERUSAHAAN TERBUKA",
+          "url": "https://quant.renr.ai/announcement/20260831101142-LK/31082026/0002/1_id-id/",
+          "label": "2026-08-31"
+        }
+      ],
+      "cited": [
+        "K9",
+        "K10",
+        "K11",
+        "D41",
+        "D53",
+        "D54"
+      ],
+      "unmatched_citations": [],
+      "answer": "**Rights Issue (PMHMETD IV)**\nEnergi Mega Persada Tbk (ENRG) telah memperoleh efektivitas PMHMETD IV pada 24 September 2026 [K9]. Emiten menerbitkan 13.282.271.875 saham baru Seri B dengan harga Rp310 per lembar, total dana Rp4,1175 triliun [K9] [K10]. Rasio hak adalah 2:1, di mana setiap pemegang 2 saham lama berhak memesan 1 saham baru [K11]. Saham ini mewakili 33,33% dari modal setelah penerbitan [K11].\n\nArsip KI mengoreksi klaim sebelumnya bahwa penambahan saham hanya meningkatkan basis sebesar 33,33%; kenyataannya jumlah lembar saham bertambah 50% [D41]. Kalender pelaksanaan perdagangan/pelanggan diperkirakan jatuh pada 8–21 Oktober 2026 [D53]. Dana yang dikumpulkan dialokasikan untuk program anak usaha [D41].\n\n**Perubahan Pengendali dan Kesepakatan**\nData KSEI per Agustus 2026 mencatat PT Shima Global sebagai pengendali resmi dengan kepemilikan 17,55% [O1]. Namun, arsip riset menyoroti adanya pengalihan hak dan kesepakatan pengendalian antara Shima, Bakrie Kalila Investment (BKI), dan Bakrie Capital Indonesia (BCI) [D41]. Dalam skenario tertentu, BCI dapat mencapai kepemilikan ekonomi sebesar 26,45%, namun pengendalian operasional dinyatakan tetap melalui kesepakatan tersebut [D41]. Hal ini menegaskan bahwa kepemilikan ekonomi dan pengendalian harus dibaca secara terpisah [D41].\n\n**Pemeriksaan Silang**\n*   **Auditor:** Laporan tahunan 2025 ENRG menyebut Y. Santosa & Rekan; audit Maret 2026 VKTR juga menyebut Y. Santosa dan Rekan [D41]. Kecocokan nama firma ini tidak membuktikan koordinasi transaksi atau pergantian auditor bersamaan [D41].\n*   **Broker Flow:** Aktivitas akumulasi oleh broker II sempat menjadi spekulasi di Stockbit, namun hal ini belum terbukti sebagai indikator beneficial owner [D54].",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 8,
+      "question": "user zeinihzafahrozi sering bahas saham apa? cek juga data resmi kepemilikan emiten yang paling sering dia bahas",
+      "error": null,
+      "rounds": 7,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "zeinihzafahrozi"
+            ]
+          },
+          "bytes": 3697,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "nama": "zeinihzafahrozi"
+          },
+          "bytes": 108,
+          "auto": true
+        },
+        {
+          "tool": "datacat_cari",
+          "args": {
+            "q": "zeinihzafahrozi"
+          },
+          "cached": true,
+          "bytes": 35,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "ticker": "GNI",
+            "min_pct": 1
+          },
+          "bytes": 46
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "ticker": "NATO",
+            "min_pct": 1
+          },
+          "cached": false,
+          "bytes": 1546
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "ticker": "PACK",
+            "min_pct": 1
+          },
+          "cached": false,
+          "bytes": 1593
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "ticker": "SAFE",
+            "min_pct": 1
+          },
+          "cached": false,
+          "bytes": 1546
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "ticker": "CNGR",
+            "min_pct": 1
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "ticker": "MGLV",
+            "min_pct": 1
+          },
+          "cached": false,
+          "bytes": 1612
+        },
+        {
+          "tool": "datacat_cari",
+          "args": {
+            "q": "GNI"
+          },
+          "cached": false,
+          "bytes": 5557
+        },
+        {
+          "tool": "datacat_cari",
+          "args": {
+            "q": "PT Green Indonesia"
+          },
+          "cached": false,
+          "bytes": 2127
+        }
+      ],
+      "tool_calls": 15,
+      "datacat_cache_hits": 1,
+      "cost": 0.000740458,
+      "model_calls": 8,
+      "prompt_tokens": 67175,
+      "completion_tokens": 1128,
+      "cached_tokens": 55952,
+      "seconds": 21.208,
+      "sources": [
+        {
+          "source_id": "D53",
+          "title": "Stockbit — Corporate actions, ekspansi, dan petunjuk yang perlu diuji",
+          "path": "files/stockbit/2026-09-25/stockbit_25092026.md",
+          "label": "25 September 2026"
+        },
+        {
+          "source_id": "D52",
+          "title": "Stockbit — Hidden Corporate Action & Speculation Scan",
+          "path": "files/stockbit/2026-09-24/stockbit_24092026.md",
+          "label": "24 September 2026"
+        },
+        {
+          "source_id": "D47",
+          "title": "Review Stockbit Ideas — 15 September 2026",
+          "path": "files/stockbit/2026-09-15/stockbit_15092026.md",
+          "label": "15 September 2026"
+        },
+        {
+          "source_id": "D2",
+          "title": "Petunjuk aksi perusahaan, spekulasi, dan batas buktinya",
+          "path": "files/stockbit/2026-08-01/Laporan_Stockbit_Agustus_September_2026.html",
+          "label": "1 Agustus–5 September 2026"
+        },
+        {
+          "source_id": "D1",
+          "title": "Apa yang berubah di balik percakapan saham?",
+          "path": "files/stockbit/2026-08-01/Laporan_Arsip_Stockbit_Agustus_September_2026.html",
+          "label": "1 Agustus–5 September 2026"
+        },
+        {
+          "source_id": "D0",
+          "title": "Bedah arsip Stockbit: 25–31 Agustus 2026",
+          "path": "files/stockbit/2026-08-25/Analisis_Stockbit_25-31_Agustus_2026.html",
+          "label": "25–31 Agustus 2026"
+        },
+        {
+          "source_id": "D43",
+          "title": "Stockbit Ideas 20–24 Agustus 2026",
+          "path": "files/stockbit/2026-08-20/penelusuran_stockbit_20-24_agustus_2026.html",
+          "label": "20–24 Agustus 2026"
+        },
+        {
+          "source_id": "K1",
+          "title": "PT Olympus Strategic Indonesia Tbk",
+          "url": "https://quant.renr.ai/issuer/NATO/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K2",
+          "title": "PT Mercury Strategic",
+          "url": "https://quant.renr.ai/account/989/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K5",
+          "title": "BP2S SG/BNP PARIBAS",
+          "url": "https://quant.renr.ai/account/2108/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K6",
+          "title": "PT Abdi Raharja",
+          "url": "https://quant.renr.ai/account/3899/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K9",
+          "title": "Samsudin Andi Arsyad",
+          "url": "https://quant.renr.ai/account/4686/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K10",
+          "title": "Eco Energi Perkasa",
+          "url": "https://quant.renr.ai/account/4683/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K13",
+          "title": "NEXTIER DATAMATE",
+          "url": "https://quant.renr.ai/account/2294/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "D53",
+        "D52",
+        "D0",
+        "D2",
+        "D1",
+        "D43",
+        "D47",
+        "K9",
+        "K10",
+        "K1",
+        "K2",
+        "K6",
+        "K5",
+        "K13"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan arsip Stockbit, **zeinihzafahrozi** paling sering membahas saham-saham berikut:\n\n1.  **PACK (PT Abadi Nusantara Hijau Investama Tbk)**: Paling banyak disebut dalam periode Agustus–September 2026. Pengguna mengaitkan PACK dengan isu \"take over\", \"tagih utang\", dan isyarat \"next brother\" yang merujuk pada hubungan antar-emiten [D53] [D52] [D0].\n2.  **NATO (PT Olympus Strategic Indonesia Tbk)**: Sering dibahas terkait spekulasi aksi korporasi (\"gebyar sebentar lagi\") dan keterkaitannya dengan entitas lain seperti TerraCom [D53] [D2] [D1].\n3.  **MGLV (PT NexAI Digital Infrastruktur Tbk)**: Disebutkan secara eksplisit pada Agustus 2026 [D43].\n4.  **SAFE (PT Steady Safe Tbk)**: Dikaitkan dengan kedatangan pihak strategis bernama CNGR [D47].\n\n**Data Kepemilikan Resmi (KSEI >1%):**\n\n*   **PACK**: Pemegang saham terbesar adalah **Eco Energi Perkasa** (38,51%) dan **Samsudin Andi Arsyad** (20,05%) per akhir Agustus 2026 [K9] [K10]. Tidak ditemukan nama *zeinihzafahrozi* sebagai pemegang saham material di emiten ini.\n*   **NATO**: Pengendali utama adalah **PT Mercury Strategic** (26,87%) dan **PT Sukses Makmur** (7,54%) [K1] [K2]. Tidak ada kaitan kepemilikan langsung dengan *zeinihzafahrozi*.\n*   **SAFE**: Dikuasai oleh **PT Infiniti Wahana** (56,61%) dan **BP2S SG/BNP PARIBAS** (27,83%) [K6] [K5].\n*   **MGLV**: Hampir seluruh saham dikuasai oleh **NEXTIER DATAMATE** (67,08%) [K13].\n\nSecara keseluruhan, tidak ada jejak kepemilikan saham (>1%) atas emiten-emitien yang sering dibicarakan oleh *zeinihzafahrozi* berdasarkan data KSEI resmi. Pembicaraan pengguna lebih mengarah pada spekulasi pasar dan rumor aksi korporasi daripada posisi kepemilikan institusional.",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 9,
+      "question": "laporan keuangan terbaru SOCI: pendapatan dan laba bersih",
+      "error": null,
+      "rounds": 7,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "SOCI"
+            ]
+          },
+          "bytes": 4939,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "SOCI"
+          },
+          "bytes": 256,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "laporan_keuangan",
+            "ticker": "SOCI",
+            "limit": 5
+          },
+          "cached": false,
+          "bytes": 1757
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen_teks",
+            "id": "8"
+          },
+          "cached": false,
+          "bytes": 4672
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen",
+            "id": "8"
+          },
+          "cached": false,
+          "bytes": 4318
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "dokumen",
+            "ticker": "SOCI",
+            "q": "Laporan Keuangan Interim Auditan per 30 Juni 2026",
+            "limit": 5
+          },
+          "cached": false,
+          "bytes": 735
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen_teks",
+            "id": "3820"
+          },
+          "cached": false,
+          "bytes": 4665
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen_teks",
+            "id": "3820",
+            "halaman_dari": 1,
+            "halaman_sampai": 50
+          },
+          "cached": false,
+          "bytes": 4665
+        }
+      ],
+      "tool_calls": 9,
+      "datacat_cache_hits": 0,
+      "cost": 0.000641913,
+      "model_calls": 8,
+      "prompt_tokens": 55415,
+      "completion_tokens": 899,
+      "cached_tokens": 45149,
+      "seconds": 21.662,
+      "sources": [
+        {
+          "source_id": "D50",
+          "title": "Stockbit — corporate action, expansion, dan petunjuk spekulasi",
+          "path": "files/stockbit/2026-09-19/stockbit_19092026.md",
+          "label": "19 September 2026"
+        },
+        {
+          "source_id": "D2",
+          "title": "Petunjuk aksi perusahaan, spekulasi, dan batas buktinya",
+          "path": "files/stockbit/2026-08-01/Laporan_Stockbit_Agustus_September_2026.html",
+          "label": "1 Agustus–5 September 2026"
+        },
+        {
+          "source_id": "D0",
+          "title": "Bedah arsip Stockbit: 25–31 Agustus 2026",
+          "path": "files/stockbit/2026-08-25/Analisis_Stockbit_25-31_Agustus_2026.html",
+          "label": "25–31 Agustus 2026"
+        },
+        {
+          "source_id": "K1",
+          "title": "SOCI",
+          "url": "https://quant.renr.ai/issuer/SOCI/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K4",
+          "title": "FinancialStatement-2023-II-SOCI.pdf",
+          "url": "https://quant.renr.ai/document/1289779/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K5",
+          "title": "Penyampaian Laporan Keuangan Interim Auditan",
+          "url": "https://quant.renr.ai/announcement/20230817224907-060/CORSEC-SOCI/VIII/2023_id-id/",
+          "label": "2023-08-17"
+        },
+        {
+          "source_id": "K7",
+          "title": "Penyampaian Laporan Keuangan Interim Auditan",
+          "url": "https://quant.renr.ai/announcement/20260907082147-064/CORSEC-SOCI/IX/2026_id-id/",
+          "label": "2026-09-07"
+        }
+      ],
+      "cited": [
+        "K5",
+        "K7",
+        "K1",
+        "K4",
+        "D50",
+        "D2",
+        "D0"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan Laporan Keuangan Interim Auditan per 30 Juni 2026 yang disampaikan pada 7 September 2026 [K5] [K7], berikut adalah data keuangan PT Soechi Lines Tbk (SOCI):\n\n**Pendapatan dan Laba Bersih (Periode 6 Bulan Berakhir 30 Juni 2026)**\nLaporan keuangan terbaru SOCI untuk periode semesteran (H1) 2026 telah diaudit oleh KAP Mirawati Sensi Idris dengan cakupan entitas grup dalam mata uang USD [K1]. Namun, teks dokumen laporan keuangan yang tersedia hanya memuat informasi mengenai daftar anak perusahaan dan struktur asetnya, serta pengantar penyampaian laporan. Data numerik spesifik mengenai **pendapatan (revenue)** dan **laba bersih (net income)** tidak tercantum dalam cuplikan teks yang dapat diakses.\n\n**Informasi Tambahan dari Dokumen:**\nDokumen tersebut menguraikan 16 anak perusahaan yang dikonsolidasikan, termasuk:\n*   **PT Sukses Osean Khatulistiwa Line**: Aset Rp 70,586 juta USD, kepemilikan 99,8% [K4].\n*   **PT Armada Bumi Pratiwi Lines**: Aset Rp 61,321 juta USD, kepemilikan 99,93% [K4].\n*   **PT Multi Ocean Shipyard**: Aset Rp 232,528 juta USD, kepemilikan 99,99% [K4].\n*   **Soechi Eternity Maritime - FZCO** (Uni Emirat Arab) dan **Eternity Ocean Maritime Ltd.** (Marshall Islands) yang belum beroperasi secara komersial [K4].\n\n**Konteks Arsip:**\nArsip Stockbit menyebutkan bahwa laba SOCI mengandung pendapatan lain-lain dan disarankan untuk memisahkan pendapatan kapal baru dari keuntungan yang tidak berulang (unrecurring) [D50]. Selain itu, terdapat pembahasan mengenai penambahan armada tanker dan kontrak sewa yang mempengaruhi prospek keuangan [D2] [D0].\n\nUntuk angka pasti pendapatan dan laba bersih H1 2026, diperlukan akses penuh ke halaman neraca dan laporan laba rugi yang tidak termuat dalam cuplikan teks di atas.",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 10,
+      "question": "pengumuman keterbukaan informasi terbaru TOWR",
+      "error": null,
+      "rounds": 2,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "TOWR"
+            ]
+          },
+          "bytes": 5940,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "TOWR"
+          },
+          "bytes": 640,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengumuman",
+            "ticker": "TOWR",
+            "dari": "2026-09-27",
+            "sampai": "2026-09-27"
+          },
+          "cached": false,
+          "bytes": 20
+        }
+      ],
+      "tool_calls": 3,
+      "datacat_cache_hits": 0,
+      "cost": 0.00021920700000000002,
+      "model_calls": 3,
+      "prompt_tokens": 11868,
+      "completion_tokens": 251,
+      "cached_tokens": 7549,
+      "seconds": 9.751,
+      "sources": [
+        {
+          "source_id": "D30",
+          "title": "Digest emiten IDX · 11–12 September 2026",
+          "path": "files/digest-emiten/2026-09-11/digest_2026-09-11_2026-09-12.md",
+          "label": "11–12 September 2026"
+        },
+        {
+          "source_id": "D29",
+          "title": "Digest emiten IDX · 11 September 2026",
+          "path": "files/digest-emiten/2026-09-11/digest_2026-09-11_2026-09-11.md",
+          "label": "11 September 2026"
+        }
+      ],
+      "cited": [
+        "D30",
+        "D29"
+      ],
+      "unmatched_citations": [],
+      "answer": "Tidak ada pengumuman keterbukaan informasi baru untuk TOWR pada tanggal 2026-09-27. Data resmi BEI menunjukkan hasil kosong untuk pengumuman pada tanggal tersebut, yang mengindikasikan belum ada pemutakhiran atau dokumen yang diprosir pada hari ini.\n\nSebagai referensi, pengumuman terbaru sebelumnya adalah Laporan Hasil Public Expose Tahunan 2026 yang diselenggarakan pada 8 September 2026 dan dilaporkan dalam window 11–12 September 2026 [D30] [D29]. Dalam laporan tersebut, manajemen menjelaskan mengenai akuisisi BMG (mantan vendor pemeliharaan) untuk efisiensi biaya dan kontrol atas vendor kritis, serta strategi menghadapi tantangan operasional [D30] [D29].",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 11,
+      "question": "siapa pelapor perubahan kepemilikan saham MDKA terbaru? periksa silang profil pihak itu: jabatan dan kepemilikan lainnya",
+      "error": null,
+      "rounds": 4,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "MDKA",
+              "periksa silang",
+              "lainnya"
+            ]
+          },
+          "bytes": 5344,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "MDKA"
+          },
+          "bytes": 912,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "ticker": "MDKA",
+            "limit": 5
+          },
+          "cached": false,
+          "bytes": 3241
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "1389"
+          },
+          "cached": false,
+          "bytes": 3126
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "nama": "Titien Supeno"
+          },
+          "bytes": 105
+        }
+      ],
+      "tool_calls": 5,
+      "datacat_cache_hits": 0,
+      "cost": 0.000406814,
+      "model_calls": 5,
+      "prompt_tokens": 29773,
+      "completion_tokens": 471,
+      "cached_tokens": 22442,
+      "seconds": 14.929,
+      "sources": [
+        {
+          "source_id": "O1",
+          "title": "Kepemilikan MDKA · PT Merdeka Copper Gold Tbk.",
+          "url": "#kepemilikan=MDKA",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "K1",
+          "title": "Laporan LK/25092026/0014/1",
+          "url": "https://quant.renr.ai/movement/5079/",
+          "label": "2026-09-25"
+        },
+        {
+          "source_id": "K16",
+          "title": "Laporan LK/05052026/0020/1",
+          "url": "https://quant.renr.ai/movement/3690/",
+          "label": "2026-05-05"
+        },
+        {
+          "source_id": "K19",
+          "title": "Jatuh Tempo Obligasi / Sukuk Korporasi",
+          "url": "https://quant.renr.ai/document/368296/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K20",
+          "title": "Jatuh Tempo Obligasi / Sukuk Korporasi",
+          "url": "https://quant.renr.ai/document/389337/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K1",
+        "K16",
+        "K19",
+        "K20"
+      ],
+      "unmatched_citations": [],
+      "answer": "Pelapor perubahan kepemilikan saham MDKA terbaru adalah **Titien Supeno** (Direksi), berdasarkan laporan KSEI tanggal 25 September 2026 [K1]. Ia melaporkan peningkatan kepemilikan dari 2.502.800 lembar menjadi 2.882.500 lembar (0,01% menjadi 0,012%) pada transaksi tanggal 23 September 2026 [K1].\n\n**Pemeriksaan Silang Profil Titien Supeno:**\n\n*   **Jabatan di MDKA:** Titien Supeno tercatat sebagai anggota Direksi MDKA yang mulai menjabat pada 10 Juni 2025 [K16].\n*   **Jabatan di Emiten Lain:** Ia juga pernah menjabat sebagai Direktur di PT Merdeka Battery Materials Tbk (MBMA) dari 20 Februari 2023 hingga 28 Maret 2025 [K16].\n*   **Kepemilikan Saham:** Berdasarkan data KSEI bulan Agustus 2026, Titien Supeno hanya memiliki kepemilikan saham di MDKA sebesar 0,01% [O1]. Tidak ditemukan kepemilikan signifikan di emiten lain atas namanya.\n*   **Jejak Dokumen:** Ia memiliki jejak dokumen terkait dengan MDKA dan MBMA, termasuk pengumuman jatuh tempo obligasi/sukuk korporasi [K19], [K20].\n\nKesimpulannya, Titien Supeno adalah direktur MDKA yang juga pernah berkecimpung di MBMA, namun saat ini kepemilikannya terbatas hanya pada MDKA.",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 12,
+      "question": "direksi atau komisaris yang baru diangkat di GOTO, siapa mereka dan apa jabatan atau kepemilikan lainnya?",
+      "error": null,
+      "rounds": 7,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "GOTO",
+              "diangkat",
+              "lainnya"
+            ]
+          },
+          "bytes": 5923,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "GOTO"
+          },
+          "bytes": 845,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_pengurus",
+            "ticker": "GOTO"
+          },
+          "cached": false,
+          "bytes": 3302
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_pengurus",
+            "ticker": "GOTO",
+            "dari": "2026-01-01"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengurus",
+            "ticker": "GOTO"
+          },
+          "cached": false,
+          "bytes": 234
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "perubahan_pengurus",
+            "id": "285"
+          },
+          "bytes": 50
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "dokumen",
+            "id": "167162"
+          },
+          "cached": false,
+          "bytes": 3813
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "9954"
+          },
+          "cached": false,
+          "bytes": 3979
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "1215"
+          },
+          "cached": false,
+          "bytes": 2737
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "6842"
+          },
+          "cached": false,
+          "bytes": 3672
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "14832"
+          },
+          "cached": false,
+          "bytes": 521
+        }
+      ],
+      "tool_calls": 11,
+      "datacat_cache_hits": 0,
+      "cost": 0.000699063,
+      "model_calls": 8,
+      "prompt_tokens": 54525,
+      "completion_tokens": 909,
+      "cached_tokens": 42587,
+      "seconds": 31.215,
+      "sources": [
+        {
+          "source_id": "K3",
+          "title": "BOARD_CHANGE 167162",
+          "url": "https://quant.renr.ai/document/167162/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K7",
+          "title": "HANS PATUWO",
+          "url": "https://quant.renr.ai/account/6842/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K8",
+          "title": "Santoso Kartono",
+          "url": "https://quant.renr.ai/account/1215/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K9",
+          "title": "ANDRE SOELISTYO",
+          "url": "https://quant.renr.ai/account/9954/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K10",
+          "title": "BOARD_CHANGE 167161",
+          "url": "https://quant.renr.ai/document/167161/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K11",
+          "title": "Lynette Ng",
+          "url": "https://quant.renr.ai/account/14832/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K17",
+          "title": "Keterbukaan Informasi terkait Transaksi Afiliasi",
+          "url": "https://quant.renr.ai/document/34975/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K18",
+          "title": "Keterbukaan Informasi terkait Transaksi Afiliasi",
+          "url": "https://quant.renr.ai/document/34974/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K19",
+          "title": "Penyampaian Laporan Keuangan Interim Yang Tidak Diaudit",
+          "url": "https://quant.renr.ai/document/672290/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K20",
+          "title": "Penyampaian Bukti Iklan Informasi Laporan Keuangan Interim",
+          "url": "https://quant.renr.ai/document/672242/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K21",
+          "title": "Transaksi Afiliasi",
+          "url": "https://quant.renr.ai/document/902558/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K22",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/987932/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K23",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/1050751/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K24",
+          "title": "Transaksi Material Tanpa Persetujuan RUPS",
+          "url": "https://quant.renr.ai/document/1063292/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K25",
+          "title": "Penyampaian Laporan Tahunan & Keberlanjutan dan ESG",
+          "url": "https://quant.renr.ai/document/375884/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K29",
+          "title": "Penyampaian Laporan Tahunan dan Keberlanjutan",
+          "url": "https://quant.renr.ai/document/901063/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K3",
+        "K10",
+        "K7",
+        "K17",
+        "K18",
+        "K19",
+        "K20",
+        "K21",
+        "K22",
+        "K23",
+        "K24",
+        "K9",
+        "K25",
+        "K29",
+        "K8",
+        "K11"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data resmi BEI, tidak ada pengangkatan direksi atau komisaris baru di PT GoTo Gojek Tokopedia Tbk (GOTO) sejak 1 Januari 2026 hingga hari ini. Pengangkatan terakhir terjadi pada 17 Desember 2025 melalui RUPSLB [K3] [K10].\n\n**Direksi dan Komisaris Baru (Efektif 17 Desember 2025):**\n\n1. **Hans Patuwo** – Direktur Utama [K3].\n   * Kepemilikan: 763.015.167 saham GOTO (0,0641%) per 31 Agustus 2026 [K7].\n   * Jejak dokumen: Tersebut dalam laporan afiliasi/emiten TOBA, VINS, dan GOTO [K17] [K18] [K19] [K20] [K21] [K22] [K23] [K24].\n\n2. **Andre Soelistyo** – Komisaris [K3].\n   * Kepemilikan: 6.734.025.184 saham GOTO (0,5653%) per 31 Agustus 2026 [K9].\n   * Jabatan lain: Anggota Komite Nominasi GOTO (periode berakhir 30 Desember 2025) [K9].\n   * Riwayat karier: Terdaftar sebagai President Director di PT TBS Energi Utama Tbk (TOBA) [K25] [K29].\n\n3. **Santoso Kartono** – Komisaris [K3].\n   * Kepemilikan: 394.010.440 saham GOTO (0,0331%) dan 185.041.495 saham PT Merdeka Gold Resources Tbk (EMAS, 1,256%) per 31 Agustus 2026 [K8].\n   * Jabatan lain: Presiden Komisaris EMAS (mulai 10 Desember 2025) [K8].\n\n**Catatan:** Lynette Ng tercatat sebagai anggota Komite Nominasi GOTO yang masih aktif saat ini [K11], namun tidak ada perubahan pengurus baru yang terdata setelah Desember 2025.",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 13,
+      "question": "siapa pembeli saham terbesar di TOWR bulan ini dan apa hubungannya dengan emiten?",
+      "error": null,
+      "rounds": 7,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "TOWR",
+              "hubungannya"
+            ]
+          },
+          "bytes": 5952,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "nama": "hubungannya"
+          },
+          "bytes": 104,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "TOWR"
+          },
+          "bytes": 640,
+          "auto": true
+        },
+        {
+          "tool": "datacat_cari",
+          "args": {
+            "q": "hubungannya"
+          },
+          "cached": true,
+          "bytes": 2332,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "ticker": "TOWR",
+            "min_pct": 1
+          },
+          "cached": false,
+          "bytes": 1574
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "transaksi",
+            "ticker": "TOWR"
+          },
+          "cached": false,
+          "bytes": 4849
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "q": "TOWR"
+          },
+          "cached": false,
+          "bytes": 3946
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "id": "5083"
+          },
+          "cached": false,
+          "bytes": 2575
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "147"
+          },
+          "cached": false,
+          "bytes": 5120
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "transaksi",
+            "ticker": "TOWR",
+            "q": "material"
+          },
+          "bytes": 95
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "transaksi",
+            "ticker": "TOWR",
+            "limit": 25
+          },
+          "cached": false,
+          "bytes": 4850
+        }
+      ],
+      "tool_calls": 12,
+      "datacat_cache_hits": 1,
+      "cost": 0.000918203,
+      "model_calls": 8,
+      "prompt_tokens": 88195,
+      "completion_tokens": 730,
+      "cached_tokens": 72217,
+      "seconds": 24.932,
+      "sources": [
+        {
+          "source_id": "K13",
+          "title": "SARANA MENARA NUSANTARA Tbk,",
+          "url": "https://quant.renr.ai/issuer/TOWR/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K14",
+          "title": "PT LINGKARMUL",
+          "url": "https://quant.renr.ai/account/903/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K15",
+          "title": "PT DWIMURIA",
+          "url": "https://quant.renr.ai/account/902/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K16",
+          "title": "PT SAPTA ADHIKARI",
+          "url": "https://quant.renr.ai/account/901/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K45",
+          "title": "Laporan LK/25092026/0018/1",
+          "url": "https://quant.renr.ai/movement/5083/",
+          "label": "2026-09-25"
+        },
+        {
+          "source_id": "K46",
+          "title": "FERDINANDUS AMING SANTOSO",
+          "url": "https://quant.renr.ai/account/147/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K45",
+        "K46"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data perubahan kepemilikan KSEI bulan September 2026, pembeli saham terbesar di TOWR adalah **Ferdinandus Aming Santoso** [K45].\n\n**Transaksi Pembelian:**\n*   **Tanggal Transaksi:** 25 September 2026 [K45]\n*   **Jumlah Saham Dibeli:** 2.577.300 lembar [K45]\n*   **Harga:** Rp 388 per lembar [K45]\n*   **Posisi Sebelum:** 12.613.281 lembar (0,0213%) [K45]\n*   **Posisi Sesudah:** 15.190.581 lembar (0,0257%) [K45]\n\n**Hubungan dengan Emiten:**\nFerdinandus Aming Santoso merupakan anggota **Direksi** PT Sarana Menara Nusantara Tbk (TOWR) [K45]. Ia juga tercatat sebagai mantan Presiden Direktur pada emiten lain, yaitu PRTL [K46].\n\nSelain Ferdinandus, transaksi pembelian signifikan lainnya di bulan ini tidak ditemukan secara individual yang melebihi volume tersebut; sebaliknya, para pemegang saham besar lain (PT Sapta Adhikari Investama, PT Dwimuria Investama Andalas, dan PT Lingkar Mulia Indah) menunjukkan posisi saham yang stabil tanpa perubahan kepemilikan baru dalam periode pelaporan September 2026 [K13, K14, K15, K16].",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 14,
+      "question": "apakah yoel bagian tancorp?",
+      "error": null,
+      "rounds": 1,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "yoel",
+              "tancorp"
+            ]
+          },
+          "bytes": 5919,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "nama": "yoel"
+          },
+          "bytes": 97,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "nama": "tancorp"
+          },
+          "bytes": 848,
+          "auto": true
+        },
+        {
+          "tool": "datacat_cari",
+          "args": {
+            "q": "yoel"
+          },
+          "cached": true,
+          "bytes": 2706,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "4813"
+          },
+          "cached": false,
+          "bytes": 2463,
+          "auto": true
+        },
+        {
+          "tool": "datacat_cari",
+          "args": {
+            "q": "tancorp"
+          },
+          "cached": true,
+          "bytes": 2746,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "8257"
+          },
+          "cached": false,
+          "bytes": 554,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "4713"
+          },
+          "cached": false,
+          "bytes": 783,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "5889"
+          },
+          "cached": false,
+          "bytes": 1154,
+          "auto": true
+        }
+      ],
+      "tool_calls": 9,
+      "datacat_cache_hits": 2,
+      "cost": 0.00044034300000000005,
+      "model_calls": 2,
+      "prompt_tokens": 17242,
+      "completion_tokens": 581,
+      "cached_tokens": 8293,
+      "seconds": 16.573,
+      "sources": [
+        {
+          "source_id": "O1",
+          "title": "Kepemilikan AVIA · AVIA AVIAN Tbk",
+          "url": "#kepemilikan=AVIA",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O2",
+          "title": "Kepemilikan BLES · SUPERIOR PRIMA SUKSES Tbk",
+          "url": "#kepemilikan=BLES",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O3",
+          "title": "Kepemilikan CLEO · SARIGUNA PRIMATIRTA Tbk",
+          "url": "#kepemilikan=CLEO",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O4",
+          "title": "Kepemilikan DEPO · CATURKARDA DEPO BANGUNAN Tbk",
+          "url": "#kepemilikan=DEPO",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O6",
+          "title": "Kepemilikan PEVE · PENTA VALENT Tbk",
+          "url": "#kepemilikan=PEVE",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O7",
+          "title": "Kepemilikan RISE · PT Jaya Sukses Makmur Sentosa Tbk.",
+          "url": "#kepemilikan=RISE",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O8",
+          "title": "Kepemilikan ZONE · MEGA PERINTIS Tbk",
+          "url": "#kepemilikan=ZONE",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "K42",
+          "title": "JAYA TRISHINDO Tbk, PT",
+          "url": "https://quant.renr.ai/issuer/HELI/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K45",
+          "title": "Penyampaian Materi Public Expose - Tahunan",
+          "url": "https://quant.renr.ai/document/43583/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K47",
+          "title": "Laporan Bulanan Registrasi Pemegang Efek",
+          "url": "https://quant.renr.ai/document/228829/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K45",
+        "K47",
+        "K42"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data resmi BEI dan arsip riset:\n\n**1. Hubungan Yoel Alex Santoso dengan PT Tancorp Abadi Nusantara (TANCORP)**\nYoel Alex Santoso memiliki riwayat karier yang erat dengan entitas bernama \"PT Tancorp Abadi Nusantara\".\n*   **2016 – 2019:** Bekerja sebagai Finance Accounting Tax Manager di PT Tancorp Abadi Nusantara [K45].\n*   **2023 – Sekarang:** Menjabat sebagai General Manager Finance, Accounting, Tax di PT Tancorp Abadi Nusantara [K45].\n\n**2. Status Kepemilikan dan Pengendalian**\nData kepemilikan saham KSEI menunjukkan bahwa berbagai entitas berawalan \"Tancorp\" memegang saham signifikan pada beberapa emiten, namun tidak ada bukti langsung bahwa Yoel Alex Santoso adalah pemegang saham pengendali atau direksi dari perusahaan-perusahaan Tancorp tersebut.\n*   **RISE:** Dikuasai oleh PT Tancorp Global (80,3%) dan PT Tancorp Global Sentosa [O7].\n*   **PEVE:** Dikuasai oleh PT Tancorp Mega Buana (80%) [O6].\n*   **CLEO:** Dikuasai oleh PT Tancorp Global Abadi (56,12%) dan PT Tancorp Global Sentosa (21,09%) [O3].\n*   **AVIA:** Dipegang oleh PT Tancorp Surya Sentosa (36,6%) [O1].\n*   **DEPO:** Dipegang oleh PT Tancorp Surya Sukses (23,5%) [O4].\n*   **ZONE & BLES:** Dipegang oleh PT Tancorp Investama Mulia (23,65% dan 18,05%) [O8, O2].\n\n**3. Peran Resmi di Emiten Lain**\nSelain perannya di PT Tancorp Abadi Nusantara, Yoel Alex Santoso tercatat secara resmi sebagai Komisaris di **MERI** (PT Merry Riana Edukasi Tbk) sejak 2025 [K47] dan Direktur di **HELI** (PT Jaya Trishindo Tbk) [K42].\n\n**Kesimpulan**\nYa, Yoel Alex Santoso adalah bagian dari Tancorp. Ia bekerja sebagai General Manager Finance, Accounting, Tax di **PT Tancorp Abadi Nusantara** sejak 2023 [K45]. Namun, ia tidak tercatat sebagai pengurus atau pemegang saham pengendali di emiten-emitin lain yang dikendalikan oleh grup Tancorp (seperti RI SE, CLEO, AVIA).",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 15,
+      "question": "emiten apa saja yang terhubung dengan grup Tancorp?",
+      "error": null,
+      "rounds": 1,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "Tancorp"
+            ]
+          },
+          "bytes": 4463,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "nama": "Tancorp"
+          },
+          "bytes": 848,
+          "auto": true
+        },
+        {
+          "tool": "datacat_cari",
+          "args": {
+            "q": "Tancorp"
+          },
+          "cached": true,
+          "bytes": 2737,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "8257"
+          },
+          "cached": false,
+          "bytes": 728,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "4713"
+          },
+          "bytes": 79,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "5889"
+          },
+          "bytes": 79,
+          "auto": true
+        }
+      ],
+      "tool_calls": 6,
+      "datacat_cache_hits": 1,
+      "cost": 0.000304523,
+      "model_calls": 2,
+      "prompt_tokens": 10252,
+      "completion_tokens": 663,
+      "cached_tokens": 4889,
+      "seconds": 10.483,
+      "sources": [
+        {
+          "source_id": "D50",
+          "title": "Stockbit — corporate action, expansion, dan petunjuk spekulasi",
+          "path": "files/stockbit/2026-09-19/stockbit_19092026.md",
+          "label": "19 September 2026"
+        },
+        {
+          "source_id": "D25",
+          "title": "Digest emiten IDX · 7–9 September 2026",
+          "path": "files/digest-emiten/2026-09-07/digest_2026-09-07_2026-09-09.md",
+          "label": "7–9 September 2026"
+        },
+        {
+          "source_id": "D23",
+          "title": "Digest emiten IDX · 5–7 September 2026",
+          "path": "files/digest-emiten/2026-09-05/digest_2026-09-05_2026-09-07.md",
+          "label": "5–7 September 2026"
+        },
+        {
+          "source_id": "D4",
+          "title": "Digest emiten IDX · 10–11 Agustus 2026",
+          "path": "files/digest-emiten/2026-08-10/digest_2026-08-10_2026-08-11.md",
+          "label": "10–11 Agustus 2026"
+        },
+        {
+          "source_id": "O2",
+          "title": "Kepemilikan BLES · SUPERIOR PRIMA SUKSES Tbk",
+          "url": "#kepemilikan=BLES",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O3",
+          "title": "Kepemilikan CLEO · SARIGUNA PRIMATIRTA Tbk",
+          "url": "#kepemilikan=CLEO",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O4",
+          "title": "Kepemilikan DEPO · CATURKARDA DEPO BANGUNAN Tbk",
+          "url": "#kepemilikan=DEPO",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O5",
+          "title": "Kepemilikan MERI · PT Merry Riana Edukasi Tbk",
+          "url": "#kepemilikan=MERI",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O6",
+          "title": "Kepemilikan PEVE · PENTA VALENT Tbk",
+          "url": "#kepemilikan=PEVE",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O7",
+          "title": "Kepemilikan RISE · PT Jaya Sukses Makmur Sentosa Tbk.",
+          "url": "#kepemilikan=RISE",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "K1",
+          "title": "PT Tancorp Bangun",
+          "url": "https://quant.renr.ai/account/8257/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K7",
+          "title": "PT Mega Perintis Tbk Jun 2026 Q2 R.1.pdf",
+          "url": "https://quant.renr.ai/document/1331107/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K18",
+          "title": "PT Cahayaputra Asa Keramik Tbk.",
+          "url": "https://quant.renr.ai/issuer/CAKK/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "D4",
+        "D50",
+        "K7"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data kepemilikan KSEI per Agustus 2026, berikut adalah emiten yang terhubung dengan grup Tancorp:\n\n**1. PT RISE (RISE)**\n*   **Pemegang Saham:** PT Tancorp Global Sentosa (80,3%) dan PT Tancorp Global (80,3%, pengendali) [O7].\n*   **Konteks Arsip:** Laporan bulanan registrasi pemegang efek Juli 2026 mengonfirmasi struktur kepemilikan mayoritas tidak berubah [D4].\n\n**2. PT Sariguna Primatirta Tbk (CLEO)**\n*   **Pemegang Saham:** PT. Tancorp Global Abadi (56,12%) dan PT Tancorp Global Sentosa (21,09%) [O3].\n\n**3. PT Penta Valent Tbk (PEVE)**\n*   **Pemegang Saham:** PT Tancorp Mega Buana (80%) [O6].\n\n**4. PT Mitra Angkasa Sejahtera Tbk (BAUT)**\n*   **Status:** Dalam arsip Stockbit, BAUT disebut sebagai \"calon pengakuisisi\" terkait pertanyaan tentang Tancorp, namun belum ada sumber pendukung atau kesepakatan yang dikonfirmasi [@scaro87 · 18/09 20:06] [D50].\n\n**5. PT Depo Bangunan Tbk (DEPO)**\n*   **Pemegang Saham:** PT Tancorp Surya Sukses (23,5%) [O4].\n*   **Transaksi Afiliasi:** Terdapat laporan fakta material keterbukaan informasi transaksi afiliasi pada Juli 2023 [D23, D25].\n\n**6. PT Superior Prima Sukses Tbk (BLES)**\n*   **Pemegang Saham:** PT Tancorp Investama Mulia (18,05%) [O2].\n\n**7. PT Merry Riana Edukasi Tbk (MERI)**\n*   **Pemegang Saham:** PT Tancorp Investama Mulia (19,32%) [O5].\n\n**8. PT Cahayaputra Asa Keramik Tbk (CAKK)**\n*   **Pemegang Saham:** PT Tancorp Bangun tercatat sebagai pemegang saham >=5% (data per Maret 2026 menunjukkan 0% saham, status perlu verifikasi lebih lanjut) [K1, K18].\n\n**9. Emiten Zona (ZONE)**\n*   **Konteks:** Laporan keuangan interim September 2026 melibatkan entitas Tancorp dalam jejak dokumen [K7].\n\n**Ringkasan Entitas Grup Tancorp Teridentifikasi:**\n*   PT Tancorp Global Sentosa\n*   PT Tancorp Global\n*   PT. Tancorp Global Abadi\n*   PT Tancorp Mega Buana\n*   PT Tancorp Surya Sentosa\n*   PT Tancorp Surya Sukses\n*   PT Tancorp Investama Mulia\n*   PT Tancorp Bangun",
+      "expect_missed": [],
+      "absence_claim": false
+    },
+    {
+      "n": 16,
+      "question": "apakah HELI dan MERI punya orang atau pengendali yang sama?",
+      "error": null,
+      "rounds": 7,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "HELI",
+              "MERI"
+            ]
+          },
+          "bytes": 6003,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "HELI"
+          },
+          "bytes": 287,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "ticker": "MERI"
+          },
+          "bytes": 285,
+          "auto": true
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengurus",
+            "ticker": "HELI"
+          },
+          "cached": false,
+          "bytes": 577
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengurus",
+            "ticker": "MERI"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "min_pct": 1,
+            "ticker": "HELI"
+          },
+          "cached": false,
+          "bytes": 1603
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pemegang_saham",
+            "min_pct": 1,
+            "ticker": "MERI"
+          },
+          "cached": false,
+          "bytes": 1539
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengumuman",
+            "q": "pengendali",
+            "ticker": "HELI"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengumuman",
+            "q": "pengendali",
+            "ticker": "MERI"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_pengurus",
+            "ticker": "HELI"
+          },
+          "cached": false,
+          "bytes": 4073
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_pengurus",
+            "ticker": "MERI"
+          },
+          "cached": false,
+          "bytes": 20
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "ticker": "HELI"
+          },
+          "cached": false,
+          "bytes": 5686
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "perubahan_kepemilikan",
+            "ticker": "MERI"
+          },
+          "cached": false,
+          "bytes": 20
+        }
+      ],
+      "tool_calls": 14,
+      "datacat_cache_hits": 0,
+      "cost": 0.0006086119999999999,
+      "model_calls": 8,
+      "prompt_tokens": 45498,
+      "completion_tokens": 876,
+      "cached_tokens": 35248,
+      "seconds": 26.439,
+      "sources": [
+        {
+          "source_id": "D53",
+          "title": "Stockbit — Corporate actions, ekspansi, dan petunjuk yang perlu diuji",
+          "path": "files/stockbit/2026-09-25/stockbit_25092026.md",
+          "label": "25 September 2026"
+        },
+        {
+          "source_id": "D51",
+          "title": "Stockbit — 20–22 September 2026",
+          "path": "files/stockbit/2026-09-22/stockbit_22092026.md",
+          "label": "22 September 2026"
+        },
+        {
+          "source_id": "D50",
+          "title": "Stockbit — corporate action, expansion, dan petunjuk spekulasi",
+          "path": "files/stockbit/2026-09-19/stockbit_19092026.md",
+          "label": "19 September 2026"
+        },
+        {
+          "source_id": "D37",
+          "title": "KI — Corporate action, expansion, dan indikasi perubahan pengendali",
+          "path": "files/keterbukaan-informasi/2026-09-19/ki_19092026.md",
+          "label": "19 September 2026"
+        },
+        {
+          "source_id": "O1",
+          "title": "Kepemilikan HELI · JAYA TRISHINDO Tbk",
+          "url": "#kepemilikan=HELI",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "O2",
+          "title": "Kepemilikan MERI · PT Merry Riana Edukasi Tbk",
+          "url": "#kepemilikan=MERI",
+          "label": "2026-08"
+        },
+        {
+          "source_id": "K1",
+          "title": "Ridwan Sinarto",
+          "url": "https://quant.renr.ai/account/15655/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K2",
+          "title": "JAYA TRISHINDO Tbk, PT",
+          "url": "https://quant.renr.ai/issuer/HELI/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K3",
+          "title": "Agus Cahyo Baskoro",
+          "url": "https://quant.renr.ai/account/15656/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K4",
+          "title": "Andre Franklin Sahelangi",
+          "url": "https://quant.renr.ai/account/4788/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K5",
+          "title": "PT Alta Internasional",
+          "url": "https://quant.renr.ai/account/4865/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K6",
+          "title": "PT Avia Nusantara",
+          "url": "https://quant.renr.ai/account/4857/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K7",
+          "title": "KOMALA TRI VARIA",
+          "url": "https://quant.renr.ai/account/663/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K8",
+          "title": "PT Startel Communicatio",
+          "url": "https://quant.renr.ai/account/4844/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K9",
+          "title": "PT Merry Riana Edukasi Tbk",
+          "url": "https://quant.renr.ai/issuer/MERI/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K10",
+          "title": "PT. Tancorp Investama",
+          "url": "https://quant.renr.ai/account/1755/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K11",
+          "title": "PT. Merry Riana",
+          "url": "https://quant.renr.ai/account/1751/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K19",
+          "title": "Laporan LK/10082026/0007/1",
+          "url": "https://quant.renr.ai/movement/2752/",
+          "label": "2026-08-10"
+        },
+        {
+          "source_id": "K20",
+          "title": "AVIA NUSANTARA KHATULISTIWA",
+          "url": "https://quant.renr.ai/account/295/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K21",
+          "title": "OWNERSHIP_CHANGE 12661",
+          "url": "https://quant.renr.ai/document/12661/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K22",
+          "title": "Laporan LK/24072026/0003/1",
+          "url": "https://quant.renr.ai/movement/2929/",
+          "label": "2026-07-24"
+        },
+        {
+          "source_id": "K23",
+          "title": "STARTEL COMMUNICATION",
+          "url": "https://quant.renr.ai/account/650/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K24",
+          "title": "OWNERSHIP_CHANGE 23509",
+          "url": "https://quant.renr.ai/document/23509/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K25",
+          "title": "Laporan LK/24072026/0002/1",
+          "url": "https://quant.renr.ai/movement/2928/",
+          "label": "2026-07-24"
+        },
+        {
+          "source_id": "K26",
+          "title": "OWNERSHIP_CHANGE 23516",
+          "url": "https://quant.renr.ai/document/23516/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K27",
+          "title": "Laporan LK/26062026/0005/1",
+          "url": "https://quant.renr.ai/movement/3204/",
+          "label": "2026-06-26"
+        },
+        {
+          "source_id": "K28",
+          "title": "OWNERSHIP_CHANGE 39774",
+          "url": "https://quant.renr.ai/document/39774/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K29",
+          "title": "Laporan LK/11062026/0006/1",
+          "url": "https://quant.renr.ai/movement/3336/",
+          "label": "2026-06-11"
+        },
+        {
+          "source_id": "K30",
+          "title": "Edwin Widjaja",
+          "url": "https://quant.renr.ai/account/4795/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K31",
+          "title": "OWNERSHIP_CHANGE 48167",
+          "url": "https://quant.renr.ai/document/48167/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K32",
+          "title": "Laporan LK/08042026/0001/1",
+          "url": "https://quant.renr.ai/movement/3893/",
+          "label": "2026-04-08"
+        },
+        {
+          "source_id": "K33",
+          "title": "PT ALTA INTERNASIONAL INDONESIA",
+          "url": "https://quant.renr.ai/account/6803/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K34",
+          "title": "OWNERSHIP_CHANGE 112381",
+          "url": "https://quant.renr.ai/document/112381/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "D53",
+        "D51",
+        "D50",
+        "D37"
+      ],
+      "unmatched_citations": [],
+      "answer": "**HELI (PT Jaya Trishindo Tbk)** dan **MERI (PT Merry Riana Edukasi Tbk)** tidak memiliki orang atau pengendali yang sama berdasarkan data kepemilikan resmi.\n\n| Jenis Hubungan | Temuan | Kekuatan | Rujukan |\n| :--- | :--- | :--- | :--- |\n| Pemegang Saham >1% | HELI: PT Startel Communication, Komala Tri Varia, PT Alta Internasional, PT Avia Nusantara. MERI: PT Merry Riana, PT Tancorp Investama. Tidak ada kesamaan nama pemegang saham. | Kuat | [O1] [O2] [K5-K8] [K9-K11] |\n| Pengendali / Direksi / Komisaris | HELI: Alva Christopher (pengendali/direksi). MERI: Tidak ada pengurus yang tercatat dalam sistem BEI. | Kuat | [O1] [O2] [K1-K4] |\n| Perubahan Kepemilikan | Pelapor kepemilikan di HELI (Komala Tri Varia, Edwin Widjaja, PT Alta Internasional, Avia Nusantara) tidak muncul sebagai pelapor di MERI. | Kuat | [K19-K34] |\n| Arsip Riset | Tidak ditemukan bukti jaringan kepemilikan atau pihak bersama antara HELI dan MERI dalam tinjauan arsip terkini. | Sedang | [D53] [D51] [D50] [D37] |\n\n**Kesimpulan:** Berdasarkan data KSEI dan laporan emiten per Agustus 2026, struktur kepemilikan dan pengendalian kedua emiten ini berbeda secara signifikan.\n\n*Pemeriksaan nama otomatis: HELI ditulis “Komala Tri Varia, Edwin Widjaja, PT Alta Internasional, Avia Nusantara”, di arsip PT Jaya Trishindo Tbk. Pakai nama menurut arsip.*",
+      "expect_missed": [
+        "Yoel|Raylan"
+      ],
+      "absence_claim": false
+    },
+    {
+      "n": 17,
+      "question": "Mohammad Raylan menjabat di emiten mana saja?",
+      "error": null,
+      "rounds": 3,
+      "calls": [
+        {
+          "tool": "cari_arsip",
+          "args": {
+            "kata": [
+              "Mohammad Raylan"
+            ]
+          },
+          "bytes": 4436,
+          "auto": true
+        },
+        {
+          "tool": "data_kepemilikan",
+          "args": {
+            "nama": "Mohammad Raylan"
+          },
+          "bytes": 108,
+          "auto": true
+        },
+        {
+          "tool": "datacat_cari",
+          "args": {
+            "q": "Mohammad Raylan"
+          },
+          "cached": true,
+          "bytes": 4540,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "15170"
+          },
+          "cached": false,
+          "bytes": 729,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "13663"
+          },
+          "cached": false,
+          "bytes": 3866,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pihak",
+            "id": "4834"
+          },
+          "cached": false,
+          "bytes": 3945,
+          "auto": true
+        },
+        {
+          "tool": "datacat_detail",
+          "args": {
+            "jenis": "pengurus",
+            "ticker": "SQMI"
+          },
+          "bytes": 40
+        },
+        {
+          "tool": "datacat_daftar",
+          "args": {
+            "jenis": "pengurus",
+            "ticker": "SQMI"
+          },
+          "cached": false,
+          "bytes": 600
+        }
+      ],
+      "tool_calls": 8,
+      "datacat_cache_hits": 1,
+      "cost": 0.000532664,
+      "model_calls": 4,
+      "prompt_tokens": 33755,
+      "completion_tokens": 889,
+      "cached_tokens": 24724,
+      "seconds": 18.031,
+      "sources": [
+        {
+          "source_id": "K2",
+          "title": "Drs. Mohammad Raylan, MM",
+          "url": "https://quant.renr.ai/account/13663/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K27",
+          "title": "BOARD_CHANGE 227462",
+          "url": "https://quant.renr.ai/document/227462/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K28",
+          "title": "BOARD_CHANGE 372596",
+          "url": "https://quant.renr.ai/document/372596/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K30",
+          "title": "BOARD_CHANGE 398519",
+          "url": "https://quant.renr.ai/document/398519/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K31",
+          "title": "BOARD_CHANGE 467360",
+          "url": "https://quant.renr.ai/document/467360/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K42",
+          "title": "BOARD_CHANGE 295935",
+          "url": "https://quant.renr.ai/document/295935/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K43",
+          "title": "BOARD_CHANGE 297037",
+          "url": "https://quant.renr.ai/document/297037/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K49",
+          "title": "Penyampaian Laporan Tahunan dan Keberlanjutan",
+          "url": "https://quant.renr.ai/document/892397/",
+          "label": "datacat"
+        },
+        {
+          "source_id": "K52",
+          "title": "Mirna Sri Hernawatie",
+          "url": "https://quant.renr.ai/account/14466/",
+          "label": "datacat"
+        }
+      ],
+      "cited": [
+        "K27",
+        "K2",
+        "K52",
+        "K28",
+        "K31",
+        "K30",
+        "K43",
+        "K42",
+        "K49"
+      ],
+      "unmatched_citations": [],
+      "answer": "Berdasarkan data resmi BEI, Mohammad Raylan tercatat dalam 3 entitas pihak berbeda yang merujuk pada nama tersebut:\n\n1. **Drs. Mohammad Raylan (id_pihak: 15170)**\n   *   **RISE** (PT Jaya Sukses Makmur Sentosa Tbk): Menjabat sebagai Ketua Komite Audit hingga pengunduran diri efektif 12 September 2025 [K27].\n\n2. **\"Drs. Mohammad Raylan, MM\" (id_pihak: 13663)**\n   *   **SQMI** (PT Wilton Makmur Indonesia Tbk): Saat ini menjabat sebagai anggota Komite Audit sejak 5 Desember 2024 [K2] [K52].\n   *   **RISE** (PT Jaya Sukses Makmur Sentosa Tbk): Sebelumnya menjabat sebagai Komisaris Independen hingga pengunduran diri efektif 7 April 2025 [K28].\n   *   **PEVE** (PT Penta Valent Tbk): Sebelumnya menjabat sebagai Komisaris Independen dan Ketua Komite Audit hingga pengunduran diri efektif 21 November 2024 [K31] [K30].\n\n3. **Mohammad Raylan (id_pihak: 4834)**\n   *   **CAKK** (PT Cahayaputra Asa Keramik Tbk): Sebelumnya menjabat sebagai Komisaris dan Ketua Komite Audit hingga pengunduran diri efektif 13 Juni 2025 [K43] [K42].\n   *   **SFAN** (PT Surya Fajar Capital Tbk): Berperan sebagai Komisaris Independen SF Sekuritas berdasarkan Laporan Tahunan 2023 [K49].\n\nData kepemilikan KSEI tidak mencatat Mohammad Raylan sebagai pemegang saham >1% di emiten manapun per Agustus 2026 [data_kepemilikan].",
+      "expect_missed": [
+        "HELI",
+        "MERI"
+      ],
+      "absence_claim": false
+    }
+  ]
+}

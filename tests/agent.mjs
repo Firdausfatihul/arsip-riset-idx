@@ -143,3 +143,43 @@ test('a provider rate limit is retried; an unrecoverable step still answers from
     fetcher:async () => Response.json({sections:[]}), stats});
   assert.equal(result.answer, 'ok'); assert.match(stats.step_failed, /membatasi/);
 });
+
+test('relationship tools: ownership name search across issuers, user terms first, person trail from filings', async () => {
+  const {ownershipTool, userTerms} = await import('../worker/agent.mjs');
+  const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
+  const data = JSON.parse(await readFile(new URL('../worker/.assets/ownership.json', import.meta.url), 'utf8'));
+  const refs = new Refs(), found = ownershipTool(data, {nama:'Tancorp'}, refs);
+  for (const code of ['MERI', 'BLES', 'RISE', 'CLEO']) assert.ok(found.includes('ticker:' + code), code);
+  assert.ok(refs.list().every(r => /^O\d+$/.test(r.source_id) && /^#kepemilikan=[A-Z0-9]+$/.test(r.url)));
+  assert.ok(ownershipTool(data, {ticker:'MERI'}, refs).includes('19.32'));
+  assert.deepEqual(userTerms('apakah yoel bagian tancorp?', manifest).map(t => t.toLowerCase()), ['yoel', 'tancorp']);
+
+  const person = {account:{id:4813, name:'Yoel Alex Santoso', html_url:'https://quant.renr.ai/account/4813/'}, seats:[],
+    mentions:[{document_id:43583, page_no:4, role_raw:''}, {document_id:4927, page_no:3, role_raw:'Komisaris'}]};
+  const docs = {43583:{announcement:{emiten_key:'HELI', tgl_date:'2026-06-19', judul:'Penyampaian Materi Public Expose - Tahunan'}},
+    4927:{announcement:{emiten_key:'MERI', tgl_date:'2026-09-10', judul:'Laporan Bulanan Registrasi Pemegang Efek'}}};
+  const fetcher = async url => Response.json(url.includes('/accounts/') ? person : docs[url.match(/documents\/(\d+)/)[1]]);
+  let seen;
+  const model = {step:async m => { if (!seen) { seen = true; return {message:{tool_calls:[{id:'p', type:'function', function:{name:'datacat_detail', arguments:'{"jenis":"pihak","id":"4813"}'}}]}}; }
+      return {message:{content:'SIAP'}}; },
+    answer:async (m, emit) => { const text = JSON.stringify(m.filter(x => x.role === 'tool').map(x => x.content)); await emit({type:'delta', text:'ok'}); return 'Yoel tidak terkait [K1].' + text; }};
+  const stats = {};
+  const result = await agentic({archive:new Archive(assets), model, question:'apakah yoel bagian tancorp?', emit:async () => {}, env:{DATACAT_API_KEY:'KEY'}, fetcher, stats});
+  assert.ok(stats.agent_calls[0].auto && stats.agent_calls[0].tool === 'cari_arsip', 'archive searched by code first');
+  assert.match(result.answer, /emiten:HELI[^}]*bio:1/, 'biography page flagged in the trail');
+  assert.match(result.answer, /emiten:MERI[^}]*peran:Komisaris/);
+  assert.ok(stats.absence_claim, 'absence stated as disproof gets a note');
+});
+
+test('a biography is cut at section headers, so a neighbour in the same PDF column is not attributed', async () => {
+  const {biography} = await import('../worker/agent.mjs');
+  const page = 'Pengalaman Kerja: Jan 2022 – Des 2023 Direktur PT Jaya Trishindo Tbk Des 2015 – Okt 2019 Direktur MNC Asuransi Indonesia '
+    + 'Andre Franklin Sahelangi Jan 2008 – Des 2011 Head of Finance- Accounting Allianz Utama Indonesia 10 Daftar Riwayat Hidup '
+    + 'Tempat / Tanggal Lahir: Surabaya, 25 Juli 1988 Pengalaman Kerja: 2026 – sekarang Direktur PT Alta Internasional Indonesia '
+    + '2025 – sekarang Komisaris PT Merry Riana Edukasi Tbk 2023 – sekarang General Manager Finance Accounting Tax Yoel Alex Santoso '
+    + 'PT Tancorp Abadi Nusantara 2016 – 2019 Finance Accounting Tax Manager PT Tancorp Abadi Nusantara 11 LAYANAN JASA PERSEROAN';
+  const yoel = biography(page, 'Yoel Alex Santoso');
+  assert.match(yoel, /Tancorp Abadi Nusantara/); assert.match(yoel, /Alta Internasional/);
+  assert.doesNotMatch(yoel, /MNC|Allianz/);
+  assert.doesNotMatch(biography(page, 'Andre Franklin Sahelangi'), /Tancorp/);
+});

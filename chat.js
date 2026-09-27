@@ -33,6 +33,7 @@
 
   function docHref(path){ return '#doc=' + encodeURIComponent(path).replace(/%2F/g, '/'); }
   function sourceHref(s){ return s.url ? s.url : docHref(s.path); }
+  var OWN = /^#kepemilikan=[A-Z0-9]{2,12}$/; // our own ownership tab, cited as [O..]
   function external(a){ a.target = '_blank'; a.rel = 'noopener noreferrer'; }
 
   function message(role, text, agentic){
@@ -57,8 +58,8 @@
     sources.forEach(function(s){
       var item = document.createElement('li'), link = document.createElement('a');
       link.href = sourceHref(s);
-      if (s.url) external(link);
-      link.textContent = '[' + s.source_id + '] ' + s.title + ' · ' + s.label + (s.url ? ' · datacat' : '');
+      if (s.url && DATACAT.test(s.url)) external(link);
+      link.textContent = '[' + s.source_id + '] ' + s.title + ' · ' + s.label + (s.url && DATACAT.test(s.url) ? ' · datacat' : '');
       item.appendChild(link); list.appendChild(item);
     });
     details.appendChild(list); block.appendChild(details);
@@ -70,10 +71,10 @@
     var byId = {};
     sources.forEach(function(s){ byId[s.source_id] = s; });
     // "[K1, K2]" and "[K1-K3]" link each id, like the server's citation reader (worker/agent.mjs).
-    var markdown = text.replace(/\[((?:[DK]\d+)(?:\s*(?:,|;|-|–)\s*[DK]?\d+)*)\]/g, function(label, group){
+    var markdown = text.replace(/\[((?:[DKO]\d+)(?:\s*(?:,|;|-|–)\s*[DKO]?\d+)*)\]/g, function(label, group){
       var ids = [];
       group.split(/\s*[,;]\s*/).forEach(function(part){
-        var range = part.match(/^([DK])(\d+)\s*[-–]\s*[DK]?(\d+)$/);
+        var range = part.match(/^([DKO])(\d+)\s*[-–]\s*[DKO]?(\d+)$/);
         if (range) for (var n = +range[2]; n <= Math.min(+range[3], +range[2] + 30); n++) ids.push(range[1] + n);
         else ids.push(part);
       });
@@ -160,7 +161,8 @@
         if (event.type === 'activity') activity.textContent = event.text;
         if (event.type === 'sources'){
           sources = event.sources.filter(function(s){
-            return (/^D\d+$/.test(s.source_id) && knownPaths.has(s.path)) || (/^K\d+$/.test(s.source_id) && DATACAT.test(s.url || ''));
+            return (/^D\d+$/.test(s.source_id) && knownPaths.has(s.path)) || (/^K\d+$/.test(s.source_id) && DATACAT.test(s.url || ''))
+              || (/^O\d+$/.test(s.source_id) && OWN.test(s.url || ''));
           });
           if (sources.length !== event.sources.length) throw new Error('Daftar arsip sudah diperbarui. Muat ulang halaman lalu coba lagi.');
           summary = sourceList(reply.block, sources);

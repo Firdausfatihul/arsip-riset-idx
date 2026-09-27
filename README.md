@@ -276,13 +276,21 @@ transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di
 - Kuota: `CHAT_AGENTIC_DAILY` pertanyaan per hari UTC untuk seluruh situs (produksi 50 di `worker/wrangler.jsonc`; tanpa nilai 10). Jawaban tersimpan tidak memakai kuota.
 - Key datacat disimpan sebagai secret Worker `DATACAT_API_KEY` (lokal di `.env.chat`), tidak pernah ke browser.
   Host, path, dan parameter ditetapkan kode; argumen alat divalidasi; endpoint tulis API tidak tersedia sebagai alat.
-- Batas per pertanyaan: 7 langkah, 16 panggilan alat, 6 KB per hasil, 70 KB bahan; maks 3 pencarian nama dan 2 pembacaan teks dokumen.
+- Batas per pertanyaan: 7 langkah, 20 panggilan alat, 6 KB per hasil, 70 KB bahan; maks 3 pencarian nama dan 3 pembacaan teks dokumen.
 - Hemat: hasil datacat dipangkas dan ditulis ringkas (tanpa tanda kutip JSON), objek berulang jadi rujukan `K1`;
   respons datacat di-cache 6 jam, jawaban identik 6 jam. Akhir tiap prompt diberi `cache_control` sehingga
   langkah berikutnya dan jawaban akhir membaca awalan dari cache provider (±77% input dari cache pada uji).
   Instruksi jawaban dikirim sebagai hasil alat: pesan user/system baru membuat template menulis ulang giliran alat dan cache hilang.
 - Pihak baru (pembeli, pelapor kepemilikan, direksi/komisaris baru) diperiksa silang lewat profil pihak di datacat.
-- Rujukan `[D..]` ke arsip, `[K..]` ke halaman datacat; nama emiten diambil dari arsip dan diperiksa setelah jawaban.
+- Penemuan awal oleh kode (tanpa panggilan model): nama dan kode di pertanyaan dicari di arsip, di indeks kepemilikan
+  (`ownership.json` dari `kepemilikan.json`: KSEI >1% dan daftar pemegang laporan emiten, tanpa alamat), dan di datacat;
+  profil dibuka untuk hingga tiga akun yang cocok (satu orang sering punya beberapa akun).
+- Profil orang memuat `jejak_dokumen` (dokumen yang menyebut namanya: emiten, tanggal, peran, halaman) dan, bila ada,
+  `riwayat_karier` dari halaman profil public expose/laporan tahunan, dipotong di judul bagian agar riwayat tetangga tidak tercampur.
+- Pertanyaan hubungan diuji per jenis: orang sama lintas emiten, rantai kepemilikan, riwayat karier, nama grup/keluarga,
+  alamat, BAE/auditor/notaris, transaksi pihak berelasi, waktu. Jawaban memakai tabel kekuatan (kuat/sedang/lemah);
+  pernyataan "tidak terkait" diberi catatan bahwa ketiadaan bukti bukan bukti. Alamat hanya ada di teks dokumen.
+- Rujukan `[D..]` ke arsip, `[K..]` ke halaman datacat, `[O..]` ke tab Kepemilikan Saham; nama emiten diambil dari arsip dan diperiksa setelah jawaban.
 - Uji: `node --test tests/agent.mjs` (tanpa jaringan) dan `node tools/eval_agentic.mjs --label nama` (API nyata, 13 pertanyaan, ±US$0,006).
 - Statistik privat (`tools/chat_metrics.py --html`) memisahkan mode biasa dan mode agen: biaya, rata-rata, termahal, panggilan alat, cache.
 

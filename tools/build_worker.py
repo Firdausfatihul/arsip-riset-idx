@@ -35,6 +35,30 @@ def covers(doc):
     return [doc['start'], doc['end']]
 
 
+ROLE_NAMES = [(1, '>=5%'), (2, 'pengendali'), (4, 'afiliasi'), (8, 'direksi'), (16, 'komisaris')]
+
+
+def ownership_index(path):
+    """Latest KSEI >1% holders and the issuer's own holder list (holders, controllers, directors,
+    commissioners) per company, for the agent's cross-company name search. No addresses: the source omits them.
+    {m: month, c: {TICKER: {n: name, k: [[holder, pct]], d: [[person, roles, pct]]}}}"""
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding='utf-8'))
+    names, months, out = data['names'], data['months'], {}
+    for company in data['companies']:
+        ksei = next((m for m in reversed(company.get('k') or []) if m), None)
+        report = next((m for m in reversed(company.get('d') or []) if m and m.get('h')), None)
+        entry = {'n': company.get('n') or ''}
+        if ksei:
+            entry['k'] = [[names[h[1]], h[4]] for h in ksei.get('h') or []]
+        if report:
+            entry['d'] = [[names[h[0]], ','.join(label for bit, label in ROLE_NAMES if (h[1] or 0) & bit), h[3]] for h in report['h']]
+        if len(entry) > 1:
+            out[company['t']] = entry
+    return {'m': months[-1]['p'] if months else '', 'c': out}
+
+
 def stockbit_handles(docs):
     """Stockbit usernames ("@primestockid"), so a question naming one is always searched.
     A name counts only when the archive mostly writes it with @: "media" and "stockbit" are words."""
@@ -83,6 +107,11 @@ def build(directory, out):
                 'wordTickers': sorted(t for t in tickers if t.lower() in WORD_TICKERS),
                 'termTickers': term_tickers(tickers)}
     (out / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    ownership = ownership_index(ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan.json')
+    if ownership:
+        (out / 'ownership.json').write_text(json.dumps(ownership, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+        manifest['ownership'] = {'asset': 'ownership.json', 'companies': len(ownership['c']), 'month': ownership['m']}
+        (out / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     events = make_events(docs, tickers, evidences)
     (out / 'events.json').write_text(json.dumps(events, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     print(f'Worker: {len(docs)} dokumen lengkap, {sum(len(d["sizes"]) for d in metadata)} bagian, '
