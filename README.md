@@ -304,6 +304,10 @@ transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di
   - `worker/facts.mjs`: formulir perubahan kepemilikan menjadi kartu (harga per saham terpisah dari nilai total, jeda lapor,
     isian formulir sebagai pernyataan pelapor), badan usaha tidak pernah ditulis "individu", risalah RUPS dibedakan keputusan dan
     kehadiran, batas 44 koneksi keluar per pertanyaan (termasuk ulangan), batas datacat 45/menit, dan pemeriksaan setelah jawaban.
+  - `cari_teks`: pencarian frasa persis di teks semua dokumen lewat halaman publik datacat (`/explore/documents/`), tanpa key API,
+    host dan path tetap, maks 3 per pertanyaan, cache 24 jam; halaman yang tidak terbaca dilaporkan sebagai galat, bukan "0 hasil".
+    Dijalankan otomatis untuk nama tanpa profil datacat (banyak komisaris/direksi hanya tercatat di teks risalah atau prospektus).
+    Kata yang tidak dikenal arsip tetap dianggap bagian nama bila bersebelahan dengan kata nama lain ("ferita lie").
   - Batas: 4 langkah model + jawaban (maks 2.000 token), 18 panggilan alat. Tautan `[O..]` membuka tab Kepemilikan dengan rentang bulan.
 - Uji: `node --test tests/agent.mjs` (tanpa jaringan) dan `node tools/eval_agentic.mjs --label nama` (API nyata, 13 pertanyaan, ±US$0,006).
 - Statistik privat (`tools/chat_metrics.py --html`) memisahkan mode biasa dan mode agen: biaya, rata-rata, termahal, panggilan alat, cache.

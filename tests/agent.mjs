@@ -258,3 +258,23 @@ test('signals: pack with must-cover items, O links with the months, coverage app
   assert.ok(stats.agent_calls.some(c => c.tool === 'data_kepemilikan' && c.args.bagian === 'peringkat' && c.auto));
   assert.equal(AGENT.version, 'agent-v5');
 });
+
+test('full-text search: exact phrase on the public site, no API key, fail-closed parser; unknown name words kept together', async () => {
+  const {searchText, parseSearch, entityTerms} = await import('../worker/agent.mjs');
+  const {ExternalBudget} = await import('../worker/facts.mjs');
+  const page = '<table class="t-table t-table--linked"><tbody><tr><td><a href="/issuer/BULL/" class="chip-ticker">BULL</a></td><td>'
+    + '<a href="/document/100219/" class="row-link" title="Risalah RUPS.pdf">Risalah</a><p class="t-caption mt-0.5 truncate">Menyetujui pengangkatan Ibu '
+    + '<mark class="hl">Ferita Lie</mark> sebagai Komisaris Independen</p></td><td class="whitespace-nowrap tabular">27 Apr 2026</td></tr></tbody></table>';
+  const seen = [], budget = new ExternalBudget(44, 8);
+  const rows = await searchText({budget, fetcher:async (url, init) => { seen.push({url, init}); return new Response(page); }}, {q:'Ferita Lie', ticker:'BULL'});
+  const url = new URL(seen[0].url);
+  assert.equal(url.origin + url.pathname, 'https://quant.renr.ai/explore/documents/');
+  assert.equal(url.searchParams.get('q'), '"Ferita Lie"'); assert.equal(url.searchParams.get('ticker'), 'BULL');
+  assert.ok(!('Authorization' in seen[0].init.headers), 'the API key never goes to the website');
+  assert.equal(seen[0].init.redirect, 'manual'); assert.equal(budget.used, 1);
+  assert.deepEqual([rows[0].emiten, rows[0].tanggal], ['BULL', '27 Apr 2026']);
+  assert.match(rows[0].kutipan, /Ferita Lie sebagai Komisaris Independen/);
+  assert.equal(parseSearch('<html>new layout</html>'), null, 'an unreadable page is an error, not "no results"');
+  const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
+  assert.deepEqual(entityTerms('kenapa bu ferita lie suka ngibul', manifest).phrases, ['ferita lie']);
+});
