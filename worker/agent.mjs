@@ -11,7 +11,7 @@ import {SCREENING, coverage, hopParties, knownPart, loadSignals, mustCover, scre
 // Internal prompts and tool results are therefore terse; only the answer to the user is normal prose.
 // v5: code does the joins (precomputed KSEI signals) and words the data fields; fewer model rounds.
 export const AGENT = Object.freeze({rounds:4, calls:18, resultBytes:6000, totalBytes:70000,
-  stepTokens:500, answerTokens:2000, dataTtl:6 * 3600000, answerTtl:6 * 3600000, version:'agent-v5',
+  stepTokens:500, answerTokens:2000, dataTtl:6 * 3600000, answerTtl:6 * 3600000, version:'agent-v5.2',
   caps:{datacat_cari:3, dokumen_teks:3, cari_teks:3}, trail:8, trailTotal:16, subrequests:44, webTtl:24 * 3600000});
 const DATACAT = 'https://quant.renr.ai';
 

@@ -256,7 +256,7 @@ test('signals: pack with must-cover items, O links with the months, coverage app
   await agentic({archive:new Archive(assets), model, question:'cari hidden gems dari pola kepemilikan', emit:async () => {}, env:{DATACAT_API_KEY:'KEY'},
     fetcher:async () => Response.json({sections:[]}), stats});
   assert.ok(stats.agent_calls.some(c => c.tool === 'data_kepemilikan' && c.args.bagian === 'peringkat' && c.auto));
-  assert.equal(AGENT.version, 'agent-v5');
+  assert.match(AGENT.version, /^agent-v5/);
 });
 
 test('full-text search: exact phrase on the public site, no API key, fail-closed parser; unknown name words kept together', async () => {
