@@ -183,3 +183,78 @@ test('a biography is cut at section headers, so a neighbour in the same PDF colu
   assert.doesNotMatch(yoel, /MNC|Allianz/);
   assert.doesNotMatch(biography(page, 'Andre Franklin Sahelangi'), /Tancorp/);
 });
+
+// ---- v5: correctness layer and precomputed KSEI signals ----
+test('fact cards word form fields as the filer\'s statements, with units and the filing lag', async () => {
+  const {GLOSSARY, movementCard, worded, rupiah} = await import('../worker/facts.mjs');
+  assert.match(GLOSSARY.retains_control(false), /tetap mempertahankan pengendalian: TIDAK \(isian pelapor/);
+  assert.equal(rupiah(1650000 * 350), '±Rp577,5 juta');
+  const movement = {report_number:'LK/1', report_date:'2026-09-17', filer_type:'KSEI', reporter:{name:'PT Graha Inti Guna Persada', kind:'INDIVIDUAL'},
+    reporter_is_board_member:true, reporter_position:'Direksi', shares_before:'443543000.00', pct_before:'68.2300', shares_after:'441893000.00',
+    pct_after:'67.9800', is_controller:true, retains_control:false,
+    lines:[{transaction_type:'SELL', transaction_type_raw:'Penjualan', shares:'1650000.00', price:'350.0000', transaction_date:'2026-09-16'}]};
+  const card = movementCard(movement).kartu;
+  assert.match(card.transaksi[0], /Penjualan 1\.650\.000 saham @ Rp350 per saham \(nilai ±Rp577,5 juta\)/);
+  assert.match(card.dilaporkan, /1 hari setelah transaksi/);
+  assert.match(card.isian_formulir, /bukan bukti jabatan di emiten/);
+  assert.equal(card.lawan_transaksi, 'tidak dicantumkan dalam formulir');
+  const found = [], out = worded({results:[movement]}, found);
+  assert.equal(out.results[0].reporter.kind, 'COMPANY', 'a PT is never an individual');
+  assert.equal(found[0].reporter, 'PT Graha Inti Guna Persada');
+  assert.ok(!('retains_control' in out.results[0]), 'raw flags replaced by the card');
+});
+
+test('minutes: resolutions and attendance are typed; checks after the answer', async () => {
+  const {typedMinutes, answerChecks, ExternalBudget} = await import('../worker/facts.mjs');
+  const text = typedMinutes('Rapat dihadiri oleh Paulinus dan Yoel. Rapat memutuskan mengangkat Budi sebagai Direktur.', 'RUPS_MINUTES');
+  assert.match(text, /\[KEHADIRAN\] Rapat dihadiri/); assert.match(text, /\[KEPUTUSAN\] Rapat memutuskan/);
+  assert.equal(typedMinutes('Laporan biasa.', 'OTHER'), 'Laporan biasa.');
+  const notes = answerChecks('Pengendali tetap mempertahankan pengendalian. PT Alta Internasional Indonesia (individu) membeli 16%.',
+    {retains:[{reporter:'PT Graha', date:'2026-09-17', report:'LK/1'}]});
+  assert.equal(notes.length, 2);
+  assert.equal(answerChecks('Formulir berisi "tetap mempertahankan pengendalian: TIDAK" [K1].', {retains:[{reporter:'A', date:'x'}]}).length, 0,
+    'an answer that reports the TIDAK is not flagged');
+  assert.equal(answerChecks('PT Wahana Konstruksi Mandiri adalah pihak (individu) pengendali ASLI.').length, 1);
+  const {isCompany} = await import('../worker/facts.mjs');
+  assert.ok(isCompany('WAHANA KONSTRUKSI MANDIRI') && isCompany('SENTOSA BERSAMA MITRA') && !isCompany('Yoel Alex Santoso') && !isCompany('Hans Saputra'));
+  const budget = new ExternalBudget(44, 8);
+  let tools = 0; while (budget.take()) tools++;
+  assert.equal(tools, 36, 'tools stop while 8 remain for the model');
+});
+
+test('names: verbs, months and glued words are dropped; known names are kept whole', async () => {
+  const {entityTerms} = await import('../worker/agent.mjs');
+  const {loadSignals} = await import('../worker/signals.mjs');
+  const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
+  const sig = await loadSignals(new Archive(assets), manifest);
+  const t = q => entityTerms(q, manifest, sig.known);
+  assert.ok(t('EPAC diambil alih PT Triple Berkah Bersama. Siapa pemilik sebenarnya, di harga berapa ia membeli?').phrases.includes('Triple Berkah Bersama'));
+  const mglv = t('MGLV: pengendali PT Nextier Datamate Center menjual banyak saham sejak Juli 2026. Siapa pembelinya?');
+  assert.deepEqual(mglv.tickers, ['MGLV']);
+  assert.ok(!mglv.phrases.some(p => /menjual|sejak|juli|pembelinya/i.test(p)), JSON.stringify(mglv.phrases));
+});
+
+test('signals: pack with must-cover items, O links with the months, coverage appendix, screening route', async () => {
+  const {loadSignals, signalView, coverage, mustCover} = await import('../worker/signals.mjs');
+  const {terse} = await import('../worker/agent.mjs');
+  const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
+  const sig = await loadSignals(new Archive(assets), manifest), refs = new Refs();
+  const pack = signalView(sig, {ticker:'LUCY', bagian:'sinyal'}, refs, terse);
+  assert.match(pack, /wajib:1/); assert.match(pack, /378\.693\.473/);
+  assert.ok(refs.list().some(r => r.url === '#kepemilikan=LUCY&dari=2026-05&sampai=2026-06'), refs.list().map(r => r.url).join());
+  const items = mustCover(sig.signals.issuers.LUCY).map(s => ({t:'LUCY', s}));
+  assert.match(coverage('LUCY tidak punya catatan penting.', items, refs, () => 'LUCY'), /belum dibahas/);
+  assert.equal(coverage('Delta Wibawa melepas 378.693.473 saham ke SENTOSA BERSAMA MITRA dan PIJAR.', items.slice(0, 1), refs, () => 'LUCY'), '');
+  const asli = mustCover(sig.signals.issuers.ASLI).filter(s => s.k === 'transfer').map(s => ({t:'ASLI', s}));
+  assert.ok(asli.length, 'ASLI transfer is a must-cover item');
+  assert.match(coverage('Tidak ada catatan.', asli, refs, () => 'ASLI'), /732\.500\.000/);
+  assert.equal(coverage('Wahana melepas 732.500.000 saham ke Cakrawala Multi Mineral.', asli, refs, () => 'ASLI'), '');
+  const calls = [];
+  const model = {step:async m => { calls.push(m); return {message:{content:'SIAP'}}; },
+    answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
+  const stats = {};
+  await agentic({archive:new Archive(assets), model, question:'cari hidden gems dari pola kepemilikan', emit:async () => {}, env:{DATACAT_API_KEY:'KEY'},
+    fetcher:async () => Response.json({sections:[]}), stats});
+  assert.ok(stats.agent_calls.some(c => c.tool === 'data_kepemilikan' && c.args.bagian === 'peringkat' && c.auto));
+  assert.equal(AGENT.version, 'agent-v5');
+});

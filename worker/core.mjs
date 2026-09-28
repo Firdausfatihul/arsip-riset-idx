@@ -367,7 +367,7 @@ export class OpenRouter {
     this.truncated = false;
     // Agentic answers pass the same tools (tool_choice none) so the whole transcript stays a cached prefix.
     // Agentic steps run without reasoning; the template renders earlier tool turns differently with it on, so the answer matches them.
-    return this.stream(messages, {maxTokens:ANSWER_TOKENS, allowPartial:true, reasoning:options.reasoning === false ? false : options.reasoningTokens === 2048 ? 2048 : true,
+    return this.stream(messages, {maxTokens:Math.min(options.maxTokens || ANSWER_TOKENS, ANSWER_TOKENS), allowPartial:true, reasoning:options.reasoning === false ? false : options.reasoningTokens === 2048 ? 2048 : true,
       ...(options.tools ? {tools:options.tools, toolChoice:options.toolChoice || 'none'} : {})}, text => emit({type:'delta', text}));
   }
 }

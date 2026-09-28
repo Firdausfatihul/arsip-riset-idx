@@ -291,6 +291,20 @@ transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di
   alamat, BAE/auditor/notaris, transaksi pihak berelasi, waktu. Jawaban memakai tabel kekuatan (kuat/sedang/lemah);
   pernyataan "tidak terkait" diberi catatan bahwa ketiadaan bukti bukan bukti. Alamat hanya ada di teks dokumen.
 - Rujukan `[D..]` ke arsip, `[K..]` ke halaman datacat, `[O..]` ke tab Kepemilikan Saham; nama emiten diambil dari arsip dan diperiksa setelah jawaban.
+- **v5 (agent-v5): sinyal KSEI dihitung saat build dan lapisan ketepatan.**
+  - `tools/ksei_signals.py` (stdlib, tanpa jaringan) membaca `kepemilikan.json` dan menulis `signals.json` dan `ksei_history.json`
+    ke aset Worker: pengalihan blok (satu pembeli), pemecahan blok (2-8 pemegang baru), pemegang baru/keluar >=2%, dekat 5%,
+    ganti nama (lembar persis sama di >=2 emiten), kelompok pemegang lintas emiten, pemegang yang juga emiten, dan peringkat awal.
+    Varian nama satu pemegang digabung (urutan kata, kesinambungan lembar atau persen); rekening kustodian/nominee dikecualikan;
+    bulan yang tidak lengkap tidak dipakai. Tiap sinyal punya tingkat (fakta/kuat/sedang/lemah) dan kalimat yang ditulis kode.
+    Uji: `python3 -B -m unittest tests/test_ksei_signals.py`.
+  - Saat menjawab, kode mengirim sinyal emiten yang disebut (yang `wajib:1` harus dibahas), lalu memeriksa emiten lain milik pihak
+    dalam sinyal itu. Sinyal wajib yang tidak dibahas ditambahkan kode di akhir jawaban. Pertanyaan "hidden gems" tanpa nama emiten
+    memakai peringkat awal (belum disetel).
+  - `worker/facts.mjs`: formulir perubahan kepemilikan menjadi kartu (harga per saham terpisah dari nilai total, jeda lapor,
+    isian formulir sebagai pernyataan pelapor), badan usaha tidak pernah ditulis "individu", risalah RUPS dibedakan keputusan dan
+    kehadiran, batas 44 koneksi keluar per pertanyaan (termasuk ulangan), batas datacat 45/menit, dan pemeriksaan setelah jawaban.
+  - Batas: 4 langkah model + jawaban (maks 2.000 token), 18 panggilan alat. Tautan `[O..]` membuka tab Kepemilikan dengan rentang bulan.
 - Uji: `node --test tests/agent.mjs` (tanpa jaringan) dan `node tools/eval_agentic.mjs --label nama` (API nyata, 13 pertanyaan, ±US$0,006).
 - Statistik privat (`tools/chat_metrics.py --html`) memisahkan mode biasa dan mode agen: biaya, rata-rata, termahal, panggilan alat, cache.
 

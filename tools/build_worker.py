@@ -12,6 +12,7 @@ import sys
 
 from build_safety import check_output
 from chat_archive import read_archive, ROOT, SYSTEM, COMMON_WORDS, WORD_TICKERS, split_text
+import ksei_signals
 from evidence_index import make_evidence, VERSION
 from event_index import make_events, term_tickers
 
@@ -107,6 +108,10 @@ def build(directory, out):
                 'wordTickers': sorted(t for t in tickers if t.lower() in WORD_TICKERS),
                 'termTickers': term_tickers(tickers)}
     (out / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    # Month-over-month and cross-issuer KSEI joins for the agentic engine (tools/ksei_signals.py).
+    signals = ksei_signals.write(ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan.json', out)
+    if signals:
+        manifest['signals'] = signals
     ownership = ownership_index(ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan.json')
     if ownership:
         (out / 'ownership.json').write_text(json.dumps(ownership, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')

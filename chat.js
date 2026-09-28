@@ -33,7 +33,7 @@
 
   function docHref(path){ return '#doc=' + encodeURIComponent(path).replace(/%2F/g, '/'); }
   function sourceHref(s){ return s.url ? s.url : docHref(s.path); }
-  var OWN = /^#kepemilikan=[A-Z0-9]{2,12}$/; // our own ownership tab, cited as [O..]
+  var OWN = /^#kepemilikan=[A-Z0-9]{2,12}(&dari=\d{4}-\d{2})?(&sampai=\d{4}-\d{2})?$/; // our own ownership tab, cited as [O..]
   function external(a){ a.target = '_blank'; a.rel = 'noopener noreferrer'; }
 
   function message(role, text, agentic){
