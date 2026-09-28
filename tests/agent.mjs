@@ -279,9 +279,20 @@ test('full-text search: exact phrase on the public site, no API key, fail-closed
   assert.deepEqual(entityTerms('kenapa bu ferita lie suka ngibul', manifest).phrases, ['ferita lie']);
   assert.deepEqual(entityTerms('kenapa bu ferita liee itu suka banget ngibul', manifest).phrases, ['ferita liee'], 'banget is not @BangGent');
   assert.deepEqual(entityTerms('user zeinfahrozi suka ngomgin apa sih?', manifest).phrases, ['zeinihzafahrozi']);
+  assert.deepEqual(entityTerms('saham yg dipegang zein fahrozi apa aja?', manifest).phrases, ['zein fahrozi', 'zeinihzafahrozi'], 'a name in parts reaches the username');
+  assert.deepEqual(entityTerms('siapa Ferita Lie', manifest).phrases, ['Ferita Lie']);
   const asked = [];
   const typo = await searchText({fetcher:async url => { const q = new URL(url).searchParams.get('q'); asked.push(q);
     return new Response(q === '"ferita lie"' ? page : '<table class="t-table"><tbody></tbody></table>'); }}, {q:'ferita liee'});
   assert.deepEqual(asked, ['"ferita liee"', '"ferita lie"']);
   assert.equal(typo[0].ejaan_dicari, 'ferita lie');
+});
+
+test('a Stockbit username gets the stocks it posts about, counted by code', async () => {
+  const root = new URL('../worker/.assets/', import.meta.url);
+  const archive = new Archive({fetch:async r => new Response(await readFile(new URL(new URL(r.url).pathname.slice(1), root)))});
+  const {archiveTool} = await import('../worker/agent.mjs');
+  const out = await archiveTool(archive, await archive.manifest(), {kata:['zeinihzafahrozi']}, new Map());
+  assert.match(out, /saham_dibahas_pengguna:\[\{pengguna:"@zeinihzafahrozi",saham:"PACK \d+x/);
+  assert.match(out, /bukan bukti dimiliki/);
 });
