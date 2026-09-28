@@ -254,9 +254,22 @@ export async function fetchDatacat({key, cache, signal, fetcher = fetch, budget}
 // Full-text search over every filing, from datacat's public website (the API search returns file names only).
 // Fixed host and path, no API key sent, a phrase in quotes for exact matches; a page we cannot parse is an error,
 // never "no results".
-export async function searchText({cache, signal, fetcher = fetch, budget}, args) {
-  const q = clean(args.q, 120).replace(/["<>]/g, ' ').trim(), t = args.ticker ? ticker(args.ticker) : null;
+// A phrase with no hit is retried once with doubled letters collapsed ("ferita liee" -> "ferita lie"), then with
+// its longest word; rows say which spelling found them.
+export async function searchText(ctx, args) {
+  const q = clean(args.q, 120).replace(/["<>]/g, ' ').replace(/\s+/g, ' ').trim();
   if (q.length < 3) throw new ToolError('q wajib diisi (frasa, mis. nama lengkap)');
+  const tries = [q, q.replace(/([a-z])\1+/gi, '$1')];
+  if (q.includes(' ')) tries.push(q.split(' ').sort((a, b) => b.length - a.length)[0]);
+  for (const [i, attempt] of [...new Set(tries)].entries()) {
+    if (attempt.length < 3) continue;
+    const rows = await searchOnce(ctx, {...args, q:attempt});
+    if (rows.length || i === tries.length - 1) return i ? rows.map(r => ({...r, ejaan_dicari:attempt})) : rows;
+  }
+  return [];
+}
+async function searchOnce({cache, signal, fetcher = fetch, budget}, args) {
+  const q = args.q, t = args.ticker ? ticker(args.ticker) : null;
   const url = new URL('/explore/documents/', DATACAT);
   url.searchParams.set('q', q.includes(' ') ? `"${q}"` : q);
   if (t) url.searchParams.set('ticker', t);
@@ -354,6 +367,7 @@ const STOP = new Set(('apakah apa siapa siapakah mana saja bagian dari dan atau 
   + 'menjual membeli melepas dilepas masuk keluar sejak pembelinya penjualnya terjadinya berkepentingan diambil alih ambil pemilik sebenarnya '
   + 'harga berapa balik besar lain selain anak usaha tanda banyak pernah sering muncul bersama dimaksud baru-baru '
   + 'stockbit keterbukaan digest datacat idx bei ksei ibu bapak pak mas mbak bang kak '
+  + 'banget bgt aja gak ga nggak engga enggak kok nih tuh deh yg dgn udah udh emang gimana kayak kaya ngibul bohong boong '
   + 'cari carikan hidden gem gems permata menarik akumulasi backdoor tersembunyi terselubung pola screening potensi peluang '
   + 'januari februari maret april mei juni juli agustus september oktober november desember jan feb mar apr jun jul agu agt sep sept okt nov des '
   + 'the and who what which is of in').split(' '));
@@ -362,7 +376,7 @@ const QUESTION = new Set('apakah apa siapa siapakah mana bagaimana kapan berapa 
 export function entityTerms(question, index, known) {
   const tickers = directTickers(question, index), common = new Set(index.commonWords), phrases = [];
   let run = [];
-  const unknown = new Set();
+  const unknown = new Set(), userCue = /\b(user|akun|username|pengguna)\b|@/i.test(question);
   const flush = () => { if (run.length && !(run.length === 1 && unknown.has(run[0]))) phrases.push(run.join(' ')); run = []; };
   const handles = new Set(index.handles || []);
   // Clause by clause, so a name never runs across "…Bersama. Siapa". Inside a name a capitalized word continues it,
@@ -377,7 +391,8 @@ export function entityTerms(question, index, known) {
       if (word === low && (/nya$/.test(low) || (/^(di|me|ber|ter|se|pe|ke)/.test(low) && low.length >= 6) || low === 'saling')) { flush(); continue; }
       // Unknown lowercase words are slang or typos unless they are near a Stockbit username (zeinfahrozi).
       if (!hits && word === low && !handles.has(low)) {
-        const near = nearestWord(low, index, index.handles || []);
+        // Near a Stockbit username only for long words or when the question speaks of a user ("banget" is not @BangGent).
+        const near = (low.length >= 8 || userCue) && nearestWord(low, index, index.handles || []);
         if (near) { flush(); phrases.push(near); continue; }
         // Unknown to the archive: part of a name only next to another name word ("ferita lie"); alone it is slang.
         run.push(word); unknown.add(word); continue;

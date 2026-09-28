@@ -277,4 +277,11 @@ test('full-text search: exact phrase on the public site, no API key, fail-closed
   assert.equal(parseSearch('<html>new layout</html>'), null, 'an unreadable page is an error, not "no results"');
   const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
   assert.deepEqual(entityTerms('kenapa bu ferita lie suka ngibul', manifest).phrases, ['ferita lie']);
+  assert.deepEqual(entityTerms('kenapa bu ferita liee itu suka banget ngibul', manifest).phrases, ['ferita liee'], 'banget is not @BangGent');
+  assert.deepEqual(entityTerms('user zeinfahrozi suka ngomgin apa sih?', manifest).phrases, ['zeinihzafahrozi']);
+  const asked = [];
+  const typo = await searchText({fetcher:async url => { const q = new URL(url).searchParams.get('q'); asked.push(q);
+    return new Response(q === '"ferita lie"' ? page : '<table class="t-table"><tbody></tbody></table>'); }}, {q:'ferita liee'});
+  assert.deepEqual(asked, ['"ferita liee"', '"ferita lie"']);
+  assert.equal(typo[0].ejaan_dicari, 'ferita lie');
 });
