@@ -264,7 +264,8 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   ada dalam dokumen. Fakta, rumor/pernyataan penulis, angka, tanggal dan ketidakpastian tetap dibedakan.
   Jawaban memakai rujukan `[D…]` yang ditautkan ke arsip, bukan URL hasil karangan model.
 - Pembacaan gagal/terpotong tidak masuk cache. Retry pemotongan catatan hanya satu kali dan tetap memakai
-  anggaran. Jawaban akhir yang mencapai batas panjang tetap ditampilkan dengan tanda terpotong, tidak masuk
+  anggaran. Catatan yang masih terpotong setelah retry (mis. katalog 1.535 kode SGX) dipakai apa adanya dengan tanda
+  "Catatan terpotong" dan tidak disimpan di cache, supaya satu unit panjang tidak menggagalkan seluruh jawaban. Jawaban akhir yang mencapai batas panjang tetap ditampilkan dengan tanda terpotong, tidak masuk
   cache jawaban dan tidak menjadi riwayat percakapan. Rujukan `[D…]` di luar sumber yang diperiksa tidak
   menggagalkan jawaban; jawaban diberi catatan agar rujukan itu diabaikan.
 - Tombol Hentikan memutus koneksi. Server menghentikan pekerjaan setelah mendeteksi pemutusan;

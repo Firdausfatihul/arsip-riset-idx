@@ -89,6 +89,19 @@ test('OpenRouter retries truncation once, uses exact model, and never returns pa
   assert.equal(requests[0].model, MODEL);
   assert.equal(requests[0].reasoning.enabled, false);
 });
+test('a source note that overflows its retry keeps the written text only when the caller accepts a cut note', async () => {
+  const sse = text => new Response([{choices:[{delta:{content:text}}]}, {choices:[{finish_reason:'length'}]}]
+    .map(e => 'data: ' + JSON.stringify(e) + '\n\n').join(''));
+  const budgets = [];
+  const streamed = new OpenRouter('test', null, async (url, request) => { budgets.push(JSON.parse(request.body).max_tokens); return sse('Catatan [D1] ' + budgets.length); });
+  let cut = false;
+  assert.equal(await streamed.complete([], {onActivity:() => {}, onTruncated:() => { cut = true; }}), 'Catatan [D1] 2');
+  assert.deepEqual(budgets, [1800, 3600]); assert.equal(cut, true); assert.ok(!streamed.truncated, 'a cut note does not mark the final answer');
+  await assert.rejects(new OpenRouter('test', null, async () => sse('x')).complete([], {onActivity:() => {}}), /batas/);
+  const plain = new OpenRouter('test', null, async () => Response.json({choices:[{finish_reason:'length', message:{content:'Sebagian'}}]}));
+  cut = false;
+  assert.equal(await plain.complete([], {onTruncated:() => { cut = true; }}), 'Sebagian'); assert.equal(cut, true);
+});
 test('SSE handles fragmented Unicode, citations, and rejects missing completion', async () => {
   for (const complete of [true, false]) {
     const lines = [{choices:[{delta:{content:'SOCI 🚢 [D47]'}}]}];
