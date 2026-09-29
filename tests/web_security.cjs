@@ -50,6 +50,23 @@ async function test(name,fn){await fn();checks++;console.log('PASS',name);}
   const input=d.getElementById('cari');input.value='baris kedua';input.dispatchEvent(new w.Event('input'));await delay(170);
   assert.equal(d.querySelector('.csv mark').textContent,'baris kedua');assert.deepEqual(errors,[]);dom.window.close();
  });
+ await test('CSV header click sorts numbers high-to-low, then low-to-high, then original order; empty last',async()=>{
+  const raw='kode,nilai,nama\nAAA,5,beta\nBBB,,alfa\nCCC,12,Gamma\nDDD,-1,\nEEE,1.234,delta\n';
+  const {dom,d,data,route,w,errors}=setup(data=>{
+   const doc=data.docs.find(x=>x.kind==='md');Object.assign(doc,{kind:'csv',content:raw,delimiter:',',stats:[]});delete doc.lazy;
+  });
+  const doc=data.docs.find(x=>x.kind==='csv');route('#doc='+encodeURIComponent(doc.path));
+  const codes=()=>[...d.querySelectorAll('.csv tbody tr')].map(r=>r.cells[0].textContent),th=i=>d.querySelectorAll('.csv th')[i];
+  assert.deepEqual([...d.querySelectorAll('.csv th')].map(x=>x.textContent),['kode','nilai','nama']);
+  th(1).querySelector('button').click();assert.deepEqual(codes(),['CCC','AAA','EEE','DDD','BBB']);assert.equal(th(1).getAttribute('aria-sort'),'descending');
+  th(1).querySelector('button').click();assert.deepEqual(codes(),['DDD','EEE','AAA','CCC','BBB']);assert.equal(th(1).getAttribute('aria-sort'),'ascending');
+  th(1).querySelector('button').click();assert.deepEqual(codes(),['AAA','BBB','CCC','DDD','EEE']);assert.equal(th(1).hasAttribute('aria-sort'),false);
+  th(2).querySelector('button').click();assert.deepEqual(codes(),['BBB','AAA','EEE','CCC','DDD']);assert.equal(th(2).getAttribute('aria-sort'),'ascending');
+  // Urutan bertahan saat pencarian merender ulang dokumen.
+  const input=d.getElementById('cari');input.value='alfa';input.dispatchEvent(new w.Event('input'));await delay(170);
+  assert.deepEqual(codes(),['BBB','AAA','EEE','CCC','DDD']);assert.equal(d.querySelector('.csv mark').textContent,'alfa');
+  assert.deepEqual(errors,[]);dom.window.close();
+ });
  await test('CSV semicolons, tabs, blank records and malformed quotes have usable output',async()=>{
   for(const [raw,delimiter,expected] of [
    ['Nama;Nilai\n"A;B";""\n',';',['A;B','']],['Nama\tNilai\nA\t02','\t',['A','02']],

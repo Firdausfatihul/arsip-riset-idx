@@ -70,11 +70,18 @@ test('document requests: every date, range, numeric date, pasted title and per-s
     'ringkas semua dokumen tanggal 22 september': ['ki_22092026.md', 'ki_24092026.md', 'stockbit_22092026.md'],
     'rights issue september siapa aja': [], 'ada berita apa soal emiten nikel minggu ini': [],
     'siapa yang beli saham di pasar nego tanggal 22 september 2026': [],
+    // A source named without a date: its documents (few) or its newest one; the CSV twin of a .md is read once.
+    'baca dokumen keterbukaan singapura / sgx , intinya apa? apa yang menarik singkat padat jelas':
+      ['keterbukaan_sg_20092026_semua_kode.md', 'keterbukaan_sg_20092026_temuan_utama.md'],
+    'ringkas dokumen asx': ['asx_20260913.md'],
+    'baca stockbit, intinya apa': ['stockbit_28092026.md'],
+    'keterbukaan singapura soal delisting apa aja': [],
   };
   for (const [q, need] of Object.entries(cases)) {
     const names = (documentRequest(q, dateQuery(q, [], years), manifest) || []).map(d => d.name);
     if (need.length) assert.ok(need.every(n => names.includes(n)), q + ' -> ' + names.join());
     else assert.deepEqual(names, [], q);
+    assert.ok(!names.some(n => n.endsWith('.csv') && names.includes(n.replace(/\.csv$/, '.md'))), q + ' reads a CSV twin');
   }
 });
 

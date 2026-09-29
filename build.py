@@ -683,6 +683,13 @@ a.chip:hover{outline:1px solid var(--c)}
 .prose pre.raw{white-space:pre-wrap}
 .doc-grid .prose.csv{max-width:100%;grid-column:1/-1}
 .prose.csv th,.prose.csv td{white-space:pre-wrap;min-width:8ch;max-width:45ch}
+.prose.csv th{padding:0;position:relative}
+.prose.csv th button{display:flex;align-items:center;gap:6px;width:100%;min-height:44px;padding:7px 10px;border:0;background:none;color:inherit;font:inherit;font-weight:600;text-align:left;cursor:pointer}
+.prose.csv th button:hover{background:var(--line)}
+.prose.csv th button:focus-visible{outline:2px solid var(--c);outline-offset:-2px}
+.prose.csv th button::after{content:"↕";font-size:13px;color:var(--faint);margin-left:auto}
+.prose.csv th[aria-sort=descending] button::after{content:"↓";color:var(--c)}
+.prose.csv th[aria-sort=ascending] button::after{content:"↑";color:var(--c)}
 .facts{display:grid;margin:0 0 18px;border-top:1px solid var(--line)}
 .facts>div{display:grid;grid-template-columns:168px minmax(0,1fr);gap:4px 20px;padding-block:10px;border-bottom:1px solid var(--line)}
 .facts dt{padding-top:4px;font:500 14px/1.45 var(--sans);color:var(--muted)}
@@ -947,10 +954,59 @@ APP_JS = r"""
     endRow();
     if (!rows.length) return '<p>File CSV kosong.</p>';
     return '<table tabindex="0" aria-label="Isi CSV"><thead><tr>' +
-      rows[0].map(function(v){ return '<th scope="col">' + esc(v) + '</th>'; }).join('') +
-      '</tr></thead><tbody>' + rows.slice(1).map(function(r){
-        return '<tr>' + r.map(function(v){ return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>';
+      rows[0].map(function(v, i){ return '<th scope="col"><button type="button" data-sort-col="' + i + '">' + esc(v) + '</button></th>'; }).join('') +
+      '</tr></thead><tbody>' + rows.slice(1).map(function(r, n){
+        return '<tr data-row="' + n + '">' + r.map(function(v){ return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>';
       }).join('') + '</tbody></table>';
+  }
+
+  // Angka CSV: 1234, -1.5, 12,5, 1,234.5, 12%. Selain itu dibandingkan sebagai teks.
+  function csvNumber(v){
+    v = v.replace(/[\s%]/g, '');
+    if (/^[-+]?(\d{1,3}(,\d{3})+)(\.\d+)?$/.test(v)) v = v.replace(/,/g, '');
+    else if (/^[-+]?\d+,\d+$/.test(v)) v = v.replace(',', '.');
+    return /^[-+]?(\d+\.?\d*|\.\d+)$/.test(v) ? parseFloat(v) : null;
+  }
+
+  // Urutkan baris tabel CSV. Kolom angka mulai dari terbesar, kolom teks dari A; sel kosong selalu di bawah.
+  // dir kosong = urutan asli file.
+  function sortCsv(table, col, dir){
+    var body = table.tBodies[0];
+    if (!body) return;
+    var rows = Array.prototype.slice.call(body.rows);
+    var vals = rows.map(function(r){ var c = r.cells[col]; return c ? c.textContent.trim() : ''; });
+    var nums = vals.map(csvNumber);
+    var order = rows.map(function(_, i){ return i; });
+    if (dir){
+      var sign = dir === 'descending' ? -1 : 1;
+      order.sort(function(a, b){
+        var va = vals[a], vb = vals[b];
+        if (!va || !vb) return (!va) - (!vb) || a - b;
+        var na = nums[a], nb = nums[b], d;
+        if (na !== null && nb !== null) d = na - nb;
+        else if (na !== null || nb !== null) d = na !== null ? -1 : 1;
+        else d = va.localeCompare(vb, 'id', {numeric: true, sensitivity: 'base'});
+        return d * sign || a - b;
+      });
+    } else {
+      order.sort(function(a, b){ return rows[a].getAttribute('data-row') - rows[b].getAttribute('data-row'); });
+    }
+    var frag = document.createDocumentFragment();
+    order.forEach(function(i){ frag.appendChild(rows[i]); });
+    body.appendChild(frag);
+    Array.prototype.forEach.call(table.tHead.rows[0].cells, function(th, i){
+      if (i === col && dir) th.setAttribute('aria-sort', dir); else th.removeAttribute('aria-sort');
+    });
+  }
+
+  function csvIsNumeric(table, col){
+    var seen = 0, num = 0;
+    Array.prototype.some.call(table.tBodies[0] ? table.tBodies[0].rows : [], function(r){
+      var v = r.cells[col] ? r.cells[col].textContent.trim() : '';
+      if (v){ seen++; if (csvNumber(v) !== null) num++; }
+      return seen >= 200;
+    });
+    return seen > 0 && num / seen >= 0.8;
   }
 
   function schedule(text){
@@ -1164,6 +1220,8 @@ APP_JS = r"""
     } else if (doc.kind === 'csv'){
       prose.classList.add('csv');
       prose.innerHTML = html;
+      var table = prose.querySelector('table');
+      if (table && doc.sort) sortCsv(table, doc.sort.col, doc.sort.dir);
     } else {
       prose.innerHTML = html;
       var info = enhance(prose, doc);
@@ -2084,6 +2142,14 @@ APP_JS = r"""
   });
   reader.addEventListener('click', function(e){
     if (e.target.closest('[data-retry-doc]') && current) renderDoc(current, input.value.trim());
+    var btn = e.target.closest('[data-sort-col]'), table = btn && btn.closest('table');
+    if (!table || !current) return;
+    // Klik pertama: angka terbesar dulu (teks A–Z); klik kedua: sebaliknya; klik ketiga: urutan asli.
+    var col = +btn.getAttribute('data-sort-col'), prev = current.sort && current.sort.col === col ? current.sort.dir : '';
+    var first = csvIsNumeric(table, col) ? 'descending' : 'ascending', second = first === 'descending' ? 'ascending' : 'descending';
+    var dir = !prev ? first : prev === first ? second : '';
+    current.sort = dir ? {col: col, dir: dir} : null;
+    sortCsv(table, col, dir);
   });
   input.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(filter, 140); });
   window.addEventListener('hashchange', route);

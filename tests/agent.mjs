@@ -111,6 +111,26 @@ test('agent loop: tools run, evidence is cited, sources map to archive and datac
   db.close();
 });
 
+test('a whole-document request in agent mode reads the documents through the archive pipeline, without agent quota', async () => {
+  let reserved = 0, steps = 0, read = '';
+  const model = {step:async () => { steps++; return {message:{}}; },
+    complete:async m => { read += JSON.stringify(m); return 'Catatan: ringkasan bukti [S1].'; },
+    answer:async (m, emit) => { read += JSON.stringify(m); await emit({type:'delta', text:'Ringkasan SGX.'}); return 'Ringkasan SGX.'; }};
+  const stats = {};
+  const result = await agentic({archive:new Archive(assets), model, emit:async () => {}, env:{DATACAT_API_KEY:'KEY'}, stats,
+    question:'baca dokumen keterbukaan singapura / sgx , intinya apa? apa yang menarik singkat padat jelas',
+    fetcher:async () => { throw new Error('no datacat for a document request'); }, reserveQuota:() => { reserved++; }});
+  assert.equal(stats.agent_redirect, 'document_request');
+  assert.equal(reserved, 0); assert.equal(steps, 0);
+  assert.ok(result.sources.length >= 2 && result.sources.every(s => /keterbukaan-singapura/.test(s.path)), result.sources.map(s => s.path).join());
+  assert.match(read, /Singapore Exchange|SGX/);
+  // A ticker keeps the question in agent mode.
+  const agentStats = {};
+  await agentic({archive:new Archive(assets), model, emit:async () => {}, env:{DATACAT_API_KEY:'KEY'}, stats:agentStats,
+    question:'baca dokumen keterbukaan SOCI', fetcher:async () => Response.json({sections:[]})});
+  assert.equal(agentStats.agent_redirect, undefined);
+});
+
 test('the agent stops at the round and call limits', async () => {
   let steps = 0;
   const model = {step:async () => { steps++; return {message:{tool_calls:Array.from({length:5}, (_, i) =>

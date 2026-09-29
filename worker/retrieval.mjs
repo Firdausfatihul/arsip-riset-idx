@@ -139,9 +139,23 @@ export function documentRequest(question, scope, index) {
     const newest = {};
     for (const d of docs) if (!newest[d.cat] || d.end > newest[d.cat]) newest[d.cat] = d.end;
     docs = docs.filter(d => d.end === newest[d.cat] && (cats.length || d.end === Object.values(newest).sort().at(-1)));
+  } else if (cats.length && READ_VERBS.test(question) && !TOPIC_WORDS.test(question)) {
+    // "baca dokumen keterbukaan singapura, intinya apa": a named source with no date means that source's
+    // documents when there are few of them, otherwise its newest one.
+    if (docs.length > 6) {
+      const newest = {};
+      for (const d of docs) if (!newest[d.cat] || d.end > newest[d.cat]) newest[d.cat] = d.end;
+      docs = docs.filter(d => d.end === newest[d.cat]);
+    }
   } else return null;
+  // A CSV next to a Markdown file of the same name holds the same rows; read it once.
+  const stems = new Set(docs.filter(d => !/\.csv$/i.test(d.name)).map(d => d.name.replace(/\.[^.]+$/, '')));
+  docs = docs.filter(d => !/\.csv$/i.test(d.name) || !stems.has(d.name.replace(/\.[^.]+$/, '')));
   return docs.length && docs.length <= 6 ? docs : null;
 }
+const READ_VERBS = /\b(baca|bacakan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|simpulkan|kesimpulan|inti|intinya|isi|isinya|garis besar|highlight|menarik)\b/i;
+// "keterbukaan singapura soal delisting" asks about a topic inside the source, not the whole source.
+const TOPIC_WORDS = /\b(soal|tentang|mengenai|terkait|perihal|yang menyebut)\b/i;
 
 // A small explicit vocabulary handles the current cross-market screening use case.
 // These are search candidates, never inferred ownership relationships.

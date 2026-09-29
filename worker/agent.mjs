@@ -1,8 +1,8 @@
 // Agentic mode: the model may call a fixed set of read-only tools, the archive and the datacat
 // API (structured IDX disclosures). Host, paths, key and limits are server-side; every tool
 // argument is validated. Tool results are data, never instructions.
-import {ChatError, directTickers, hash, nearestWord, plainHistory, readLimited, size} from './core.mjs';
-import {selectRecords} from './retrieval.mjs';
+import {ChatError, converse, directTickers, hash, nearestWord, plainHistory, readLimited, size} from './core.mjs';
+import {dateQuery, documentRequest, selectRecords} from './retrieval.mjs';
 import {wrongNames, nameNotice} from './screening.mjs';
 import {ExternalBudget, answerChecks, datacatSlot, typedMinutes, worded} from './facts.mjs';
 import {SCREENING, coverage, hopParties, knownPart, loadSignals, mustCover, screeningView, signalView} from './signals.mjs';
@@ -11,7 +11,7 @@ import {SCREENING, coverage, hopParties, knownPart, loadSignals, mustCover, scre
 // Internal prompts and tool results are therefore terse; only the answer to the user is normal prose.
 // v5: code does the joins (precomputed KSEI signals) and words the data fields; fewer model rounds.
 export const AGENT = Object.freeze({rounds:4, calls:18, resultBytes:6000, totalBytes:70000,
-  stepTokens:500, answerTokens:2000, dataTtl:6 * 3600000, answerTtl:6 * 3600000, version:'agent-v5.3',
+  stepTokens:500, answerTokens:2000, dataTtl:6 * 3600000, answerTtl:6 * 3600000, version:'agent-v5.4',
   caps:{datacat_cari:3, dokumen_teks:3, cari_teks:3}, trail:8, trailTotal:16, subrequests:44, webTtl:24 * 3600000});
 const DATACAT = 'https://quant.renr.ai';
 
@@ -44,7 +44,7 @@ const DETAILS = {
 };
 
 export const TOOLS = [
-  {type:'function', function:{name:'cari_arsip', description:'Arsip riset internal (Stockbit, analisis KI, digest). Murah, pakai dulu. Hasil kutipan+ref D.',
+  {type:'function', function:{name:'cari_arsip', description:'Arsip riset internal (Stockbit, analisis KI BEI, digest, keterbukaan Australia/ASX dan Singapura/SGX). Murah, pakai dulu. Hasil kutipan+ref D.',
     parameters:{type:'object', properties:{kata:{type:'array', items:{type:'string'}, maxItems:4, description:'kode saham huruf besar/nama/istilah'}}, required:['kata']}}},
   {type:'function', function:{name:'data_kepemilikan', description:'Data KSEI >1% Feb-Agu 2026 + daftar pemegang laporan emiten, sinyal dihitung kode. '
     + 'ticker: bagian sinyal (pengalihan/pemecahan blok, keluar-masuk, kelompok, ganti nama; wajib:1 = harus dibahas), riwayat (per bulan), kelompok. '
@@ -517,6 +517,18 @@ export async function agentic({archive, model, question, history = [], emit, sig
     await emit({type:'sources', sources:saved.sources, terms:[], batches:0});
     await emit({type:'delta', text:saved.answer});
     return {...saved, cache_hit:true, batches:0};
+  }
+  // "baca dokumen keterbukaan singapura, intinya apa" asks for whole documents, which agent mode only sees as
+  // short search quotes (it answered that no SGX document existed). The archive pipeline reads them entirely
+  // and costs no agent quota. A ticker keeps the question in agent mode.
+  if (!directTickers(question, index).length) {
+    const years = [...new Set((index.docs || []).flatMap(d => [d.start, d.end]).filter(d => /^20\d{2}/.test(d || '')).map(d => +d.slice(0, 4)))];
+    const docs = documentRequest(question, dateQuery(question, history, years), index);
+    if (docs) {
+      stats.agent_redirect = 'document_request';
+      await emit({type:'status', text:'Pertanyaan meminta isi dokumen; dokumen dibaca utuh tanpa kuota mode agen…'});
+      return converse(archive, model, question, history, emit, signal, {cache, client, metrics:stats});
+    }
   }
   await reserveQuota();
   const refs = new Refs(), used = new Map(), seen = new Map(), evidence = [], retains = [];

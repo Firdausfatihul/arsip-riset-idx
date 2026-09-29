@@ -104,7 +104,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
 ## Cara kerja viewer (`site/index.html`)
 
 - **CSV:** taruh file UTF-8 (BOM boleh) di `needtobeindexed/`, lalu build ulang seperti biasa. Contoh `stockbit_20260929.csv` masuk Stockbit tanggal 29 September 2026; nama tanpa kategori yang dikenali masuk **Lainnya**.
-  CSV dibuka sebagai tabel yang dapat digeser mendatar, dengan baris pertama sebagai judul kolom dan nama file sebagai judul dokumen. Pemisah koma, titik koma, atau tab dideteksi saat build (koma jika tidak terdeteksi). Tanda kutip, koma dan baris baru di dalam sel didukung. Nilai tetap teks: nol awal, angka panjang, HTML, dan rumus tidak diubah atau dijalankan. Pencarian yang sama menandai teks di tabel; **Unduh CSV asli** mengambil salinan file tanpa perubahan.
+  CSV dibuka sebagai tabel yang dapat digeser mendatar, dengan baris pertama sebagai judul kolom dan nama file sebagai judul dokumen. Pemisah koma, titik koma, atau tab dideteksi saat build (koma jika tidak terdeteksi). Tanda kutip, koma dan baris baru di dalam sel didukung. Nilai tetap teks: nol awal, angka panjang, HTML, dan rumus tidak diubah atau dijalankan. Klik judul kolom untuk mengurutkan: kolom angka mulai dari nilai terbesar, kolom teks dari A–Z; klik kedua membalik urutan, klik ketiga kembali ke urutan file. Sel kosong selalu di bawah, dan urutan bertahan saat mencari. Pencarian yang sama menandai teks di tabel; **Unduh CSV asli** mengambil salinan file tanpa perubahan.
 - Satu halaman. Metadata semua dokumen, isi `.md`/`.csv` sampai 256 KB (`EMBED_LIMIT`), dan teks `.html` tertanam di
   `<script type="application/json" id="arsip-data">`.
 - `.md`/`.csv` di atas 256 KB (digest besar; digest kecil tetap tertanam) **tidak ditanam**: viewer mengambil `files/…`
@@ -276,6 +276,7 @@ Kotak centang **Mode agen** membuat model memanggil alat baca-saja: `cari_arsip`
 (`quant.renr.ai`, data terstruktur keterbukaan informasi BEI: kepemilikan, pemegang saham, RUPS, pengurus,
 transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di `worker/agent.mjs`.
 
+- Permintaan isi dokumen tanpa kode saham ("baca dokumen keterbukaan singapura, intinya apa", "ringkas KI 22 September") dialihkan ke alur arsip biasa yang membaca dokumen utuh; tidak memakai kuota mode agen. Mode agen hanya melihat kutipan pencarian pendek, jadi dulu menjawab dokumen SGX tidak ada.
 - Kuota: `CHAT_AGENTIC_DAILY` pertanyaan per hari UTC untuk seluruh situs (produksi 50 di `worker/wrangler.jsonc`; tanpa nilai 10). Jawaban tersimpan tidak memakai kuota.
 - Key datacat disimpan sebagai secret Worker `DATACAT_API_KEY` (lokal di `.env.chat`), tidak pernah ke browser.
   Host, path, dan parameter ditetapkan kode; argumen alat divalidasi; endpoint tulis API tidak tersedia sebagai alat.
