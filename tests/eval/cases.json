@@ -2,6 +2,20 @@
  "note": "Kasus uji akurasi chat dari log pertanyaan nyata. gold = dokumen yang benar-benar memuat kode (huruf besar, persis). facts = regex yang wajib muncul di jawaban (tidak peka huruf besar-kecil). Dokumen dirujuk dengan nama file, supaya tetap benar saat nomor D bergeser. holdout = kata-katanya sengaja tidak ada di daftar istilah instruksi, untuk mengukur kemampuan menerjemahkan sendiri.",
  "cases": [
   {
+   "id": "optimization_sgx",
+   "origin": "synthetic_cache_benchmark",
+   "question": "ringkas SGX",
+   "docs_all": ["keterbukaan_sg_20092026_semua_kode.md", "keterbukaan_sg_20092026_temuan_utama.md"],
+   "facts": ["41H|BlackGold", "WJ9|Advanced Systems"]
+  },
+  {
+   "id": "optimization_sgx_stockbit",
+   "origin": "synthetic_cache_benchmark",
+   "question": "ringkas SGX dan Stockbit",
+   "docs_all": ["keterbukaan_sg_20092026_semua_kode.md", "keterbukaan_sg_20092026_temuan_utama.md", "stockbit_28092026.md"],
+   "facts": ["SGX|Singapura", "Stockbit", "AADI|NINE|PACK|HRUM|SINI|JECX|IBST|KETR|AHAP|IRSX|PURA|TRIN|FORU|ENRG"]
+  },
+  {
    "id": "ki22_full",
    "question": "ringkas keterbukaan informasi 22 September 2026",
    "docs_all": [

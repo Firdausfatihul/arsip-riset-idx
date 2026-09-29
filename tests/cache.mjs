@@ -65,6 +65,46 @@ test('shared notes are question independent; failed notes are not cached; concur
  db.prepare('UPDATE evidence_cache SET expires=0').run();assert.equal(cache.get('notes','k'),null);
  db.close();
 });
+
+const deferred = () => { let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject}; };
+test('a cancelled shared waiter stops promptly without cancelling the owner or creating duplicate work',async()=>{
+ const {db,cache}=cacheFixture(),gate=deferred(),started=deferred(),waiter=new AbortController();let calls=0;
+ const owner=cache.once('agentic','cancel-waiter',async()=>{calls++;started.resolve();return gate.promise;},1000);
+ await started.promise;
+ const joined=cache.once('agentic','cancel-waiter',async()=>{calls++;return {answer:'wrong'};},1000,{signal:waiter.signal,retrySharedFailure:true});
+ waiter.abort(new Error('waiter stopped'));
+ await assert.rejects(joined,/waiter stopped/);
+ assert.equal(calls,1);assert.equal(cache.pending.size,1);
+ gate.resolve({answer:'owner result'});await owner;
+ assert.deepEqual(cache.get('agentic','cancel-waiter'),{answer:'owner result'});db.close();
+});
+test('a live waiter recovers from owner cancellation; late owner results neither overwrite nor evict recovery',async()=>{
+ const {db,cache}=cacheFixture(),first=deferred(),firstStarted=deferred(),second=deferred(),secondStarted=deferred(),ownerSignal=new AbortController();let calls=0;
+ const owner=cache.once('agentic','cancel-owner',async()=>{calls++;firstStarted.resolve();return first.promise;},1000,{signal:ownerSignal.signal});
+ const ownerFailure=assert.rejects(owner,/owner stopped/);
+ await firstStarted.promise;
+ const waiter=cache.once('agentic','cancel-owner',async()=>{calls++;secondStarted.resolve();return second.promise;},1000,{retrySharedFailure:true});
+ ownerSignal.abort(new Error('owner stopped'));await ownerFailure;await secondStarted.promise;
+ assert.equal(calls,2);assert.equal(cache.get('agentic','cancel-owner'),null);
+ first.resolve({answer:'cancelled owner'});await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(cache.get('agentic','cancel-owner'),null);assert.equal(cache.pending.size,1);
+ second.resolve({answer:'recovered'});
+ const result=await waiter;assert.equal(result.hit,false);assert.equal(cache.pending.size,0);
+ assert.deepEqual(cache.get('agentic','cancel-owner'),{answer:'recovered'});db.close();
+});
+test('coalesced failure recovery is bounded and incomplete results are never persisted',async()=>{
+ const {db,cache}=cacheFixture(),gate=deferred(),started=deferred();let attempts=0;
+ const owner=cache.once('agentic','failure',async()=>{started.resolve();return gate.promise;},1000);
+ const rejected=assert.rejects(owner,/first failure/);await started.promise;
+ const waiter=cache.once('agentic','failure',async()=>{attempts++;throw Error('second failure');},1000,{retrySharedFailure:true});
+ const waiterRejected=assert.rejects(waiter,/second failure/);gate.reject(Error('first failure'));
+ await Promise.all([rejected,waiterRejected]);assert.equal(attempts,1);assert.equal(cache.pending.size,0);
+ await cache.once('agentic','partial',async()=>({answer:'partial',incomplete:true}),1000);
+ assert.equal(cache.get('agentic','partial'),null);
+ const aborted=new AbortController();aborted.abort();let ran=false;
+ await assert.rejects(cache.once('agentic','aborted',async()=>{ran=true;return {};},1000,{signal:aborted.signal}));
+ assert.equal(ran,false);db.close();
+});
 test('question changes reuse expensive source notes; document hash and client history invalidate correctly',async()=>{
  const {db,cache}=cacheFixture();let hash='h1';
  const doc={source_id:'D47',asset:'raw',evidence_asset:'evidence',title:'SOCI',path:'files/soci.md',label:'2026',name:'soci',end:'2026',sizes:[95000],document_id:'stable'};

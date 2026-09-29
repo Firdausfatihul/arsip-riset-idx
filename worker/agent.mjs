@@ -1,19 +1,23 @@
 // Agentic mode: the model may call a fixed set of read-only tools, the archive and the datacat
 // API (structured IDX disclosures). Host, paths, key and limits are server-side; every tool
 // argument is validated. Tool results are data, never instructions.
-import {ChatError, converse, directTickers, hash, nearestWord, plainHistory, readLimited, size} from './core.mjs';
+import {MODEL, ChatError, converse, directTickers, hash, nearestWord, plainHistory, readLimited, size} from './core.mjs';
+import {citations} from './citations.mjs';
+export {citations} from './citations.mjs';
 import {dateQuery, documentRequest, selectRecords} from './retrieval.mjs';
 import {wrongNames, nameNotice} from './screening.mjs';
 import {ExternalBudget, answerChecks, datacatSlot, typedMinutes, worded} from './facts.mjs';
-import {SCREENING, coverage, hopParties, knownPart, loadSignals, mustCover, screeningView, signalView} from './signals.mjs';
+import {SCREENING, coverage, dataVersion, hopParties, knownPart, loadSignals, mustCover, screeningView, signalView} from './signals.mjs';
 
 // Input tokens are most of the cost: every round resends instructions, tools and earlier results.
 // Internal prompts and tool results are therefore terse; only the answer to the user is normal prose.
 // v5: code does the joins (precomputed KSEI signals) and words the data fields; fewer model rounds.
 export const AGENT = Object.freeze({rounds:4, calls:18, resultBytes:6000, totalBytes:70000,
-  stepTokens:500, answerTokens:2000, dataTtl:6 * 3600000, answerTtl:6 * 3600000, version:'agent-v5.7',
+  stepTokens:500, answerTokens:2000, dataTtl:6 * 3600000, answerTtl:6 * 3600000, version:'agent-v5.8',
   caps:{datacat_cari:3, dokumen_teks:3, cari_teks:3}, trail:8, trailTotal:16, subrequests:44, webTtl:24 * 3600000});
 const DATACAT = 'https://quant.renr.ai';
+// Prompt changes invalidate answers, while unchanged source formats retain their short-lived data cache.
+export const DATACAT_CACHE_VERSION = 'datacat-pruned-v2', WEB_CACHE_VERSION = 'datacat-snippets-v1';
 
 // jenis -> endpoint. Lists are newest first where the API supports it.
 // q is passed only where the API supports it: elsewhere it is silently ignored and unrelated rows come back.
@@ -290,26 +294,42 @@ export class Refs {
 }
 
 // ---- Tool execution ------------------------------------------------------------------------
-export async function fetchDatacat({key, cache, signal, fetcher = fetch, budget}, {path, params}) {
-  const url = new URL(path, DATACAT);
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+const ordered = value => Array.isArray(value) ? value.map(ordered) : value && typeof value === 'object'
+  ? Object.fromEntries(Object.keys(value).sort().map(key => [key, ordered(value[key])])) : value;
+export function requestIdentity({path, params = {}}) {
+  const query = new URLSearchParams();
+  for (const key of Object.keys(params).sort()) query.set(key, params[key]);
+  return path + '?' + query.toString();
+}
+export async function fetchDatacat({key, cache, signal, fetcher = fetch, budget, requests}, request) {
+  const url = new URL(requestIdentity(request), DATACAT);
   if (url.origin !== DATACAT) throw new ToolError('host tidak diizinkan');
-  const cacheKey = await hash([AGENT.version, url.pathname + url.search]);
+  const cacheKey = await hash([DATACAT_CACHE_VERSION, url.pathname + url.search]);
   const saved = cache?.get('datacat', cacheKey);
   if (saved) return {data:saved, cached:true};
-  if (budget && !budget.take()) throw new ToolError('batas koneksi tercapai; jawab dengan bukti yang ada');
-  if (!await datacatSlot()) throw new ToolError('datacat sedang sibuk; jawab dengan bukti yang ada');
-  // Workers support only "follow" and "manual" redirects; a redirect is refused below instead of followed.
-  const response = await fetcher(url.toString(), {headers:{Authorization:'Api-Key ' + key, Accept:'application/json'}, redirect:'manual',
-    signal:AbortSignal.any([signal || new AbortController().signal, AbortSignal.timeout(20000)])});
-  if (response.status >= 300 && response.status < 400) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat mengalihkan permintaan; tidak diikuti'); }
-  if (response.status === 404) { response.body?.cancel().catch(() => {}); return {data:{error:'tidak ditemukan'}, cached:false}; }
-  if (response.status === 429) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat sedang membatasi permintaan; lanjutkan dengan bukti yang ada'); }
-  if (!response.ok) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat gagal (' + response.status + ')'); }
-  const data = prune(JSON.parse(await readLimited(response.body, 4000000, 20000, signal))) ?? {};
-  // Only the pruned form is kept; disclosures change daily, so entries expire.
-  if (size(data) <= 300000) cache?.put('datacat', cacheKey, data, AGENT.dataTtl);
-  return {data, cached:false};
+  const memo = 'datacat:' + cacheKey;
+  if (requests?.has(memo)) return {...await requests.get(memo), cached:true};
+  const pending = (async () => {
+    if (budget && !budget.take()) throw new ToolError('batas koneksi tercapai; jawab dengan bukti yang ada');
+    if (!await datacatSlot()) throw new ToolError('datacat sedang sibuk; jawab dengan bukti yang ada');
+    const response = await fetcher(url.toString(), {headers:{Authorization:'Api-Key ' + key, Accept:'application/json'}, redirect:'manual',
+      signal:AbortSignal.any([signal || new AbortController().signal, AbortSignal.timeout(20000)])});
+    if (response.status >= 300 && response.status < 400) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat mengalihkan permintaan; tidak diikuti'); }
+    if (response.status === 404) { response.body?.cancel().catch(() => {}); return {data:{error:'tidak ditemukan'}, cached:false, not_found:true}; }
+    if (response.status === 429) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat sedang membatasi permintaan; lanjutkan dengan bukti yang ada'); }
+    if (!response.ok) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat gagal (' + response.status + ')'); }
+    const data = prune(JSON.parse(await readLimited(response.body, 4000000, 20000, signal))) ?? {};
+    signal?.throwIfAborted();
+    if (size(data) <= 300000) cache?.put('datacat', cacheKey, data, AGENT.dataTtl);
+    return {data, cached:false};
+  })();
+  // Per-question memo also reuses large results without adding them to persistent storage.
+  requests?.set(memo, pending);
+  try {
+    const result = await pending;
+    if (result.not_found) requests?.delete(memo);
+    return result;
+  } catch (error) { requests?.delete(memo); throw error; }
 }
 
 // Full-text search over every filing, from datacat's public website (the API search returns file names only).
@@ -329,23 +349,30 @@ export async function searchText(ctx, args) {
   }
   return [];
 }
-async function searchOnce({cache, signal, fetcher = fetch, budget}, args) {
+async function searchOnce({cache, signal, fetcher = fetch, budget, requests}, args) {
   const q = args.q, t = args.ticker ? ticker(args.ticker) : null;
   const url = new URL('/explore/documents/', DATACAT);
   url.searchParams.set('q', q.includes(' ') ? `"${q}"` : q);
   if (t) url.searchParams.set('ticker', t);
-  const key = await hash([AGENT.version, 'web', url.pathname + url.search]);
+  const key = await hash([WEB_CACHE_VERSION, 'web', url.pathname + url.search]);
   const saved = cache?.get('web', key);
   if (saved) return saved;
-  if (budget && !budget.take()) throw new ToolError('batas koneksi tercapai; jawab dengan bukti yang ada');
-  const response = await fetcher(url.toString(), {headers:{Accept:'text/html', 'User-Agent':'arsip-riset-idx/1.0'}, redirect:'manual',
-    signal:AbortSignal.any([signal || new AbortController().signal, AbortSignal.timeout(20000)])});
-  if (!response.ok) { response.body?.cancel().catch(() => {}); throw new ToolError('pencarian teks gagal (' + response.status + ')'); }
-  const page = await readLimited(response.body, 600000, 20000, signal);
-  const rows = parseSearch(page);
-  if (rows === null) throw new ToolError('pencarian teks tidak dapat dibaca; pakai alat lain');
-  cache?.put('web', key, rows, AGENT.webTtl);
-  return rows;
+  const memo = 'web:' + key;
+  if (requests?.has(memo)) return requests.get(memo);
+  const pending = (async () => {
+    if (budget && !budget.take()) throw new ToolError('batas koneksi tercapai; jawab dengan bukti yang ada');
+    const response = await fetcher(url.toString(), {headers:{Accept:'text/html', 'User-Agent':'arsip-riset-idx/1.0'}, redirect:'manual',
+      signal:AbortSignal.any([signal || new AbortController().signal, AbortSignal.timeout(20000)])});
+    if (!response.ok) { response.body?.cancel().catch(() => {}); throw new ToolError('pencarian teks gagal (' + response.status + ')'); }
+    const page = await readLimited(response.body, 600000, 20000, signal);
+    const rows = parseSearch(page);
+    if (rows === null) throw new ToolError('pencarian teks tidak dapat dibaca; pakai alat lain');
+    signal?.throwIfAborted();
+    cache?.put('web', key, rows, AGENT.webTtl);
+    return rows;
+  })();
+  requests?.set(memo, pending);
+  try { return await pending; } catch (error) { requests?.delete(memo); throw error; }
 }
 const unhtml = t => t.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/\s+/g, ' ').trim();
 export function parseSearch(html) {
@@ -420,7 +447,8 @@ const fold = t => String(t).toLowerCase().replace(/\b(pt|tbk|persero)\b|[.,()]/g
 let ownershipCache = null;
 async function ownershipData(archive, index) {
   if (!index.ownership?.asset) return null;
-  if (ownershipCache?.version !== index.version) ownershipCache = {version:index.version, data:archive.read(index.ownership.asset)};
+  const version = dataVersion(index);
+  if (ownershipCache?.version !== version) ownershipCache = {version, data:archive.read(index.ownership.asset)};
   return ownershipCache.data;
 }
 export function ownershipTool(data, args, refs) {
@@ -499,16 +527,6 @@ export function entityTerms(question, index, known) {
   const trimmed = phrases.map(p => knownPart(p, known) || p);
   return {tickers:tickers.slice(0, 3), phrases:[...new Set(trimmed)].slice(0, 3)};
 }
-// Distinctive words the user wrote ("yoel", "tancorp"): searched in the archive by code before the model plans.
-export function userTerms(question, index) {
-  const common = new Set(index.commonWords), handles = new Set(index.handles || []), out = [...directTickers(question, index)];
-  for (const word of question.match(/@?[\p{L}\p{N}_]{4,}/gu) || []) {
-    const w = word.replace(/^@/, '').toLowerCase(), hits = index.postings?.[w]?.length || 0;
-    if (common.has(w) || out.some(t => t.toLowerCase() === w)) continue;
-    if (handles.has(w) || (hits >= 1 && hits <= 15)) out.push(word.replace(/^@/, ''));
-  }
-  return [...new Set(out)].slice(0, 4);
-}
 // A person's biography on a profile page: from the nearest "riwayat hidup"/"pengalaman kerja" header before the
 // name to the next header, so a neighbour's career in the same scrambled PDF column is not attributed to them.
 const HEADER = /daftar riwayat hidup|riwayat hidup|pengalaman kerja|tempat\s*\/\s*tanggal lahir|profil (?:dewan )?(?:direksi|komisaris)/gi;
@@ -534,18 +552,6 @@ export function biography(text, name) {
 const BIO = /public expose|laporan tahunan|annual report|prospektus|keterbukaan informasi.*(pengangkatan|perubahan pengurus)|risalah rups/i;
 
 // ---- The agent -----------------------------------------------------------------------------
-// "[K3]", "[K1, K2]" and "[K1-K4]" all cite; the page renders the same forms (chat.js).
-export function citations(text) {
-  const out = [];
-  for (const m of text.matchAll(/\[((?:[DKO]\d+)(?:\s*(?:,|;|-|–)\s*[DKO]?\d+)*)\]/g)) {
-    for (const part of m[1].split(/\s*[,;]\s*/)) {
-      const range = part.match(/^([DKO])(\d+)\s*[-–]\s*[DKO]?(\d+)$/);
-      if (range) for (let n = +range[2]; n <= Math.min(+range[3], +range[2] + 30); n++) out.push(range[1] + n);
-      else if (/^[DKO]\d+$/.test(part)) out.push(part);
-    }
-  }
-  return out;
-}
 // Each round resends the previous round's prompt plus new results. The provider's automatic cache only
 // matches identical whole prompts, so the end of every prompt is marked for explicit caching: the next
 // round then reads everything before it from cache. One mark per request, on the last text message.
@@ -561,22 +567,20 @@ export function markCache(messages) {
   return out;
 }
 
-export const agenticKey = (question, history, client, version) =>
-  hash([AGENT.version, version, question.trim().replace(/\s+/g, ' ').toLowerCase(), history.map(t => t.content), history.length ? client : 'public']);
+let instructionsKey;
+export async function agenticKey(question, history, client, version, {date = new Date().toISOString().slice(0, 10), model = MODEL, data = version} = {}) {
+  instructionsKey ||= hash([SYSTEM, ANSWER, TOOLS]);
+  return hash([AGENT.version, model, await instructionsKey, version, data, date,
+    question.trim().replace(/\s+/g, ' '), history, history.length ? client : 'public']);
+}
 
-export async function agentic({archive, model, question, history = [], emit, signal, cache, env, client = 'local', stats = {}, reserveQuota = () => {}, fetcher, today}) {
-  const index = await archive.manifest();
+export async function agentic(options) {
+  const {archive, model, question, history = [], emit, signal, cache, env, client = 'local', stats = {}, today} = options;
+  signal?.throwIfAborted();
+  const index = await archive.manifest(), date = today || new Date().toISOString().slice(0, 10);
   if (!env?.DATACAT_API_KEY) throw new ChatError('Mode agen belum diaktifkan pengelola.');
-  Object.assign(stats, {mode:'agentic', agent_rounds:0, agent_calls:[], datacat_cache_hits:0});
-  const answerKey = await agenticKey(question, history, client, index.version);
-  const saved = cache?.get('agentic', answerKey);
-  if (saved) {
-    stats.answer_cache_hit = true;
-    await emit({type:'status', phase:'answer', text:'Menampilkan jawaban mode agen yang tersimpan…'});
-    await emit({type:'sources', sources:saved.sources, terms:saved.terms || [], batches:0});
-    await emit({type:'delta', text:saved.answer});
-    return {...saved, cache_hit:true, batches:0};
-  }
+  Object.assign(stats, {mode:'agentic', agent_version:AGENT.version, agent_model:MODEL, agent_data_version:dataVersion(index),
+    agent_rounds:0, agent_tool_calls:0, agent_calls:[], datacat_cache_hits:0});
   // "baca dokumen keterbukaan singapura, intinya apa" asks for whole documents, which agent mode only sees as
   // short search quotes (it answered that no SGX document existed). The archive pipeline reads them entirely
   // and costs no agent quota. A ticker keeps the question in agent mode.
@@ -589,9 +593,34 @@ export async function agentic({archive, model, question, history = [], emit, sig
       return converse(archive, model, question, history, emit, signal, {cache, client, metrics:stats});
     }
   }
+  const answerKey = await agenticKey(question, history, client, index.version, {date, data:dataVersion(index)});
+  const compute = async () => {
+    signal?.throwIfAborted();
+    const result = await runAgent({...options, history, client, stats, date, index});
+    signal?.throwIfAborted();
+    return result;
+  };
+  let cached;
+  if (cache?.once) cached = await cache.once('agentic', answerKey, compute, AGENT.answerTtl, {signal, retrySharedFailure:true});
+  else {
+    const saved = cache?.get('agentic', answerKey);
+    cached = saved ? {value:saved, hit:true} : {value:await compute(), hit:false};
+    if (!cached.hit && !cached.value.incomplete) cache?.put('agentic', answerKey, cached.value, AGENT.answerTtl);
+  }
+  if (!cached.hit) return cached.value;
+  signal?.throwIfAborted();
+  stats.answer_cache_hit = true;
+  stats.answer_shared = !!cached.shared;
+  await emit({type:'status', phase:'answer', text:cached.shared ? 'Menampilkan hasil penelusuran identik yang selesai…' : 'Menampilkan jawaban mode agen yang tersimpan…'});
+  await emit({type:'sources', sources:cached.value.sources, terms:cached.value.terms || [], batches:0});
+  await emit({type:'delta', text:cached.value.answer});
+  return {...cached.value, cache_hit:true, batches:0};
+}
+
+async function runAgent({archive, model, question, history, emit, signal, cache, env, client, stats, reserveQuota = () => {}, fetcher, date, index}) {
   await reserveQuota();
-  const refs = new Refs(), used = new Map(), seen = new Map(), evidence = [], retains = [];
-  const budget = new ExternalBudget(AGENT.subrequests);
+  const refs = new Refs(), used = new Map(), seen = new Map(), callKeys = new WeakMap(), delivered = new Map(), evidence = [], retains = [];
+  const budget = new ExternalBudget(AGENT.subrequests), requests = new Map();
   // Every OpenRouter request, retries included, uses one of the per-request subrequests.
   if (typeof model.fetcher === 'function' && !model.budgeted) {
     const send = model.fetcher;
@@ -600,30 +629,40 @@ export async function agentic({archive, model, question, history = [], emit, sig
   }
   let sig = null;
   try { sig = await loadSignals(archive, index); } catch { stats.signals_error = true; }
-  const date = today || new Date().toISOString().slice(0, 10);
   const messages = [{role:'system', content:SYSTEM}, ...plainHistory(history.slice(-6)),
     {role:'user', content:question + '\n(Tanggal hari ini: ' + date + ')'}];
   let calls = 0, bytes = 0;
-  // Code caps the waste seen in live runs: five spellings of one name, a document read page by page,
-  // the same empty list asked again with other words.
-  const used_by = {}, empty = {}, emptyLists = new Map(), textSearched = new Set();
+  // Code caps the waste seen in live runs: five spellings of one name and a document read page by page.
+  const used_by = {}, emptyLists = new Map(), textSearched = new Set();
   let trailUsed = 0;
   const run = async (call, fallback = false) => {
     const name = call.function?.name, raw = call.function?.arguments || '{}';
-    let args, result;
+    let args;
     try { args = JSON.parse(raw); if (!args || typeof args !== 'object' || Array.isArray(args)) throw 0; }
     catch { return 'KESALAHAN: argumen bukan objek JSON'; }
     if (name === 'datacat_daftar') {
       args = latestArgs(args, question, date, history);
       call.function.arguments = JSON.stringify(args);
     }
-    const id = name + JSON.stringify(args);
-    if (seen.has(id)) return seen.get(id);
+    let request;
+    try {
+      if (!['cari_arsip','cari_teks','data_kepemilikan'].includes(name)) request = datacatRequest(name, args);
+    } catch (error) { return 'KESALAHAN: ' + error.message; }
+    const id = request ? 'datacat:' + requestIdentity(request) : name + JSON.stringify(ordered(args));
+    callKeys.set(call, id);
+    if (seen.has(id)) { stats.agent_tool_reuse = (stats.agent_tool_reuse || 0) + 1; return seen.get(id); }
+    const pending = Promise.resolve().then(() => execute(call, name, args, request, fallback)).then(result => {
+      if (result.startsWith('KESALAHAN')) seen.delete(id);
+      return result;
+    }, error => { seen.delete(id); throw error; });
+    seen.set(id, pending);
+    return pending;
+  };
+  const execute = async (call, name, args, request, fallback) => {
+    let result;
     const kind = name === 'datacat_detail' && args.jenis === 'dokumen_teks' ? 'dokumen_teks' : name;
     if (AGENT.caps[kind] && (used_by[kind] || 0) >= AGENT.caps[kind]) return `KESALAHAN: batas ${kind} tercapai; pakai hasil yang ada`;
     used_by[kind] = (used_by[kind] || 0) + 1;
-    const scope = name === 'datacat_daftar' ? args.jenis + ':' + String(args.ticker || '').toUpperCase() : null;
-    if (scope && empty[scope] >= 2) return 'KESALAHAN: ' + scope + ' sudah 2x kosong; data belum tersedia, jangan ulangi';
     const record = {tool:name, args};
     stats.agent_calls.push(record);
     try {
@@ -631,18 +670,16 @@ export async function agentic({archive, model, question, history = [], emit, sig
       else if (name === 'cari_teks') {
         if (args.ticker) textSearched.add(String(args.ticker).toUpperCase());
         const search = fallback === true ? searchOnce : searchText;
-        const rows = await search({cache, signal, fetcher, budget}, args);
+        const rows = await search({cache, signal, fetcher, budget, requests}, args);
         result = rows.length ? compact({frasa:args.q, dokumen:rows, catatan:'potongan teks dokumen; baca dokumen_teks untuk konteks'}, refs)
           : terse({frasa:args.q, dokumen:'tidak ada dokumen yang memuat frasa ini'});
       }
       else if (name === 'data_kepemilikan') result = await ownershipResult(args);
       else {
-        const request = datacatRequest(name, args);
-        let {data, cached} = await fetchDatacat({key:env.DATACAT_API_KEY, cache, signal, fetcher, budget}, request);
+        let {data, cached} = await fetchDatacat({key:env.DATACAT_API_KEY, cache, signal, fetcher, budget, requests}, request);
         if (name === 'datacat_daftar') {
           const isEmpty = Array.isArray(data.results) && !data.results.length && (data.count == null || Number(data.count) === 0)
             || Number(data.count) === 0 && data.count != null && !data.results?.length;
-          if (isEmpty && scope) empty[scope] = (empty[scope] || 0) + 1;
           // One scoped fallback is available if the main list remains empty when planning ends.
           const t = request.params.ticker, key = args.jenis + ':' + t;
           if (t && fallbackTopic(args.jenis, question)) {
@@ -660,7 +697,7 @@ export async function agentic({archive, model, question, history = [], emit, sig
           // The trail costs one subrequest per document: skipped when the budget runs low.
           const pick = budget.remaining() < 12 ? [] : ids.slice(0, Math.max(0, Math.min(AGENT.trail, AGENT.trailTotal - trailUsed)));
           trailUsed += pick.length;
-          const docs = await Promise.all(pick.map(id => fetchDatacat({key:env.DATACAT_API_KEY, cache, signal, fetcher, budget}, {path:`/api/v1/documents/${id}/`, params:{}})
+          const docs = await Promise.all(pick.map(id => fetchDatacat({key:env.DATACAT_API_KEY, cache, signal, fetcher, budget, requests}, {path:`/api/v1/documents/${id}/`, params:{}})
             .then(r => r.data).catch(() => null)));
           const jejak = pick.map((id, i) => {
             const m = data.mentions.find(x => x.document_id === id), a = docs[i]?.announcement || {};
@@ -677,7 +714,7 @@ export async function agentic({archive, model, question, history = [], emit, sig
               used_by.bio = (used_by.bio || 0) + 1;
               try {
                 const id = bio.html_url.match(/document\/(\d+)/)[1];
-                const {data:page} = await fetchDatacat({key:env.DATACAT_API_KEY, cache, signal, fetcher, budget},
+                const {data:page} = await fetchDatacat({key:env.DATACAT_API_KEY, cache, signal, fetcher, budget, requests},
                   {path:`/api/v1/documents/${id}/text/`, params:{page_from:String(bio.halaman), page_to:String(bio.halaman)}});
                 const text = biography(String(page?.text || ''), person);
                 // Its own citation id, so the career facts can be cited like any datacat page.
@@ -698,7 +735,6 @@ export async function agentic({archive, model, question, history = [], emit, sig
       result = 'KESALAHAN: ' + (error instanceof ToolError ? error.message : 'alat gagal; lanjutkan dengan bukti yang ada');
     }
     record.bytes = result.length;
-    seen.set(id, result);
     return result;
   };
   // Ownership: precomputed signal views when available; the issuer holder lists (roles) still come from ownership.json.
@@ -714,12 +750,16 @@ export async function agentic({archive, model, question, history = [], emit, sig
     messages.push({role:'assistant', content:'', tool_calls:toolCalls});
     toolCalls.forEach((call, i) => {
       let content = results[i];
+      const key = callKeys.get(call), previous = key && delivered.get(key);
+      if (previous) content = 'rujukan:' + previous.cites + '\nhasil_sama_dengan:' + previous.id + '; gunakan bukti dari hasil tersebut';
       if (bytes + content.length > AGENT.totalBytes) content = 'KESALAHAN: batas bahan tercapai; jawab dengan bukti yang ada';
       bytes += content.length;
-      if (!content.startsWith('KESALAHAN')) {
+      if (!previous && !content.startsWith('KESALAHAN')) {
         const cites = [...new Set([...content.matchAll(/\b([DKO]\d+)\b/g)].map(m => m[1]))]
           .filter(c => c[0] === 'D' ? used.has(c) : refs.list().some(r => r.source_id === c));
-        content = 'rujukan:' + (cites.length ? cites.join(',') : '-') + '\n' + content;
+        const cited = cites.length ? cites.join(',') : '-';
+        content = 'rujukan:' + cited + '\n' + content;
+        if (key) delivered.set(key, {id:call.id, cites:cited});
         evidence.push(call.function?.name);
       }
       messages.push({role:'tool', tool_call_id:call.id, content});
@@ -747,7 +787,7 @@ export async function agentic({archive, model, question, history = [], emit, sig
   for (const p of parties.slice(0, 2)) {
     add('datacat_cari', {q:p});
     try {
-      const {data} = await fetchDatacat({key:env.DATACAT_API_KEY, cache, signal, fetcher, budget}, datacatRequest('datacat_cari', {q:p}));
+      const {data} = await fetchDatacat({key:env.DATACAT_API_KEY, cache, signal, fetcher, budget, requests}, datacatRequest('datacat_cari', {q:p}));
       const accounts = (data.sections || []).find(x => x.key === 'accounts')?.results || [], words = fold(p).split(' ');
       // The same person often has several records ("Drs. Mohammad Raylan, MM", "Mohammad Raylan"): open up to three.
       const match = accounts.filter(a => words.every(w => fold(a.name).includes(w)));
@@ -757,9 +797,9 @@ export async function agentic({archive, model, question, history = [], emit, sig
     } catch { /* discovery is best effort */ }
   }
   if (auto.length) {
+    stats.agent_tool_calls = calls += auto.length;
     const results = await Promise.all(auto.map(call => run(call)));
     stats.agent_calls.forEach(c => { if (auto.some(a => a.function.name === c.tool && a.function.arguments === JSON.stringify(c.args))) c.auto = true; });
-    calls += auto.length;
     deliver(auto, results);
   }
   for (let round = 0; round < AGENT.rounds; round++) {
@@ -778,8 +818,8 @@ export async function agentic({archive, model, question, history = [], emit, sig
     const allowed = toolCalls.slice(0, Math.max(0, AGENT.calls - calls));
     // The model's narration between calls is dropped: it would be resent every round.
     await emit({type:'status', text:'Memanggil ' + allowed.map(c => c.function?.name).join(', ') + '…'});
+    stats.agent_tool_calls = calls += allowed.length;
     const results = await Promise.all(allowed.map(call => run(call)));
-    calls += allowed.length;
     deliver(allowed, results);
     if (calls >= AGENT.calls || bytes >= AGENT.totalBytes) break;
   }
@@ -787,12 +827,12 @@ export async function agentic({archive, model, question, history = [], emit, sig
   if (fallback && calls < AGENT.calls && bytes + AGENT.resultBytes <= AGENT.totalBytes && (used_by.cari_teks || 0) < AGENT.caps.cari_teks && budget.remaining() > budget.reserve) {
     const call = {id:'fallback', type:'function', function:{name:'cari_teks', arguments:JSON.stringify(fallback)}};
     await emit({type:'status', text:'Daftar utama kosong; memeriksa satu pencarian teks dokumen…'});
+    stats.agent_tool_calls = ++calls;
     const result = await run(call, true);
-    calls++;
     stats.agent_fallback = fallback;
     deliver([call], [result]);
   }
-  stats.agent_tool_calls = calls; stats.agent_evidence_bytes = bytes;
+  stats.agent_evidence_bytes = bytes;
   if (!evidence.length) throw new ChatError('Mode agen belum menemukan bukti. Sebutkan kode saham, nama pihak, atau topik yang lebih spesifik.');
   await emit({type:'status', phase:'answer', text:`Menulis jawaban dari ${evidence.length} hasil penelusuran…`});
   // Official names from the archive: datacat issuer records carry only the ticker, and the model fills gaps from memory.
@@ -847,6 +887,5 @@ export async function agentic({archive, model, question, history = [], emit, sig
   stats.agent_sources = {archive:archiveSources.length, datacat:datacatSources.length, uncited_refs:refs.list().length - datacatSources.length};
   await emit({type:'sources', sources, terms:named, batches:0});
   const result = {answer, documents:sources.length, batches:0, sources, terms:named, agentic:true, incomplete:!!model.truncated};
-  if (!result.incomplete) cache?.put('agentic', answerKey, {answer, sources, documents:sources.length, agentic:true, terms:named}, AGENT.answerTtl);
   return result;
 }

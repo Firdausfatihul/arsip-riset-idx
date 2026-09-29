@@ -189,3 +189,13 @@ test('compact answers receive one final reminder while explicit user lengths are
     assert.ok(last.startsWith(question));
   }
 });
+
+test('normal and screening answers validate grouped citations with the shared parser',async()=>{
+  for(const screening of [false,true]){
+    const f=fixture({large:screening}),m=model();
+    m.answer=async(messages,emit)=>{const text='Bukti [D2;D99].';await emit({type:'delta',text});return text;};
+    const result=await ask(f,m,screening?'SGX soal delisting':'ringkas SGX');
+    assert.match(result.answer,/Rujukan D99 tidak termasuk sumber/);
+    assert.match(result.answer,/\[D2;D99\]/);
+  }
+});

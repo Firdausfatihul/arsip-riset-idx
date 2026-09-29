@@ -4,6 +4,18 @@ export async function hash(value) {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// A cancelled caller stops waiting without cancelling another caller's work.
+function waitFor(pending, signal) {
+  if (!signal) return pending;
+  signal.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener('abort', abort);
+    const abort = () => { cleanup(); reject(signal.reason); };
+    signal.addEventListener('abort', abort, {once:true});
+    pending.then(value => { cleanup(); resolve(value); }, error => { cleanup(); reject(error); });
+  });
+}
+
 export class CacheStore {
   constructor(sql) {
     this.sql = sql; this.pending = new Map();
@@ -48,16 +60,33 @@ export class CacheStore {
       this.sql.exec('DELETE FROM evidence_cache WHERE rowid IN (SELECT rowid FROM evidence_cache ORDER BY touched LIMIT 16)');
     }
   }
-  async once(kind, key, compute, ttl) {
+  async once(kind, key, compute, ttl, {signal, retrySharedFailure = false} = {}) {
+    signal?.throwIfAborted();
     const found = this.get(kind, key);
     if (found !== null) return {value:found, hit:true, shared:false};
     const id = kind + ':' + key;
-    if (this.pending.has(id)) return {value:await this.pending.get(id), hit:true, shared:true};
+    const shared = this.pending.get(id);
+    if (shared) {
+      try { return {value:await waitFor(shared, signal), hit:true, shared:true}; }
+      catch (error) {
+        signal?.throwIfAborted();
+        if (!retrySharedFailure) throw error;
+        // A surviving waiter can retry with its own model, signal and quota. Never
+        // remove a newer owner's work or keep retrying a failing shared request.
+        if (this.pending.get(id) === shared) this.pending.delete(id);
+        return this.once(kind, key, compute, ttl, {signal});
+      }
+    }
     // Answers cut at the length limit are shown once but never reused.
-    const pending = Promise.resolve().then(compute).then(value => { if (!value?.incomplete) this.put(kind, key, value, ttl); return value; });
+    const work = Promise.resolve().then(() => { signal?.throwIfAborted(); return compute(); });
+    const pending = waitFor(work, signal).then(value => {
+      signal?.throwIfAborted();
+      if (!value?.incomplete) this.put(kind, key, value, ttl);
+      return value;
+    });
     this.pending.set(id, pending);
     try { return {value:await pending, hit:false, shared:false}; }
-    finally { this.pending.delete(id); }
+    finally { if (this.pending.get(id) === pending) this.pending.delete(id); }
   }
   record(id, result, metrics) {
     const now = Date.now();

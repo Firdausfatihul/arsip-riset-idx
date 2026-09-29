@@ -5,13 +5,14 @@
 import {readFile, writeFile, mkdir} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import path from 'node:path';
-import {localEvalProvenance, summarizeAssessment} from './eval_reporting.mjs';
+import {localEvalProvenance, summarizeAssessment, runEvalAttempts, sumUsage} from './eval_reporting.mjs';
 
 const arg = (name, fallback) => { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : fallback; };
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const {Archive, CacheStore, OpenRouter} = await import(path.join(root, 'worker/core.mjs'));
 const {SourceStore} = await import(path.join(root, 'worker/source-store.mjs'));
-const {agentic, citations} = await import(path.join(root, 'worker/agent.mjs'));
+const {agentic} = await import(path.join(root, 'worker/agent.mjs'));
+const {citations} = await import(path.join(root, 'worker/citations.mjs'));
 const env = await readFile(path.join(root, '.env.chat'), 'utf8');
 const key = name => env.match(new RegExp('^' + name + '\\s*=\\s*["\']?([^\\s"\']+)', 'm'))?.[1];
 const label = arg('label', 'run'), maxUsd = Number(arg('max-usd', '0.5')), only = arg('only', '') ? new Set(arg('only').split(',').map(Number)) : null;
@@ -57,19 +58,19 @@ for (const [i, item] of QUESTIONS.entries()) {
   const question = typeof item === 'string' ? item : item.q, expect = typeof item === 'string' ? [] : item.expect;
   if (only && !only.has(i + 1)) continue;
   const own = shared ? sharedCache : sqlite(), cache = new CacheStore(own.sql);
-  const model = new OpenRouter(key('OPENROUTER_API_KEY'), null, undefined, () => { if (spent > maxUsd) throw Error('Eval USD ceiling reached'); }, {responseCache:false});
-  const stats = {}, started = Date.now(), events = [];
-  let result, error;
   // A provider rate limit says nothing about the agent; wait and run the question again.
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    error = undefined;
+  const r = await runEvalAttempts(async () => {
+    const model = new OpenRouter(key('OPENROUTER_API_KEY'), null, undefined, () => { if (spent > maxUsd) throw Error('Eval USD ceiling reached'); }, {responseCache:false});
+    const stats = {}, started = Date.now();
+    let result, error;
     try {
-      result = await agentic({archive, model, question, emit:async e => events.push(e), cache, env:{DATACAT_API_KEY:key('DATACAT_API_KEY')}, stats});
+      result = await agentic({archive, model, question, emit:async () => {}, cache, env:{DATACAT_API_KEY:key('DATACAT_API_KEY')}, stats});
     } catch (e) { error = e.message; }
-    if (!/membatasi permintaan/.test(error || '')) break;
-    await new Promise(ok => setTimeout(ok, 20000 * attempt));
-  }
-  const usage = model.usage(); spent += usage.known_cost_usd;
+    const usage = model.usage(); spent += usage.known_cost_usd;
+    return {result,error,usage,receipts:model.receipts,metrics:stats,elapsed_ms:Date.now() - started};
+  }, {maxAttempts:3});
+  const {result,error,usage,metrics:stats} = r;
+  const totalMetric = name => r.runs.reduce((n, run) => n + (run.metrics[name] || 0), 0);
   // Use the runtime parser for grouped/ranged D/K/O references as well as single IDs.
   const cited = [...new Set(citations(result?.answer || ''))];
   const known = new Set((result?.sources || []).map(s => s.source_id));
@@ -80,18 +81,24 @@ for (const [i, item] of QUESTIONS.entries()) {
   const checks = {citations:unmatched_citations.length === 0};
   if (expect.length) checks.facts = expect_missed.length === 0;
   const row = {n:i + 1, question, status, fixture_assessed:expect.length > 0, checks, incomplete:!!result?.incomplete,
-    error:error || null, rounds:stats.agent_rounds, calls:stats.agent_calls, tool_calls:stats.agent_tool_calls,
-    datacat_cache_hits:stats.datacat_cache_hits, cost:usage.known_cost_usd, model_calls:usage.calls, prompt_tokens:usage.prompt_tokens,
-    completion_tokens:usage.completion_tokens, cached_tokens:usage.cached_tokens, seconds:(Date.now() - started) / 1000,
+    error:error || null, rounds:stats.agent_rounds, total_rounds:totalMetric('agent_rounds'),
+    calls:r.runs.flatMap(run => (run.metrics.agent_calls || []).map(call => ({...call,attempt:run.attempt}))),
+    tool_calls:totalMetric('agent_tool_calls'),final_tool_calls:stats.agent_tool_calls,
+    datacat_cache_hits:totalMetric('datacat_cache_hits'),cost:usage.known_cost_usd,model_calls:usage.calls,prompt_tokens:usage.prompt_tokens,
+    completion_tokens:usage.completion_tokens,cached_tokens:usage.cached_tokens,seconds:r.elapsed_ms / 1000,
+    usage,final_usage:r.final_usage,receipts:r.receipts,runs:r.runs,attempts:r.attempts,
     sources:result?.sources, cited, unmatched_citations, runtime_invalid_citations, answer:result?.answer,
     facts_total:expect.length, expect_missed, absence_claim:!!stats.absence_claim};
   results.push(row);
   console.log(`${status.toUpperCase()} #${row.n} rounds=${row.rounds} tools=${row.tool_calls} calls=${row.model_calls} $${row.cost.toFixed(5)} ${row.seconds.toFixed(0)}s `
     + `sources=${row.sources?.length ?? 0} unmatched=${row.unmatched_citations.length}${expect.length ? (row.expect_missed.length ? ' MISSED=' + row.expect_missed.join(';') : ' expect=ok') : ''} ${error || ''}`);
-  for (const c of stats.agent_calls || []) console.log(`      ${c.tool} ${JSON.stringify(c.args)}${c.cached ? ' (cache)' : ''}${c.bytes ? ' ' + c.bytes + 'B' : ''}`);
+  for (const c of row.calls) console.log(`      [attempt ${c.attempt}] ${c.tool} ${JSON.stringify(c.args)}${c.cached ? ' (cache)' : ''}${c.bytes ? ' ' + c.bytes + 'B' : ''}`);
   if (own !== sharedCache) own.db.close();
 }
 const summary = {label, created_at:new Date().toISOString(), questions:results.length,
+  archive_version:manifest.version,data_version:manifest.data_version || null,
+  app_cache:shared?'shared':'cold_per_case',provider_response_cache:false,
+  usage_scope:'All question attempts, including failed retries. Checks, sources, rounds and answer describe the final outcome.',
   ...summarizeAssessment(results), errors:results.filter(r => r.status === 'error').length,
   // Retained for old report readers: ok is an execution count, never accuracy.
   ok:results.filter(r => r.status === 'complete').length,
@@ -100,8 +107,10 @@ const summary = {label, created_at:new Date().toISOString(), questions:results.l
   facts_missed:results.reduce((n,r) => n + r.expect_missed.length,0),
   invalid_citations:results.reduce((n,r) => n + r.unmatched_citations.length,0),
   total_usd:spent, mean_usd:spent / Math.max(1, results.length), max_usd:Math.max(0, ...results.map(r => r.cost)),
+  usage:sumUsage(results.map(r => r.usage)),
   mean_tool_calls:results.reduce((n, r) => n + (r.tool_calls || 0), 0) / Math.max(1, results.length),
   mean_seconds:results.reduce((n, r) => n + r.seconds, 0) / Math.max(1, results.length)};
 await mkdir(path.join(root, 'reports/eval'), {recursive:true});
 await writeFile(path.join(root, 'reports/eval', 'agentic-' + label + '.json'), JSON.stringify({provenance, summary, results}, null, 2) + '\n');
 console.log(JSON.stringify(summary, null, 2));
+sharedCache.db.close();store.db.close();

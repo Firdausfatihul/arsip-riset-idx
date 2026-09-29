@@ -1,5 +1,5 @@
 """KSEI signal layer on the real kepemilikan.json (no network). Facts checked by hand against the KSEI rows."""
-import json, pathlib, sys, unittest
+import json, os, pathlib, subprocess, sys, unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -69,6 +69,21 @@ class KseiSignals(unittest.TestCase):
         self.assertEqual(json.dumps(again, sort_keys=True), json.dumps(self.signals, sort_keys=True))
         self.assertLess(len(json.dumps(self.signals, ensure_ascii=False)), 5_000_000)
         self.assertEqual(len(self.signals['leaderboard']), 50)
+
+    def test_generated_bytes_are_stable_across_python_hash_seeds(self):
+        script = '''import hashlib,json,pathlib,sys,tempfile
+sys.path.insert(0,sys.argv[2])
+import ksei_signals
+with tempfile.TemporaryDirectory() as tmp:
+    out=pathlib.Path(tmp)
+    ksei_signals.write(pathlib.Path(sys.argv[1]),out)
+    print(json.dumps({name:hashlib.sha256((out/name).read_bytes()).hexdigest()
+        for name in ('signals.json','ksei_history.json')}))
+'''
+        outputs = [subprocess.check_output([sys.executable, '-B', '-c', script, str(SOURCE), str(ROOT / 'tools')],
+                                          env={**os.environ, 'PYTHONHASHSEED': seed})
+                   for seed in ('1', '777')]
+        self.assertEqual(outputs[0], outputs[1], 'set iteration must not change generated asset bytes')
 
 
 if __name__ == '__main__':

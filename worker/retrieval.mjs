@@ -165,10 +165,9 @@ function titledDocuments(question, index) {
   return index.docs.filter(d => d.title.length >= 12 && q.includes(fold(d.title)));
 }
 const SUMMARY_WORDS = /\b(dokumen|laporan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|isi|simpulkan|kesimpulan|baca|keterbukaan|stockbit|digest)\b/i;
-export function documentRequest(question, scope, index) {
+export function documentRequest(question, scope, index, request = requestScope(question, index, scope.date?.slice(0,4))) {
   const titled = dedupeDocuments(titledDocuments(question, index));
   if (titled.length && titled.length <= 6) return titled;
-  const request = requestScope(question, index, scope.date?.slice(0,4));
   const cats = request.categories;
   // Naming a source ("ki 18 september", "KI 26/9") asks for its document, like a summary verb does.
   if (!cats.length && !SUMMARY_WORDS.test(question)) return null;

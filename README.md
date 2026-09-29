@@ -348,11 +348,25 @@ belum pernah diminta juga diimpor ke tabel sumber persisten tanpa AI; Assets tet
   versi parser; catatan juga berdasarkan model, instruksi, metadata sumber dan isi unit.
   Catatan menggunakan ID sumber lokal yang dipetakan ulang saat menjawab agar perubahan nomor
   `[D…]` setelah build tidak membuat rujukan lama salah.
+  Cache bahan dokumen utuh tidak bergantung pada judul sumber pendamping. Cache catatan tetap
+  membedakan fokus instruksi, termasuk sumber pendamping. Versi catatan terpisah dari versi alur,
+  dengan hash instruksi aktual. Seleksi lintas negara juga
+  memakai identitas dokumen/bagian yang tetap, sehingga penomoran ulang D tidak membuang hasil seleksi.
 - Cache jawaban: 15 menit, kuncinya mencakup pertanyaan, riwayat, model, versi seluruh arsip dan
-  instruksi. Pertanyaan dengan riwayat dibatasi ke klien yang sama; jawaban tanpa riwayat dapat
+  instruksi, serta hash tabel fakta/nama `events.json`. Pertanyaan dengan riwayat dibatasi ke klien yang sama; jawaban tanpa riwayat dapat
   digunakan lintas pengguna. Pertanyaan yang hanya mirip tidak dipaksa memakai jawaban yang sama.
-- Pekerjaan dengan kunci sama yang datang bersamaan bergabung pada satu pekerjaan. Kegagalan
-  atau pembatalan pemilik pekerjaan bersama dapat menggagalkan penunggu; hasil parsial tidak disimpan.
+- Mode agen memakai cache jawaban 6 jam yang juga membedakan huruf besar/kecil, tanggal hari ini,
+  dan fingerprint isi data turunan. `manifest.version` tetap khusus dokumen; `asset_hashes` dan
+  `data_version` mencakup events, kepemilikan, sinyal, dan riwayat KSEI. Cache data datacat/web
+  mempunyai versi format sendiri, sehingga perubahan prompt agen tidak membuang data mentah yang masih berlaku.
+  Generator sinyal mengurutkan anggota kelompok agar build dari data yang sama menghasilkan byte/hash yang sama.
+- Pekerjaan dengan kunci sama yang datang bersamaan bergabung pada satu pekerjaan. Di mode agen,
+  pembatalan penunggu tidak menghentikan pemilik. Jika pemilik gagal/dibatalkan, penunggu aktif boleh
+  mencoba sekali dengan model, sinyal pembatalan, dan kuotanya sendiri. Jalur biasa mempertahankan
+  perilaku sebelumnya: kegagalan pemilik dapat menggagalkan penunggu. Hasil parsial tidak disimpan.
+- Panggilan alat agen yang menghasilkan permintaan tervalidasi identik berbagi hasil yang sedang
+  diproses. Hasil berikutnya menunjuk ID panggilan pertama; query dan rentang tanggal berbeda tetap
+  dibaca terpisah. Permintaan HTTP yang sama dalam satu pertanyaan juga dipakai ulang.
 - Maksimal 512 entri / 16 MB isi cache; entri lama dikeluarkan bila batas tercapai. Batas per entri 1 MB.
   Cache dapat bertahan setelah restart/deploy SQLite, tetapi selalu memeriksa versi sumber.
 - Prompt menempatkan bahan yang tetap sebelum pertanyaan/riwayat yang berubah untuk membantu cache
@@ -406,7 +420,8 @@ nol. Batas anggaran byte/token tetap dicadangkan sebelum panggilan dan terpisah 
 Rincian biaya permintaan tersedia pada bagian yang dapat dibuka di bawah jawaban.
 
 ```bash
-node tools/eval_chat.mjs --label nama      # kasus tests/eval/cases.json, API nyata, batas US$2
+node tools/eval_chat.mjs --label nama      # kasus tests/eval/cases.json, API nyata, ambang biaya US$2
+node tools/eval_chat.mjs --label cache --only optimization_sgx,optimization_sgx_stockbit --shared-cache 1 --concurrency 1
 node --test tests/eval_reporting.mjs       # kontrak laporan evaluasi, tanpa jaringan
 python3 -B -m unittest tests/test_chat_metrics.py # pemisahan ID tes dalam laporan, tanpa jaringan
 node tools/compare_chat_costs.mjs           # simulasi offline, tidak memanggil provider
@@ -420,6 +435,13 @@ key khusus `.env.chat`; biaya aktual berasal dari respons provider. Batas US$1 a
 konservatif berdasarkan byte dan tarif tertinggi endpoint yang diverifikasi pada 20 September 2026;
 verifikasi ulang tarif sebelum menjalankan ulang jika harga/model berubah. Cache provider tidak
 dipaksa kosong, sehingga laporan mencantumkan cached token dan hasil yang benar-benar ditagih.
+
+Evaluasi normal secara default memakai cache aplikasi kosong per percobaan; `--shared-cache 1`
+khusus eksperimen penggunaan ulang. Cache respons provider dimatikan dalam evaluator. Total biaya/token
+dan receipts mencakup pertanyaan pembuka serta semua percobaan ulang, termasuk yang gagal;
+`final_usage`, jawaban dan pemeriksaan sumber menggambarkan percobaan terakhir. `--max-usd` evaluator
+adalah ambang yang diperiksa sebelum panggilan berikutnya, bukan batas tagihan keras untuk panggilan
+yang sedang berlangsung. Kasus `optimization_*` adalah benchmark sintetis, bukan pertanyaan pengguna riil.
 
 Kedua skrip evaluasi memakai fungsi lokal, bukan endpoint chat produksi. Hasilnya menyimpan ID run dan asal
 `test/local`. Ringkasan memisahkan `completed` dari `fixture_assessed`/`fixture_passed`, serta kegagalan pemeriksaan

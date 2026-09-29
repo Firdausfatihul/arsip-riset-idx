@@ -3,10 +3,13 @@
 // covered it. Signals are holding patterns from month-end KSEI lists, never proof of intent.
 
 let loaded = null;
+// Generated data has a content fingerprint; older fixtures also retain metadata in their identity.
+export const dataVersion = index => index.data_version || JSON.stringify([index.version, index.signals || null, index.ownership || null]);
 export async function loadSignals(archive, index) {
   if (!index.signals?.asset) return null;
-  if (loaded?.version !== index.version) {
-    loaded = {version:index.version, data:Promise.all([archive.read(index.signals.asset), archive.read(index.signals.history)])
+  const version = dataVersion(index);
+  if (loaded?.version !== version) {
+    loaded = {version, data:Promise.all([archive.read(index.signals.asset), archive.read(index.signals.history)])
       .then(([signals, history]) => ({signals, history, known:knownNames(signals)}))
       .catch(error => { loaded = null; throw error; })};
   }

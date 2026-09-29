@@ -274,7 +274,7 @@ def find_clusters(issuers, months, signals):
     for members in (g for g in groups.values() if 3 <= len(g) <= 80):
         cid = len(out)
         per = collections.defaultdict(list)
-        for k in members:
+        for k in sorted(members):
             for t, p in multi[k].items():
                 per[t].append((display[k], round(p, 2)))
         entry = {'id': cid, 'members': sorted(display[k] for k in members), 'issuers': {}}

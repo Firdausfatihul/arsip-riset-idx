@@ -9,7 +9,7 @@ export const THEMATIC_RULES = 'Pilih semua kandidat yang mungkin menjawab hubung
  +'Jangan memilih laporan registrasi bulanan hanya karena banyak bank Singapura, kecuali ada perusahaan pemilik bernama yang jelas di balik rekening atau transaksi korporasi. '
  +'Jangan menyimpulkan cuplikan ini membuktikan penyelesaian transaksi.';
 
-export async function chooseThematic(groups, terms, model, cache, stats, emit) {
+export async function chooseThematic(groups, terms, model, cache, stats, emit, modelIdentity = 'unspecified') {
   const geo=/\b(?:ASX|SGX|Australia|Australian|Singapura|Singapore|Singapur)\b/i;
   const candidates=[];
   for(const group of groups)for(const row of group.rows)if(geo.test(row.content))candidates.push({doc:group.doc,row});
@@ -20,7 +20,10 @@ export async function chooseThematic(groups, terms, model, cache, stats, emit) {
     return {id,source:doc.source_id,context:row.context.slice(0,180),excerpt};
   });
   // Stable topic selection is reusable across different questions; no user history enters it.
-  const key=await hash([THEMATIC_RULES,terms,candidates.map(c=>[c.doc.document_id,c.doc.document_hash,c.row.section_id]),previews]);
+  // D labels are display aliases that can change after a build. Candidate order and stable
+  // document/section identity still invalidate selection when the actual candidate set changes.
+  const key=await hash(['thematic-selection-v1',modelIdentity,THEMATIC_RULES,terms,candidates.map(c=>[c.doc.document_id,c.doc.document_hash,c.row.section_id]),
+    previews.map(({source,...preview})=>preview)]);
   stats.candidates_found=candidates.length;
   await emit({type:'status',text:`Memilih bukti hubungan lintas negara dari ${candidates.length} kandidat…`});
   const compute=async()=>{

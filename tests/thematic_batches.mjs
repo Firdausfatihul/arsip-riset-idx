@@ -59,3 +59,17 @@ test('selector material above the existing archive bound fails before any model 
   await assert.rejects(chooseThematic(groups(2200),['SGX'],model,null,{},()=>{}),/exceed archive limit/);
   assert.equal(calls,0);
 });
+
+test('selection cache ignores display D labels but retains source hashes, candidate order and model identity',async()=>{
+  const input=groups(3),saved=cache();let calls=0;
+  const model={complete:async messages=>{calls++;assert.ok(JSON.parse(messages[1].content).every(r=>r.source===input[0].doc.source_id));return '{"ids":[0]}';}};
+  const run=async(modelId='model-a')=>{const stats={};const result=await chooseThematic(input,['SGX'],model,saved,stats,()=>{},modelId);return {stats,result};};
+  assert.equal((await run()).stats.candidate_cache_hit,false);
+  input[0].doc.source_id='D99';
+  const renamed=await run();assert.equal(renamed.stats.candidate_cache_hit,true);
+  assert.equal(renamed.result[0].doc.source_id,'D99');assert.equal(calls,1);
+  input[0].doc.document_hash='new-hash';assert.equal((await run()).stats.candidate_cache_hit,false);
+  input[0].rows.reverse();const reordered=await run();assert.equal(reordered.stats.candidate_cache_hit,false);
+  assert.equal(reordered.result[0].rows[0].section_id,'s2');
+  assert.equal((await run('model-b')).stats.candidate_cache_hit,false);assert.equal(calls,4);
+});

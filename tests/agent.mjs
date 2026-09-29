@@ -263,14 +263,14 @@ test('a provider rate limit is retried; an unrecoverable step still answers from
 });
 
 test('relationship tools: ownership name search across issuers, user terms first, person trail from filings', async () => {
-  const {ownershipTool, userTerms} = await import('../worker/agent.mjs');
+  const {ownershipTool, entityTerms} = await import('../worker/agent.mjs');
   const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
   const data = JSON.parse(await readFile(new URL('../worker/.assets/ownership.json', import.meta.url), 'utf8'));
   const refs = new Refs(), found = ownershipTool(data, {nama:'Tancorp'}, refs);
   for (const code of ['MERI', 'BLES', 'RISE', 'CLEO']) assert.ok(found.includes('ticker:' + code), code);
   assert.ok(refs.list().every(r => /^O\d+$/.test(r.source_id) && /^#kepemilikan=[A-Z0-9]+$/.test(r.url)));
   assert.ok(ownershipTool(data, {ticker:'MERI'}, refs).includes('19.32'));
-  assert.deepEqual(userTerms('apakah yoel bagian tancorp?', manifest).map(t => t.toLowerCase()), ['yoel', 'tancorp']);
+  assert.deepEqual(entityTerms('apakah yoel bagian tancorp?', manifest).phrases.map(t => t.toLowerCase()), ['yoel', 'tancorp']);
 
   const person = {account:{id:4813, name:'Yoel Alex Santoso', html_url:'https://quant.renr.ai/account/4813/'}, seats:[],
     mentions:[{document_id:43583, page_no:4, role_raw:''}, {document_id:4927, page_no:3, role_raw:'Komisaris'}]};
