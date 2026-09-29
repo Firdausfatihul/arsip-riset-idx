@@ -199,9 +199,11 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
 
 ### Cara dokumen dipilih dan dibaca
 
-- Pencarian menemukan **semua dokumen** yang cocok dengan ticker/kata utuh; tidak memakai top-3/top-5.
-  Pertanyaan tanpa ticker memakai satu panggilan kecil untuk menentukan istilah dari konteks percakapan.
+- Pencarian menemukan **semua dokumen dalam cakupan yang diminta** yang cocok dengan ticker/kata utuh; tidak memakai top-3/top-5.
+  Sumber yang disebut (misalnya SGX atau Stockbit) tetap membatasi pencarian topik. Pertanyaan tanpa ticker memakai
+  satu panggilan kecil untuk membedakan pencarian topik, ringkasan dokumen, dan penemuan kandidat dari konteks percakapan.
   Pertanyaan hubungan Indonesia–ASX/SGX memakai variasi nama negara/bursa yang dikenali langsung, tanpa panggilan penentu istilah.
+  Bukti hubungan lintas negara dapat berasal dari kedua sisi, termasuk dokumen Indonesia.
 - Kode saham dicocokkan **peka huruf besar**: kata biasa "naik", "gold", "true" bukan ticker NAIK/GOLD/TRUE.
   Kode yang juga kata umum (`WORD_TICKERS` di `tools/chat_archive.py`) dalam huruf kecil hanya dibaca sebagai
   ticker setelah kata petunjuk (analisa, saham, emiten, dokumen, …) atau bila pertanyaan hanya berisi kode itu ("ship").
@@ -212,11 +214,17 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
 - Jika pencarian tidak menemukan apa pun, ejaan terdekat di indeks kata dicoba dulu tanpa panggilan model
   ("Zeinfahrozi" → zeinihzafahrozi): hanya huruf yang hilang atau satu salah ketik, huruf pertama sama.
   Jawaban menyebut koreksi ejaan itu. Baru setelah itu model diminta istilah lain.
-- Permintaan satu dokumen ("ringkas keterbukaan informasi 22 September", "stockbit terbaru") membaca dokumen itu
-  secara utuh berdasarkan kategori dan tanggal katalog, bukan mencari frasa di seluruh arsip. Tahun boleh dihilangkan
-  bila seluruh arsip berada dalam satu tahun.
-- Pertanyaan lanjutan tanpa objek baru ("analisa lebih dalam", "semua dokumen") memakai istilah pencarian giliran
-  sebelumnya yang disimpan bersama riwayat server, tanpa menebak ulang.
+- Permintaan isi dokumen ("ringkas keterbukaan informasi 22 September", "baca SGX, intinya apa") membaca dokumen
+  berdasarkan sumber dan tanggal katalog. Tanpa tanggal, pilihan awal memakai potret terbaru per sumber; "semua"
+  memperluas ke riwayat sumber itu, tetap dalam batas bahan. CSV dengan kembaran Markdown bernama sama tidak dibaca dua kali.
+  Tahun boleh dihilangkan bila seluruh arsip berada dalam satu tahun. "Stockbit 25 September dan KI 26 September"
+  memasangkan tiap tanggal dengan sumbernya; "SGX soal delisting" tetap mencari topik dalam sumber SGX.
+- Permintaan kandidat/rumor yang jarang dibahas dapat dijawab tanpa ticker. Tanpa sumber atau tanggal, mode biasa
+  mulai dari potret KI Indonesia dan Stockbit terbaru, lalu menyebut cakupannya. Ini penemuan kandidat dari bahan tersebut,
+  bukan screening seluruh pasar; jumlah temuan tidak dipaksakan bila bukti kurang.
+- Pertanyaan lanjutan ("analisa lebih dalam", "periksa dokumen di atas", "apa risikonya") mempertahankan topik dan
+  cakupan sumber/dokumen yang disimpan di server. Koreksi tanggal atau "yang terbaru" memilih ulang dalam sumber itu;
+  objek atau sumber baru mengikuti permintaan baru. Riwayat singkat tetap berlaku, bukan memori riset tanpa batas.
 - `tools/evidence_index.py` membagi sumber secara deterministik saat build, tanpa API berbayar.
   Heading emiten dipertahankan sebagai bagian utuh; baris tabel membawa header, artikel HTML tetap utuh,
   dan skrip/data HTML tetap menjadi bagian sumber. Gabungan `content` seluruh bagian harus sama persis
@@ -262,7 +270,8 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   Tanpa daftar ini, uji 35 pertanyaan menemukan 23 nama perusahaan karangan model; dengan daftar ini, 0.
 - Catatan ringkas dapat melewatkan detail. Model tidak boleh menganggap tidak tercatat berarti tidak
   ada dalam dokumen. Fakta, rumor/pernyataan penulis, angka, tanggal dan ketidakpastian tetap dibedakan.
-  Jawaban memakai rujukan `[D…]` yang ditautkan ke arsip, bukan URL hasil karangan model.
+  Jawaban dimulai dengan kesimpulan, memakai rujukan `[D…]` yang ditautkan ke arsip, dan menyebut batas bukti.
+  Jika diminta singkat, targetnya sekitar 150–250 kata kecuali pengguna menentukan panjang lain.
 - Pembacaan gagal/terpotong tidak masuk cache. Retry pemotongan catatan hanya satu kali dan tetap memakai
   anggaran. Catatan yang masih terpotong setelah retry (mis. katalog 1.535 kode SGX) dipakai apa adanya dengan tanda
   "Catatan terpotong" dan tidak disimpan di cache, supaya satu unit panjang tidak menggagalkan seluruh jawaban. Jawaban akhir yang mencapai batas panjang tetap ditampilkan dengan tanda terpotong, tidak masuk
@@ -281,29 +290,36 @@ transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di
 - Kuota: `CHAT_AGENTIC_DAILY` pertanyaan per hari UTC untuk seluruh situs (produksi 50 di `worker/wrangler.jsonc`; tanpa nilai 10). Jawaban tersimpan tidak memakai kuota.
 - Key datacat disimpan sebagai secret Worker `DATACAT_API_KEY` (lokal di `.env.chat`), tidak pernah ke browser.
   Host, path, dan parameter ditetapkan kode; argumen alat divalidasi; endpoint tulis API tidak tersedia sebagai alat.
-- Batas per pertanyaan: 7 langkah, 20 panggilan alat, 6 KB per hasil, 70 KB bahan; maks 3 pencarian nama dan 3 pembacaan teks dokumen.
+- Batas per pertanyaan: 4 langkah model lalu jawaban maksimal 2.000 token, 18 panggilan alat, 6 KB per hasil dan 70 KB bahan;
+  maks 3 pencarian nama, 3 pembacaan teks dokumen dan 3 pencarian frasa teks. Batas koneksi keluar tetap berlaku.
 - Hemat: hasil datacat dipangkas dan ditulis ringkas (tanpa tanda kutip JSON), objek berulang jadi rujukan `K1`;
   respons datacat di-cache 6 jam, jawaban identik 6 jam. Akhir tiap prompt diberi `cache_control` sehingga
   langkah berikutnya dan jawaban akhir membaca awalan dari cache provider (±77% input dari cache pada uji).
   Instruksi jawaban dikirim sebagai hasil alat: pesan user/system baru membuat template menulis ulang giliran alat dan cache hilang.
 - Pihak baru (pembeli, pelapor kepemilikan, direksi/komisaris baru) diperiksa silang lewat profil pihak di datacat.
-- Penemuan awal oleh kode (tanpa panggilan model): nama dan kode di pertanyaan dicari di arsip, di indeks kepemilikan
-  (`ownership.json` dari `kepemilikan.json`: KSEI >1% dan daftar pemegang laporan emiten, tanpa alamat), dan di datacat;
-  profil dibuka untuk hingga tiga akun yang cocok (satu orang sering punya beberapa akun).
+- Penemuan awal oleh kode dimulai dari arsip. Nama pihak tetap dicari dengan nama lengkap di indeks kepemilikan dan
+  datacat; profil dibuka untuk hingga tiga akun yang cocok. Username Stockbit dicari sebagai penulis, bukan diasumsikan pemegang saham.
+  Sinyal kepemilikan emiten ditambahkan bila pertanyaan membahas pemilik, relasi, transaksi saham atau analisis emiten;
+  pertanyaan pengumuman, laporan keuangan atau RUPS sederhana tidak otomatis memerlukan penelusuran sinyal tersebut.
+- "Terbaru" berarti entri terakhir yang tersedia, bukan hanya hari ini; periode yang disebut pengguna tetap dipertahankan.
+  Bila daftar utama kosong, agen boleh mencoba satu pencarian teks bertopik dan berticker yang sesuai selama anggaran masih ada.
+  Hasil kosong atau alat gagal tidak membuktikan peristiwa tidak terjadi.
+- Hasil daftar menyertakan jumlah yang ditampilkan/diterima, total bila tersedia, dan penanda cakupan terbatas atau teks dipangkas.
+  Jawaban harus menyebut keterbatasan bahan; potongan daftar bukan pemeriksaan lengkap.
 - Profil orang memuat `jejak_dokumen` (dokumen yang menyebut namanya: emiten, tanggal, peran, halaman) dan, bila ada,
   `riwayat_karier` dari halaman profil public expose/laporan tahunan, dipotong di judul bagian agar riwayat tetangga tidak tercampur.
 - Pertanyaan hubungan diuji per jenis: orang sama lintas emiten, rantai kepemilikan, riwayat karier, nama grup/keluarga,
   alamat, BAE/auditor/notaris, transaksi pihak berelasi, waktu. Jawaban memakai tabel kekuatan (kuat/sedang/lemah);
   pernyataan "tidak terkait" diberi catatan bahwa ketiadaan bukti bukan bukti. Alamat hanya ada di teks dokumen.
 - Rujukan `[D..]` ke arsip, `[K..]` ke halaman datacat, `[O..]` ke tab Kepemilikan Saham; nama emiten diambil dari arsip dan diperiksa setelah jawaban.
-- **v5 (agent-v5): sinyal KSEI dihitung saat build dan lapisan ketepatan.**
+- **Sinyal KSEI dihitung saat build dan diperiksa bersama bukti.**
   - `tools/ksei_signals.py` (stdlib, tanpa jaringan) membaca `kepemilikan.json` dan menulis `signals.json` dan `ksei_history.json`
     ke aset Worker: pengalihan blok (satu pembeli), pemecahan blok (2-8 pemegang baru), pemegang baru/keluar >=2%, dekat 5%,
     ganti nama (lembar persis sama di >=2 emiten), kelompok pemegang lintas emiten, pemegang yang juga emiten, dan peringkat awal.
     Varian nama satu pemegang digabung (urutan kata, kesinambungan lembar atau persen); rekening kustodian/nominee dikecualikan;
     bulan yang tidak lengkap tidak dipakai. Tiap sinyal punya tingkat (fakta/kuat/sedang/lemah) dan kalimat yang ditulis kode.
     Uji: `python3 -B -m unittest tests/test_ksei_signals.py`.
-  - Saat menjawab, kode mengirim sinyal emiten yang disebut (yang `wajib:1` harus dibahas), lalu memeriksa emiten lain milik pihak
+  - Untuk pertanyaan yang relevan dengan kepemilikan, kode mengirim sinyal emiten yang disebut (yang `wajib:1` harus dibahas), lalu memeriksa emiten lain milik pihak
     dalam sinyal itu. Sinyal wajib yang tidak dibahas ditambahkan kode di akhir jawaban. Pertanyaan "hidden gems" tanpa nama emiten
     memakai peringkat awal (belum disetel).
   - `worker/facts.mjs`: formulir perubahan kepemilikan menjadi kartu (harga per saham terpisah dari nilai total, jeda lapor,
@@ -313,8 +329,10 @@ transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di
     host dan path tetap, maks 3 per pertanyaan, cache 24 jam; halaman yang tidak terbaca dilaporkan sebagai galat, bukan "0 hasil".
     Dijalankan otomatis untuk nama tanpa profil datacat (banyak komisaris/direksi hanya tercatat di teks risalah atau prospektus).
     Kata yang tidak dikenal arsip tetap dianggap bagian nama bila bersebelahan dengan kata nama lain ("ferita lie").
-  - Batas: 4 langkah model + jawaban (maks 2.000 token), 18 panggilan alat. Tautan `[O..]` membuka tab Kepemilikan dengan rentang bulan.
-- Uji: `node --test tests/agent.mjs` (tanpa jaringan) dan `node tools/eval_agentic.mjs --label nama` (API nyata, 13 pertanyaan, ±US$0,006).
+  - Tautan `[O..]` membuka tab Kepemilikan dengan rentang bulan.
+- Uji: `node --test tests/agent.mjs` (tanpa jaringan) dan `node tools/eval_agentic.mjs --label nama`
+  (kasus dalam skrip, API nyata, ambang biaya bawaan US$0,50 yang diperbarui setelah tiap pertanyaan; bukan batas tagihan mutlak).
+  Proses selesai tidak sama dengan jawaban yang telah diuji kebenarannya.
 - Statistik privat (`tools/chat_metrics.py --html`) memisahkan mode biasa dan mode agen: biaya, rata-rata, termahal, panggilan alat, cache.
 
 ### Cache bersama dan invalidasi
@@ -388,7 +406,9 @@ nol. Batas anggaran byte/token tetap dicadangkan sebelum panggilan dan terpisah 
 Rincian biaya permintaan tersedia pada bagian yang dapat dibuka di bawah jawaban.
 
 ```bash
-node tools/eval_chat.mjs --label nama      # uji akurasi 24 pertanyaan nyata (tests/eval/cases.json), API nyata, batas US$2
+node tools/eval_chat.mjs --label nama      # kasus tests/eval/cases.json, API nyata, batas US$2
+node --test tests/eval_reporting.mjs       # kontrak laporan evaluasi, tanpa jaringan
+python3 -B -m unittest tests/test_chat_metrics.py # pemisahan ID tes dalam laporan, tanpa jaringan
 node tools/compare_chat_costs.mjs           # simulasi offline, tidak memanggil provider
 node tools/compare_chat_costs.mjs --live    # perbandingan API nyata, batas cadangan konservatif US$1
 python3 tools/chat_metrics.py --days 7 --out reports/private/chat-metrics.json --html reports/private/chat-statistics.html
@@ -401,6 +421,11 @@ konservatif berdasarkan byte dan tarif tertinggi endpoint yang diverifikasi pada
 verifikasi ulang tarif sebelum menjalankan ulang jika harga/model berubah. Cache provider tidak
 dipaksa kosong, sehingga laporan mencantumkan cached token dan hasil yang benar-benar ditagih.
 
+Kedua skrip evaluasi memakai fungsi lokal, bukan endpoint chat produksi. Hasilnya menyimpan ID run dan asal
+`test/local`. Ringkasan memisahkan `completed` dari `fixture_assessed`/`fixture_passed`, serta kegagalan pemeriksaan
+sumber, pola fakta, istilah dan ID rujukan. Kasus tanpa ekspektasi isi tidak dihitung sebagai lolos pemeriksaan isi.
+Pemeriksaan ini terbatas pada fixture; lolos bukan audit lengkap kebenaran jawaban. Field lama `ok` berarti proses selesai.
+
 Endpoint `GET /api/chat/metrics?days=7` memerlukan bearer `CHAT_METRICS_TOKEN`, secret terpisah dari
 key OpenRouter. Nilainya disimpan lokal di `.env.chat.metrics` (izin 600, diabaikan Git), diunggah
 sebagai secret Worker, dan tidak masuk frontend. Tanpa secret, endpoint menolak akses. Pengelola
@@ -408,6 +433,13 @@ memakai `tools/chat_metrics.py`; token tidak dicetak atau ditaruh pada URL. Lapo
 pertanyaan berulang, topik teratas, tren harian, token/biaya, hasil proses, dan cache hit. Teks pertanyaan
 ditampilkan dengan escaping HTML. Laporan JSON/HTML privat disimpan di `reports/private/` yang
 diabaikan Git. `--limit` (maksimal 500) dan `--offset` menyediakan halaman riwayat berikutnya.
+
+Untuk memisahkan tes produksi, catat ID permintaannya dalam ledger privat, misalnya
+`{"runs":[{"run_id":"smoke-1","execution":"production","production_request_ids":["request-id"]}]}`.
+Berikan `--test-runs reports/private/test-runs.json` saat membuat laporan. Hanya ID yang cocok ditandai tes;
+lainnya **belum diketahui asalnya**, bukan otomatis pengguna riil. Teks yang sama dapat berasal dari pengguna maupun replay tes.
+Agregat server tetap mencakup seluruh trafik; tabel asal input hanya menghitung ID unik pada halaman yang dimuat.
+`--from-file reports/private/questions-0.json` mengolah snapshot lama tanpa jaringan; gunakan nama output baru untuk mempertahankan aslinya.
 
 ### Batas keamanan dan biaya
 

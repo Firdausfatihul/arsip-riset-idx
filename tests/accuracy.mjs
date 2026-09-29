@@ -63,7 +63,8 @@ test('document requests: every date, range, numeric date, pasted title and per-s
     'ada loh itu disini Keterbukaan Informasi · 22 September 2026': ['ki_22092026.md'],
     'stockbit 22 dan 25 september ada apa aja': ['stockbit_22092026.md', 'stockbit_25092026.md'],
     'bandingkan ki 18 september dengan ki 19 september': ['ki_18092026.md', 'ki_19092026.md'],
-    'keterbukaan terbaru sama stockbit terbaru, mana yang paling menarik': ['ki_26092026.md', 'stockbit_25092026.md'],
+    'keterbukaan terbaru sama stockbit terbaru, mana yang paling menarik': ['keterbukaan-informasi','stockbit'].map(cat =>
+      manifest.docs.filter(d => d.cat === cat).sort((a,b) => b.end.localeCompare(a.end))[0].name),
     'KI 26/9 ada corporate action apa': ['ki_26092026.md'],
     'stockbit 24/9 sama KI 24/9 bandingin': ['stockbit_24092026.md', 'ki_24092026.md'],
     'apa yang dibahas di stockbit 20 sampai 22 september': ['stockbit_22092026.md'],

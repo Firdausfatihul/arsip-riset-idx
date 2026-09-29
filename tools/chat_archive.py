@@ -63,7 +63,9 @@ def read_archive(directory):
         target = (directory / doc["path"]).resolve()
         if not target.is_relative_to(directory):
             raise ValueError("Lokasi dokumen dalam indeks tidak valid.")
-        doc["body"] = target.read_text(encoding="utf-8")
+        # Preserve source bytes including CSV CRLF and BOM; evidence hashes must describe
+        # the file the viewer serves, not Python's universal-newline conversion.
+        doc["body"] = target.read_bytes().decode("utf-8")
         if doc["kind"] == "html":
             doc["body"] = report_source(doc["body"])
         # Search HTML using its visible/data text index; send its entire file to the model.

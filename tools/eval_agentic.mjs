@@ -5,16 +5,18 @@
 import {readFile, writeFile, mkdir} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import path from 'node:path';
+import {localEvalProvenance, summarizeAssessment} from './eval_reporting.mjs';
 
 const arg = (name, fallback) => { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : fallback; };
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const {Archive, CacheStore, OpenRouter} = await import(path.join(root, 'worker/core.mjs'));
 const {SourceStore} = await import(path.join(root, 'worker/source-store.mjs'));
-const {agentic} = await import(path.join(root, 'worker/agent.mjs'));
+const {agentic, citations} = await import(path.join(root, 'worker/agent.mjs'));
 const env = await readFile(path.join(root, '.env.chat'), 'utf8');
 const key = name => env.match(new RegExp('^' + name + '\\s*=\\s*["\']?([^\\s"\']+)', 'm'))?.[1];
 const label = arg('label', 'run'), maxUsd = Number(arg('max-usd', '0.5')), only = arg('only', '') ? new Set(arg('only').split(',').map(Number)) : null;
 const shared = arg('shared-cache', '') === '1';
+const provenance = localEvalProvenance('agentic');
 
 export const QUESTIONS = [
   'siapa pemegang saham terbesar SOCI dan apakah ada perubahan kepemilikan terbaru?',
@@ -68,23 +70,38 @@ for (const [i, item] of QUESTIONS.entries()) {
     await new Promise(ok => setTimeout(ok, 20000 * attempt));
   }
   const usage = model.usage(); spent += usage.known_cost_usd;
-  const cited = [...new Set([...(result?.answer || '').matchAll(/\[([DK]\d+)\]/g)].map(m => m[1]))];
+  // Use the runtime parser for grouped/ranged D/K/O references as well as single IDs.
+  const cited = [...new Set(citations(result?.answer || ''))];
   const known = new Set((result?.sources || []).map(s => s.source_id));
-  const row = {n:i + 1, question, error:error || null, rounds:stats.agent_rounds, calls:stats.agent_calls, tool_calls:stats.agent_tool_calls,
+  const runtime_invalid_citations = [...new Set(stats.invalid_citations || [])];
+  const unmatched_citations = [...new Set([...cited.filter(c => !known.has(c)), ...runtime_invalid_citations])];
+  const expect_missed = expect.filter(e => !new RegExp(e, 'i').test(result?.answer || ''));
+  const status = error || !result ? 'error' : result.clarification ? 'clarification' : 'complete';
+  const checks = {citations:unmatched_citations.length === 0};
+  if (expect.length) checks.facts = expect_missed.length === 0;
+  const row = {n:i + 1, question, status, fixture_assessed:expect.length > 0, checks, incomplete:!!result?.incomplete,
+    error:error || null, rounds:stats.agent_rounds, calls:stats.agent_calls, tool_calls:stats.agent_tool_calls,
     datacat_cache_hits:stats.datacat_cache_hits, cost:usage.known_cost_usd, model_calls:usage.calls, prompt_tokens:usage.prompt_tokens,
     completion_tokens:usage.completion_tokens, cached_tokens:usage.cached_tokens, seconds:(Date.now() - started) / 1000,
-    sources:result?.sources, cited, unmatched_citations:cited.filter(c => !known.has(c)), answer:result?.answer,
-    expect_missed:expect.filter(e => !new RegExp(e, 'i').test(result?.answer || '')), absence_claim:!!stats.absence_claim};
+    sources:result?.sources, cited, unmatched_citations, runtime_invalid_citations, answer:result?.answer,
+    facts_total:expect.length, expect_missed, absence_claim:!!stats.absence_claim};
   results.push(row);
-  console.log(`${error ? 'ERR ' : 'OK  '} #${row.n} rounds=${row.rounds} tools=${row.tool_calls} calls=${row.model_calls} $${row.cost.toFixed(5)} ${row.seconds.toFixed(0)}s `
+  console.log(`${status.toUpperCase()} #${row.n} rounds=${row.rounds} tools=${row.tool_calls} calls=${row.model_calls} $${row.cost.toFixed(5)} ${row.seconds.toFixed(0)}s `
     + `sources=${row.sources?.length ?? 0} unmatched=${row.unmatched_citations.length}${expect.length ? (row.expect_missed.length ? ' MISSED=' + row.expect_missed.join(';') : ' expect=ok') : ''} ${error || ''}`);
   for (const c of stats.agent_calls || []) console.log(`      ${c.tool} ${JSON.stringify(c.args)}${c.cached ? ' (cache)' : ''}${c.bytes ? ' ' + c.bytes + 'B' : ''}`);
   if (own !== sharedCache) own.db.close();
 }
-const summary = {label, created_at:new Date().toISOString(), questions:results.length, ok:results.filter(r => !r.error).length,
+const summary = {label, created_at:new Date().toISOString(), questions:results.length,
+  ...summarizeAssessment(results), errors:results.filter(r => r.status === 'error').length,
+  // Retained for old report readers: ok is an execution count, never accuracy.
+  ok:results.filter(r => r.status === 'complete').length,
+  ok_note:'Legacy alias of completed; not a correctness score.',
+  facts_total:results.reduce((n,r) => n + r.facts_total,0),
+  facts_missed:results.reduce((n,r) => n + r.expect_missed.length,0),
+  invalid_citations:results.reduce((n,r) => n + r.unmatched_citations.length,0),
   total_usd:spent, mean_usd:spent / Math.max(1, results.length), max_usd:Math.max(0, ...results.map(r => r.cost)),
   mean_tool_calls:results.reduce((n, r) => n + (r.tool_calls || 0), 0) / Math.max(1, results.length),
   mean_seconds:results.reduce((n, r) => n + r.seconds, 0) / Math.max(1, results.length)};
 await mkdir(path.join(root, 'reports/eval'), {recursive:true});
-await writeFile(path.join(root, 'reports/eval', 'agentic-' + label + '.json'), JSON.stringify({summary, results}, null, 2) + '\n');
+await writeFile(path.join(root, 'reports/eval', 'agentic-' + label + '.json'), JSON.stringify({provenance, summary, results}, null, 2) + '\n');
 console.log(JSON.stringify(summary, null, 2));

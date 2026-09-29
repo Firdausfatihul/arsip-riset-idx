@@ -24,10 +24,28 @@ export async function chooseThematic(groups, terms, model, cache, stats, emit) {
   stats.candidates_found=candidates.length;
   await emit({type:'status',text:`Memilih bukti hubungan lintas negara dari ${candidates.length} kandidat…`});
   const compute=async()=>{
-    const reply=await model.complete([{role:'system',content:THEMATIC_RULES},{role:'user',content:JSON.stringify(previews)}],{jsonMode:true,maxTokens:1800});
-    const parsed=JSON.parse(reply);
-    if(!Array.isArray(parsed.ids) || !parsed.ids.length || parsed.ids.some(id=>!Number.isInteger(id)||id<0||id>=candidates.length))throw new Error('Invalid candidate selection');
-    return [...new Set(parsed.ids)];
+    const messages=rows=>[{role:'system',content:THEMATIC_RULES},{role:'user',content:JSON.stringify(rows)}];
+    const encoder=new TextEncoder(),size=value=>encoder.encode(JSON.stringify(value)).length;
+    const overhead=size(messages([])),batches=[];let batch=[],bytes=overhead,total=0;
+    // Count the escaped JSON inside message content, not just the unescaped preview text.
+    for(const preview of previews){
+      const added=size(JSON.stringify(preview))-2;
+      if(overhead+added>380000)throw new Error('Thematic candidate exceeds context limit');
+      if(batch.length && bytes+added+1>380000){batches.push(batch);total+=bytes;batch=[];bytes=overhead;}
+      bytes+=added+(batch.length?1:0);batch.push(preview);
+    }
+    if(batch.length){batches.push(batch);total+=bytes;}
+    if(total>4000000)throw new Error('Thematic candidates exceed archive limit');
+    stats.candidate_batches=batches.length;
+    const ids=new Set();
+    for(const rows of batches){
+      const reply=await model.complete(messages(rows),{jsonMode:true,maxTokens:1800});
+      const parsed=JSON.parse(reply),allowed=new Set(rows.map(row=>row.id));
+      if(!Array.isArray(parsed.ids) || parsed.ids.some(id=>!Number.isInteger(id)||!allowed.has(id)))throw new Error('Invalid candidate selection');
+      for(const id of parsed.ids)ids.add(id);
+    }
+    if(!ids.size)throw new Error('Invalid candidate selection');
+    return [...ids];
   };
   const selection=cache?await cache.once('candidates',key,compute):{value:await compute(),hit:false};
   stats.candidate_cache_hit=selection.hit;stats.candidates_selected=selection.value.length;

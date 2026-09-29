@@ -7,6 +7,7 @@ import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {localEvalProvenance, summarizeAssessment} from './eval_reporting.mjs';
 
 const arg=(name,fallback)=>{const i=process.argv.indexOf('--'+name);return i>0?process.argv[i+1]:fallback;};
 const root=path.resolve(path.dirname(new URL(import.meta.url).pathname),'..');
@@ -14,6 +15,7 @@ const impl=path.resolve(arg('impl',path.join(root,'worker')));
 const assets=path.resolve(arg('assets',path.join(impl,'.assets')));
 const label=arg('label','run'),maxUsd=Number(arg('max-usd','2')),concurrency=Number(arg('concurrency','3'));
 const only=arg('only','')?new Set(arg('only').split(',')):null;
+const provenance=localEvalProvenance('archive');
 const core=await import(pathToFileURL(path.join(impl,'core.mjs')));
 const {SourceStore}=await import(pathToFileURL(path.join(impl,'source-store.mjs')));
 const {Archive,CacheStore,OpenRouter,converse}=core;
@@ -63,10 +65,11 @@ const remember=(history,question,result)=>core.rememberTurn?core.rememberTurn(hi
   :[...history,{role:'user',content:question},{role:'assistant',content:result.answer.slice(0,1500)}].slice(-6);
 
 async function evaluate(c){
+  const fixture_assessed=!!(c.terms_include?.length || c.terms_exclude?.length || c.docs_all?.length || c.docs_any?.length || c.facts?.length);
   let history=[];
   if(c.prime){
     const p=await run(c.prime,[],c.id);
-    if(!p.result)return {id:c.id,question:c.question,status:'error',error:'prime failed: '+p.error,pass:false,usage:p.usage};
+    if(!p.result)return {id:c.id,question:c.question,status:'error',error:'prime failed: '+p.error,pass:false,fixture_assessed,checks:{status:false},usage:p.usage};
     history=remember(history,c.prime,p.result);
   }
   const r=await run(c.question,history,c.id);
@@ -83,8 +86,9 @@ async function evaluate(c){
   const facts=(c.facts||[]).map(f=>({fact:f,hit:new RegExp(f,'i').test(answer)}));
   if(facts.length)checks.facts=facts.every(f=>f.hit);
   const refs=[...new Set([...answer.matchAll(/\[(D\d+)\]/g)].map(m=>m[1]))];
+  checks.citations=refs.every(d=>found.includes(d));
   const precision=gold&&found.length?found.filter(d=>gold.includes(d)).length/found.length:null;
-  return {id:c.id,question:c.question,status,error:r.error,pass:Object.values(checks).every(Boolean),checks,facts,
+  return {id:c.id,question:c.question,status,error:r.error,pass:Object.values(checks).every(Boolean),fixture_assessed,checks,facts,
     terms,sources:found,source_precision:precision,citations:refs,invalid_citations:refs.filter(d=>!found.includes(d)),
     incomplete:!!r.result?.incomplete,path:r.result?.screening?'table':r.result?.overview?'list':'text',
     unverified_numbers:r.metrics.unverified_numbers||[],wrong_names:r.metrics.wrong_names||[],answer,usage:r.usage,elapsed_ms:r.elapsed_ms,attempts:r.attempts,
@@ -102,11 +106,12 @@ await Promise.all(Array.from({length:concurrency},async()=>{
 }));
 const sum=(f)=>results.reduce((n,r)=>n+(f(r)||0),0),prec=results.filter(r=>r.source_precision!==null&&r.source_precision!==undefined);
 const summary={label,impl,archive_version:manifest.version,created_at:new Date().toISOString(),cases:results.length,
-  passed:sum(r=>r.pass),completed:sum(r=>r.status==='complete'),errors:sum(r=>r.status==='error'),
+  // Legacy passed includes cases with status-only checks; use fixture_passed for the assessed subset.
+  passed:sum(r=>r.pass),...summarizeAssessment(results),errors:sum(r=>r.status==='error'),
   facts_hit:sum(r=>r.facts?.filter(f=>f.hit).length),facts_total:sum(r=>r.facts?.length),
   mean_source_precision:prec.length?prec.reduce((n,r)=>n+r.source_precision,0)/prec.length:null,
   invalid_citations:sum(r=>r.invalid_citations?.length),flagged_numbers:sum(r=>r.unverified_numbers?.length),wrong_names:sum(r=>r.wrong_names?.length),cost_usd:sum(r=>r.usage?.known_cost_usd),
   provider_calls:sum(r=>r.usage?.calls)};
 const out=path.join(root,'reports/eval');await mkdir(out,{recursive:true});
-await writeFile(path.join(out,label+'.json'),JSON.stringify({summary,results},null,2)+'\n');
+await writeFile(path.join(out,label+'.json'),JSON.stringify({provenance,summary,results},null,2)+'\n');
 console.log(JSON.stringify(summary,null,2));

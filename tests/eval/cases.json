@@ -550,6 +550,21 @@
    "question": "Carikan data hakimson growth capital"
   },
   {
+   "id": "sgx_summary_no_date",
+   "question": "Baca keterbukaan SGX, intinya apa dan apa yang menarik? Singkat padat.",
+   "docs_all": [
+    "keterbukaan_sg_20092026_semua_kode.md",
+    "keterbukaan_sg_20092026_temuan_utama.md"
+   ]
+  },
+  {
+   "id": "stockbit_discovery_no_ticker",
+   "question": "Dari Stockbit terbaru, cari rumor atau tesis menarik yang jarang dibahas. Singkat padat; kalau tidak ada ukuran popularitas, jelaskan batasnya.",
+   "docs_all": [
+    "stockbit_28092026.md"
+   ]
+  },
+  {
    "id": "name_typo_lower",
    "question": "user zeinfahrozi suka ngomgin apa sih? sp nya apa aja, singkat padat, jelas",
    "docs_any": [

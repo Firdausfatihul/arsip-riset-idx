@@ -21,8 +21,10 @@ test('all source partitions reconstruct originals, including scripts, tables and
  for(const doc of index.docs){
   const d=await archive.read(doc.evidence_asset),raw=(await archive.read(doc.asset)).parts.map(p=>p.text).join('');
   assert.equal(d.records.map(r=>r.content).join(''),raw,doc.name);
-  let end=0;for(const r of d.records){assert.equal(r.start,end);assert.equal(raw.slice(r.start,r.end),r.content);end=r.end;}
-  assert.equal(end,raw.length);
+  // Python source offsets count Unicode code points, not JavaScript UTF-16 units (emoji).
+  const codepoints=Array.from(raw);
+  let end=0;for(const r of d.records){assert.equal(r.start,end);assert.equal(codepoints.slice(r.start,r.end).join(''),r.content);end=r.end;}
+  assert.equal(end,codepoints.length);
   for(const r of d.records) if(/\bSOCI\b/i.test(r.content))assert.ok(r.tickers.includes('SOCI'));
  }
 });

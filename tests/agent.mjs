@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {Archive, CacheStore, validate} from '../worker/core.mjs';
-import {AGENT, agentic, citations, compact, datacatRequest, fetchDatacat, prune, Refs, TOOLS} from '../worker/agent.mjs';
+import {AGENT, agentic, citations, compact, datacatRequest, fetchDatacat, latestArgs, needsOwnership, prune, Refs, TOOLS} from '../worker/agent.mjs';
 
 // No network: every datacat and model call below is simulated.
 const realFetch = globalThis.fetch;
@@ -49,6 +49,40 @@ test('datacat responses are pruned, capped, and links become citation ids', () =
   assert.equal(refs.list()[0].url, 'https://quant.renr.ai/issuer/SOCI/');
   // Empty lists stay ("no holdings on record"); nulls, empty strings and API links are dropped.
   assert.deepEqual(prune({a:null, b:'', c:[], d:{url:'x'}}), {c:[]});
+});
+
+test('coverage reports the rows actually displayed after compression, without exposing pagination URLs', () => {
+  const data = {count:257, count_is_capped:true, next:'https://quant.renr.ai/api/v1/movements/?offset=25', offset:0, limit:25,
+    coverage_hint:'Belum seluruh laporan diproses.', results:Array.from({length:25}, (_, i) =>
+      ({id:i + 1, name:'Pemegang ' + i, description:'x'.repeat(1500), other:'y'.repeat(1500)}))};
+  const text = compact(data, new Refs()), shown = Number(text.match(/ditampilkan:(\d+)/)?.[1]);
+  assert.ok(shown > 0 && shown < 25, text);
+  assert.equal((text.match(/id_baris:/g) || []).length, shown);
+  assert.match(text, /diterima:25,total:257,terbatas:true/);
+  assert.match(text, /total_dibatasi:true,ada_halaman_lanjutan:true/);
+  assert.match(text, /bahan_dipangkas:true/);
+  assert.match(text, /coverage_hint:/);
+  assert.doesNotMatch(text, /https?:/);
+  assert.ok(text.length <= AGENT.resultBytes);
+  assert.match(compact({count:1, next:null, results:[{id:1}]}, new Refs()), /ditampilkan:1,diterima:1,total:1,terbatas:false/);
+  assert.match(compact({results:[]}, new Refs()), /total:tidak diketahui,terbatas:true/);
+});
+
+test('latest removes an invented today-only filter while explicit dates, periods and dated follow-ups remain', () => {
+  const args = {jenis:'pengumuman', ticker:'TOWR', dari:'2026-09-29', sampai:'2026-09-29'};
+  assert.deepEqual(latestArgs(args, 'pengumuman terbaru TOWR', '2026-09-29'), {jenis:'pengumuman', ticker:'TOWR'});
+  for (const q of ['pengumuman terbaru TOWR hari ini', 'terbaru TOWR September 2026', 'terbaru TOWR bulan ini',
+    'terbaru TOWR 29/9', 'terbaru TOWR tiga bulan terakhir', 'pengumuman TOWR 29 September 2026'])
+    assert.deepEqual(latestArgs(args, q, '2026-09-29'), args, q);
+  assert.deepEqual(latestArgs(args, 'yang terbaru?', '2026-09-29', [{role:'user', content:'pengumuman TOWR bulan September'}]), args);
+  assert.equal(args.dari, '2026-09-29', 'the caller object is unchanged');
+});
+
+test('ownership discovery applies to ownership, relationships and broad analysis, not simple filings', () => {
+  for (const q of ['pengumuman keterbukaan terbaru TOWR', 'laporan keuangan SOCI', 'RUPS tahunan BBCA 2026 termasuk dividen',
+    'analisis laporan keuangan SOCI', 'perubahan direksi GOTO']) assert.equal(needsOwnership(q), false, q);
+  for (const q of ['siapa pembeli saham terbesar TOWR', 'pemegang saham SOCI', 'apakah HELI dan MERI punya orang yang sama',
+    'apakah yoel bagian tancorp', 'analisis LUCY', 'cari hidden gems', 'siapa pengendali ASLI']) assert.equal(needsOwnership(q), true, q);
 });
 
 test('unsupported filters are refused instead of returning unrelated rows; ids are typed by kind', () => {
@@ -129,6 +163,70 @@ test('a whole-document request in agent mode reads the documents through the arc
   await agentic({archive:new Archive(assets), model, emit:async () => {}, env:{DATACAT_API_KEY:'KEY'}, stats:agentStats,
     question:'baca dokumen keterbukaan SOCI', fetcher:async () => Response.json({sections:[]})});
   assert.equal(agentStats.agent_redirect, undefined);
+});
+
+test('latest announcement reaches the newest-first API without today filters or irrelevant ownership appendix', async () => {
+  const urls = [], stats = {};
+  let steps = 0, transcript;
+  const model = {step:async () => ++steps === 1 ? {message:{tool_calls:[{id:'latest', type:'function', function:{name:'datacat_daftar',
+    arguments:JSON.stringify({jenis:'pengumuman', ticker:'TOWR', dari:'2026-09-29', sampai:'2026-09-29'})}}]}} : {message:{content:'SIAP'}},
+    answer:async m => { transcript = m; return 'Pengumuman terakhir tersedia.'; }};
+  const result = await agentic({archive:new Archive(assets), model, question:'pengumuman keterbukaan terbaru TOWR', today:'2026-09-29',
+    emit:async () => {}, env:{DATACAT_API_KEY:'KEY'}, stats,
+    fetcher:async url => { urls.push(new URL(url)); return Response.json({count:1, next:null, results:[{id:1, judul:'Laporan 28 September', date:'2026-09-28'}]}); }});
+  const query = urls.find(u => u.pathname === '/api/v1/announcements/').searchParams;
+  assert.equal(query.get('sort'), '-date'); assert.equal(query.has('from'), false); assert.equal(query.has('to'), false);
+  assert.ok(!stats.agent_calls.some(c => c.tool === 'data_kepemilikan'), JSON.stringify(stats.agent_calls));
+  assert.ok(!stats.coverage_appendix); assert.doesNotMatch(result.answer, /Data terhitung sistem/);
+  assert.deepEqual(result.terms, ['TOWR']);
+  const call = transcript.flatMap(m => m.tool_calls || []).find(c => c.id === 'latest');
+  assert.deepEqual(JSON.parse(call.function.arguments), {jenis:'pengumuman', ticker:'TOWR'}, 'the transcript records the actual request');
+});
+
+test('an unresolved empty main list gets one scoped text fallback; existing searches and call limits prevent repetition', async () => {
+  const page = '<table class="t-table"><tr><td><a href="/issuer/BBCA/">BBCA</a></td><td><a href="/document/123/" title="Risalah RUPS 2025.pdf">RUPS</a>'
+    + '<p class="t-caption">RUPS menyetujui dividen</p></td></tr></table>';
+  const run = async mode => {
+    let steps = 0, webCalls = 0, transcript;
+    const stats = {}, list = {id:'main', type:'function', function:{name:'datacat_daftar', arguments:'{"jenis":"rups","ticker":"BBCA"}'}};
+    const model = {step:async () => {
+      if (++steps !== 1) return {message:{content:'SIAP'}};
+      const calls = [list];
+      if (mode === 'already-searched') calls.push({id:'searched', type:'function', function:{name:'cari_teks', arguments:'{"q":"RUPS","ticker":"BBCA"}'}});
+      if (mode === 'at-limit') for (let i = 0; i < AGENT.calls; i++) calls.push({id:'extra' + i, type:'function', function:{name:'datacat_cari', arguments:JSON.stringify({q:'nama ' + i})}});
+      return {message:{tool_calls:calls}};
+    }, answer:async m => { transcript = m; return mode.startsWith('overclaim') ? 'Hasil RUPS belum dipublikasikan dan RUPS belum dilaksanakan.'
+      : 'Dalam hasil yang diperiksa, pengumuman RUPS 2026 belum ditemukan. Hasil kosong bukan bukti bahwa RUPS belum dilaksanakan.'; }};
+    const result = await agentic({archive:new Archive(assets), model, question:'RUPS tahunan BBCA 2026 memutuskan apa termasuk dividen',
+      emit:async () => {}, env:{DATACAT_API_KEY:'KEY'}, stats,
+      cache:{get:kind => kind === 'datacat' ? (mode.endsWith('nonempty') ? {count:1, results:[{judul:'Risalah RUPS 2026'}]} : {count:0, results:[]}) : null, put:() => {}},
+      fetcher:async url => { webCalls++; const u = new URL(url); assert.equal(u.pathname, '/explore/documents/');
+        assert.equal(u.searchParams.get('ticker'), 'BBCA'); assert.equal(u.searchParams.get('q'), 'RUPS'); return new Response(page); }});
+    return {stats, steps, webCalls, transcript, result};
+  };
+  const empty = await run('empty');
+  assert.deepEqual(empty.stats.agent_fallback, {ticker:'BBCA', q:'RUPS'});
+  assert.equal(empty.webCalls, 1); assert.equal(empty.steps, 2, 'fallback adds no planning round');
+  assert.match(JSON.stringify(empty.transcript), /RUPS menyetujui dividen/);
+  assert.match(JSON.stringify(empty.transcript), /Risalah RUPS 2025/, 'the requested 2026 meeting is not silently substituted with a historical result');
+  const content = empty.transcript.at(-1).content;
+  const finalInstruction = Array.isArray(content) ? content.map(part => part.text || '').join('') : content;
+  assert.match(finalInstruction, /Hasil kosong atau historis[^.]+bukan bukti belum dipublikasikan, belum dilaksanakan/);
+  assert.match(finalInstruction, /Jangan menyarankan menunggu acara\/pengumuman berdasarkan catatan lama/);
+  assert.equal(empty.stats.publication_absence_claim, undefined, 'bounded absence wording needs no correction');
+  assert.doesNotMatch(empty.result.answer, /Koreksi batas bukti/);
+  const overclaim = await run('overclaim');
+  assert.equal(overclaim.stats.publication_absence_claim, true);
+  assert.match(overclaim.result.answer, /Koreksi batas bukti:[\s\S]+tidak menetapkan apakah informasi sudah dipublikasikan atau peristiwa sudah dilaksanakan/);
+  assert.equal(overclaim.steps, 2, 'the deterministic correction makes no extra model call');
+  const noEmptyList = await run('overclaim-nonempty');
+  assert.equal(noEmptyList.stats.publication_absence_claim, undefined, 'this correction is specific to an empty primary list');
+  for (const mode of ['already-searched', 'nonempty', 'at-limit']) {
+    const r = await run(mode);
+    assert.equal(r.stats.agent_fallback, undefined, mode);
+    assert.equal(r.webCalls, mode === 'already-searched' ? 1 : 0, mode);
+    assert.ok(r.stats.agent_tool_calls <= AGENT.calls, mode);
+  }
 });
 
 test('the agent stops at the round and call limits', async () => {

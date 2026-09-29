@@ -39,8 +39,8 @@ test('full archive queries use SQLite, retain known evidence and finish cross-ma
  assert.equal((await archive.search(['SOCI'])).length,8);
  assert.deepEqual(await archive.search(['" OR *; DROP TABLE source_passages; --']),[]);
  const terms=['ASX','Australia','SGX','Singapore','Singapura'];
- // Source IDs shift as documents are added; locate the SGX report by file name.
- const SGX=manifest.docs.find(d=>d.name.startsWith('sgx_')).source_id;
+ // Source IDs and reports change; use an active SGX research document, not the removed chronology.
+ const SGX=manifest.docs.find(d=>d.cat==='keterbukaan-singapura' && /temuan_utama\.md$/.test(d.name)).source_id;
  const docs=await archive.search(terms);assert.ok(docs.some(d=>d.source_id==='D3'));assert.ok(docs.some(d=>d.source_id===SGX));
  let messages,notes=0;const calls=[];const stats={};const cache=new CacheStore(store.sql);
  const model={complete:async(m,options)=>{calls.push(m);if(options?.jsonMode){const rows=JSON.parse(m[1].content);return JSON.stringify({ids:rows.filter(r=>['D3',SGX].includes(r.source)).map(r=>r.id)});}notes++;return 'Catatan sumber [D1].';},answer:async(m,emit)=>{messages=m;await emit({type:'delta',text:`Hubungan yang perlu diverifikasi [${SGX}].`});return `Hubungan yang perlu diverifikasi [${SGX}].`;}};

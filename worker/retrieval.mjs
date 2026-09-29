@@ -1,12 +1,16 @@
 const months = {januari:1,january:1,jan:1,februari:2,february:2,feb:2,maret:3,march:3,mar:3,april:4,apr:4,mei:5,may:5,juni:6,june:6,jun:6,juli:7,july:7,jul:7,agustus:8,august:8,agu:8,aug:8,september:9,sep:9,sept:9,oktober:10,october:10,okt:10,oct:10,november:11,nov:11,desember:12,december:12,des:12,dec:12};
 const monthNames = Object.keys(months).join('|');
+// A short correction such as "september 22" carries the same date as "22 september".
+const dateOrder = text => text.replace(new RegExp('\\b(' + monthNames + ')\\s+(\\d{1,2})(?!\\d)\\b,?','gi'), '$2 $1');
 function validDate(y,m,d) {
   const date = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   const parsed = new Date(date + 'T00:00:00Z');
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0,10) === date ? date : null;
 }
 export function dateQuery(question, history = [], years = []) {
+  question = dateOrder(question);
   const full = text => {
+    text = dateOrder(text);
     let m = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
     if (m) return validDate(+m[1],+m[2],+m[3]);
     m = text.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](20\d{2})\b/);
@@ -88,16 +92,17 @@ export function filterRecords(rows, scope) {
 // "Ringkas keterbukaan informasi 22 September" names a document, not a topic inside documents.
 // Category words plus a date (or "terbaru") select whole documents by their catalog date.
 const CATEGORY_WORDS = [
-  [/\b(asx|australia)\b/i,'keterbukaan-australia'], [/\b(sgx|singapura|singapore)\b/i,'keterbukaan-singapura'],
+  [/\b(asx|australia)\b/i,'keterbukaan-australia'], [/\b(sgx|singapur[ae]?|singapore)\b/i,'keterbukaan-singapura'],
   [/\b(keterbukaan|ki)\b/i,'keterbukaan-informasi'], [/\bstockbit\b/i,'stockbit'], [/\bdigest\b/i,'digest-emiten']];
 function categories(text) {
-  const cats = [];
-  for (const [re,cat] of CATEGORY_WORDS) if (re.test(text) && !(cat==='keterbukaan-informasi' && cats.length)) cats.push(cat);
-  return cats;
+  // A qualified foreign disclosure label is one source, but "SGX dan KI" names two.
+  const domestic = text.replace(/\b(?:keterbukaan(?:\s+informasi)?|ki)\s+(?:sgx|singapur[ae]?|singapore|asx|australia)\b/gi, '');
+  return CATEGORY_WORDS.filter(([re,cat]) => re.test(cat === 'keterbukaan-informasi' ? domestic : text)).map(([,cat]) => cat);
 }
 const span = d => d.covers || [d.start,d.end];
 // Every date the user wrote: "25 september", "22 dan 25 sept", "23-24 sept" (range), "26/9", "2026-09-26".
 export function requestedDates(question, year) {
+  question = dateOrder(question);
   const out = [], add = (y,m,d) => { const v = validDate(+y,+m,+d); if (v) out.push({from:v, to:v}); };
   for (const m of question.matchAll(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/g)) add(m[1],m[2],m[3]);
   for (const m of question.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(20\d{2}))?\b/g)) if (m[3] || year) add(m[3] || year,m[2],m[1]);
@@ -113,6 +118,46 @@ export function requestedDates(question, year) {
   }
   return out;
 }
+
+// Source scope survives topic search as well as whole-document requests. Dates here describe
+// catalog coverage; callers handling event dates can apply categories alone.
+export function requestScope(question, index, year) {
+  const years = [...new Set((index.docs || []).map(d => d.end?.slice(0,4)).filter(Boolean))];
+  year ||= years.length === 1 ? years[0] : undefined;
+  const cats = categories(question), dates = requestedDates(question, year);
+  const clauses = question.split(/\s+\b(?:dan|dengan|sama|serta|versus|vs)\b\s+|\s*[;]\s*/i);
+  const dated = clauses.map(text => ({categories:categories(text), dates:requestedDates(text, year)}))
+    .filter(c => c.categories.length && c.dates.length);
+  // "Stockbit 25 Sep dan KI 26 Sep" binds each date; "25–26 Sep Stockbit dan KI"
+  // shares the single range. Splitting a date list (22 dan 25 Sep) must not lose day 22.
+  const pairs = dated.length > 1 ? dated.flatMap(c => c.categories.map(category => ({category, dates:c.dates}))) : [];
+  const latest = /\b(terbaru|terakhir|latest|paling baru)\b/i.test(question);
+  const all = /\b(semua|seluruh|selengkapnya|all)\b/i.test(question);
+  return {categories:cats, dates, pairs, latest, all, explicit:!!(cats.length || dates.length || latest || all)};
+}
+
+export function scopeDocuments(docs, request, {dates = false, latest = false} = {}) {
+  const cats = request.categories || [];
+  let selected = docs.filter(d => !cats.length || cats.includes(d.cat));
+  if (dates && request.dates?.length) selected = selected.filter(d => {
+    const paired = (request.pairs || []).filter(p => p.category === d.cat).flatMap(p => p.dates);
+    const ranges = paired.length ? paired : request.dates, [start,end] = span(d);
+    return start && ranges.some(r => start <= r.to && r.from <= end);
+  });
+  if (latest) {
+    const newest = {};
+    for (const d of selected) if (!newest[d.cat] || d.end > newest[d.cat]) newest[d.cat] = d.end;
+    const last = Object.values(newest).sort().at(-1);
+    selected = selected.filter(d => d.end === newest[d.cat] && (cats.length || d.end === last));
+  }
+  return selected;
+}
+
+export function dedupeDocuments(docs) {
+  const key = d => [d.cat,d.end,d.name.replace(/\.[^.]+$/, '')].join(':');
+  const markdown = new Set(docs.filter(d => /\.md$/i.test(d.name)).map(key));
+  return docs.filter(d => !/\.csv$/i.test(d.name) || !markdown.has(key(d)));
+}
 // A pasted document title ("Stockbit — 20–22 September 2026 jelaskan") names that document.
 const fold = t => t.toLowerCase().replace(/[–—-]/g,'-').replace(/\s+/g,' ').trim();
 function titledDocuments(question, index) {
@@ -121,50 +166,39 @@ function titledDocuments(question, index) {
 }
 const SUMMARY_WORDS = /\b(dokumen|laporan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|isi|simpulkan|kesimpulan|baca|keterbukaan|stockbit|digest)\b/i;
 export function documentRequest(question, scope, index) {
-  const titled = titledDocuments(question, index);
+  const titled = dedupeDocuments(titledDocuments(question, index));
   if (titled.length && titled.length <= 6) return titled;
-  const cats = categories(question);
-  const latest = /\b(terbaru|terakhir|latest|paling baru)\b/i.test(question);
+  const request = requestScope(question, index, scope.date?.slice(0,4));
+  const cats = request.categories;
   // Naming a source ("ki 18 september", "KI 26/9") asks for its document, like a summary verb does.
   if (!cats.length && !SUMMARY_WORDS.test(question)) return null;
-  const dates = requestedDates(question, scope.date?.slice(0,4) || (index.docs[0]?.end || '').slice(0,4));
-  let docs = index.docs.filter(d => !cats.length || cats.includes(d.cat));
-  if (dates.length) {
-    // covers = periode yang dibahas (mis. laporan 24 Sep tentang 23–24 Sep); dokumen lama tanpa covers memakai tanggal katalog.
-    docs = docs.filter(d => { const [s,e] = span(d); return s && dates.some(r => s <= r.to && r.from <= e); });
+  if (TOPIC_WORDS.test(question)) return null;
+  let docs;
+  if (request.dates.length) {
+    docs = scopeDocuments(index.docs, request, {dates:true});
     // Without a category, a date alone is a document request only with a summary verb.
-    if (!cats.length && !/\b(ringkas|ringkasan|rangkum|rangkuman|summary|summarize|simpulkan|kesimpulan|baca|isi)\b/i.test(question)) return null;
-  } else if (latest) {
-    // "keterbukaan terbaru sama stockbit terbaru": the newest document of each named source.
-    const newest = {};
-    for (const d of docs) if (!newest[d.cat] || d.end > newest[d.cat]) newest[d.cat] = d.end;
-    docs = docs.filter(d => d.end === newest[d.cat] && (cats.length || d.end === Object.values(newest).sort().at(-1)));
-  } else if (cats.length && READ_VERBS.test(question) && !TOPIC_WORDS.test(question)) {
-    // "baca dokumen keterbukaan singapura, intinya apa": a named source with no date means that source's
-    // documents when there are few of them, otherwise its newest one.
-    if (docs.length > 6) {
-      const newest = {};
-      for (const d of docs) if (!newest[d.cat] || d.end > newest[d.cat]) newest[d.cat] = d.end;
-      docs = docs.filter(d => d.end === newest[d.cat]);
-    }
+    if (!cats.length && !READ_VERBS.test(question)) return null;
+  } else if (request.latest || (cats.length && (READ_VERBS.test(question) || (request.all && SUMMARY_WORDS.test(question))))) {
+    // No date means the newest snapshot; historical documents require an explicit "semua".
+    docs = scopeDocuments(index.docs, request, {latest:request.latest || !request.all});
   } else return null;
-  // A CSV next to a Markdown file of the same name holds the same rows; read it once.
-  const stems = new Set(docs.filter(d => !/\.csv$/i.test(d.name)).map(d => d.name.replace(/\.[^.]+$/, '')));
-  docs = docs.filter(d => !/\.csv$/i.test(d.name) || !stems.has(d.name.replace(/\.[^.]+$/, '')));
+  docs = dedupeDocuments(docs);
   return docs.length && docs.length <= 6 ? docs : null;
 }
 const READ_VERBS = /\b(baca|bacakan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|simpulkan|kesimpulan|inti|intinya|isi|isinya|garis besar|highlight|menarik)\b/i;
-// "keterbukaan singapura soal delisting" asks about a topic inside the source, not the whole source.
-const TOPIC_WORDS = /\b(soal|tentang|mengenai|terkait|perihal|yang menyebut)\b/i;
+// Common action names are topics even without "soal": "ringkas SGX delisting".
+const TOPIC_WORDS = /\b(soal|tentang|mengenai|terkait|perihal|yang menyebut|delisting|go private|rights? issue|hmetd|private placement|tender offer|akuisisi|acquisition|buyback|dividen|dividend|merger|stock split|kepemilikan|pengendali)\b/i;
 
 // A small explicit vocabulary handles the current cross-market screening use case.
 // These are search candidates, never inferred ownership relationships.
 export function crossMarketQuery(question) {
-  if(!/\b(indonesia|bei|idx)\b/i.test(question) || !/\b(hubungan|berhubungan|terkait|kaitan|akuisisi|acquisition|kepemilikan|pengendali|investasi)\b/i.test(question))return null;
+  const indonesia = /\b(indonesia|bei|idx)\b/i.test(question) ||
+    (/\bindo\b/i.test(question) && !/\b(?:saham|ticker|kode)\s+indo\b/i.test(question));
+  if(!indonesia || !/\b(hubungan|berhubungan|terkait|kaitan|akuisisi|acquisition|kepemilikan|pengendali|investasi|backdoor)\b/i.test(question))return null;
   const terms=[];
   if(/\b(asx|australia)\b/i.test(question))terms.push('ASX','Australia','Australian');
   if(/\b(sgx|singapur[ae]?|singapore)\b/i.test(question))terms.push('SGX','Singapura','Singapore','Singapur');
-  return terms.length?{terms,version:'cross-market-v2'}:null;
+  return terms.length?{terms,version:'cross-market-v3'}:null;
 }
 
 export function thematicPassages(data, terms) {
