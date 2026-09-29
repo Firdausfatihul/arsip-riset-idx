@@ -1,7 +1,7 @@
 # Arsip Riset IDX
 
-Viewer Markdown statis untuk arsip riset pasar modal (Stockbit, Keterbukaan Informasi emiten BEI, Australia, dan Singapura, serta data IDX Signal Desk).
-File sumber di `needtobeindexed/` tidak diubah. Markdown disalin mentah; HTML lama dibungkus dalam iframe terisolasi saat build.
+Viewer Markdown, HTML, dan CSV statis untuk arsip riset pasar modal (Stockbit, Keterbukaan Informasi emiten BEI, Australia, dan Singapura, serta data IDX Signal Desk).
+File sumber di `needtobeindexed/` tidak diubah. Markdown dan CSV disalin mentah; HTML lama dibungkus dalam iframe terisolasi saat build.
 `build.py` hanya membuat halaman daftar dan pencarian, karena static host tidak bisa membaca isi folder.
 
 > Untuk agent (Codex, Claude, dll.): semua yang dibutuhkan untuk membangun ulang dan meng-host ulang ada di file ini.
@@ -26,7 +26,7 @@ Sumber build: `needtobeindexed/`, `build.py`, `chat.js`, dan `chat.config.json` 
 
 ```
 archivescrapingweb/
-├── needtobeindexed/      # SUMBER: taruh file .md di sini (file .html lama juga masih didukung)
+├── needtobeindexed/      # SUMBER: taruh file .md, .html, atau .csv di sini
 │   └── idx-signal-desk/  # DISALIN OTOMATIS oleh tools/sync_idx.py (jangan isi manual; isinya ditimpa)
 │       ├── kepemilikan.json  # data tab Kepemilikan Saham
 │       └── kepemilikan-perubahan.json  # laporan perubahan kepemilikan per emiten
@@ -48,8 +48,8 @@ archivescrapingweb/
 ├── README.md             # file ini
 ├── AGENTS.md / CLAUDE.md # penunjuk ke README ini untuk agent
 └── site/                 # HASIL BUILD, jangan diedit manual, dihapus & dibuat ulang tiap build
-    ├── index.html        # aplikasi viewer + daftar dokumen + isi .md ≤256 KB tertanam (JSON)
-    ├── files/<kategori>/<YYYY-MM-DD>/<nama-asli>.md   # salinan mentah
+    ├── index.html        # aplikasi viewer + daftar dokumen + isi .md/.csv ≤256 KB tertanam (JSON)
+    ├── files/<kategori>/<YYYY-MM-DD>/<nama-asli>.md   # salinan mentah (.csv juga)
     ├── files/kepemilikan/kepemilikan.json            # salinan data kepemilikan, diambil viewer saat tab dibuka
     ├── files/kepemilikan/kepemilikan-perubahan.json  # laporan perubahan, diambil saat satu emiten dibuka
     ├── robots.txt
@@ -102,9 +102,11 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
 
 ## Cara kerja viewer (`site/index.html`)
 
-- Satu halaman. Metadata semua dokumen, isi `.md` sampai 256 KB (`EMBED_LIMIT`), dan teks `.html` tertanam di
+- **CSV:** taruh file UTF-8 (BOM boleh) di `needtobeindexed/`, lalu build ulang seperti biasa. Contoh `stockbit_20260929.csv` masuk Stockbit tanggal 29 September 2026; nama tanpa kategori yang dikenali masuk **Lainnya**.
+  CSV dibuka sebagai tabel yang dapat digeser mendatar, dengan baris pertama sebagai judul kolom dan nama file sebagai judul dokumen. Pemisah koma, titik koma, atau tab dideteksi saat build (koma jika tidak terdeteksi). Tanda kutip, koma dan baris baru di dalam sel didukung. Nilai tetap teks: nol awal, angka panjang, HTML, dan rumus tidak diubah atau dijalankan. Pencarian yang sama menandai teks di tabel; **Unduh CSV asli** mengambil salinan file tanpa perubahan.
+- Satu halaman. Metadata semua dokumen, isi `.md`/`.csv` sampai 256 KB (`EMBED_LIMIT`), dan teks `.html` tertanam di
   `<script type="application/json" id="arsip-data">`.
-- `.md` di atas 256 KB (digest besar; digest kecil tetap tertanam) **tidak ditanam**: viewer mengambil `files/…`
+- `.md`/`.csv` di atas 256 KB (digest besar; digest kecil tetap tertanam) **tidak ditanam**: viewer mengambil `files/…`
   dengan `fetch()` saat dokumen dibuka, dan mengambil semuanya (3 sekaligus) saat kotak cari pertama kali diisi ≥2 huruf.
   Selama itu catatan cari menulis "memuat isi N dokumen besar…". Yang gagal dimuat bisa dicoba lagi lewat tombol **Coba lagi**, saat dibuka ulang, atau saat mencari ≥30 detik kemudian.
   Ini jalan di server HTTP dan Claude Artifact. Dari `file://` (dobel klik) dokumen besar tidak bisa dibuka atau dicari; dokumen kecil tetap jalan.
@@ -154,7 +156,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   - Pencarian di tab Dokumen: kalau yang dicari persis kode emiten, catatan di bawah kotak cari memberi tautan ke kepemilikannya.
 - Pencarian mencocokkan judul, ringkasan, tanggal, nama file, kode saham, **dan isi teks** (tidak peka huruf besar-kecil).
   Jumlah kemunculan tampil di kartu hasil pencarian, dan kata yang dicari ditandai `<mark>` di dokumen yang sedang dibuka.
-  - File `.md`: yang dicari isi mentahnya (`content`).
+  - File `.md`/`.csv`: yang dicari isi mentahnya (`content`).
   - File `.html`: yang dicari teks yang tampil (tanpa `<script>`/`<style>`) plus nilai string data JSON di `<script>`
     (mis. `const records=[{"summary": "..."}]`), disimpan sebagai `text` (lihat `html_text()` di `build.py`).
     Penandaan dikirim melalui pesan terbatas ke iframe terisolasi, maksimal 500 kemunculan; pencarian maksimal 128 karakter. Jumlah indeks tetap tersedia jika frame belum merespons.

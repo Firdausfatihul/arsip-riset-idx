@@ -6,7 +6,7 @@ const ownership=JSON.parse(fs.readFileSync(path.join(root,'site/files/kepemilika
 const changesFile=path.join(root,'site/files/kepemilikan/kepemilikan-perubahan.json');
 const changes=fs.existsSync(changesFile)?JSON.parse(fs.readFileSync(changesFile,'utf8')):{format:1,coverage:null,companies:{}};
 const delay=ms=>new Promise(r=>setTimeout(r,ms));let checks=0;
-function setup(mutate,mutateChanges){
+function setup(mutate,mutateChanges,fetchDoc){
  const errors=[],console=new VirtualConsole();console.on('jsdomError',e=>errors.push(e.message));
  const dom=new JSDOM(html,{url:'https://archive.test/',runScripts:'outside-only',virtualConsole:console});
  const w=dom.window,d=w.document;let data=JSON.parse(d.getElementById('arsip-data').textContent),own=structuredClone(ownership),ch=structuredClone(changes);
@@ -17,7 +17,7 @@ function setup(mutate,mutateChanges){
   if(String(url).startsWith(data.own.path))return Response.json(own);
   if(data.own.changes&&String(url).startsWith(data.own.changes))return Response.json(ch);
   const file=data.docs.find(x=>String(url).split('?')[0]===x.path);
-  if(file)return new Response(fs.readFileSync(path.join(root,'site',file.path),'utf8'));
+  if(file)return fetchDoc ? fetchDoc(file) : new Response(fs.readFileSync(path.join(root,'site',file.path),'utf8'));
   throw Error('Network forbidden: '+url);
  };
  w.eval([...d.querySelectorAll('script')].at(-1).textContent);
@@ -36,6 +36,42 @@ async function test(name,fn){await fn();checks++;console.log('PASS',name);}
   route('#doc='+encodeURIComponent(data.docs.find(d=>d.kind==='md').path));
   const prose=d.querySelector('.prose');assert.ok(prose);assert.equal(prose.querySelector('script,style,form,img,svg,[style],[id="chat-form"]'),null);
   assert.equal(w.hacked,undefined);assert.ok(prose.querySelector('a[href="https://www.idx.co.id/"]'));assert.equal(prose.querySelector('a[href^="javascript:"],a[href^="data:"],a[href^="file:"],a[href^="//"]'),null);dom.window.close();
+ });
+ await test('CSV preserves quoted fields, newlines and literal values; search highlights cells',async()=>{
+  const raw='\uFEFFKode,Catatan,Nilai,Kosong\r\nSOCI,"koma, dan ""kutip""\r\nbaris kedua",00123,\r\nBBCA,<img src=x onerror=bad>,=1+1,9007199254740993\r\n';
+  const {dom,d,data,route,w,errors}=setup(data=>{
+   const doc=data.docs.find(x=>x.kind==='md');Object.assign(doc,{kind:'csv',content:raw,delimiter:',',stats:[]});delete doc.lazy;
+  });
+  const doc=data.docs.find(x=>x.kind==='csv');route('#doc='+encodeURIComponent(doc.path));
+  assert.deepEqual([...d.querySelectorAll('.csv th')].map(x=>x.textContent),['Kode','Catatan','Nilai','Kosong']);
+  assert.deepEqual([...d.querySelectorAll('.csv tbody tr')].map(r=>[...r.cells].map(c=>c.textContent)),[
+   ['SOCI','koma, dan "kutip"\nbaris kedua','00123',''],['BBCA','<img src=x onerror=bad>','=1+1','9007199254740993']]);
+  assert.equal(d.querySelector('.csv img,.csv script'),null);assert.ok(d.querySelector('#reader a[download]'));
+  const input=d.getElementById('cari');input.value='baris kedua';input.dispatchEvent(new w.Event('input'));await delay(170);
+  assert.equal(d.querySelector('.csv mark').textContent,'baris kedua');assert.deepEqual(errors,[]);dom.window.close();
+ });
+ await test('CSV semicolons, tabs, blank records and malformed quotes have usable output',async()=>{
+  for(const [raw,delimiter,expected] of [
+   ['Nama;Nilai\n"A;B";""\n',';',['A;B','']],['Nama\tNilai\nA\t02','\t',['A','02']],
+   ['Judul\n\n""\nA,ekstra\n',',',['','A','ekstra']],
+   ['',',',null],['Nama,Nilai\nA,"kutip belum ditutup',',',null]
+  ]){
+   const {dom,d,data,route}=setup(data=>{const doc=data.docs[0];Object.assign(doc,{kind:'csv',content:raw,delimiter,stats:[]});delete doc.lazy;});
+   route('#doc='+encodeURIComponent(data.docs[0].path));
+   if(expected)assert.deepEqual([...d.querySelectorAll('.csv td')].map(c=>c.textContent),expected);
+   else {assert.equal(d.querySelector('.csv table'),null);assert.match(d.querySelector('.csv').textContent,/kosong|kutip/);}
+   dom.window.close();
+  }
+ });
+ await test('CSV lazy loading retries failures, renders the table and remains searchable',async()=>{
+  let attempts=0;
+  const {dom,d,data,route,w,errors}=setup(data=>{
+   data.docs=data.docs.slice(0,1);Object.assign(data.docs[0],{kind:'csv',delimiter:',',lazy:true,stats:[]});delete data.docs[0].content;
+  },null,()=>{attempts++;if(attempts===1)throw Error('Offline');return new Response('Kode,Catatan\nSOCI,unikcsv');});
+  route('#doc='+encodeURIComponent(data.docs[0].path));await delay(10);assert.ok(d.querySelector('[data-retry-doc]'));
+  d.querySelector('[data-retry-doc]').click();await delay(10);assert.equal(attempts,2);assert.equal(d.querySelector('.csv td').textContent,'SOCI');
+  route('#');const input=d.getElementById('cari');input.value='unikcsv';input.dispatchEvent(new w.Event('input'));await delay(170);
+  assert.match(d.getElementById('cari-catatan').textContent,/1 dari 1 dokumen/);assert.deepEqual(errors,[]);dom.window.close();
  });
  await test('prototype routes and hostile query/hash do not crash or inject HTML',async()=>{
   const {dom,d,route,errors,w}=setup();for(const word of ['constructor','__proto__','toString','<img src=x onerror=bad>'])route('#doc='+encodeURIComponent(word));

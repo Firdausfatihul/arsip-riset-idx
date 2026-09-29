@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Bangun viewer Markdown statis dari folder needtobeindexed/.
+"""Bangun viewer Markdown, HTML, dan CSV statis dari folder needtobeindexed/.
 
-Tidak ada konversi: berkas .md disalin apa adanya ke site/files/ dan dirender
+Tidak ada konversi: berkas .md dan .csv disalin apa adanya ke site/files/ dan dirender
 langsung di browser. Script ini hanya membuat daftar isinya (static host tidak
 bisa membaca isi folder sendiri), dikelompokkan per sumber (Stockbit, Keterbukaan
 Informasi, Digest Emiten) dan tanggal yang dibaca dari nama berkas.
@@ -16,6 +16,7 @@ Tambah berkas ke needtobeindexed/, jalankan ulang, lalu upload folder site/.
 """
 import argparse
 import base64
+import csv
 import hashlib
 import html
 import json
@@ -103,7 +104,7 @@ LIBS = (
     ("https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js", "sha384-H+hy9ULve6xfxRkWIh/YOtvDdpXgV2fmAGQkIDTxIgZwNoaoBal14Di2YTMR6MzR"),
     ("https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.4.15/purify.min.js", "sha384-uUMu9JDY09vBzRf9SPcK2VgUj+W/70J6Soc+Dded5P474ElQ63iv9j5N3DE7Kp3N"),
 )
-# Markdown di atas batas ini tidak ditanam di index.html; viewer mengambilnya dari files/… saat dibuka atau dicari.
+# Markdown/CSV di atas batas ini diambil dari files/… saat dibuka atau dicari.
 EMBED_LIMIT = 256 * 1024
 EXPLICIT_RANGE = re.compile(r"\d{4}-\d{2}-\d{2}[_\-\s]+(?:to[_\-\s]+)?\d{4}-\d{2}-\d{2}")
 # Data tab Kepemilikan Saham: disalin apa adanya, viewer mengambilnya saat tab dibuka.
@@ -358,17 +359,20 @@ def load_doc(path, index):
     check_source(path, SRC)
     stem = path.stem
     text = path.read_text(encoding="utf-8", errors="replace")
+    kind = {".md": "md", ".csv": "csv"}.get(path.suffix.lower(), "html")
     modified = datetime.fromtimestamp(path.stat().st_mtime).date()
     start, end, precision = parse_dates(stem) or (modified, modified, "day")
     # Nama yang sudah menulis dua tanggal lengkap tidak ditafsir ulang dari isi dokumen.
-    exact = None if EXPLICIT_RANGE.search(stem) else refine_from_text(text, start, end, precision)
+    exact = None if kind == "csv" or EXPLICIT_RANGE.search(stem) else refine_from_text(text, start, end, precision)
     if exact:
         (start, end), precision = exact, "day"
     elif precision == "month":
         end = max(start, min(end, modified))
     category = categorize(stem)
-    kind = "md" if path.suffix.lower() == ".md" else "html"
-    title, desc, codes = md_info(text) if kind == "md" else html_info(text)
+    if kind == "csv":
+        title, desc, codes = "", "Tabel CSV · baris pertama sebagai judul kolom.", []
+    else:
+        title, desc, codes = md_info(text) if kind == "md" else html_info(text)
     doc = {
         "id": f"d{index}",
         # Kunci stabil untuk statistik pengunjung (tidak berubah walau urutan file berubah).
@@ -385,11 +389,21 @@ def load_doc(path, index):
         "desc": desc,
         "size": path.stat().st_size,
         "codes": codes,
-        "tickers": sorted(set(TICKER.findall(text if kind == "md" else strip_tags(text)))),
+        "tickers": sorted(set(TICKER.findall(strip_tags(text) if kind == "html" else text))),
     }
     if kind == "md":
         doc["words"] = len(re.findall(r"\S+", text))
         doc["content"] = text
+    elif kind == "csv":
+        doc["content"], doc["stats"] = text, []
+        try:
+            doc["delimiter"] = csv.Sniffer().sniff(text[:65536].lstrip("\ufeff"), delimiters=",;\t").delimiter
+        except csv.Error:
+            # Jumlah kolom yang tidak rata: coba judul kolom saja.
+            try:
+                doc["delimiter"] = csv.Sniffer().sniff(text.lstrip("\ufeff").split("\n", 1)[0], delimiters=",;\t").delimiter
+            except csv.Error:
+                doc["delimiter"] = ","
     else:
         cards = re.findall(r'<div class="card"><strong>([^<]+)</strong><span>([^<]+)</span>', text)
         doc["stats"] = [f"{squash(n)} {squash(lbl)}" for n, lbl in cards[:3]]
@@ -665,6 +679,8 @@ a.chip:hover{outline:1px solid var(--c)}
 .prose hr{border:0;border-top:1px solid var(--line-strong);margin:28px 0}
 .prose hr:has(+ h2){display:none}
 .prose pre.raw{white-space:pre-wrap}
+.doc-grid .prose.csv{max-width:100%;grid-column:1/-1}
+.prose.csv th,.prose.csv td{white-space:pre-wrap;min-width:8ch;max-width:45ch}
 .facts{display:grid;margin:0 0 18px;border-top:1px solid var(--line)}
 .facts>div{display:grid;grid-template-columns:168px minmax(0,1fr);gap:4px 20px;padding-block:10px;border-bottom:1px solid var(--line)}
 .facts dt{padding-top:4px;font:500 14px/1.45 var(--sans);color:var(--muted)}
@@ -841,7 +857,7 @@ APP_JS = r"""
     // Daftar arsip tetap; simpan elemen sekali agar pencarian tidak memindai DOM laporan panjang berulang kali.
     d.listNodes = document.querySelectorAll('[data-id="' + d.id + '"]');
   });
-  // Markdown besar tidak ditanam di halaman: ambil dari files/… saat dibuka atau saat pencarian pertama.
+  // Markdown/CSV besar diambil saat dibuka atau saat pencarian pertama.
   var lazyDocs = docs.filter(function(d){ return d.lazy; }), bulk = null;
   function loadDoc(d){
     if (d.content != null) return Promise.resolve(d);
@@ -904,6 +920,35 @@ APP_JS = r"""
       var holder = document.createElement('div'); holder.appendChild(clean); return holder.innerHTML;
     }
     return null;
+  }
+
+  function csvHtml(text, delimiter){
+    text = text.replace(/^\uFEFF/, '');
+    var rows = [], row = [], cell = '', quoted = false, started = false;
+    function endRow(){
+      if (started || row.length || cell) { row.push(cell); rows.push(row); }
+      row = []; cell = ''; started = false;
+    }
+    for (var i = 0; i < text.length; i++){
+      var c = text[i];
+      if (quoted){
+        if (c === '"'){
+          if (text[i + 1] === '"'){ cell += '"'; i++; } else quoted = false;
+        } else cell += c;
+      } else if (c === '"' && cell === '') { quoted = true; started = true; }
+      else if (c === delimiter) { row.push(cell); cell = ''; started = true; }
+      else if (c === '\n' || c === '\r'){
+        endRow(); if (c === '\r' && text[i + 1] === '\n') i++;
+      } else { cell += c; started = true; }
+    }
+    if (quoted) return '<p>Tabel belum bisa dibaca: ada tanda kutip yang belum ditutup. Buka file CSV asli untuk memeriksa isinya.</p>';
+    endRow();
+    if (!rows.length) return '<p>File CSV kosong.</p>';
+    return '<table tabindex="0" aria-label="Isi CSV"><thead><tr>' +
+      rows[0].map(function(v){ return '<th scope="col">' + esc(v) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + rows.slice(1).map(function(r){
+        return '<tr>' + r.map(function(v){ return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>';
+      }).join('') + '</tbody></table>';
   }
 
   function schedule(text){
@@ -1074,13 +1119,14 @@ APP_JS = r"""
       (doc.stats || []).forEach(function(s){ meta.push('<span>' + esc(s) + '</span>'); });
     }
     meta.push('<span class="stat always-live" data-stat-key="' + esc(doc.key) + '" data-live-label="sedang membaca" hidden></span>');
-    meta.push('<a href="' + esc(doc.path) + '">' + (doc.kind === 'md' ? 'Buka .md mentah' : 'Buka halaman penuh') + '</a>');
+    meta.push('<a href="' + esc(doc.path) + '"' + (doc.kind === 'csv' ? ' download' : '') + '>' +
+      (doc.kind === 'csv' ? 'Unduh CSV asli' : doc.kind === 'md' ? 'Buka .md mentah' : 'Buka halaman penuh') + '</a>');
     reader.setAttribute('data-cat', doc.cat);
     var head =
       '<nav class="crumbs" aria-label="Lokasi"><a href="#">← Kembali ke daftar</a><span>/</span><span>' + esc(doc.catName) + '</span><span>/</span><span>' + esc(doc.label) + '</span></nav>' +
       '<header class="doc-head"><p class="kicker"><span class="swatch"></span>' + esc(doc.catName) + '<span>·</span><time datetime="' + doc.end + '">' + esc(doc.label) + '</time></p>' +
       '<h1>' + esc(doc.title) + '</h1><p class="meta">' + meta.join('') + '</p><p class="hit-note" hidden></p></header>';
-    if (doc.kind !== 'md'){
+    if (doc.kind === 'html'){
       // Laporan HTML ditampilkan utuh di dalam viewer, apa adanya.
       reader.innerHTML = head + '<iframe class="doc-frame" referrerpolicy="no-referrer" src="' + esc(doc.path) + '" title="' + esc(doc.title) + '"></iframe>';
       var frame = reader.querySelector('.doc-frame');
@@ -1107,12 +1153,15 @@ APP_JS = r"""
       return;
     }
     reader.innerHTML = head + '<div class="doc-grid"><div class="prose"></div></div>';
-    // HTML hasil Markdown disimpan supaya mengetik di kotak cari tidak mengurai ulang dokumen besar.
-    if (doc.html === undefined) doc.html = toHtml(doc.content);
+    // Simpan hasil render agar pencarian tidak mengurai ulang dokumen besar.
+    if (doc.html === undefined) doc.html = doc.kind === 'csv' ? csvHtml(doc.content, doc.delimiter) : toHtml(doc.content);
     var prose = reader.querySelector('.prose'), html = doc.html;
     if (html === null){
       prose.innerHTML = '<pre class="raw"></pre>';
       prose.firstChild.textContent = doc.content;
+    } else if (doc.kind === 'csv'){
+      prose.classList.add('csv');
+      prose.innerHTML = html;
     } else {
       prose.innerHTML = html;
       var info = enhance(prose, doc);
@@ -1128,7 +1177,7 @@ APP_JS = r"""
   function show(doc, section){
     var q = input.value.trim().slice(0,128), fresh = current !== doc;
     // .doc-loading masih tampil = dokumen besar belum/tidak jadi dirender (mis. ditinggal saat memuat): render ulang.
-    if (fresh || (doc.kind === 'md' && (renderedQuery !== q || reader.querySelector('.doc-loading')))) renderDoc(doc, q);
+    if (fresh || (doc.kind !== 'html' && (renderedQuery !== q || reader.querySelector('.doc-loading')))) renderDoc(doc, q);
     overview.hidden = true; reader.hidden = false;
     selectedCategory = doc.cat;
     markSource();
@@ -2017,7 +2066,7 @@ APP_JS = r"""
     empty.hidden = shown > 0;
     if (current && !reader.hidden && renderedQuery !== raw){
       var frame = reader.querySelector('.doc-frame');
-      if (current.kind === 'md') renderDoc(current, raw); else if (frame) markFrame(frame, current, raw);
+      if (current.kind !== 'html') renderDoc(current, raw); else if (frame) markFrame(frame, current, raw);
     }
   }
 
@@ -2044,7 +2093,7 @@ APP_JS = r"""
 # ---------------------------------------------------------------- page
 
 def doc_href(doc):
-    # Semua dokumen (MD dan HTML) dibuka di dalam viewer supaya pengunjungnya terhitung.
+    # Semua dokumen dibuka di dalam viewer supaya pengunjungnya terhitung.
     return doc_link(doc["path"])
 
 
@@ -2055,7 +2104,8 @@ def stat_span(key, cls="stat", live_label="aktif", always_live=False):
 
 
 def overview_item(doc):
-    meta = [f'<span class="fmt">{"Markdown" if doc["kind"] == "md" else "HTML"}</span>',
+    label = {"md": "Markdown", "html": "HTML", "csv": "CSV"}[doc["kind"]]
+    meta = [f'<span class="fmt">{label}</span>',
             f'<span>{angka(round(doc["size"] / 1024))} KB</span>']
     if doc["kind"] == "md":
         if doc["codes"]:
@@ -2110,7 +2160,7 @@ def build_page(docs, by_cat, own=None):
     entries = []
     for d in docs:
         entry = {k: v for k, v in d.items() if not k.startswith("_") and k != "raw"}
-        if d["kind"] == "md" and d["size"] > EMBED_LIMIT:
+        if d["kind"] != "html" and d["size"] > EMBED_LIMIT:
             del entry["content"]
             entry["lazy"] = True
         entries.append(entry)
@@ -2221,7 +2271,7 @@ def main():
 
     # Termasuk subfolder (mis. idx-signal-desk/ hasil tools/sync_idx.py); berkas dan folder berawalan titik dilewati.
     files = sorted((p for p in SRC.rglob("*")
-                    if p.is_file() and p.suffix.lower() in (".md", ".html", ".htm")
+                    if p.is_file() and p.suffix.lower() in (".md", ".html", ".htm", ".csv")
                     and not any(part.startswith(".") for part in p.relative_to(SRC).parts)),
                    key=lambda p: p.relative_to(SRC).as_posix())
     docs = [load_doc(p, i) for i, p in enumerate(files)]
@@ -2253,7 +2303,7 @@ def main():
     for doc, src in zip(docs, files):
         target = out / doc["path"]
         target.parent.mkdir(parents=True, exist_ok=True)
-        if doc["kind"] == "md":
+        if doc["kind"] != "html":
             shutil.copy2(src, target)
         else:
             target.write_text(with_nav_bar(doc), encoding="utf-8")

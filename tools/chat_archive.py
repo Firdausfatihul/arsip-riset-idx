@@ -67,7 +67,7 @@ def read_archive(directory):
         if doc["kind"] == "html":
             doc["body"] = report_source(doc["body"])
         # Search HTML using its visible/data text index; send its entire file to the model.
-        doc["search_body"] = doc["body"] if doc["kind"] == "md" else doc.get("text", "")
+        doc["search_body"] = doc.get("text", "") if doc["kind"] == "html" else doc["body"]
         doc["source_id"] = doc["id"].upper()
         docs.append(doc)
     tickers = set((data.get("own") or {}).get("tickers", []))
