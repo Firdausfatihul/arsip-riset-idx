@@ -66,6 +66,7 @@ archivescrapingweb/
 | `digest_YYYY-MM-DD_YYYY-MM-DD[_HHMM-HHMM].md` | Digest Emiten (dibuat `tools/sync_idx.py`) |
 | `asx_YYYYMMDD.md` | Keterbukaan Informasi Australia (tanggal potret riset) |
 | `sgx_YYYYMMDD.md` / `sgx_january-20september2026.md` | Keterbukaan Informasi Singapura (SGX); file kedua memakai 20 September 2026 sebagai tanggal penyusunan |
+| `keterbukaan_sg_DDMMYYYY_*.md` / `.csv` | Keterbukaan Informasi Singapura (SGX), tanggal dari nama file |
 | `idx-signal-desk/kepemilikan.json` | bukan dokumen: data tab **Kepemilikan Saham** (dibuat `tools/sync_idx.py`) |
 | lainnya | dicocokkan dengan kata kunci (lihat di bawah), kalau tidak cocok masuk **Lainnya** |
 

@@ -277,6 +277,8 @@ def day_parts(start, end, precision="day"):
 
 def categorize(stem):
     low = stem.lower()
+    if low.startswith("keterbukaan_sg_"):
+        return "keterbukaan-singapura"
     first = re.split(r"[_\-\s.]+", low)[0]
     for key, cat in CATEGORIES.items():
         if first in cat["prefixes"]:
