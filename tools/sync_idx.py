@@ -7,16 +7,20 @@
 
 Yang disalin, ke needtobeindexed/idx-signal-desk/ (folder ini milik skrip, isinya boleh ditimpa):
   digest_<awal>_<akhir>[_HHMM-HHMM].md   satu per jendela "Saved Intelligence" (render /api/share/render)
-  kepemilikan.json                       semua bulan KSEI: pemegang >1%, free float resmi, dan jumlah pemegang per emiten
-                                         (dibaca tab Kepemilikan Saham di viewer)
+  kepemilikan.json                       semua bulan (laporan emiten sejak Mei 2023, KSEI >1% sejak Feb 2026): pemegang >1%,
+                                         pemegang >=5%, free float resmi, dan jumlah pemegang per emiten (tab Kepemilikan Saham)
+  kepemilikan-laporan.json               daftar pemegang saham, jenis pemilik BAE, dan tautan laporan bulanan emiten,
+                                         diambil viewer saat satu emiten dibuka
   kepemilikan-perubahan.json             laporan perubahan kepemilikan pemegang saham per emiten (Jul 2023–),
                                          diambil viewer saat satu emiten dibuka
 Hanya membaca: GET, render tanpa menulis berkas, dan ledger kepemilikan dibuka read-only. Tidak memicu scraping IDX.
 """
 import argparse
+import collections
 import difflib
 import http.client
 import json
+import math
 import os
 import re
 import sqlite3
@@ -42,8 +46,12 @@ STATE = DEST / ".sync.json"
 OWNED = re.compile(r"^(digest|kepemilikan)_[\w\-]+\.md$")
 OWNERSHIP_JSON = DEST / "kepemilikan.json"
 FILINGS_JSON = DEST / "kepemilikan-perubahan.json"
-# Naikkan kalau bentuk kepemilikan.json berubah, supaya sinkron berikutnya membuatnya ulang.
-OWNERSHIP_FORMAT = 3
+REPORTS_JSON = DEST / "kepemilikan-laporan.json"
+# Naikkan kalau bentuk kepemilikan.json / kepemilikan-laporan.json berubah, supaya sinkron berikutnya membuatnya ulang.
+OWNERSHIP_FORMAT = 4
+REPORTS_FORMAT = 1
+# Tautan laporan emiten di IDX hampir selalu diawali ini; kepemilikan-laporan.json menyimpan sisanya saja.
+IDX_REPORT_BASE = "https://www.idx.co.id/StaticData/NewsAndAnnouncement/ANNOUNCEMENTSTOCK/"
 
 # Arsip ini bisa dibagikan lewat link. Nomor HP pribadi (mis. corporate secretary) dan kode akses rapat
 # yang ikut terkutip dari pengumuman disamarkan; nama, alamat usaha, dan angka kepemilikan tidak diubah.
@@ -223,35 +231,133 @@ def https_or_none(url):
 
 
 def chosen_version(periods, month):
-    """Versi laporan yang dipilih server untuk bulan itu, dan semua versinya."""
+    """Versi laporan yang dipilih server untuk bulan itu, semua versinya, dan apakah versinya bertentangan."""
     for period in periods or []:
         if str(period.get("period", "")).startswith(month):
             versions = period.get("versions") or []
-            return next((v for v in versions if v.get("id") == period.get("preferred_id")), versions[0] if versions else None), versions
-    return None, []
+            chosen = next((v for v in versions if v.get("id") == period.get("preferred_id")), versions[0] if versions else None)
+            return chosen, versions, bool(period.get("conflict"))
+    return None, [], False
 
 
-def report_metrics(chosen, versions):
+# Aturan kepercayaan angka laporan emiten, sama dengan tab Ownership di Signal Desk (web/index.html: ownSnapshotComparable,
+# ownMetricOk, ownBlockholders). Angka yang tidak lolos tetap disalin, hanya ditandai belum terverifikasi.
+SOURCE_BLOCKED = re.compile(r"^(issuer_mismatch|previous_parse_retained|issuer_code_mismatch|source_refresh_degraded)(:|$)")
+SKIPPED_TABLE = re.compile(r"^(required_metric_missing|holder_needs_review|holder_percentage_mismatch|holder_headers_unverified|"
+                           r"conflicting_holder|composition_rows_incomplete_or_out_of_order):")
+HOLDER_REVIEW = re.compile(r"^(holder_needs_review|conflicting_holder)(:|$)")
+
+
+def number(v):
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) else None
+
+
+def metric(snapshot, key):
+    return number((((snapshot or {}).get("metrics") or {}).get(key) or {}).get("value"))
+
+
+def metric_ok(snapshot, key):
+    validation = (((snapshot or {}).get("metrics") or {}).get(key) or {}).get("validation")
+    return metric(snapshot, key) is not None and (not validation or validation == "ok")
+
+
+def comparable(snapshot):
+    """Laporan bisa dipakai untuk angka terverifikasi: sumbernya tidak diblokir dan masalahnya hanya tabel yang dilewati."""
+    if not snapshot:
+        return False
+    issues = [str(x) for x in snapshot.get("issues") or []]
+    if snapshot.get("import_status") in ("quarantined", "previous_parse_retained") or any(SOURCE_BLOCKED.match(x) for x in issues):
+        return False
+    if snapshot.get("validation") == "missing":
+        return False
+    return snapshot.get("validation") == "ok" or (bool(issues) and all(SKIPPED_TABLE.match(x) for x in issues))
+
+
+def holder_roles(holder):
+    roles = holder.get("roles")
+    return [str(r).strip() for r in roles] if isinstance(roles, list) else [r.strip() for r in str(holder.get("role") or "").split(",") if r.strip()]
+
+
+def js_round(value, scale):
+    """Math.round(value * scale) / scale, seperti di Signal Desk (Python round() membulatkan ke genap)."""
+    return math.floor(value * scale + 0.5) / scale
+
+
+def blockholders(snapshot, trusted):
+    """Pemegang >=5% gabungan dari laporan emiten: saham semua pemegang >=5% (termasuk direksi/komisaris >=5%) / total saham.
+
+    (nilai, 1 kalau terverifikasi). Tidak diketahui (None) kalau daftarnya kosong atau terbukti tidak lengkap:
+    daftar kosong bukan bukti nol. Terverifikasi hanya kalau nama + publik <5% + treasuri = total saham dan semua peran terbaca.
+    """
+    holders = (snapshot or {}).get("holders") or []
+    total = metric(snapshot, "total_shares") if metric_ok(snapshot, "total_shares") else None
+    if not holders or not total or total <= 0:
+        return None, 0
+    state = "unchecked"
+    parts = [metric(snapshot, k) if metric_ok(snapshot, k) else None for k in ("public_under5_scrip", "public_under5_scripless", "treasury_shares")]
+    named = [number(h.get("shares")) for h in holders]
+    if None not in parts and None not in named:
+        if abs(total - sum(parts) - sum(named)) > 1:
+            return None, 0
+        clean = all(holder_roles(h) and "unknown" not in holder_roles(h) for h in holders) and \
+            not any(HOLDER_REVIEW.match(str(x)) for x in snapshot.get("issues") or [])
+        state = "ok" if clean else state
+    block = []
+    for h in holders:
+        roles, name = holder_roles(h), re.sub(r"\s+", "", str(h.get("name") or "")).lower()
+        if re.match(r"(masyarakat|public|publik)", name):
+            continue  # baris "Masyarakat" adalah porsi publik, bukan pemegang
+        shares = number(h.get("shares"))
+        pct = 100 * shares / total if shares is not None else number(h.get("pct"))
+        if "shareholder_5plus" in roles or (("director" in roles or "commissioner" in roles) and pct is not None and pct >= 5):
+            block.append(shares)
+    if None in block:
+        return None, 0
+    value = math.floor(1e8 * sum(block) / total + 0.5) / 1e6
+    return value, int(trusted and state == "ok" and value <= 100.0001)
+
+
+def ksei_ok(cur):
+    """Akumulasi >1% terverifikasi: semua baris emiten itu di file KSEI lolos pemeriksaan."""
+    total = number(cur.get("total_pct"))
+    holders = cur.get("holders") or []
+    return bool(holders) and total is not None and cur.get("validation") == "ok" and \
+        all(h.get("validation") == "ok" for h in holders) and 0 <= total <= 100.05
+
+
+def ksei_block(cur):
+    """Pemegang >=5% menurut baris KSEI >1%, dipakai kalau laporan emiten bulan itu tidak terbaca."""
+    holders = cur.get("holders") or []
+    if not holders or cur.get("validation") == "missing" or number(cur.get("total_pct")) is None:
+        return None, 0
+    return js_round(sum(h["pct"] for h in holders if (number(h.get("pct")) or 0) >= 5), 1e6), int(ksei_ok(cur))
+
+
+def report_metrics(chosen, versions, trusted):
     """Free float resmi dan jumlah pemegang dari laporan bulanan emiten.
 
-    Free float: [nilai, 1 kalau tervalidasi, url sumber, [nilai versi laporan lain]]. Jumlah pemegang: [nilai, 1 kalau tervalidasi].
+    Free float: [nilai, 1 kalau terverifikasi, [nilai versi laporan lain]]. Jumlah pemegang: [nilai, 1 kalau terverifikasi].
     """
-    metrics = (chosen or {}).get("metrics") or {}
-    ff, count = metrics.get("free_float_pct") or {}, metrics.get("holder_count") or {}
     free_float = holders = None
-    if ff.get("value") is not None:
-        others = sorted({v["metrics"]["free_float_pct"]["value"] for v in versions if v is not chosen
-                         and ((v.get("metrics") or {}).get("free_float_pct") or {}).get("value") not in (None, ff["value"])})
-        free_float = [ff["value"], int(ff.get("validation") == "ok"), https_or_none(chosen.get("source_url")), others]
-    if count.get("value") is not None:
-        holders = [count["value"], int(count.get("validation") == "ok")]
+    ff, count = metric(chosen, "free_float_pct"), metric(chosen, "holder_count")
+    if ff is not None:
+        others = sorted({metric(v, "free_float_pct") for v in versions if v is not chosen} - {None, ff})
+        free_float = [ff, int(trusted and metric_ok(chosen, "free_float_pct") and 0 <= ff <= 100), others]
+    if count is not None:
+        holders = [count, int(trusted and metric_ok(chosen, "holder_count"))]
     return free_float, holders
+
+
+def report_url(url):
+    """Tautan laporan di IDX tanpa awalan IDX_REPORT_BASE yang sama untuk semua laporan."""
+    url = https_or_none(url)
+    return url[len(IDX_REPORT_BASE):] if url and url.startswith(IDX_REPORT_BASE) else url
 
 
 def report_holders(chosen, name_ref):
     """Daftar pemegang saham di laporan emiten: pemegang >=5%/pengendali/afiliasi, lalu direksi dan komisaris.
 
-    {h: [[nama, peran (bit ROLE_BITS), lembar, persen, 1 kalau tervalidasi]], s: total saham, u: url laporan}.
+    {h: [[nama, peran (bit ROLE_BITS), lembar, persen, 1 kalau tervalidasi]], s: total saham}.
     h kosong = laporan ada tetapi tabelnya belum terbaca oleh Signal Desk (mis. teks PDF acak).
     Alamat dan kutipan halaman laporan sengaja tidak disalin.
     """
@@ -260,8 +366,7 @@ def report_holders(chosen, name_ref):
     rows = [[name_ref(redact(h.get("name") or "")), sum(ROLE_BITS.get(r, 0) for r in h.get("roles") or []),
              h.get("shares"), h.get("pct"), int(h.get("validation") == "ok")] for h in chosen.get("holders") or []]
     rows.sort(key=lambda r: (not r[1] & 7, -(r[3] or 0), r[0]))
-    total = ((chosen.get("metrics") or {}).get("total_shares") or {}).get("value")
-    return {"h": rows, "s": total, "u": https_or_none(chosen.get("source_url"))}
+    return {"h": rows, "s": metric(chosen, "total_shares")}
 
 
 def report_categories(chosen, category_ref):
@@ -273,6 +378,27 @@ def report_categories(chosen, category_ref):
              r.get("shares"), r.get("pct"), int(r.get("validation") == "ok")] for r in chosen["rows"]]
     totals = [[DOMICILE.get(r.get("domicile"), ""), r.get("holder_count"), r.get("shares"), r.get("pct")] for r in chosen.get("totals") or []]
     return {"r": rows, "t": totals, "u": https_or_none(chosen.get("source_url"))}
+
+
+def month_range(details, ksei_months):
+    """Bulan untuk semua larik: dari bulan laporan emiten pertama yang cukup lengkap sampai bulan data terakhir.
+
+    Bulan yang dilaporkan kurang dari 10% emiten (laporan lama yang tercecer, halaman PDF acak yang terbaca sebagai
+    tahun depan) tidak memperpanjang sumbu; bulan KSEI selalu ikut. Bulan di tengah tanpa data tetap ada (null).
+    """
+    this_month, counts = date.today().isoformat()[:7], collections.Counter()
+    for d in details:
+        counts.update({str(p.get("period") or "")[:7] for p in d.get("periods") or []})
+    floor = max(5, len(details) // 10)
+    dense = {m for m, n in counts.items() if n >= floor and re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", m) and m <= this_month}
+    dense |= set(ksei_months)
+    if not dense:
+        return []
+    months, (y, m) = [], map(int, min(dense).split("-"))
+    while f"{y:04d}-{m:02d}" <= max(dense):
+        months.append(f"{y:04d}-{m:02d}")
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    return months
 
 
 def holder_groups(holders):
@@ -417,25 +543,31 @@ def filing_rows(filings, audit, today):
 
 
 def ownership_data(server, index, ledger, pid):
-    """Semua bulan KSEI dalam satu struktur ringkas untuk tab Kepemilikan Saham.
+    """Semua bulan dalam satu struktur ringkas untuk tab Kepemilikan Saham.
 
-    months:    [{p: "2026-08", asOf, url, desc}] urut naik; semua larik per emiten sejajar dengan ini (null = tidak ada data).
-    names/classes: kamus nama investor dan jenis pemegang (baris hanya menyimpan nomor urutnya).
+    months:    [{p: "2026-08", asOf, url, desc}] urut naik (lihat month_range); asOf/url hanya ada di bulan data KSEI.
+               Semua larik per emiten sejajar dengan ini (null = tidak ada data).
+    names/classes: kamus nama investor KSEI dan jenis pemegang (baris hanya menyimpan nomor urutnya).
     companies: [{t: kode, n: nama, k: [{tp: akumulasi >1%, h: [[investor, nama, jenis, L/F, persen, lembar, jumlah baris]],
-                i: [catatan]}], f: [free float], c: [jumlah pemegang],
-                d: [daftar pemegang saham laporan emiten], b: [jenis pemilik BAE]}]  (d dan b tidak ada kalau kosong semua)
+                i: [catatan; ada = belum terverifikasi]}], f: [free float], c: [jumlah pemegang],
+                p: [[pemegang >=5% gabungan, 1 kalau terverifikasi, R (laporan emiten) / K (baris KSEI >=5%)]],
+                r: satu huruf per bulan: v laporan emiten terbaca, x ada tetapi tabel pemegangnya belum terbaca, - tidak ada}]
     Nomor investor tetap sama lintas bulan per emiten: nama yang sama, atau nama mirip dengan lembar persis sama
     dari bulan data sebelumnya (lihat match_renamed), sehingga viewer bisa membandingkan dua bulan mana pun.
-    Hasil kedua: laporan perubahan kepemilikan per emiten (lihat filing_rows), ditulis ke berkas terpisah.
+
+    Hasil kedua (kepemilikan-laporan.json, diambil saat satu emiten dibuka):
+      {months: [p], base: awalan url, names, categories, companies: {KODE: {d: [daftar pemegang | nomor bulan dengan
+       daftar yang persis sama | null], u: [url laporan, tanpa base kalau diawali base], b: [jenis pemilik BAE]}}}
+    Hasil ketiga: laporan perubahan kepemilikan per emiten (lihat filing_rows).
     """
     tickers = sorted({c["ticker"] for c in index["companies"]} | set((ledger or {}).get("tickers") or []))
     if len(tickers) > 5000 or any(not isinstance(t, str) or not re.fullmatch(r"[A-Z0-9]{2,12}", t) for t in tickers):
         raise ValueError("Kode emiten dari server tidak valid.")
     with ThreadPoolExecutor(max_workers=4) as pool:
         details = list(pool.map(lambda t: server.get(f"/api/ownership/{quote(t)}?profile_id={pid}"), tickers))
-    months = sorted(index["ksei"]["months"])
+    months = month_range(details, index["ksei"]["months"])
     meta = [{"p": m, "asOf": None, "url": None, "desc": None} for m in months]
-    names, classes, categories, lookup = [], [], [], {}
+    names, classes, dps_names, categories, lookup = [], [], [], [], {}
 
     def ref(table, value):
         key = (id(table), value)
@@ -444,21 +576,30 @@ def ownership_data(server, index, ledger, pid):
             table.append(value)
         return lookup[key]
 
-    companies, filings, today = [], {}, date.today().isoformat()
+    companies, reports, filings, today = [], {}, {}, date.today().isoformat()
     for d in sorted(details, key=lambda d: d["ticker"]):
         rows = filing_rows(d.get("filings"), d.get("ownership_audit"), today)
         if rows:
             filings[d["ticker"]] = rows
         ksei = {p["period"]: p for p in d.get("ksei_periods") or []}
-        ids, prev, k, f, c, dps, bae = {}, None, [], [], [], [], []
+        ids, prev, k, f, c, p5, status, dps, urls, bae = {}, None, [], [], [], [], "", [], [], []
         for i, month in enumerate(months):
-            chosen, versions = chosen_version(d.get("periods"), month)
-            free_float, holders = report_metrics(chosen, versions)
+            chosen, versions, conflict = chosen_version(d.get("periods"), month)
+            trusted = comparable(chosen) and not conflict
+            free_float, holders = report_metrics(chosen, versions, trusted)
             f.append(free_float)
             c.append(holders)
-            dps.append(report_holders(chosen, lambda v: ref(names, v)))
+            listed = report_holders(chosen, lambda v: ref(dps_names, v))
+            status += "-" if not chosen else "v" if listed["h"] else "x"
+            same = next((j for j in range(i - 1, -1, -1) if isinstance(dps[j], dict)), None)
+            dps.append(same if listed and same is not None and dps[same] == listed else listed)
+            urls.append(report_url((chosen or {}).get("source_url")))
             bae.append(report_categories(chosen_version(d.get("category_periods"), month)[0], lambda v: ref(categories, v)))
+            block = blockholders(chosen, trusted)
             cur = ksei.get(month)
+            if block[0] is None and cur:
+                block = ksei_block(cur) + ("K",)
+            p5.append(None if block[0] is None else [block[0], block[1], block[2] if len(block) > 2 else "R"])
             if not cur:
                 k.append(None)
                 continue
@@ -479,21 +620,27 @@ def ownership_data(server, index, ledger, pid):
             rows.sort(key=lambda r: (-(r[4] or 0), r[0]))
             entry = {"tp": cur.get("total_pct"), "h": rows}
             issues = cur.get("issues") or ([] if cur.get("validation") in (None, "ok") else [cur.get("validation")])
+            if not issues and not ksei_ok(cur) and cur.get("holders"):
+                issues = ["row_needs_review"]
             if issues:
                 entry["i"] = [redact(issue_text(x)) for x in issues]
             k.append(entry)
             prev = groups
-        if any(k) or any(f) or any(dps) or rows:
-            company = {"t": d["ticker"], "n": redact((d.get("company_name") or "").strip()), "k": k, "f": f, "c": c}
-            if any(dps):
-                company["d"] = dps
+        if any(k) or any(f) or any(c) or any(p5) or any(x is not None for x in dps) or d["ticker"] in filings:
+            companies.append({"t": d["ticker"], "n": redact((d.get("company_name") or "").strip()), "k": k, "f": f, "c": c, "p": p5, "r": status})
+            report = {}
+            if any(x is not None for x in dps):
+                report["d"], report["u"] = dps, urls
             if any(bae):
-                company["b"] = bae
-            companies.append(company)
+                report["b"] = bae
+            if report:
+                reports[d["ticker"]] = report
     data = {"format": OWNERSHIP_FORMAT, "updated": index.get("updated_at"), "months": meta,
-            "names": names, "classes": classes, "categories": categories, "companies": companies}
+            "names": names, "classes": classes, "companies": companies}
+    laporan = {"format": REPORTS_FORMAT, "months": months, "base": IDX_REPORT_BASE, "names": dps_names,
+               "categories": categories, "companies": reports}
     changes = {"format": 1, "coverage": (ledger or {}).get("coverage"), "companies": filings}
-    return data, changes
+    return data, laporan, changes
 
 
 def sync_ownership(server, state, force, profile, guard):
@@ -502,21 +649,21 @@ def sync_ownership(server, state, force, profile, guard):
     if index.get("profile_id") not in (None, profile["id"]):
         raise ProfileMismatch(f"data kepemilikan dari profil '{index.get('profile_id')}', bukan '{profile['id']}'")
     ledger = read_ledger(profile) if getattr(server, "local", False) else None
-    fp = json.dumps({"format": OWNERSHIP_FORMAT,
+    fp = json.dumps({"format": [OWNERSHIP_FORMAT, REPORTS_FORMAT],
                      "index": {k: index.get(k) for k in ("profile_id", "updated_at", "parser_version", "counts", "ksei")},
                      "ksei_files": ledger and ledger["files"], "ksei_tickers": ledger and len(ledger["tickers"]),
                      "filings": ledger and ledger["filings"], "coverage": ledger and ledger["coverage"]}, sort_keys=True)
     if not force and state.get("ownership") == fp and OWNERSHIP_JSON.exists():
         return [], []
-    data, changes = ownership_data(server, index, ledger, pid)
+    data, laporan, changes = ownership_data(server, index, ledger, pid)
     if not data["companies"]:
         print("  server tidak mengembalikan data kepemilikan; kepemilikan.json lama dibiarkan")
         return [], []
-    text = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-    changed = [OWNERSHIP_JSON.name] if write_if_changed(OWNERSHIP_JSON, text) else []
-    if changes["companies"]:
-        if write_if_changed(FILINGS_JSON, json.dumps(changes, ensure_ascii=False, separators=(",", ":"))):
-            changed.append(FILINGS_JSON.name)
+    changed = []
+    for path, value in ((OWNERSHIP_JSON, data), (REPORTS_JSON, laporan if laporan["companies"] else None),
+                        (FILINGS_JSON, changes if changes["companies"] else None)):
+        if value is not None and write_if_changed(path, json.dumps(value, ensure_ascii=False, separators=(",", ":"))):
+            changed.append(path.name)
     guard()
     removed = prune("kepemilikan_", set(), allow_empty=True)
     state["ownership"] = fp
@@ -579,13 +726,13 @@ def _sync_once(args):
 
 
 def sync_once(args):
-    global DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON
-    original, old_state, old_ownership, old_filings = DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON
+    global DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON
+    original, old_state, old_ownership, old_filings, old_reports = DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON
     if original.is_symlink() or not original.resolve().is_relative_to((ROOT / "needtobeindexed").resolve()):
         raise ValueError("Folder sinkron menunjuk keluar arsip.")
     original.mkdir(parents=True, exist_ok=True)
     def managed(path):
-        return path.name in (".sync.json", "kepemilikan.json", "kepemilikan-perubahan.json") or bool(OWNED.fullmatch(path.name))
+        return path.name in (".sync.json", "kepemilikan.json", "kepemilikan-perubahan.json", "kepemilikan-laporan.json") or bool(OWNED.fullmatch(path.name))
     originals = {}
     for path in original.iterdir():
         if managed(path):
@@ -598,10 +745,10 @@ def sync_once(args):
             (stage / name).write_bytes(data)
         try:
             DEST, STATE, OWNERSHIP_JSON = stage, stage / ".sync.json", stage / "kepemilikan.json"
-            FILINGS_JSON = stage / "kepemilikan-perubahan.json"
+            FILINGS_JSON, REPORTS_JSON = stage / "kepemilikan-perubahan.json", stage / "kepemilikan-laporan.json"
             changed = _sync_once(args)
         finally:
-            DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON = original, old_state, old_ownership, old_filings
+            DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON = original, old_state, old_ownership, old_filings, old_reports
         staged = {p.name: p.read_bytes() for p in stage.iterdir() if managed(p)}
         # Refuse concurrent edits instead of silently overwriting them.
         current = {p.name: p.read_bytes() for p in original.iterdir() if managed(p) and p.is_file() and not p.is_symlink()}

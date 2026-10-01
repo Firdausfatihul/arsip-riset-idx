@@ -29,6 +29,7 @@ archivescrapingweb/
 ├── needtobeindexed/      # SUMBER: taruh file .md, .html, atau .csv di sini
 │   └── idx-signal-desk/  # DISALIN OTOMATIS oleh tools/sync_idx.py (jangan isi manual; isinya ditimpa)
 │       ├── kepemilikan.json  # data tab Kepemilikan Saham
+│       ├── kepemilikan-laporan.json    # daftar pemegang saham, jenis pemilik BAE, tautan laporan emiten
 │       └── kepemilikan-perubahan.json  # laporan perubahan kepemilikan per emiten
 ├── build.py              # generator (Python 3.9+, stdlib saja)
 ├── report-frame.js       # pencarian dan navigasi lokal di laporan HTML terisolasi
@@ -51,6 +52,7 @@ archivescrapingweb/
     ├── index.html        # aplikasi viewer + daftar dokumen + isi .md/.csv ≤256 KB tertanam (JSON)
     ├── files/<kategori>/<YYYY-MM-DD>/<nama-asli>.md   # salinan mentah (.csv juga)
     ├── files/kepemilikan/kepemilikan.json            # salinan data kepemilikan, diambil viewer saat tab dibuka
+    ├── files/kepemilikan/kepemilikan-laporan.json    # daftar pemegang laporan emiten, diambil saat satu emiten dibuka
     ├── files/kepemilikan/kepemilikan-perubahan.json  # laporan perubahan, diambil saat satu emiten dibuka
     ├── robots.txt
     ├── sitemap.xml       # hanya dibuat kalau BASE_URL di-set
@@ -128,7 +130,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
 - Routing lewat hash: `#doc=files/<kategori>/<tanggal>/<file>.md` dan opsional `&s=<id-bagian>`.
   Contoh: `#doc=files/keterbukaan-informasi/2026-09-14/pemeriksaan_55_emiten_14_September_2026.md&s=foru`
   Tab kepemilikan: `#kepemilikan=<KODE>&dari=<YYYY-MM>&sampai=<YYYY-MM>` (kode kosong = daftar semua emiten;
-  tanpa `dari`/`sampai` = bulan data pertama dan terakhir). Contoh: `#kepemilikan=BBRI&dari=2026-06`
+  tanpa `dari` = bulan KSEI pertama, tanpa `sampai` = bulan terakhir). Contoh: `#kepemilikan=BBRI&dari=2026-06`, `#kepemilikan=ADES&dari=2023-05`
 - Rapikan otomatis setelah render Markdown:
   - `## Judul` → id slug (`[^a-z0-9]+` → `-`), masuk daftar isi. Kalau dokumen membagi bagian dengan `#` (lebih dari satu H1), daftar isi memakai H1.
   - `### 01. MNCN — Judul`, `### 1. FORU`, `### 2.1 ESTA — Judul`, `### FORU`, atau bagian bernomor `# 2. DOOH` → badge ticker, masuk grid "Emiten" dan pintasan pada kartu daftar. Nomor subbab bertingkat dikenali oleh generator dan pembaca; tautan lama ke judul subbab tetap dapat dibuka.
@@ -137,13 +139,16 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   - Paragraf `Label: isi` di dalam bagian emiten, atau yang labelnya kode 4 huruf → tabel label/isi (`<dl class="facts">`).
   - Paragraf berisi ≥3 entri `15 September 2026: ... 17 September: ...` → daftar jadwal.
   - Sel tabel yang isinya persis 4 huruf kapital → badge ticker.
-- **Kepemilikan Saham** (`files/kepemilikan/kepemilikan.json`, ±2 MB, diambil dengan `fetch()` saat tab pertama dibuka):
-  - Kontrol: cari (Enter membuka kode yang cocok), pilih emiten, **Dari** dan **Sampai** (tanggal file KSEI).
+- **Kepemilikan Saham** (`files/kepemilikan/kepemilikan.json`, ±3,3 MB, diambil dengan `fetch()` saat tab pertama dibuka;
+  `kepemilikan-laporan.json` ±4,4 MB diambil saat emiten pertama dibuka):
+  - Sumbu bulan: laporan bulanan emiten sejak Mei 2023 (bulan pertama yang dilaporkan ≥10% emiten), KSEI >1% sejak Feb 2026.
+    Bulan sebelum KSEI hanya berisi angka laporan emiten. Rentang awal = bulan KSEI pertama sampai bulan terakhir.
+  - Kontrol: cari (Enter membuka kode yang cocok), pilih emiten, **Dari** dan **Sampai** (tanggal file KSEI, atau bulan laporan emiten sebelum KSEI).
   - Tanpa emiten: tabel semua emiten, akumulasi >1% di tanggal Dari dan Sampai, perubahan (poin), jumlah pemegang >1%,
     jumlah pemegang saham (dengan perubahan %), free float resmi (dua yang terakhir dari laporan emiten terakhir sampai Sampai, bulannya ditulis),
     tren kecil. Bisa diurutkan per perubahan akumulasi atau per perubahan jumlah pemegang; 100 baris pertama, lalu "Tampilkan semua".
-  - Satu emiten: kotak angka per tanggal Sampai dibanding Dari; grafik bulanan (akumulasi >1%, sisa <1%, free float resmi, jumlah pemegang)
-    dengan rentang diarsir, klik bulan untuk mengubah rentang (sebelum rentang = Dari, sesudahnya = Sampai), panah + Enter dari keyboard;
+  - Satu emiten: kotak angka per tanggal Sampai dibanding Dari; grafik bulanan (akumulasi >1% + pemegang ≥5%, sisa <1% + free float resmi,
+    jumlah pemegang), dipangkas ke bulan pertama/terakhir yang punya angka, dengan rentang diarsir, klik bulan untuk mengubah rentang (sebelum rentang = Dari, sesudahnya = Sampai), panah + Enter dari keyboard;
     batang "siapa menambah, siapa mengurangi" antara Dari dan Sampai; tabel pemegang >1% dengan perubahan persen dan lembar serta tren kecil;
     **daftar pemegang saham (DPS) dari laporan emiten**: pemegang ≥5%/pengendali/afiliasi, direksi dan komisaris dengan lembar dan persen,
     dibanding laporan sebelumnya, plus jumlah pemegang saham dan total saham; **jenis pemilik (laporan BAE)** dengan jumlah pemegang per jenis
@@ -153,6 +158,11 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
     tautan file KSEI dan laporan emiten di IDX.
   - Laporan emiten tidak terbit tiap bulan, jadi angka laporan memakai laporan terakhir sampai Sampai, dibanding laporan terakhir sampai Dari
     (atau laporan paling awal di dalam rentang). Laporan yang ada tetapi tabelnya belum terbaca Signal Desk ditandai, dengan tautan ke PDF-nya.
+  - **Pemegang ≥5%** mengikuti tab Ownership Signal Desk: saham semua pemegang ≥5% (termasuk direksi/komisaris ≥5%, tanpa baris "Masyarakat")
+    dibagi total saham laporan emiten; kalau laporan bulan itu tidak terbaca, jumlah baris KSEI ≥5%. Tooltip dan tabel menyebut sumbernya.
+  - Angka terverifikasi memakai aturan Signal Desk (`comparable()`/`blockholders()` di `tools/sync_idx.py`): sumber tidak diblokir, versi tidak
+    bertentangan, metrik lolos validasi, dan untuk ≥5% daftar nama + publik <5% + treasuri = total saham. Yang belum terverifikasi tetap tampil
+    sebagai titik kosong (tidak disambung garis) dan diberi ⚠ di tabel "Lihat angka per bulan".
   - Semua grafik SVG buatan sendiri di `APP_JS`, tanpa library.
   - Pencarian di tab Dokumen: kalau yang dicari persis kode emiten, catatan di bawah kotak cari memberi tautan ke kepemilikannya.
 - Pencarian mencocokkan judul, ringkasan, tanggal, nama file, kode saham, **dan isi teks** (tidak peka huruf besar-kecil).
@@ -615,11 +625,14 @@ python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # 
 - `digest_<awal>_<akhir>[_HHMM-HHMM].md`: satu per jendela di *Library → Summary Windows*, isi = `POST /api/share/render`
   (format md, semua digest per emiten). Baris judul diganti supaya tiap berkas bisa dibedakan.
   Akhiran jam dipakai kalau jendela tidak 00:00–23:59 (mis. `_0000-1959`).
-- `kepemilikan.json`: semua bulan KSEI sekaligus, dari `GET /api/ownership` dan `/api/ownership/<KODE>?profile_id=…`:
+- `kepemilikan.json`: semua bulan sekaligus (laporan emiten sejak Mei 2023 dan bulan KSEI), dari `GET /api/ownership` dan `/api/ownership/<KODE>?profile_id=…`:
   per emiten per bulan akumulasi >1%, pemegang >1% (baris dengan nama investor sama dijumlahkan), catatan data KSEI, free float resmi,
-  jumlah pemegang, daftar pemegang saham (nama, peran, lembar, persen; tanpa alamat) dan jenis pemilik BAE dari laporan emiten bulan yang sama. Tiap investor punya nomor yang sama lintas bulan: nama sama, atau nama mirip dengan
+  jumlah pemegang, pemegang ≥5% gabungan, dan status laporan emiten, masing-masing dengan penanda terverifikasi.
+- `kepemilikan-laporan.json`: daftar pemegang saham laporan emiten (nama, peran, lembar, persen; tanpa alamat; bulan dengan daftar persis sama
+  menunjuk bulan sebelumnya), jenis pemilik BAE, dan tautan laporan di IDX (tanpa awalan `base`). Bentuknya di docstring `ownership_data()`.
+  Tiap investor KSEI punya nomor yang sama lintas bulan: nama sama, atau nama mirip dengan
   jumlah lembar persis sama di bulan data sebelumnya (KSEI kadang menulis `TASPEN` / `PT TASPEN (PERSERO)`), jadi viewer bisa membandingkan
-  dua bulan mana pun. Bentuknya dijelaskan di docstring `ownership_data()`; kalau diubah, naikkan `OWNERSHIP_FORMAT`.
+  dua bulan mana pun. Bentuknya dijelaskan di docstring `ownership_data()`; kalau diubah, naikkan `OWNERSHIP_FORMAT` / `REPORTS_FORMAT`.
   Berkas lama `kepemilikan_<tanggal>.md` (format sebelum 15 Sep 2026) dihapus otomatis. `/api/ownership` hanya mendaftar emiten yang punya laporan emiten,
   jadi daftar kode emiten KSEI (mis. ASII, BMRI) dan identitas file KSEI aktif dibaca langsung dari
   `<data_dir profil>/ownership/ledger.sqlite3` dalam mode read-only. Kalau ledger tidak terbaca, hanya emiten dari `/api/ownership` yang disalin.
@@ -668,7 +681,7 @@ Langkah untuk Claude Code:
      }
      ```
      `.md` **wajib** `"contentType": "text/plain"` (persis, tanpa `; charset=...`). Selain itu publish ditolak.
-     `files/kepemilikan/kepemilikan.json` pakai `"contentType": "application/json"`.
+     `files/kepemilikan/*.json` (kepemilikan, kepemilikan-laporan, kepemilikan-perubahan) pakai `"contentType": "application/json"`.
      File yang sudah dihapus dari sumber harus dikirim sebagai `null` supaya ikut hilang.
 4. Kalau mau diindeks mesin pencari, jangan pakai opsi ini karena artifact privat. Pakai B/C/D.
 

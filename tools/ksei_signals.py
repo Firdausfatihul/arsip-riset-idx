@@ -54,11 +54,13 @@ def month(m):
 
 
 def build(data):
-    months = [m['p'] for m in data['months']]
+    # kepemilikan.json format 4 also carries issuer-report months before the first KSEI file; signals use KSEI months only.
+    keep = [i for i in range(len(data['months'])) if any(i < len(co.get('k') or []) and co['k'][i] for co in data['companies'])]
+    months = [data['months'][i]['p'] for i in keep]
     names, classes, n = data['names'], data['classes'], len(months)
     issuers, history = {}, {}
     for co in data['companies']:
-        t, k = co['t'], co.get('k') or []
+        t, k = co['t'], [(co.get('k') or [])[i] if i < len(co.get('k') or []) else None for i in keep]
         series = {}
         for i, entry in enumerate(k):
             for inv, ni, ci, _lf, p, sh, _rows in (entry or {}).get('h', []):

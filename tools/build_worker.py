@@ -39,22 +39,32 @@ def covers(doc):
 ROLE_NAMES = [(1, '>=5%'), (2, 'pengendali'), (4, 'afiliasi'), (8, 'direksi'), (16, 'komisaris')]
 
 
-def ownership_index(path):
+def latest_report(entries):
+    """Newest readable holder list in kepemilikan-laporan.json; an integer entry repeats that month's list."""
+    for entry in reversed(entries or []):
+        entry = entries[entry] if isinstance(entry, int) else entry
+        if entry and entry.get('h'):
+            return entry
+    return None
+
+
+def ownership_index(path, reports_path=None):
     """Latest KSEI >1% holders and the issuer's own holder list (holders, controllers, directors,
     commissioners) per company, for the agent's cross-company name search. No addresses: the source omits them.
     {m: month, c: {TICKER: {n: name, k: [[holder, pct]], d: [[person, roles, pct]]}}}"""
     if not path.exists():
         return None
     data = json.loads(path.read_text(encoding='utf-8'))
+    reports = json.loads(reports_path.read_text(encoding='utf-8')) if reports_path and reports_path.exists() else {}
     names, months, out = data['names'], data['months'], {}
     for company in data['companies']:
         ksei = next((m for m in reversed(company.get('k') or []) if m), None)
-        report = next((m for m in reversed(company.get('d') or []) if m and m.get('h')), None)
+        report = latest_report((reports.get('companies') or {}).get(company['t'], {}).get('d'))
         entry = {'n': company.get('n') or ''}
         if ksei:
             entry['k'] = [[names[h[1]], h[4]] for h in ksei.get('h') or []]
         if report:
-            entry['d'] = [[names[h[0]], ','.join(label for bit, label in ROLE_NAMES if (h[1] or 0) & bit), h[3]] for h in report['h']]
+            entry['d'] = [[reports['names'][h[0]], ','.join(label for bit, label in ROLE_NAMES if (h[1] or 0) & bit), h[3]] for h in report['h']]
         if len(entry) > 1:
             out[company['t']] = entry
     return {'m': months[-1]['p'] if months else '', 'c': out}
@@ -122,7 +132,8 @@ def build(directory, out):
     signals = ksei_signals.write(ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan.json', out)
     if signals:
         manifest['signals'] = signals
-    ownership = ownership_index(ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan.json')
+    ownership = ownership_index(ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan.json',
+                                ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan-laporan.json')
     if ownership:
         (out / 'ownership.json').write_text(json.dumps(ownership, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         manifest['ownership'] = {'asset': 'ownership.json', 'companies': len(ownership['c']), 'month': ownership['m']}

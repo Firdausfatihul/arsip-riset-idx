@@ -5,17 +5,20 @@ const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'sit
 const ownership=JSON.parse(fs.readFileSync(path.join(root,'site/files/kepemilikan/kepemilikan.json'),'utf8'));
 const changesFile=path.join(root,'site/files/kepemilikan/kepemilikan-perubahan.json');
 const changes=fs.existsSync(changesFile)?JSON.parse(fs.readFileSync(changesFile,'utf8')):{format:1,coverage:null,companies:{}};
+const reportsFile=path.join(root,'site/files/kepemilikan/kepemilikan-laporan.json');
+const reports=fs.existsSync(reportsFile)?JSON.parse(fs.readFileSync(reportsFile,'utf8')):null;
 const delay=ms=>new Promise(r=>setTimeout(r,ms));let checks=0;
-function setup(mutate,mutateChanges,fetchDoc){
+function setup(mutate,mutateChanges,fetchDoc,mutateReports){
  const errors=[],console=new VirtualConsole();console.on('jsdomError',e=>errors.push(e.message));
  const dom=new JSDOM(html,{url:'https://archive.test/',runScripts:'outside-only',virtualConsole:console});
- const w=dom.window,d=w.document;let data=JSON.parse(d.getElementById('arsip-data').textContent),own=structuredClone(ownership),ch=structuredClone(changes);
- if(mutate)mutate(data,own);if(mutateChanges)mutateChanges(ch);d.getElementById('arsip-data').textContent=JSON.stringify(data);
+ const w=dom.window,d=w.document;let data=JSON.parse(d.getElementById('arsip-data').textContent),own=structuredClone(ownership),ch=structuredClone(changes),rep=reports&&structuredClone(reports);
+ if(mutate)mutate(data,own);if(mutateChanges)mutateChanges(ch);if(mutateReports)mutateReports(rep);d.getElementById('arsip-data').textContent=JSON.stringify(data);
  w.marked=marked;w.DOMPurify=purify(w);w.TextDecoder=TextDecoder;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.fetch=async url=>{
   if(String(url).startsWith('version.json'))return Response.json({version:data.version});
   if(String(url).startsWith(data.own.path))return Response.json(own);
   if(data.own.changes&&String(url).startsWith(data.own.changes))return Response.json(ch);
+  if(data.own.reports&&String(url).startsWith(data.own.reports))return Response.json(rep);
   const file=data.docs.find(x=>String(url).split('?')[0]===x.path);
   if(file)return fetchDoc ? fetchDoc(file) : new Response(fs.readFileSync(path.join(root,'site',file.path),'utf8'));
   throw Error('Network forbidden: '+url);
@@ -100,6 +103,27 @@ async function test(name,fn){await fn();checks++;console.log('PASS',name);}
   assert.ok(d.querySelector('#own-body table'));assert.equal(d.querySelectorAll('#own-emiten option').length,ownership.companies.length+1);
   for(const company of ownership.companies){route('#kepemilikan='+company.t);assert.ok(d.querySelector('#own-trend svg'),company.t);}
   await delay(10);assert.deepEqual(errors,[]);dom.window.close();
+ });
+ await test('ownership history: issuer-report months before KSEI, ≥5% series, hollow unverified points, default range',async()=>{
+  const first=ownership.months.findIndex(m=>m.asOf);assert.ok(first>0,'months before the first KSEI file');
+  const {dom,d,route,errors}=setup();route('#kepemilikan=ADES');await delay(10);
+  assert.equal(d.getElementById('own-dari').value,String(first));assert.equal(d.getElementById('own-sampai').value,String(ownership.months.length-1));
+  const legend=[...d.querySelectorAll('#own-trend text.t')].map(t=>t.textContent);assert.ok(legend.includes('Pemegang ≥5%'),legend.join());
+  assert.ok(d.querySelector('#own-trend circle.own-dot.s5'));assert.ok(d.querySelector('#own-trend circle.own-dot.open'),'unverified months are hollow');
+  const rows=d.querySelector('.own-twin').querySelectorAll('tbody tr');assert.ok(rows.length>first,'monthly table reaches back before KSEI');
+  assert.match(rows[rows.length-1].cells[0].textContent,/Mei 2023/);
+  assert.match(d.querySelector('.own-tiles').textContent,/Pemegang ≥5%91,35%/);
+  assert.ok(d.querySelector('#own-reports table'),'DPS table filled from kepemilikan-laporan.json');assert.deepEqual(errors,[]);dom.window.close();
+ });
+ if(reports)await test('malformed or hostile issuer-report file is rejected or inert',async()=>{
+  const t=Object.keys(reports.companies).find(k=>reports.companies[k].d);
+  let {dom,d,route,errors}=setup(null,null,null,r=>{r.names.fill('<img src=x onerror=bad>');r.companies[t].u=r.companies[t].u.map(()=>'javascript:alert(1)');});
+  route('#kepemilikan='+t);await delay(10);
+  assert.equal(d.querySelector('#own-body img,#own-body a[href^="javascript:"]'),null);dom.window.close();
+  for(const attack of [r=>r.format=2,r=>{r.companies[t].d[0]=5;},r=>r.companies[t].u[0]='../x?<',r=>r.months.pop(),r=>r.base='http://x/']){
+   ({dom,d,route}=setup(null,null,null,attack));route('#kepemilikan='+t);await delay(10);
+   assert.equal(d.querySelector('#own-reports table'),null);assert.match(d.getElementById('own-reports').textContent,/belum berhasil dimuat/);dom.window.close();
+  }
  });
  const filed=Object.keys(changes.companies)[0];
  if(filed)await test('ownership-change filings render, hostile values stay inert, malformed file is rejected',async()=>{
