@@ -48,7 +48,7 @@ OWNERSHIP_JSON = DEST / "kepemilikan.json"
 FILINGS_JSON = DEST / "kepemilikan-perubahan.json"
 REPORTS_JSON = DEST / "kepemilikan-laporan.json"
 # Naikkan kalau bentuk kepemilikan.json / kepemilikan-laporan.json berubah, supaya sinkron berikutnya membuatnya ulang.
-OWNERSHIP_FORMAT = 4
+OWNERSHIP_FORMAT = 5
 REPORTS_FORMAT = 1
 # Tautan laporan emiten di IDX hampir selalu diawali ini; kepemilikan-laporan.json menyimpan sisanya saja.
 IDX_REPORT_BASE = "https://www.idx.co.id/StaticData/NewsAndAnnouncement/ANNOUNCEMENTSTOCK/"
@@ -305,7 +305,7 @@ def blockholders(snapshot, trusted):
     block = []
     for h in holders:
         roles, name = holder_roles(h), re.sub(r"\s+", "", str(h.get("name") or "")).lower()
-        if re.match(r"(masyarakat|public|publik)", name):
+        if PUBLIC_ROW.match(name):
             continue  # baris "Masyarakat" adalah porsi publik, bukan pemegang
         shares = number(h.get("shares"))
         pct = 100 * shares / total if shares is not None else number(h.get("pct"))
@@ -315,6 +315,42 @@ def blockholders(snapshot, trusted):
         return None, 0
     value = math.floor(1e8 * sum(block) / total + 0.5) / 1e6
     return value, int(trusted and state == "ok" and value <= 100.0001)
+
+
+PUBLIC_ROW = re.compile(r"(masyarakat|public|publik)")
+SUBTOTAL_ROW = re.compile(r"^(total|jumlah|subtotal|sub-total)(pengendali|nonpengendali|non-pengendali|pemegang|saham)|^afiliasi(pengendali)?$|^lain")
+# Baris sisa di laporan lama, di posisi mana pun pada nama: "Umum (Publik)", "Pemegang saham lainnya", "Saham Treasury".
+# Hanya untuk written_blockholders; blockholders() tetap memakai PUBLIC_ROW supaya nama seperti "... Public Company" tidak terbuang.
+LEFTOVER_ROW = re.compile(r"^umum|\((publik|public|umum|masyarakat)\)|lainnya|treasur|tresur|dibelikembali|^pemegangsaham$")
+
+
+def written_blockholders(snapshot):
+    """Cadangan kalau total saham laporan emiten tidak terbaca (umumnya laporan sebelum April 2026):
+    jumlah persen yang tertulis di laporan untuk pemegang >=5% yang punya peran (pemegang, pengendali, afiliasi, direksi,
+    komisaris). Baris "Masyarakat" dan subtotal ("Total Pengendali", "Afiliasi") tidak dihitung.
+
+    Selalu belum terverifikasi karena tidak dicocokkan ke total saham. Pada 3.200 bulan yang angka resminya terverifikasi
+    (Sep 2026), hasil cara ini sama dalam 0,02 poin untuk 98,3% bulan dan meleset >1 poin di 7 bulan.
+    Tidak diketahui (None) kalau daftar meragukan: pemegang >=5% tanpa peran yang terbaca, atau persen tertulis yang
+    bertentangan dengan lembarnya (selisih >1 poin dari lembar / total saham tersirat, yaitu median lembar*100/persen).
+    """
+    if not snapshot or metric_ok(snapshot, "total_shares"):
+        return None
+    rows = []
+    for h in snapshot.get("holders") or []:
+        name = re.sub(r"\s+", "", str(h.get("name") or "")).lower()
+        if not (PUBLIC_ROW.match(name) or SUBTOTAL_ROW.match(name) or LEFTOVER_ROW.search(name)):
+            rows.append((number(h.get("pct")), number(h.get("shares")), any(r in ROLE_BITS for r in holder_roles(h))))
+    implied = sorted(shares * 100 / pct for pct, shares, _ in rows if pct is not None and pct >= 0.5 and shares and shares > 0)
+    if len(implied) >= 2:
+        total = implied[len(implied) // 2]
+        if any(pct is not None and shares and abs(shares * 100 / total - pct) > 1 for pct, shares, _ in rows):
+            return None
+    big = [(pct, known) for pct, _, known in rows if pct is not None and pct >= 5]
+    if not big or not all(known for _, known in big):
+        return None
+    value = js_round(sum(pct for pct, _ in big), 1e6)
+    return value if value <= 100.01 else None
 
 
 def ksei_ok(cur):
@@ -550,7 +586,8 @@ def ownership_data(server, index, ledger, pid):
     names/classes: kamus nama investor KSEI dan jenis pemegang (baris hanya menyimpan nomor urutnya).
     companies: [{t: kode, n: nama, k: [{tp: akumulasi >1%, h: [[investor, nama, jenis, L/F, persen, lembar, jumlah baris]],
                 i: [catatan; ada = belum terverifikasi]}], f: [free float], c: [jumlah pemegang],
-                p: [[pemegang >=5% gabungan, 1 kalau terverifikasi, R (laporan emiten) / K (baris KSEI >=5%)]],
+                p: [[pemegang >=5% gabungan, 1 kalau terverifikasi, R (laporan emiten) / K (baris KSEI >=5%) /
+                     P (persen tertulis laporan, kalau total saham tidak terbaca; selalu 0, lihat written_blockholders)]],
                 r: satu huruf per bulan: v laporan emiten terbaca, x ada tetapi tabel pemegangnya belum terbaca, - tidak ada}]
     Nomor investor tetap sama lintas bulan per emiten: nama yang sama, atau nama mirip dengan lembar persis sama
     dari bulan data sebelumnya (lihat match_renamed), sehingga viewer bisa membandingkan dua bulan mana pun.
@@ -599,6 +636,9 @@ def ownership_data(server, index, ledger, pid):
             cur = ksei.get(month)
             if block[0] is None and cur:
                 block = ksei_block(cur) + ("K",)
+            if block[0] is None:
+                written = written_blockholders(chosen)
+                block = block if written is None else (written, 0, "P")
             p5.append(None if block[0] is None else [block[0], block[1], block[2] if len(block) > 2 else "R"])
             if not cur:
                 k.append(None)

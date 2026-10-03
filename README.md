@@ -160,6 +160,9 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
     (atau laporan paling awal di dalam rentang). Laporan yang ada tetapi tabelnya belum terbaca Signal Desk ditandai, dengan tautan ke PDF-nya.
   - **Pemegang ≥5%** mengikuti tab Ownership Signal Desk: saham semua pemegang ≥5% (termasuk direksi/komisaris ≥5%, tanpa baris "Masyarakat")
     dibagi total saham laporan emiten; kalau laporan bulan itu tidak terbaca, jumlah baris KSEI ≥5%. Tooltip dan tabel menyebut sumbernya.
+    Kalau total saham laporan tidak terbaca (umumnya laporan sebelum April 2026), dipakai jumlah **persen tertulis** pemegang ≥5% yang punya peran
+    (`written_blockholders()`, tanpa baris Masyarakat/subtotal/lainnya/treasuri; kosong kalau ada pemegang ≥5% tanpa peran atau persen bertentangan dengan lembarnya).
+    Angka ini tidak dicocokkan ke total saham, jadi digambar **putus-putus** dan ditandai "persen tertulis laporan"; diuji pada 3.200 bulan terverifikasi: 98% sama dalam 0,02 poin.
   - Angka terverifikasi memakai aturan Signal Desk (`comparable()`/`blockholders()` di `tools/sync_idx.py`): sumber tidak diblokir, versi tidak
     bertentangan, metrik lolos validasi, dan untuk ≥5% daftar nama + publik <5% + treasuri = total saham. Yang belum terverifikasi tetap tampil
     sebagai titik kosong (tidak disambung garis) dan diberi ⚠ di tabel "Lihat angka per bulan".

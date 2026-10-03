@@ -781,6 +781,7 @@ a.chip:hover{outline:1px solid var(--c)}
 .own-leg{stroke-width:3;stroke-linecap:round}
 .own-line{fill:none;stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
 .own-dot{stroke:var(--surface);stroke-width:2}
+.own-line.est{stroke-dasharray:5 4;stroke-width:1.8}
 .own-leg.s1,.own-line.s1{stroke:var(--s1)}.own-leg.s2,.own-line.s2{stroke:var(--s2)}.own-leg.s3,.own-line.s3{stroke:var(--s3)}.own-leg.s4,.own-line.s4{stroke:var(--s4)}.own-leg.s5,.own-line.s5{stroke:var(--s5)}
 .own-dot.s1{fill:var(--s1)}.own-dot.s2{fill:var(--s2)}.own-dot.s3{fill:var(--s3)}.own-dot.s4{fill:var(--s4)}.own-dot.s5{fill:var(--s5)}
 .own-dot.open{fill:var(--surface)}.own-dot.open.s1{stroke:var(--s1)}.own-dot.open.s2{stroke:var(--s2)}.own-dot.open.s3{stroke:var(--s3)}.own-dot.open.s4{stroke:var(--s4)}.own-dot.open.s5{stroke:var(--s5)}
@@ -1440,7 +1441,7 @@ APP_JS = r"""
     function index(v, table){ require(Number.isSafeInteger(v) && v >= 0 && v < table.length); }
     function flag(v){ require(v === 0 || v === 1); }
     function url(v){ require(v === null || (typeof v === 'string' && v.length <= 4096)); }
-    require(d && d.format === 4);  // 4 = bulan laporan emiten sebelum KSEI, pemegang ≥5%; daftar pemegang di kepemilikan-laporan.json
+    require(d && d.format === 5);  // 5 = pemegang ≥5% juga dari persen tertulis laporan (P); 4 = bulan laporan emiten sebelum KSEI
     array(d.months,240); require(d.months.length === own.months.length && d.months.length > 0);
     d.months.forEach(function(m,i){ require(m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m.p) && m.p === own.months[i].p); url(m.url); });
     [d.names,d.classes].forEach(function(a){ array(a,200000).forEach(function(v){ require(typeof v === 'string' && v.length <= 4000); }); });
@@ -1461,7 +1462,7 @@ APP_JS = r"""
           } else if (key === 'c'){
             require(Array.isArray(v) && v.length === 2); number(v[0]); flag(v[1]);
           } else {
-            require(Array.isArray(v) && v.length === 3 && (v[2] === 'R' || v[2] === 'K')); number(v[0]); flag(v[1]);
+            require(Array.isArray(v) && v.length === 3 && (v[2] === 'R' || v[2] === 'K' || v[2] === 'P')); number(v[0]); flag(v[1]); require(v[2] !== 'P' || v[1] === 0);
           }
         });
       });
@@ -1767,9 +1768,9 @@ APP_JS = r"""
       var pr = reportPair(c.p, from, to);
       if (pr.cur == null) return tile('s5', 'Pemegang ≥5%', '—', 'belum terbaca sampai ' + esc(monthName(to)));
       var a = pr.cmp == null ? null : c.p[pr.cmp][0], v = c.p[pr.cur];
-      return tile('s5', 'Pemegang ≥5%', pctText(r2(v[0])), (v[2] === 'K' ? 'baris KSEI ≥5% ' : 'laporan ') + esc(monthName(pr.cur)) +
+      return tile('s5', 'Pemegang ≥5%', pctText(r2(v[0])), (v[2] === 'K' ? 'baris KSEI ≥5% ' : v[2] === 'P' ? 'persen tertulis laporan ' : 'laporan ') + esc(monthName(pr.cur)) +
         (a == null ? '' : ' · <span class="' + tone(v[0] - a) + '">' + poinText(v[0] - a) + '</span> vs ' + esc(shortMonth(pr.cmp))) +
-        (v[1] ? '' : ' · angka belum terverifikasi'));
+        (v[1] ? '' : v[2] === 'P' ? ' · belum dicocokkan ke total saham' : ' · angka belum terverifikasi'));
     }
     // Angka laporan emiten: laporan terakhir sampai Sampai, selisih dengan laporan pembanding (lihat reportPair).
     function reportTile(key, label, list, fmt, fmtDelta){
@@ -1794,19 +1795,21 @@ APP_JS = r"""
       tile('', 'Pemegang &gt;1%', countText(holdersAt(c, to)), delta(holdersAt(c, from), holdersAt(c, to), countDelta)) +
       reportTile('s4', 'Jumlah pemegang saham', c.c, countText, countDelta) + '</div>' +
       '<p class="own-note">Akumulasi &gt;1% = jumlah persen semua pemegang di atas 1% menurut KSEI. Sisa &lt;1% = 100 − akumulasi, perkiraan kasar porsi pemegang kecil. ' +
-      'Pemegang ≥5% = saham semua pemegang ≥5% (termasuk direksi/komisaris ≥5%) dibagi total saham menurut laporan emiten; kalau laporan bulan itu tidak terbaca, jumlah baris KSEI ≥5%. ' +
+      'Pemegang ≥5% = saham semua pemegang ≥5% (termasuk direksi/komisaris ≥5%) dibagi total saham menurut laporan emiten; kalau laporan bulan itu tidak terbaca, jumlah baris KSEI ≥5%; kalau total saham laporan tidak terbaca (umumnya sebelum April 2026), jumlah persen yang tertulis di laporan (garis putus-putus). ' +
       'Free float resmi dan jumlah pemegang berasal dari laporan bulanan emiten; free float resmi memakai definisi lain (mengecualikan pengendali, afiliasi, direksi/komisaris, treasuri), jadi angkanya berbeda dari sisa &lt;1%.</p>';
 
     var dom = chartDomain(c);
     function cell(v, ok, fmt){ return fmt(v) + (v != null && !ok ? ' <span class="own-tags">⚠ belum terverifikasi</span>' : ''); }
     h += '<section class="own-card"><div class="own-card-head"><h3>Tren bulanan</h3><span id="own-trend-note"></span></div>' +
-      '<div class="own-chart" id="own-trend"></div><p class="own-legend"><span>○ titik kosong = angka belum terverifikasi, tidak disambung</span><span>celah = bulan tanpa data</span></p>' +
+      '<div class="own-chart" id="own-trend"></div><p class="own-legend"><span>○ titik kosong = angka belum terverifikasi, tidak disambung</span>' +
+      '<span id="own-est-legend" hidden>putus-putus = pemegang ≥5% dari persen tertulis laporan, belum dicocokkan ke total saham</span>' +
+      '<span>celah = bulan tanpa data</span></p>' +
       '<details class="own-twin"><summary>Lihat angka per bulan</summary><div class="own-scroll"><table class="own-table"><thead><tr>' +
       '<th scope="col">Bulan (tanggal KSEI)</th><th scope="col">Akumulasi &gt;1%</th><th scope="col">Pemegang ≥5%</th><th scope="col">Sisa &lt;1%</th><th scope="col">Free float resmi</th><th scope="col">Pemegang &gt;1%</th><th scope="col">Jumlah pemegang</th></tr></thead><tbody>' +
       (dom ? series(function(i){ return i; }, dom[0], dom[1]) : []).reverse().map(function(i){
         var p5 = c.p[i];
         return '<tr' + (i >= from && i <= to ? ' class="in-range"' : '') + '><th scope="row">' + esc(monthText(i)) + '</th><td>' + cell(tpAt(c, i), tpOk(c, i), pctText) +
-          '</td><td>' + (p5 ? cell(r2(p5[0]), p5[1], pctText) + '<span class="own-tags">' + (p5[2] === 'K' ? 'KSEI' : 'laporan') + '</span>' : '—') +
+          '</td><td>' + (p5 ? (p5[2] === 'P' ? pctText(r2(p5[0])) : cell(r2(p5[0]), p5[1], pctText)) + '<span class="own-tags">' + (p5[2] === 'K' ? 'KSEI' : p5[2] === 'P' ? 'persen tertulis laporan' : 'laporan') + '</span>' : '—') +
           '</td><td>' + cell(restAt(c, i), tpOk(c, i), pctText) + '</td><td>' + cell(ffAt(c, i), okAt(c.f, i), pctText) + '</td><td>' + countText(holdersAt(c, i)) +
           '</td><td>' + cell(countAt(c, i), okAt(c.c, i), countText) + '</td></tr>';
       }).join('') + '</tbody></table></div></details></section>';
@@ -2051,7 +2054,8 @@ APP_JS = r"""
     function vals(fn){ return series(fn, 0, n - 1); }
     var panes = [
       {fmt: pctText, series: [{cls: 's1', label: 'Akumulasi >1% (KSEI)', v: vals(function(i){ return tpAt(c, i); }), ok: vals(function(i){ return tpOk(c, i); })},
-                              {cls: 's5', label: 'Pemegang ≥5%', v: vals(function(i){ return b5At(c, i) == null ? null : r2(b5At(c, i)); }), ok: vals(function(i){ return okAt(c.p, i); })}]},
+                              {cls: 's5', label: 'Pemegang ≥5%', v: vals(function(i){ return b5At(c, i) == null ? null : r2(b5At(c, i)); }), ok: vals(function(i){ return okAt(c.p, i); }),
+                               est: vals(function(i){ return !!c.p[i] && c.p[i][2] === 'P'; })}]},
       {fmt: pctText, series: [{cls: 's2', label: 'Sisa <1% (perkiraan)', v: vals(function(i){ return restAt(c, i); }), ok: vals(function(i){ return tpOk(c, i); })},
                               {cls: 's3', label: 'Free float resmi IDX', v: vals(function(i){ return ffAt(c, i); }), ok: vals(function(i){ return okAt(c.f, i); })}]}];
     var counts = vals(function(i){ return countAt(c, i); });
@@ -2069,7 +2073,7 @@ APP_JS = r"""
       });
       p.legendH = y + 14;
     });
-    var H = axisH, y0 = 0, s = '';
+    var H = axisH, y0 = 0, s = '', shownEst = false;
     panes.forEach(function(p, pi){ H += p.legendH + paneH + (pi ? gap : 0); });
     var axY = H - axisH, r0 = Math.max(st.from, a), r1 = Math.min(st.to, b);
     if (r0 <= r1) s += '<rect class="own-range" x="' + (X(r0) - band / 2).toFixed(1) + '" y="0" width="' + (band * (r1 - r0 + 1)).toFixed(1) + '" height="' + axY + '"/>';
@@ -2079,7 +2083,8 @@ APP_JS = r"""
           '<text class="t" x="' + (se.lx + 26) + '" y="' + (y0 + se.ly) + '">' + esc(se.label) + '</text>';
       });
       var top = y0 + p.legendH, bottom = top + paneH, all = [], trusted = [];
-      p.series.forEach(function(se){ for (var i = a; i <= b; i++) if (se.v[i] != null){ all.push(se.v[i]); if (se.ok[i]) trusted.push(se.v[i]); } });
+      function usable(se, i){ return se.ok[i] || !!(se.est && se.est[i]); }  // perkiraan (P) ikut skala dan garis, tetapi putus-putus
+      p.series.forEach(function(se){ for (var i = a; i <= b; i++) if (se.v[i] != null){ all.push(se.v[i]); if (usable(se, i)) trusted.push(se.v[i]); } });
       if (!all.length){
         s += '<text x="' + (padL + (W - padL - padR) / 2) + '" y="' + (top + paneH / 2) + '" text-anchor="middle">belum ada data</text>';
         y0 = bottom + gap; return;
@@ -2093,22 +2098,27 @@ APP_JS = r"""
         s += '<line class="own-grid" x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y + '" y2="' + y + '"/>' +
           '<text x="' + (padL - 8) + '" y="' + (+y + 4) + '" text-anchor="end">' + esc(p.fmt(t)) + '</text>';
       });
-      // Garis hanya menyambung dua bulan berurutan yang sama-sama terverifikasi.
+      // Garis hanya menyambung dua bulan berurutan yang sama-sama terverifikasi; ruas yang menyentuh perkiraan (P) putus-putus.
       p.series.forEach(function(se){
-        var d = '';
+        var d = '', dash = '';
         for (var i = a; i <= b; i++){
-          if (!has(se, i) || !se.ok[i]) continue;
-          d += (i > a && has(se, i - 1) && se.ok[i - 1] ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(se.v[i]).toFixed(1);
+          if (!has(se, i) || !usable(se, i)) continue;
+          var pt = X(i).toFixed(1) + ' ' + Y(se.v[i]).toFixed(1);
+          if (!se.est || !se.est[i]) d += (i > a && has(se, i - 1) && se.ok[i - 1] && !(se.est && se.est[i - 1]) ? 'L' : 'M') + pt;
+          if (i > a && has(se, i - 1) && usable(se, i - 1) && se.est && (se.est[i] || se.est[i - 1]))
+            dash += 'M' + X(i - 1).toFixed(1) + ' ' + Y(se.v[i - 1]).toFixed(1) + 'L' + pt;
         }
         if (d) s += '<path class="own-line ' + se.cls + '" d="' + d + '"/>';
+        if (dash) s += '<path class="own-line est ' + se.cls + '" d="' + dash + '"/>';
+        if (se.est) for (var e = a; e <= b; e++) if (se.est[e] && has(se, e)) shownEst = true;
       });
       var labels = {};  // label angka di awal/akhir rentang, dikumpulkan per bulan supaya dua seri tidak bertumpuk
       p.series.forEach(function(se){
         for (var i = a; i <= b; i++){
           if (!has(se, i)) continue;
           var v = se.v[i], edge = i === st.from || i === st.to, x = X(i), y = Y(v);
-          s += '<circle class="own-dot ' + se.cls + (se.ok[i] ? '' : ' open') + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (edge ? 4.5 : se.ok[i] ? 3 : 2.6) + '"/>';
-          if (edge) (labels[i] = labels[i] || []).push({x: x, y: y, text: p.fmt(v) + (se.ok[i] ? '' : ' ⚠') + (v > hi ? ' ↑' : v < lo ? ' ↓' : '')});
+          s += '<circle class="own-dot ' + se.cls + (usable(se, i) ? '' : ' open') + '" cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="' + (edge ? 4.5 : usable(se, i) ? 3 : 2.6) + '"/>';
+          if (edge) (labels[i] = labels[i] || []).push({x: x, y: y, text: (se.est && se.est[i] ? '≈' : '') + p.fmt(v) + (usable(se, i) ? '' : ' ⚠') + (v > hi ? ' ↑' : v < lo ? ' ↓' : '')});
         }
       });
       Object.keys(labels).forEach(function(k){
@@ -2144,7 +2154,8 @@ APP_JS = r"""
     }
     function tipLines(i){
       return panes.map(function(p){ return p.series.map(function(se){
-        var v = se.v[i], note = v == null ? '' : (se.ok[i] ? '' : ' ⚠ belum terverifikasi') + (se.cls === 's5' && c.p[i] ? (c.p[i][2] === 'K' ? ' (KSEI)' : ' (laporan)') : '');
+        var v = se.v[i], est = !!(se.est && se.est[i]), note = v == null ? '' : (se.ok[i] || est ? '' : ' ⚠ belum terverifikasi') +
+          (se.cls === 's5' && c.p[i] ? (c.p[i][2] === 'K' ? ' (KSEI)' : est ? ' (persen tertulis laporan, belum dicocokkan ke total saham)' : ' (laporan)') : '');
         return [se, p.fmt(v) + note];
       }); }).reduce(function(x, y){ return x.concat(y); }, []);
     }
@@ -2153,6 +2164,8 @@ APP_JS = r"""
       s += '<rect class="own-hit" data-i="' + k + '" x="' + (X(k) - band / 2).toFixed(1) + '" y="0" width="' + band.toFixed(1) + '" height="' + axY + '" tabindex="' + (k === focusAt ? 0 : -1) + '" role="button" aria-label="' +
         esc(monthText(k) + ': ' + tipLines(k).map(function(l){ return l[0].label + ' ' + l[1]; }).join(', ')) + '"/>';
     }
+    var estLegend = document.getElementById('own-est-legend');
+    if (estLegend) estLegend.hidden = !shownEst;  // hanya kalau ada titik perkiraan di jendela yang tampil
     el.setAttribute('data-w', W);
     el.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="group" aria-label="Grafik bulanan ' + esc(c.t) +
       '. Panah kiri/kanan untuk berpindah bulan, Enter untuk mengubah rentang.">' + s + '</svg><div class="own-tip" hidden></div>';
