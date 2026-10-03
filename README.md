@@ -148,7 +148,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
     jumlah pemegang saham (dengan perubahan %), free float resmi (dua yang terakhir dari laporan emiten terakhir sampai Sampai, bulannya ditulis),
     tren kecil. Bisa diurutkan per perubahan akumulasi atau per perubahan jumlah pemegang; 100 baris pertama, lalu "Tampilkan semua".
   - Satu emiten: kotak angka per tanggal Sampai dibanding Dari; grafik bulanan (akumulasi >1% + pemegang ≥5%, sisa <1% + free float resmi,
-    jumlah pemegang), dipangkas ke bulan pertama/terakhir yang punya angka, dengan rentang diarsir, klik bulan untuk mengubah rentang (sebelum rentang = Dari, sesudahnya = Sampai), panah + Enter dari keyboard;
+    jumlah pemegang), mula-mula diperbesar ke rentang Dari–Sampai plus satu bulan di tiap sisi (supaya bulan KSEI tidak terjepit di ujung riwayat sejak 2023); tombol **Tampilkan sejak/sampai/semua bulan** memperlihatkan semua bulan yang punya angka (pilihan ini berlaku untuk emiten lain sampai halaman dimuat ulang), tombol hanya muncul kalau ada bulan tersembunyi; rentang diarsir; klik bulan untuk mengubah rentang (sebelum rentang = Dari, sesudahnya = Sampai), panah + Enter dari keyboard;
     batang "siapa menambah, siapa mengurangi" antara Dari dan Sampai; tabel pemegang >1% dengan perubahan persen dan lembar serta tren kecil;
     **daftar pemegang saham (DPS) dari laporan emiten**: pemegang ≥5%/pengendali/afiliasi, direksi dan komisaris dengan lembar dan persen,
     dibanding laporan sebelumnya, plus jumlah pemegang saham dan total saham; **jenis pemilik (laporan BAE)** dengan jumlah pemegang per jenis

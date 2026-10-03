@@ -768,6 +768,7 @@ a.chip:hover{outline:1px solid var(--c)}
 .own-card-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px;margin-bottom:10px}
 .own-card-head h3{margin:0;font:600 22px/1.2 var(--cond)}
 .own-card-head>span{font:12.5px/1.4 var(--mono);color:var(--faint)}
+.own-zoom{margin-left:8px;font:500 12.5px var(--mono);color:var(--own);background:none;border:1px solid var(--own);border-radius:3px;padding:4px 9px;cursor:pointer}
 .own-chart{position:relative;padding-block:10px 2px;background:var(--surface);border:1px solid var(--line)}
 .own-chart svg{display:block;max-width:100%;height:auto}
 .own-chart text{font:11.5px var(--mono);fill:var(--muted)}
@@ -841,7 +842,7 @@ a.chip:hover{outline:1px solid var(--c)}
 @media (pointer:coarse), (max-width:1199px){
   a.chip{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}
   .toc ol a,.own-code{min-height:44px}
-  .own-more button,.hit-note button{min-height:44px;font-size:14px}
+  .own-more button,.hit-note button,.own-zoom{min-height:44px;font-size:14px}
 }
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 """
@@ -1399,7 +1400,7 @@ APP_JS = r"""
   var own = data.own, ownView = document.getElementById('own'), ownBody = document.getElementById('own-body'),
       ownSearch = document.getElementById('own-cari'), ownPick = document.getElementById('own-emiten'),
       ownFrom = document.getElementById('own-dari'), ownTo = document.getElementById('own-sampai');
-  var ownData = null, ownLoading = null, ownState = {t: '', from: 0, to: 0, sort: 'besar', all: false, refocus: null};
+  var ownData = null, ownLoading = null, ownState = {t: '', from: 0, to: 0, sort: 'besar', all: false, chartAll: false, refocus: null};
   var DEF_FROM = 0;
   if (own) for (var di = 0; di < own.months.length; di++) if (own.months[di].asOf){ DEF_FROM = di; break; }
   var BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -1798,7 +1799,7 @@ APP_JS = r"""
 
     var dom = chartDomain(c);
     function cell(v, ok, fmt){ return fmt(v) + (v != null && !ok ? ' <span class="own-tags">⚠ belum terverifikasi</span>' : ''); }
-    h += '<section class="own-card"><div class="own-card-head"><h3>Tren bulanan</h3><span>Rentang terpilih diarsir · klik bulan untuk mengubah rentang</span></div>' +
+    h += '<section class="own-card"><div class="own-card-head"><h3>Tren bulanan</h3><span id="own-trend-note"></span></div>' +
       '<div class="own-chart" id="own-trend"></div><p class="own-legend"><span>○ titik kosong = angka belum terverifikasi, tidak disambung</span><span>celah = bulan tanpa data</span></p>' +
       '<details class="own-twin"><summary>Lihat angka per bulan</summary><div class="own-scroll"><table class="own-table"><thead><tr>' +
       '<th scope="col">Bulan (tanggal KSEI)</th><th scope="col">Akumulasi &gt;1%</th><th scope="col">Pemegang ≥5%</th><th scope="col">Sisa &lt;1%</th><th scope="col">Free float resmi</th><th scope="col">Pemegang &gt;1%</th><th scope="col">Jumlah pemegang</th></tr></thead><tbody>' +
@@ -2036,7 +2037,17 @@ APP_JS = r"""
 
   function trendChart(el, c){
     var st = ownState, ms = own.months, n = ms.length, W = Math.max(300, Math.floor(el.clientWidth || 720)), narrow = W < 560;
-    var dom = chartDomain(c) || [0, n - 1], a = dom[0], b = dom[1], m = b - a + 1;
+    var known = chartDomain(c), dom = known || [0, n - 1], a = dom[0], b = dom[1];
+    // Bawaan: grafik diperbesar ke Dari–Sampai plus satu bulan di tiap sisi (supaya klik di luar rentang tetap bisa memperluasnya),
+    // agar bulan KSEI tidak terjepit di ujung riwayat laporan sejak 2023. Tombol hanya muncul kalau memang ada bulan yang tersembunyi.
+    var za = Math.max(a, st.from - 1), zb = Math.min(b, st.to + 1), before = za > a, after = zb < b;
+    var canZoom = !!known && za < zb && (before || after), zoom = canZoom && !st.chartAll;
+    if (zoom){ a = za; b = zb; }
+    var m = b - a + 1, note = document.getElementById('own-trend-note');
+    if (note) note.innerHTML = 'Rentang terpilih diarsir · klik bulan untuk mengubah rentang' + (!canZoom ? '' :
+      ' <button type="button" id="own-zoom" class="own-zoom">' + (!zoom ? 'Perbesar ke rentang terpilih' :
+        before && after ? 'Tampilkan semua bulan (' + esc(monthText(dom[0])) + ' – ' + esc(monthText(dom[1])) + ')' :
+        before ? 'Tampilkan sejak ' + esc(monthText(dom[0])) : 'Tampilkan sampai ' + esc(monthText(dom[1]))) + '</button>');
     function vals(fn){ return series(fn, 0, n - 1); }
     var panes = [
       {fmt: pctText, series: [{cls: 's1', label: 'Akumulasi >1% (KSEI)', v: vals(function(i){ return tpAt(c, i); }), ok: vals(function(i){ return tpOk(c, i); })},
@@ -2220,6 +2231,11 @@ APP_JS = r"""
     });
     ownBody.addEventListener('click', function(e){
       if (e.target.id === 'own-semua'){ ownState.all = true; renderOwn(); }
+      if (e.target.id === 'own-zoom'){
+        var el = document.getElementById('own-trend'), c = ownData && ownData.byT[ownState.t];
+        ownState.chartAll = !ownState.chartAll;
+        if (el && c){ trendChart(el, c); var again = document.getElementById('own-zoom'); if (again) again.focus(); }
+      }
       if (e.target.id === 'own-retry') route();
     });
     var ownResize;
