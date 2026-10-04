@@ -1,11 +1,78 @@
 """KSEI signal layer on the real kepemilikan.json (no network). Facts checked by hand against the KSEI rows."""
-import json, os, pathlib, subprocess, sys, unittest
+import copy, json, os, pathlib, subprocess, sys, unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 import ksei_signals  # noqa: E402
 
 SOURCE = ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan.json'
+
+
+class KseiValidity(unittest.TestCase):
+    def data(self):
+        return {'format': 6, 'months': [{'p': '2026-02'}, {'p': '2026-03'}],
+                'names': ['Seller', 'Buyer', 'Anchor'], 'classes': ['Individual'],
+                'companies': [{'t': 'TEST', 'n': 'Test', 'k': [
+                    {'tp': 14.8, 'h': [[0, 0, 0, 'L', 10, 1000, 1], [2, 2, 0, 'L', 4.8, 480, 1]]},
+                    {'tp': 14.8, 'h': [[1, 1, 0, 'L', 10, 1000, 1], [2, 2, 0, 'L', 4.8, 480, 1]]}]}]}
+
+    def kinds(self, signals, ticker='TEST'):
+        return {s['k'] for s in signals['issuers'].get(ticker, {}).get('signals', [])}
+
+    def test_valid_control_produces_moves(self):
+        signals, _ = ksei_signals.build(self.data())
+        self.assertTrue({'transfer', 'new', 'exit', 'near5'} <= self.kinds(signals))
+
+    def test_either_flagged_endpoint_cannot_generate_moves(self):
+        for endpoint in (0, 1):
+            with self.subTest(endpoint=endpoint):
+                data = self.data()
+                data['companies'][0]['k'][endpoint]['i'] = ['Persentase tidak cocok dengan total saham.']
+                signals, history = ksei_signals.build(data)
+                self.assertFalse(self.kinds(signals) & {'transfer', 'split', 'new', 'exit'})
+                self.assertFalse(history['issuers']['TEST']['usable'][endpoint])
+                self.assertTrue(history['issuers']['TEST']['issues'][endpoint])
+                anchor = next(h for h in history['issuers']['TEST']['holders'] if h['name'] == 'Anchor')
+                self.assertEqual(anchor['pct'][endpoint], 4.8, 'raw flagged observations stay inspectable')
+
+    def test_suspect_latest_does_not_supply_facts_or_party_endpoint(self):
+        data = self.data()
+        data['companies'][0]['k'][1]['i'] = ['Nama investor ambigu.']
+        signals, _ = ksei_signals.build(data)
+        self.assertFalse(self.kinds(signals))
+        self.assertNotIn(ksei_signals.tokkey('Buyer'), signals['parties'])
+        self.assertEqual(signals['parties'][ksei_signals.tokkey('Anchor')]['series'][0][2], '2026-02')
+
+    def test_empty_missing_and_invalid_numeric_snapshots_are_unusable(self):
+        for bad in (None, {'tp': 0, 'h': []}, {'tp': 101, 'h': [[0, 0, 0, 'L', 101, 1000, 1]]},
+                    {'tp': 10, 'h': [[0, 0, 0, 'L', 10, None, 1]]}):
+            with self.subTest(bad=bad):
+                data = self.data()
+                # Retain the month axis through another issuer, as real files do.
+                data['companies'].append({**copy.deepcopy(data['companies'][0]), 't': 'CTRL'})
+                data['companies'][0]['k'][0] = bad
+                signals, history = ksei_signals.build(data)
+                self.assertFalse(self.kinds(signals) & {'transfer', 'split', 'new', 'exit'})
+                self.assertFalse(history['issuers']['TEST']['usable'][0])
+
+    def test_rename_needs_both_valid_endpoints_in_each_issuer(self):
+        data = self.data()
+        data['companies'].append({**copy.deepcopy(data['companies'][0]), 't': 'TWO'})
+        signals, _ = ksei_signals.build(data)
+        self.assertTrue(signals['renames'])
+        for endpoint in (0, 1):
+            bad = copy.deepcopy(data)
+            bad['companies'][0]['k'][endpoint]['i'] = ['Perlu dicek.']
+            signals, _ = ksei_signals.build(bad)
+            self.assertFalse(signals['renames'])
+
+    def test_no_ksei_observations_returns_empty_layer(self):
+        data = self.data()
+        data['companies'][0]['k'] = [None, None]
+        signals, history = ksei_signals.build(data)
+        self.assertIsNone(signals['asof'])
+        self.assertEqual(signals['issuers'], {})
+        self.assertEqual(history['issuers'], {})
 
 
 @unittest.skipUnless(SOURCE.exists(), 'kepemilikan.json not synced')

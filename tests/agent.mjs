@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {Archive, CacheStore, validate} from '../worker/core.mjs';
 import {AGENT, agentic, citations, compact, datacatRequest, fetchDatacat, latestArgs, needsOwnership, prune, Refs, TOOLS} from '../worker/agent.mjs';
+import {latestSourceDocuments} from './helpers/archive-expectations.mjs';
 
 // No network: every datacat and model call below is simulated.
 const realFetch = globalThis.fetch;
@@ -156,7 +157,9 @@ test('a whole-document request in agent mode reads the documents through the arc
     fetcher:async () => { throw new Error('no datacat for a document request'); }, reserveQuota:() => { reserved++; }});
   assert.equal(stats.agent_redirect, 'document_request');
   assert.equal(reserved, 0); assert.equal(steps, 0);
-  assert.ok(result.sources.length >= 2 && result.sources.every(s => /keterbukaan-singapura/.test(s.path)), result.sources.map(s => s.path).join());
+  const expected = latestSourceDocuments(await new Archive(assets).manifest(), 'keterbukaan-singapura');
+  assert.ok(expected.length > 0);
+  assert.deepEqual(result.sources.map(s=>s.path).sort(), expected.map(d=>d.path).sort());
   assert.match(read, /Singapore Exchange|SGX/);
   // A ticker keeps the question in agent mode.
   const agentStats = {};

@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {Archive, CacheStore, OpenRouter, converse, size} from '../worker/core.mjs';
 import {dateQuery,filterRecords,selectRecords} from '../worker/retrieval.mjs';
+import {tickerDocuments} from './helpers/archive-expectations.mjs';
 
 function cacheFixture() {
  const db=new DatabaseSync(':memory:');
@@ -28,16 +29,17 @@ test('all source partitions reconstruct originals, including scripts, tables and
   for(const r of d.records) if(/\bSOCI\b/i.test(r.content))assert.ok(r.tickers.includes('SOCI'));
  }
 });
-test('SOCI uses all eight sources and raw issuer text with >95% lower model input; exact answer reuses across clients',async()=>{
+test('SOCI uses every matching source and raw issuer text with >95% lower model input; exact answer reuses across clients',async()=>{
  const {db,cache}=cacheFixture();const metrics={},model=new Fake();
+ const expected=await tickerDocuments(await archive.manifest(),'SOCI');assert.ok(expected.length>0);
  const first=await converse(archive,model,'di soci ada apa ya?',[],()=>{},null,{cache,metrics,client:'a'});
- assert.equal(first.documents,8);assert.equal(model.calls.length,1);assert.equal(metrics.fallback_documents,0);
+ assert.equal(first.documents,expected.length);assert.equal(model.calls.length,1);assert.equal(metrics.fallback_documents,0);
  assert.ok(size(model.calls[0])<metrics.baseline_source_bytes*0.05);
  const prompt=JSON.stringify(model.calls[0]);assert.match(prompt,/7\.059\.000\.000/);assert.match(prompt,/14,09%/);
  const next=new Fake(),repeat={};await converse(archive,next,'di soci ada apa ya?',[],()=>{},null,{cache,metrics:repeat,client:'b'});
  assert.equal(next.calls.length,0);assert.equal(repeat.answer_cache_hit,true);
  const different=new Fake(),stats={};await converse(archive,different,'SOCI tanggal 17 September 2026',[],()=>{},null,{cache,metrics:stats,client:'b'});
- assert.equal(different.calls.length,1);assert.equal(stats.source_cache_hits,8);assert.ok(stats.excluded_dated_records>0);
+ assert.equal(different.calls.length,1);assert.equal(stats.source_cache_hits,expected.length);assert.ok(stats.excluded_dated_records>0);
  db.close();
 });
 test('dates: full/ISO, unknown, invalid, ranges, and short followup; unknown source dates are retained',()=>{

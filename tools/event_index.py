@@ -51,10 +51,12 @@ def classify(sentence, terms=None):
     for type_id, pattern in COMPILED:
         for m in pattern.finditer(sentence):
             if not negated(sentence, m):
-                found.append(type_id)
+                if type_id not in found:
+                    found.append(type_id)
                 if terms is not None:
                     terms.add(m[0].upper())
-                break
+                # Collect every term, even after the type is known: a later KBLI
+                # denotes an industry code, not the issuer KMI Wire and Cable.
     # "tanpa HMETD" is a private placement, not a rights issue.
     if 'private_placement' in found and 'rights_issue' in found and not re.search(
             r'rights? issue|\bPMHMETD\b|penawaran umum terbatas', sentence, re.I):

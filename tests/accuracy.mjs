@@ -5,6 +5,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {Archive, OpenRouter, converse, directTickers, nearestWord, rememberTurn} from '../worker/core.mjs';
 import {dateQuery, documentRequest} from '../worker/retrieval.mjs';
 import {SourceStore} from '../worker/source-store.mjs';
+import {latestSourceDocuments} from './helpers/archive-expectations.mjs';
 
 const read = name => readFile(new URL('../worker/.assets/' + name, import.meta.url), 'utf8').then(JSON.parse);
 const manifest = await read('manifest.json');
@@ -73,9 +74,9 @@ test('document requests: every date, range, numeric date, pasted title and per-s
     'siapa yang beli saham di pasar nego tanggal 22 september 2026': [],
     // A source named without a date: its documents (few) or its newest one; the CSV twin of a .md is read once.
     'baca dokumen keterbukaan singapura / sgx , intinya apa? apa yang menarik singkat padat jelas':
-      ['keterbukaan_sg_20092026_semua_kode.md', 'keterbukaan_sg_20092026_temuan_utama.md'],
-    'ringkas dokumen asx': ['asx_20260913.md'],
-    'baca stockbit, intinya apa': ['stockbit_28092026.md'],
+      latestSourceDocuments(manifest, 'keterbukaan-singapura').map(d=>d.name),
+    'ringkas dokumen asx': latestSourceDocuments(manifest, 'keterbukaan-australia').map(d=>d.name),
+    'baca stockbit, intinya apa': latestSourceDocuments(manifest, 'stockbit').map(d=>d.name),
     'keterbukaan singapura soal delisting apa aja': [],
   };
   for (const [q, need] of Object.entries(cases)) {
@@ -159,7 +160,8 @@ test('corporate-action table skips negations, routine treasury holdings and KBLI
   assert.ok(!events.events.some(e => /^tidak ada aksi korporasi seperti [^.;]*$/i.test(e.text)));
   assert.ok(events.events.some(e => e.ticker === 'BAJA' && e.type === 'rights_issue'));
   assert.ok(!events.events.some(e => e.type === 'buyback' && /^Saham treasuri (tetap )?[\d.]+ lembar/.test(e.text)));
-  assert.ok(!events.events.some(e => e.ticker === 'KBLI' && e.type === 'business_change'));
+  assert.ok(!events.events.some(e => e.ticker === 'KBLI' && e.type === 'business_change' &&
+    /\bKBLI\s+\d{5}\b/.test(e.text) && !/\(KBLI\)|saham KBLI/.test(e.text)));
   assert.ok(events.events.some(e => e.ticker === 'EURO' && e.type === 'rights_issue'));
   assert.deepEqual(directTickers('emiten indonesia apa saja yang baru menambah KBLI', manifest), []);
   assert.deepEqual(directTickers('analisa saham KBLI', manifest), ['KBLI']);

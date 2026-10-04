@@ -149,22 +149,28 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
     tren kecil. Bisa diurutkan per perubahan akumulasi atau per perubahan jumlah pemegang; 100 baris pertama, lalu "Tampilkan semua".
   - Satu emiten: kotak angka per tanggal Sampai dibanding Dari; grafik bulanan (akumulasi >1% + pemegang ≥5%, sisa <1% + free float resmi,
     jumlah pemegang), mula-mula diperbesar ke rentang Dari–Sampai plus satu bulan di tiap sisi (supaya bulan KSEI tidak terjepit di ujung riwayat sejak 2023); tombol **Tampilkan sejak/sampai/semua bulan** memperlihatkan semua bulan yang punya angka (pilihan ini berlaku untuk emiten lain sampai halaman dimuat ulang), tombol hanya muncul kalau ada bulan tersembunyi; rentang diarsir; klik bulan untuk mengubah rentang (sebelum rentang = Dari, sesudahnya = Sampai), panah + Enter dari keyboard;
-    batang "siapa menambah, siapa mengurangi" antara Dari dan Sampai; tabel pemegang >1% dengan perubahan persen dan lembar serta tren kecil;
+    batang "siapa menambah, siapa mengurangi" berdasarkan perubahan **lembar saham** antara Dari dan Sampai, dengan perubahan porsi sebagai angka pendamping;
+    hanya dibandingkan bila kedua snapshot KSEI tersedia dan lolos validasi. Bulan tanpa data tidak dianggap nol atau tidak berubah.
+    Pemegang yang hanya tercatat pada satu ujung rentang diberi status tercatat/tidak lagi tercatat >1%, tanpa menganggap jumlah sebelumnya/sesudahnya nol.
+    Ini perubahan posisi antara dua tanggal, bukan catatan seluruh transaksi beli/jual. Tabel pemegang >1% tetap menampilkan angka sumber serta tren kecil;
     **daftar pemegang saham (DPS) dari laporan emiten**: pemegang ≥5%/pengendali/afiliasi, direksi dan komisaris dengan lembar dan persen,
     dibanding laporan sebelumnya, plus jumlah pemegang saham dan total saham; **jenis pemilik (laporan BAE)** dengan jumlah pemegang per jenis
     (hanya ±30 emiten yang tabelnya terbaca); **laporan perubahan kepemilikan** (formulir KSEI/IDX dan surat BAE ≥5%, Jul 2023–):
     tanggal, pemegang, lembar/persen sebelum dan sesudah, transaksi, PDF, dan catatan "Perlu dicek" dari audit Signal Desk tanpa mengoreksi angka;
-    laporan di rentang Dari–Sampai tampil, sisanya di balik "Laporan lain" (Sampai = bulan terakhir berarti tanpa batas akhir);
+    laporan di rentang Dari–Sampai tampil, sisanya di balik "Laporan lain"; batas akhir tetap berlaku pada bulan terakhir data KSEI;
     tautan file KSEI dan laporan emiten di IDX.
   - Laporan emiten tidak terbit tiap bulan, jadi angka laporan memakai laporan terakhir sampai Sampai, dibanding laporan terakhir sampai Dari
     (atau laporan paling awal di dalam rentang). Laporan yang ada tetapi tabelnya belum terbaca Signal Desk ditandai, dengan tautan ke PDF-nya.
-  - **Pemegang ≥5%** mengikuti tab Ownership Signal Desk: saham semua pemegang ≥5% (termasuk direksi/komisaris ≥5%, tanpa baris "Masyarakat")
+  - **Pemegang ≥5%**: saham masing-masing pemegang ≥5% (termasuk direksi/komisaris ≥5%, tanpa baris Masyarakat, subtotal, Afiliasi agregat, atau treasuri)
     dibagi total saham laporan emiten; kalau laporan bulan itu tidak terbaca, jumlah baris KSEI ≥5%. Tooltip dan tabel menyebut sumbernya.
     Kalau total saham laporan tidak terbaca (umumnya laporan sebelum April 2026), dipakai jumlah **persen tertulis** pemegang ≥5% yang punya peran
-    (`written_blockholders()`, tanpa baris Masyarakat/subtotal/lainnya/treasuri; kosong kalau ada pemegang ≥5% tanpa peran atau persen bertentangan dengan lembarnya).
-    Angka ini tidak dicocokkan ke total saham, jadi digambar **putus-putus** dan ditandai "persen tertulis laporan"; diuji pada 3.200 bulan terverifikasi: 98% sama dalam 0,02 poin.
-  - Angka terverifikasi memakai aturan Signal Desk (`comparable()`/`blockholders()` di `tools/sync_idx.py`): sumber tidak diblokir, versi tidak
-    bertentangan, metrik lolos validasi, dan untuk ≥5% daftar nama + publik <5% + treasuri = total saham. Yang belum terverifikasi tetap tampil
+    (`written_blockholders()`, tanpa baris Masyarakat/subtotal/lainnya/treasuri; kosong kalau sumber diblokir, versi bertentangan, nama berulang,
+    ada pemegang ≥5% tanpa peran, atau persen bertentangan dengan lembarnya).
+    Angka ini tidak dicocokkan ke total saham, jadi ditampilkan sebagai titik kosong tanpa garis penghubung dan ditandai "persen tertulis laporan".
+  - Angka terverifikasi memakai aturan `comparable()`/`blockholders()` di `tools/sync_idx.py`: sumber tidak diblokir, versi tidak
+    bertentangan, metrik dan baris pemegang lolos validasi, identitas tidak ambigu, dan untuk ≥5% komposisi saham dapat direkonsiliasi.
+    Baris kelompok positif yang pembagian per pemegangnya tidak diketahui tidak membuat agregat ≥5% menjadi terverifikasi.
+    Nama berulang di laporan emiten dipertahankan, tetapi tidak menghasilkan perubahan jika pasangan barisnya ambigu. Yang belum terverifikasi tetap tampil
     sebagai titik kosong (tidak disambung garis) dan diberi ⚠ di tabel "Lihat angka per bulan".
   - Semua grafik SVG buatan sendiri di `APP_JS`, tanpa library.
   - Pencarian di tab Dokumen: kalau yang dicari persis kode emiten, catatan di bawah kotak cari memberi tautan ke kepemilikannya.
@@ -330,7 +336,9 @@ transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di
     ke aset Worker: pengalihan blok (satu pembeli), pemecahan blok (2-8 pemegang baru), pemegang baru/keluar >=2%, dekat 5%,
     ganti nama (lembar persis sama di >=2 emiten), kelompok pemegang lintas emiten, pemegang yang juga emiten, dan peringkat awal.
     Varian nama satu pemegang digabung (urutan kata, kesinambungan lembar atau persen); rekening kustodian/nominee dikecualikan;
-    bulan yang tidak lengkap tidak dipakai. Tiap sinyal punya tingkat (fakta/kuat/sedang/lemah) dan kalimat yang ditulis kode.
+    bulan kosong, tidak lengkap, atau mempunyai catatan validasi tidak dipakai untuk sinyal, peringkat, atau indeks pihak.
+    Riwayat mentah menyimpan penanda kelayakan dan alasan per bulan; jawaban riwayat tidak menyajikan angka bermasalah sebagai fakta terverifikasi.
+    Tiap sinyal punya tingkat (fakta/kuat/sedang/lemah) dan kalimat yang ditulis kode.
     Uji: `python3 -B -m unittest tests/test_ksei_signals.py`.
   - Untuk pertanyaan yang relevan dengan kepemilikan, kode mengirim sinyal emiten yang disebut (yang `wajib:1` harus dibahas), lalu memeriksa emiten lain milik pihak
     dalam sinyal itu. Sinyal wajib yang tidak dibahas ditambahkan kode di akhir jawaban. Pertanyaan "hidden gems" tanpa nama emiten
@@ -621,6 +629,7 @@ ke `needtobeindexed/idx-signal-desk/`, lalu menjalankan `build.py` kalau ada yan
 
 ```bash
 python3 tools/sync_idx.py                 # sekali
+python3 tools/sync_idx.py --ownership-only # perbarui kepemilikan saja, tanpa merender ulang digest
 python3 tools/sync_idx.py --watch 15      # tiap 15 menit, biarkan jalan di tab Terminal
 python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # sekalian siapkan publish Artifact
 ```
@@ -633,9 +642,10 @@ python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # 
   jumlah pemegang, pemegang ≥5% gabungan, dan status laporan emiten, masing-masing dengan penanda terverifikasi.
 - `kepemilikan-laporan.json`: daftar pemegang saham laporan emiten (nama, peran, lembar, persen; tanpa alamat; bulan dengan daftar persis sama
   menunjuk bulan sebelumnya), jenis pemilik BAE, dan tautan laporan di IDX (tanpa awalan `base`). Bentuknya di docstring `ownership_data()`.
-  Tiap investor KSEI punya nomor yang sama lintas bulan: nama sama, atau nama mirip dengan
-  jumlah lembar persis sama di bulan data sebelumnya (KSEI kadang menulis `TASPEN` / `PT TASPEN (PERSERO)`), jadi viewer bisa membandingkan
-  dua bulan mana pun. Bentuknya dijelaskan di docstring `ownership_data()`; kalau diubah, naikkan `OWNERSHIP_FORMAT` / `REPORTS_FORMAT`.
+  Tiap investor KSEI punya nomor yang sama lintas bulan: nama sama atau variasi nama dengan kata inti lengkap yang sama dan pasangan unik,
+  termasuk saat jumlah saham berubah (mis. `LO KHENG HONG. DRS` / `DRS LO KHENG HONG`). Nomor/penanda rekening dipertahankan;
+  nama yang hanya mirip atau sebagian sama tidak otomatis digabung. Identitas ambigu diberi catatan dan tidak dipakai untuk kesimpulan perubahan.
+  Bentuknya dijelaskan di docstring `ownership_data()`; kalau diubah, naikkan `OWNERSHIP_FORMAT` / `REPORTS_FORMAT`.
   Berkas lama `kepemilikan_<tanggal>.md` (format sebelum 15 Sep 2026) dihapus otomatis. `/api/ownership` hanya mendaftar emiten yang punya laporan emiten,
   jadi daftar kode emiten KSEI (mis. ASII, BMRI) dan identitas file KSEI aktif dibaca langsung dari
   `<data_dir profil>/ownership/ledger.sqlite3` dalam mode read-only. Kalau ledger tidak terbaca, hanya emiten dari `/api/ownership` yang disalin.
@@ -759,3 +769,17 @@ NODE_PATH=/path/to/test-deps/node_modules node tests/web_security.cjs
 ```
 
 Uji web memeriksa seluruh 963 emiten dalam data saat audit. Uji ini tidak menghubungi layanan model atau menjalankan sinkronisasi terhadap server asli. Uji DOM tidak menggantikan pemeriksaan CSP/sandbox di browser.
+
+Unit test disimpan di `tests/` dan ikut Git; dependensi `node_modules/` dan cache `__pycache__/` diabaikan. Regresi kepemilikan mencakup periode tanpa KSEI,
+variasi nama dan identitas ambigu, perubahan lembar/persen berlawanan, subtotal ≥5%, validasi kedua tanggal, pasangan DPS ganda, serta batas tanggal laporan perubahan.
+
+```bash
+python3 -B -m unittest discover -s tests -p 'test_*.py'
+# Uji integrasi arsip menggunakan hasil build terbaru; build_worker tidak men-deploy.
+python3 -B build.py
+python3 -B tools/build_worker.py
+node --test tests/*.mjs
+# Pakai lokasi dependency uji berisi jsdom@26.1.0, marked@15.0.7, dompurify@3.4.15:
+NODE_PATH=/path/to/test-deps/node_modules node tests/ownership_ui.cjs
+NODE_PATH=/path/to/test-deps/node_modules node tests/web_security.cjs
+```

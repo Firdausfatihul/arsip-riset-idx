@@ -51,7 +51,9 @@ test('topic focuses remain distinct even when their selected raw evidence is ide
     await ask(f,m,'SGX soal alpha');const before=m.notes.length;assert.ok(before>0);
     const stats={};await ask(f,m,'SGX soal beta',stats);assert.equal(stats.note_cache_hits,0);
     assert.equal(m.notes.length,before*2);
-    assert.deepEqual(m.notes.slice(0,before).map(n=>n.raw),m.notes.slice(before).map(n=>n.raw));
+    // Concurrent note readers may finish in a different order; compare the complete
+    // multiset of evidence hashes while retaining the focus/cache assertions above.
+    assert.deepEqual(m.notes.slice(0,before).map(n=>n.raw).sort(),m.notes.slice(before).map(n=>n.raw).sort());
     assert.ok(m.notes.slice(before).every(n=>n.instruction.includes('tentang beta.')));
   } finally {f.db.close();}
 });

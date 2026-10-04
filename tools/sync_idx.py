@@ -17,7 +17,6 @@ Hanya membaca: GET, render tanpa menulis berkas, dan ledger kepemilikan dibuka r
 """
 import argparse
 import collections
-import difflib
 import http.client
 import json
 import math
@@ -48,7 +47,7 @@ OWNERSHIP_JSON = DEST / "kepemilikan.json"
 FILINGS_JSON = DEST / "kepemilikan-perubahan.json"
 REPORTS_JSON = DEST / "kepemilikan-laporan.json"
 # Naikkan kalau bentuk kepemilikan.json / kepemilikan-laporan.json berubah, supaya sinkron berikutnya membuatnya ulang.
-OWNERSHIP_FORMAT = 5
+OWNERSHIP_FORMAT = 6
 REPORTS_FORMAT = 1
 # Tautan laporan emiten di IDX hampir selalu diawali ini; kepemilikan-laporan.json menyimpan sisanya saja.
 IDX_REPORT_BASE = "https://www.idx.co.id/StaticData/NewsAndAnnouncement/ANNOUNCEMENTSTOCK/"
@@ -299,17 +298,20 @@ def blockholders(snapshot, trusted):
     if None not in parts and None not in named:
         if abs(total - sum(parts) - sum(named)) > 1:
             return None, 0
-        clean = all(holder_roles(h) and "unknown" not in holder_roles(h) for h in holders) and \
-            not any(HOLDER_REVIEW.match(str(x)) for x in snapshot.get("issues") or [])
+        clean = all(holder_roles(h) and "unknown" not in holder_roles(h) and h.get("validation") == "ok"
+                    for h in holders) and not duplicate_holder_names(holders) and \
+            not any(HOLDER_REVIEW.match(str(x)) for x in snapshot.get("issues") or []) and \
+            not any(aggregate_holder(h.get("name")) and (number(h.get("shares")) or number(h.get("pct")) or 0) > 0
+                    for h in holders)
         state = "ok" if clean else state
     block = []
     for h in holders:
         roles, name = holder_roles(h), re.sub(r"\s+", "", str(h.get("name") or "")).lower()
-        if PUBLIC_ROW.match(name):
-            continue  # baris "Masyarakat" adalah porsi publik, bukan pemegang
+        if aggregate_holder(h.get("name"), include_public=True):
+            continue  # kelompok/subtotal bukan identitas satu pemegang >=5%
         shares = number(h.get("shares"))
         pct = 100 * shares / total if shares is not None else number(h.get("pct"))
-        if "shareholder_5plus" in roles or (("director" in roles or "commissioner" in roles) and pct is not None and pct >= 5):
+        if pct is not None and pct >= 5:
             block.append(shares)
     if None in block:
         return None, 0
@@ -324,7 +326,18 @@ SUBTOTAL_ROW = re.compile(r"^(total|jumlah|subtotal|sub-total)(pengendali|nonpen
 LEFTOVER_ROW = re.compile(r"^umum|\((publik|public|umum|masyarakat)\)|lainnya|treasur|tresur|dibelikembali|^pemegangsaham$")
 
 
-def written_blockholders(snapshot):
+def aggregate_holder(name, include_public=False):
+    name = re.sub(r"\s+", "", str(name or "")).lower()
+    return bool(SUBTOTAL_ROW.match(name) or LEFTOVER_ROW.search(name) or
+                (include_public and PUBLIC_ROW.match(name)))
+
+
+def duplicate_holder_names(holders):
+    counts = collections.Counter(investor_signature(h.get("name")) for h in holders)
+    return {name for name, count in counts.items() if name and count > 1}
+
+
+def written_blockholders(snapshot, conflict=False):
     """Cadangan kalau total saham laporan emiten tidak terbaca (umumnya laporan sebelum April 2026):
     jumlah persen yang tertulis di laporan untuk pemegang >=5% yang punya peran (pemegang, pengendali, afiliasi, direksi,
     komisaris). Baris "Masyarakat" dan subtotal ("Total Pengendali", "Afiliasi") tidak dihitung.
@@ -334,7 +347,10 @@ def written_blockholders(snapshot):
     Tidak diketahui (None) kalau daftar meragukan: pemegang >=5% tanpa peran yang terbaca, atau persen tertulis yang
     bertentangan dengan lembarnya (selisih >1 poin dari lembar / total saham tersirat, yaitu median lembar*100/persen).
     """
-    if not snapshot or metric_ok(snapshot, "total_shares"):
+    if not snapshot or metric_ok(snapshot, "total_shares") or conflict or \
+            snapshot.get("import_status") in ("quarantined", "previous_parse_retained") or \
+            any(SOURCE_BLOCKED.match(str(issue)) for issue in snapshot.get("issues") or []) or \
+            duplicate_holder_names(snapshot.get("holders") or []):
         return None
     rows = []
     for h in snapshot.get("holders") or []:
@@ -357,7 +373,7 @@ def ksei_ok(cur):
     """Akumulasi >1% terverifikasi: semua baris emiten itu di file KSEI lolos pemeriksaan."""
     total = number(cur.get("total_pct"))
     holders = cur.get("holders") or []
-    return bool(holders) and total is not None and cur.get("validation") == "ok" and \
+    return bool(holders) and total is not None and not cur.get("issues") and cur.get("validation") == "ok" and \
         all(h.get("validation") == "ok" for h in holders) and 0 <= total <= 100.05
 
 
@@ -390,7 +406,7 @@ def report_url(url):
     return url[len(IDX_REPORT_BASE):] if url and url.startswith(IDX_REPORT_BASE) else url
 
 
-def report_holders(chosen, name_ref):
+def report_holders(chosen, name_ref, trusted=True):
     """Daftar pemegang saham di laporan emiten: pemegang >=5%/pengendali/afiliasi, lalu direksi dan komisaris.
 
     {h: [[nama, peran (bit ROLE_BITS), lembar, persen, 1 kalau tervalidasi]], s: total saham}.
@@ -399,8 +415,12 @@ def report_holders(chosen, name_ref):
     """
     if not chosen:
         return None
+    holders = chosen.get("holders") or []
+    duplicates = duplicate_holder_names(holders)
     rows = [[name_ref(redact(h.get("name") or "")), sum(ROLE_BITS.get(r, 0) for r in h.get("roles") or []),
-             h.get("shares"), h.get("pct"), int(h.get("validation") == "ok")] for h in chosen.get("holders") or []]
+             h.get("shares"), h.get("pct"), int(trusted and h.get("validation") == "ok" and
+                 investor_signature(h.get("name")) not in duplicates and
+                 not aggregate_holder(h.get("name"), include_public=True))] for h in holders]
     rows.sort(key=lambda r: (not r[1] & 7, -(r[3] or 0), r[0]))
     return {"h": rows, "s": metric(chosen, "total_shares")}
 
@@ -450,37 +470,96 @@ def holder_groups(holders):
 
 
 NAME_NOISE = {"PT", "TBK", "PERSERO", "PERSEROAN", "PERUSAHAAN", "LTD", "LIMITED", "PTE", "PRIVATE", "INC", "CO", "CORP",
-              "CORPORATION", "DRS", "DRA", "IR", "SE", "SH", "SKH", "AC", "SA", "THE", "OF", "DR", "NA"}
+              "CORPORATION", "DRS", "DRA", "IR", "SE", "SH", "SKH", "DR"}
+ACCOUNT_NAME = re.compile(r"\b(?:A\s*[/.-]\s*C|AC|ACCT|ACCOUNT|REKENING|QQ|Q[. ]*Q|NOMINEE[S]?)\b", re.I)
 
 
 def name_tokens(name):
+    """Kata inti lengkap; nomor rekening dan kata pembeda tetap dipertahankan."""
     return {t for t in re.split(r"[^A-Z0-9]+", str(name or "").upper())
-            if len(t) > 1 and t not in NAME_NOISE and not t.isdigit()}
+            if t and t not in NAME_NOISE}
+
+
+def investor_signature(name):
+    """Normalisasi dekorasi nama, tanpa fuzzy/subset atau menghapus identitas rekening.
+
+    Nama dengan penanda rekening/nominee mempertahankan urutan kata dan nomor. Nama biasa
+    boleh berubah urutan (DRS LO KHENG HONG; PT TRIPLE BERSAMA BERKAH), dengan semua kata inti sama.
+    """
+    raw = str(name or "").upper()
+    tokens = tuple(t for t in re.split(r"[^A-Z0-9]+", raw) if t and t not in NAME_NOISE)
+    if not tokens:
+        return ()
+    return ("account", *tokens) if ACCOUNT_NAME.search(raw) else ("name", *sorted(tokens))
 
 
 def same_investor(a, b):
-    """Nama mirip: satu berisi semua kata inti yang lain (TASPEN / PT TASPEN (PERSERO)) atau hampir sama ejaannya."""
-    ta, tb = name_tokens(a), name_tokens(b)
-    if not ta or not tb:
-        return False
-    return ta <= tb or tb <= ta or difflib.SequenceMatcher(None, " ".join(sorted(ta)), " ".join(sorted(tb))).ratio() >= 0.85
+    a, b = investor_signature(a), investor_signature(b)
+    return bool(a and a == b)
 
 
 def match_renamed(now, old):
     """KSEI kadang menulis nama investor berbeda antarbulan (TASPEN / PT TASPEN (PERSERO)).
 
-    Pasangan "baru" dan "keluar" dianggap investor yang sama hanya kalau jumlah lembarnya persis sama
-    dan namanya mirip; lembar sama dengan nama berbeda bisa berarti saham benar-benar berpindah tangan.
+    Semua kata inti harus sama dan pasangan harus unik di kedua sisi. Perubahan lembar tidak
+    mengubah identitas. Kemiripan sebagian nama atau jumlah lembar sama bukan bukti identitas.
     """
-    gone = {k: g for k, g in old.items() if k not in now and g["total"]}
-    renamed = {}
-    for key, g in now.items():
-        if key in old or not g["total"]:
+    gone = {k: g for k, g in old.items() if k not in now}
+    candidates = {k: [p for p, o in gone.items() if same_investor(o["name"], g["name"])]
+                  for k, g in now.items() if k not in old}
+    uses = collections.Counter(p for ps in candidates.values() for p in ps)
+    return {k: gone[ps[0]] for k, ps in candidates.items() if len(ps) == 1 and uses[ps[0]] == 1}
+
+
+def assign_investor_ids(groups, history):
+    """ID stabil seluruh riwayat, satu ID per baris per bulan; alias ambigu tetap terpisah.
+
+    history menyimpan seluruh ejaan yang pernah terlihat, termasuk ketika investor sempat di
+    bawah ambang. Pasangan nama persis didahulukan; normalisasi hanya untuk pasangan unik.
+    """
+    keys = sorted(groups, key=str)
+    next_id = max((g["inv"] for g in history.values()), default=-1) + 1
+    exact = {key: history[key]["inv"] for key in keys if key in history}
+    counts = collections.Counter(exact.values())
+    assigned = {key: inv for key, inv in exact.items() if counts[inv] == 1}
+    ambiguous = {key for key, inv in exact.items() if counts[inv] > 1}
+    tainted = {investor_signature(old["name"]) for old in history.values() if old.get("ambiguous")}
+    signatures = collections.defaultdict(list)
+    for key in keys:
+        signature = investor_signature(groups[key]["name"])
+        if signature:
+            signatures[signature].append(key)
+            if signature in tainted:
+                ambiguous.add(key)
+    for same in signatures.values():
+        if len(same) > 1:
+            ambiguous.update(same)
+    candidates = {}
+    for key in keys:
+        if key in assigned or key in ambiguous:
             continue
-        match = next((k for k, o in gone.items() if o["total"] == g["total"] and same_investor(o["name"], g["name"])), None)
-        if match:
-            renamed[key] = gone.pop(match)
-    return renamed
+        candidates[key] = {old["inv"] for old in history.values()
+                           if same_investor(old["name"], groups[key]["name"])}
+    uses = collections.Counter(inv for invs in candidates.values() for inv in invs)
+    used = set(assigned.values())
+    for key in keys:
+        if key in assigned:
+            continue
+        invs = candidates.get(key, set())
+        inv = next(iter(invs)) if len(invs) == 1 else None
+        if inv is not None and inv not in used and uses[inv] == 1:
+            assigned[key] = inv
+        else:
+            if invs:
+                ambiguous.add(key)
+            assigned[key] = next_id
+            next_id += 1
+        used.add(assigned[key])
+    for key in keys:
+        groups[key]["inv"] = assigned[key]
+        history[key] = {"name": groups[key]["name"], "inv": assigned[key], "ambiguous": key in ambiguous}
+    return ["identitas investor ambigu; varian nama tetap dipisahkan (" + str(groups[key]["name"]) + ")"
+            for key in sorted(ambiguous, key=str)]
 
 
 ISSUE_TEXT = {
@@ -589,8 +668,8 @@ def ownership_data(server, index, ledger, pid):
                 p: [[pemegang >=5% gabungan, 1 kalau terverifikasi, R (laporan emiten) / K (baris KSEI >=5%) /
                      P (persen tertulis laporan, kalau total saham tidak terbaca; selalu 0, lihat written_blockholders)]],
                 r: satu huruf per bulan: v laporan emiten terbaca, x ada tetapi tabel pemegangnya belum terbaca, - tidak ada}]
-    Nomor investor tetap sama lintas bulan per emiten: nama yang sama, atau nama mirip dengan lembar persis sama
-    dari bulan data sebelumnya (lihat match_renamed), sehingga viewer bisa membandingkan dua bulan mana pun.
+    Nomor investor tetap sama lintas bulan per emiten: nama sama atau variasi semua kata inti sama yang
+    unik di kedua sisi (lihat assign_investor_ids). Pasangan ambigu ditandai dan tidak dipaksakan sama.
 
     Hasil kedua (kepemilikan-laporan.json, diambil saat satu emiten dibuka):
       {months: [p], base: awalan url, names, categories, companies: {KODE: {d: [daftar pemegang | nomor bulan dengan
@@ -619,14 +698,14 @@ def ownership_data(server, index, ledger, pid):
         if rows:
             filings[d["ticker"]] = rows
         ksei = {p["period"]: p for p in d.get("ksei_periods") or []}
-        ids, prev, k, f, c, p5, status, dps, urls, bae = {}, None, [], [], [], [], "", [], [], []
+        history, k, f, c, p5, status, dps, urls, bae = {}, [], [], [], [], "", [], [], []
         for i, month in enumerate(months):
             chosen, versions, conflict = chosen_version(d.get("periods"), month)
             trusted = comparable(chosen) and not conflict
             free_float, holders = report_metrics(chosen, versions, trusted)
             f.append(free_float)
             c.append(holders)
-            listed = report_holders(chosen, lambda v: ref(dps_names, v))
+            listed = report_holders(chosen, lambda v: ref(dps_names, v), trusted=trusted)
             status += "-" if not chosen else "v" if listed["h"] else "x"
             same = next((j for j in range(i - 1, -1, -1) if isinstance(dps[j], dict)), None)
             dps.append(same if listed and same is not None and dps[same] == listed else listed)
@@ -637,7 +716,7 @@ def ownership_data(server, index, ledger, pid):
             if block[0] is None and cur:
                 block = ksei_block(cur) + ("K",)
             if block[0] is None:
-                written = written_blockholders(chosen)
+                written = written_blockholders(chosen, conflict=conflict)
                 block = block if written is None else (written, 0, "P")
             p5.append(None if block[0] is None else [block[0], block[1], block[2] if len(block) > 2 else "R"])
             if not cur:
@@ -648,24 +727,22 @@ def ownership_data(server, index, ledger, pid):
             if not meta[i]["url"] and str(source.get("url") or "").startswith("https://"):
                 meta[i]["url"], meta[i]["desc"] = source["url"], redact(source.get("description") or "")
             groups = holder_groups(cur.get("holders") or [])
-            renamed = match_renamed(groups, prev) if prev else {}
+            identity_issues = assign_investor_ids(groups, history)
+            if identity_issues and p5[-1] and p5[-1][2] == "K":
+                p5[-1][1] = 0
             rows = []
             for key, g in groups.items():
-                inv = ids.get(key)
-                if inv is None:
-                    inv = renamed[key]["inv"] if key in renamed else len({*ids.values()})
-                ids[key] = g["inv"] = inv
-                rows.append([inv, ref(names, redact(g["name"] or "")), ref(classes, g["cls"] or ""), g["lf"] or "",
+                rows.append([g["inv"], ref(names, redact(g["name"] or "")), ref(classes, g["cls"] or ""), g["lf"] or "",
                              None if g["pct"] is None else round(g["pct"], 4), g["total"], g["rows"]])
             rows.sort(key=lambda r: (-(r[4] or 0), r[0]))
             entry = {"tp": cur.get("total_pct"), "h": rows}
             issues = cur.get("issues") or ([] if cur.get("validation") in (None, "ok") else [cur.get("validation")])
             if not issues and not ksei_ok(cur) and cur.get("holders"):
                 issues = ["row_needs_review"]
+            issues = list(issues) + identity_issues
             if issues:
                 entry["i"] = [redact(issue_text(x)) for x in issues]
             k.append(entry)
-            prev = groups
         if any(k) or any(f) or any(c) or any(p5) or any(x is not None for x in dps) or d["ticker"] in filings:
             companies.append({"t": d["ticker"], "n": redact((d.get("company_name") or "").strip()), "k": k, "f": f, "c": c, "p": p5, "r": status})
             report = {}
@@ -693,7 +770,8 @@ def sync_ownership(server, state, force, profile, guard):
                      "index": {k: index.get(k) for k in ("profile_id", "updated_at", "parser_version", "counts", "ksei")},
                      "ksei_files": ledger and ledger["files"], "ksei_tickers": ledger and len(ledger["tickers"]),
                      "filings": ledger and ledger["filings"], "coverage": ledger and ledger["coverage"]}, sort_keys=True)
-    if not force and state.get("ownership") == fp and OWNERSHIP_JSON.exists():
+    if not force and state.get("ownership") == fp and all(
+            path.exists() for path in (OWNERSHIP_JSON, REPORTS_JSON, FILINGS_JSON)):
         return [], []
     data, laporan, changes = ownership_data(server, index, ledger, pid)
     if not data["companies"]:
@@ -751,7 +829,7 @@ def _sync_once(args):
     profile = next((p for p in profiles["profiles"] if p["id"] == expected), {"id": expected})
     if state.get("profile_id") != expected:
         state = {"profile_id": expected}
-    d_changed, d_removed = sync_digests(server, state, args.force, guard)
+    d_changed, d_removed = ([], []) if getattr(args, "ownership_only", False) else sync_digests(server, state, args.force, guard)
     o_changed, o_removed = sync_ownership(server, state, args.force, profile, guard)
     guard()
     state["synced_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
@@ -856,6 +934,7 @@ def main():
     ap.add_argument("--force", action="store_true", help="render ulang semua walau server tidak berubah")
     ap.add_argument("--build", action="store_true", help="build walau tidak ada perubahan")
     ap.add_argument("--no-build", action="store_true", help="hanya salin berkas")
+    ap.add_argument("--ownership-only", action="store_true", help="hanya sinkron data kepemilikan; digest dan statusnya dipertahankan")
     ap.add_argument("--fragment-index", type=Path, help="teruskan ke build.py (versi index untuk Claude Artifact)")
     args = ap.parse_args()
     if not args.watch:

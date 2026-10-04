@@ -12,9 +12,9 @@ Tiers describe the inference, not the data: "fakta" (the KSEI rows themselves), 
 "sedang" (ratio or round-lot matches, clusters), "lemah" (ambiguous matches). A cluster is a holding pattern,
 never proof of acting together.
 """
-import collections, itertools, json, re
+import collections, itertools, json, math, re
 
-VERSION = 'ksei-signals-v1'
+VERSION = 'ksei-signals-v2'
 BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
 INSTITUTION = {'Mutual Funds', 'Insurance', 'Bank', 'Securities Company', 'Investment Manager', 'Trustee Bank', 'Financial Institution',
                'Financial Institutional', 'Private Bank', 'Pension Fund', 'State Owned Enterprises', 'Hedge Fund', 'Investment Advisors'}
@@ -58,6 +58,10 @@ def build(data):
     keep = [i for i in range(len(data['months'])) if any(i < len(co.get('k') or []) and co['k'][i] for co in data['companies'])]
     months = [data['months'][i]['p'] for i in keep]
     names, classes, n = data['names'], data['classes'], len(months)
+    if not n:
+        return ({'version': VERSION, 'months': [], 'asof': None, 'issuers': {}, 'parties': {},
+                 'renames': [], 'clusters': [], 'leaderboard': []},
+                {'version': VERSION, 'months': [], 'issuers': {}})
     issuers, history = {}, {}
     for co in data['companies']:
         t, k = co['t'], [(co.get('k') or [])[i] if i < len(co.get('k') or []) else None for i in keep]
@@ -70,8 +74,17 @@ def build(data):
                 s['pct'][i], s['sh'][i] = p, sh
         merge_variants(series, n)
         counts = [len((entry or {}).get('h', [])) if entry else None for entry in k] + [None] * (n - len(k))
-        issuers[t] = {'n': co.get('n') or t, 'series': list(series.values()), 'usable': usable_months(counts, k, n)}
-        history[t] = {'n': co.get('n') or t, 'holders': [{'name': s['names'][-1], 'names': s['names'], 'cls': s['cls'], 'pct': s['pct'], 'sh': s['sh']}
+        usable = usable_months(counts, k, n)
+        # Keep the source history inspectable, but do not feed suspect values to facts,
+        # rankings, party indexes or cross-issuer inference.
+        clean = [{**s, 'pct': [p if usable[i] else None for i, p in enumerate(s['pct'])],
+                  'sh': [sh if usable[i] else None for i, sh in enumerate(s['sh'])]} for s in series.values()]
+        issuers[t] = {'n': co.get('n') or t, 'series': clean, 'usable': usable}
+        history[t] = {'n': co.get('n') or t, 'usable': usable,
+                      'issues': [list((entry or {}).get('i') or []) +
+                                 ([] if usable[i] or (entry or {}).get('i') else ['Data KSEI tidak layak dibandingkan.'])
+                                 for i, entry in enumerate(k)],
+                      'holders': [{'name': s['names'][-1], 'names': s['names'], 'cls': s['cls'], 'pct': s['pct'], 'sh': s['sh']}
                                                           for s in series.values()]}
     issuer_names = {tokkey(v['n']): t for t, v in issuers.items() if len(tokkey(v['n'])) > 3}
     signals = collections.defaultdict(list)
@@ -121,14 +134,19 @@ def merge_variants(series, n):
 
 
 def usable_months(counts, k, n):
-    """A month is unusable when missing, or when the holder list collapses and recovers (partial file):
-    no exit/new/transfer is inferred across it."""
-    ok = [c is not None for c in counts]
+    """No facts or inferred changes use missing, empty, flagged or partial snapshots."""
+    def finite(value):
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+    def valid(entry):
+        return bool(entry and entry.get('h') and not entry.get('i') and finite(entry.get('tp')) and
+                    0 <= entry['tp'] <= 100.05 and
+                    all(finite(row[4]) and 0 <= row[4] <= 100.05 and finite(row[5]) and row[5] >= 0
+                        for row in entry['h']))
+
+    ok = [i < len(k) and valid(k[i]) for i in range(n)]
     for i in range(1, n - 1):
         if ok[i] and ok[i - 1] and ok[i + 1] and counts[i - 1] >= 4 and counts[i] < 0.6 * min(counts[i - 1], counts[i + 1]):
-            ok[i] = False
-    for i, entry in enumerate(k[:n]):
-        if entry and any('tidak ada baris' in str(note).lower() for note in entry.get('i') or []):
             ok[i] = False
     return ok
 
@@ -186,20 +204,20 @@ def holder_signals(t, v, months, issuer_names, signals):
             continue
         first = next((i for i, x in enumerate(p) if x is not None), None)
         end = max((i for i, x in enumerate(p) if x is not None), default=None)
-        if first and ok[first - 1] and ok[first] and p[-1] is not None and p[-1] >= 2:
+        if first and ok[first - 1] and ok[first] and ok[last] and p[-1] is not None and p[-1] >= 2:
             signals[t].append({'k': 'new', 'm': months[first], 'tier': 'fakta', 'who': name, 'pct': p[-1], 'parties': [name],
                                'dari': months[first - 1], 'sampai': months[-1],
                                'kalimat': f'{name} pertama tercatat di atas 1% pada {month(months[first])}; kini {pct(p[-1])}% ({month(months[-1])}).'})
-        if end is not None and end < last and ok[end + 1] and p[end] >= 2:
+        if end is not None and end < last and ok[end] and ok[end + 1] and p[end] >= 2:
             signals[t].append({'k': 'exit', 'm': months[end + 1], 'tier': 'fakta', 'who': name, 'pct': p[end], 'from5': p[end] >= 5,
                                'parties': [name], 'dari': months[end], 'sampai': months[end + 1],
                                'kalimat': f'{name} ({pct(p[end])}% pada {month(months[end])}) tidak lagi tercatat di atas 1% pada {month(months[end + 1])}.'})
-        if p[-1] is not None and 4.5 <= p[-1] < 5:
+        if ok[last] and p[-1] is not None and 4.5 <= p[-1] < 5:
             signals[t].append({'k': 'near5', 'm': months[-1], 'tier': 'fakta', 'who': name, 'pct': p[-1], 'parties': [name],
                                'dari': months[-1], 'sampai': months[-1],
                                'kalimat': f'{name} memegang {pct(p[-1])}% ({month(months[-1])}), tepat di bawah batas pelaporan 5%.'})
         other = issuer_names.get(tokkey(name))
-        if other and other != t and p[-1] is not None:
+        if other and other != t and ok[last] and p[-1] is not None:
             signals[t].append({'k': 'issuer_holder', 'm': months[-1], 'tier': 'fakta', 'who': name, 'ticker': other, 'pct': p[-1],
                                'parties': [name], 'dari': months[-1], 'sampai': months[-1],
                                'kalimat': f'Pemegang {name} ({pct(p[-1])}%) adalah emiten tercatat {other}; pemegang saham {other} ikut relevan.'})
@@ -214,10 +232,12 @@ def find_renames(issuers, months):
             if custodian(s['names'][-1], s['cls']):
                 continue
             for i in range(1, len(months)):
+                if not (ok[i - 1] and ok[i]):
+                    continue
                 a, b = s['sh'][i - 1], s['sh'][i]
-                if a and not b and ok[i]:
+                if a and not b:
                     gone[(months[i], s['names'][-1])].append((t, a))
-                if b and not a and ok[i - 1]:
+                if b and not a:
                     came[(months[i], s['names'][0])].append((t, b))
     out = []
     for (m, old), g in gone.items():

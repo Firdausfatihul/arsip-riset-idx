@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import {Archive, OpenRouter, ChatError, validate, searchTerms, batches, size, converseLegacy as converse, MODEL, LIMITS, readLimited} from '../worker/core.mjs';
+import {tickerDocuments} from './helpers/archive-expectations.mjs';
 
 const assets = {async fetch(request) {
   try { return new Response(await readFile(new URL('../worker/.assets' + new URL(request.url).pathname, import.meta.url))); }
@@ -27,20 +28,61 @@ class FakeModel {
   }
   async answer(messages, emit) { this.final = messages; await emit({type:'delta', text:'Hasil SOCI [D47].'}); return 'Hasil SOCI [D47].'; }
 }
-test('SOCI finds all eight full documents; every part reaches the model in order', async () => {
+function legacyFixture() {
+  // Fixed multi-document/multi-batch source material. The real archive can grow
+  // beyond the legacy full-document budget without invalidating this contract.
+  const payloads = {};
+  const docs = ['SOCI', 'SOCI', 'SMDR'].map((ticker, i) => {
+    const source_id = 'D' + (47 + i), asset = source_id + '.json';
+    const parts = Array.from({length:3}, (_, part) => ({source_id, part:part + 1,
+      text:`${ticker} dokumen ${i}, bagian ${part + 1}. ` + 'Bukti kapal 🚢 dan angka 123. '.repeat(5000)}));
+    payloads[asset] = {parts, search:parts.map(p=>p.text).join('')};
+    return {source_id, asset, title:ticker + ' document ' + i, name:asset, path:'files/' + asset,
+      end:'2026-09-0' + (i + 1), label:'September 2026', sizes:parts.map(p=>size(p))};
+  });
+  payloads['manifest.json'] = {docs, tickers:['SOCI', 'SMDR'], commonWords:[], handles:[],
+    postings:{soci:['D47', 'D48'], smdr:['D49']}, system:'Gunakan seluruh bukti dan pertahankan sumber.'};
+  return new Archive({fetch:async request => {
+    const data = payloads[new URL(request.url).pathname.slice(1)];
+    return data ? Response.json(data) : new Response('Not found', {status:404});
+  }});
+}
+test('legacy full-document reader passes every selected part and preserves final batch order', async () => {
+  const sample = legacyFixture();
   const model = new FakeModel(), events = [];
-  const result = await converse(archive, model, 'analisis soci', [], e => events.push(e));
-  const docs = await archive.search(['SOCI']);
-  assert.equal(docs.length, 8);
-  assert.equal(result.documents, 8);
+  const result = await converse(sample, model, 'analisis soci', [], e => events.push(e));
+  const docs = await sample.search(['SOCI']);
+  assert.deepEqual(docs.map(d=>d.source_id), ['D48', 'D47']);
+  assert.equal(result.documents, 2);
+  assert.equal(model.parts.length, 6);
   for (const doc of docs) {
-    const original = await archive.read(doc.asset);
+    const original = await sample.read(doc.asset);
     assert.deepEqual(model.parts.filter(p => p.source_id === doc.source_id).sort((a,b) => a.part-b.part), original.parts.sort((a,b) => a.part-b.part));
   }
-  for (const group of batches(docs)) {
-    const parts = await Promise.all(group.map(async ({doc, part}) => (await archive.read(doc.asset)).parts[part]));
+  const groups = batches(docs);
+  assert.ok(groups.length > 1, 'fixture exercises multiple batches and readers');
+  assert.equal(result.batches, groups.length);
+  for (const group of groups) {
+    const parts = await Promise.all(group.map(async ({doc, part}) => (await sample.read(doc.asset)).parts[part]));
     assert.ok(size(parts) <= LIMITS.batch);
   }
+  const finalContext = JSON.parse(model.final.at(-1).content.split('\n').at(-1));
+  assert.deepEqual(finalContext.map(c=>({batch:c.batch, ids:c.source_ids})),
+    groups.map((group,i)=>({batch:i + 1, ids:[...new Set(group.map(x=>x.doc.source_id))]})));
+});
+test('current SOCI search includes every raw-source match and rejects oversized legacy reads before model calls', async () => {
+  const docs = await archive.search(['SOCI']);
+  const expected = await tickerDocuments(await archive.manifest(), 'SOCI');
+  assert.ok(expected.length > 0);
+  assert.deepEqual(docs.map(d=>d.source_id).sort(), expected.map(d=>d.source_id).sort());
+  const bytes = docs.reduce((total,doc)=>total + doc.sizes.reduce((a,b)=>a+b,0), 0);
+  assert.ok(bytes > LIMITS.archive, 'current corpus exceeds the legacy full-document budget');
+  const model = new FakeModel(), events = [];
+  await assert.rejects(converse(archive, model, 'analisis soci', [], e=>events.push(e)),
+    error=>error instanceof ChatError && /Topik terlalu luas/.test(error.message));
+  assert.equal(model.parts.length, 0);
+  assert.equal(model.final, undefined);
+  assert.ok(!events.some(e=>e.type === 'sources' || e.type === 'delta' || e.type === 'done'));
 });
 test('search is word based and exact phrases do not match distant words', async () => {
   const index = {docs:[{source_id:'D1', asset:'D1.json', title:'', end:'2026', name:'a'}],

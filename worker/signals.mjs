@@ -58,10 +58,15 @@ export function signalView(data, args, refs, terse) {
     if (!issuer && !holders) return terse({ticker:code, hasil:'tidak ada sinyal KSEI untuk emiten ini (data >1% ' + signals.months[0] + '..' + signals.asof + ')'});
     const name = issuer?.n || holders?.n || code;
     if (part === 'riwayat') {
-      const rows = (holders?.holders || []).filter(h => h.pct.some(p => p != null))
+      const usable = holders?.usable;
+      const rows = (holders?.holders || []).map(h => ({...h, pct:h.pct.map((p, i) => usable && !usable[i] ? null : p)}))
+        .filter(h => h.pct.some(p => p != null))
         .sort((a, b) => (b.pct.at(-1) ?? 0) - (a.pct.at(-1) ?? 0)).slice(0, 15)
         .map(h => ({nama:h.name, ...(h.names.length > 1 ? {varian:h.names.slice(0, -1)} : {}), pct:h.pct.map(p => p ?? '-').join(' ')}));
-      return terse({ref:oref(refs, code, name, signals.months[0], signals.asof, signals.asof), emiten:name, bulan:signals.months.join(' '), pemegang:rows});
+      const notes = (usable || []).flatMap((ok, i) => ok ? [] :
+        [`${signals.months[i]}: ${(holders.issues?.[i] || []).join('; ') || 'data KSEI tidak layak dibandingkan'}`]);
+      return terse({ref:oref(refs, code, name, signals.months[0], signals.asof, signals.asof), emiten:name, bulan:signals.months.join(' '), pemegang:rows,
+        ...(notes.length ? {catatan:notes, arti_tanda_kosong:'data tidak tersedia atau belum terverifikasi; bukan kepemilikan nol'} : {})});
     }
     if (part === 'kelompok') {
       const rows = (issuer?.signals || []).filter(s => s.k === 'cluster')

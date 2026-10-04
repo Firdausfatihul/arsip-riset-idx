@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {readFile} from 'node:fs/promises';
 import {SourceStore} from '../worker/source-store.mjs';
 import {Archive,converse,size,OpenRouter,CacheStore} from '../worker/core.mjs';
+import {tickerDocuments} from './helpers/archive-expectations.mjs';
 const manifest=JSON.parse(await readFile(new URL('../worker/.assets/manifest.json',import.meta.url),'utf8'));
 function fixture(){
  const db=new DatabaseSync(':memory:');
@@ -36,7 +37,8 @@ test('full archive queries use SQLite, retain known evidence and finish cross-ma
  for(const doc of manifest.docs)await store.importDocument(manifest,doc,await evidence(doc));
  assert.equal(store.status(manifest).ready,manifest.docs.length);
  const archive=new Archive({fetch:()=>{throw Error('No per-query asset fetch allowed');}},store);archive.index=Promise.resolve(manifest);
- assert.equal((await archive.search(['SOCI'])).length,8);
+ const expected=await tickerDocuments(manifest,'SOCI');assert.ok(expected.length>0);
+ assert.deepEqual((await archive.search(['SOCI'])).map(d=>d.source_id).sort(),expected.map(d=>d.source_id).sort());
  assert.deepEqual(await archive.search(['" OR *; DROP TABLE source_passages; --']),[]);
  const terms=['ASX','Australia','SGX','Singapore','Singapura'];
  // Source IDs and reports change; use an active SGX research document, not the removed chronology.
