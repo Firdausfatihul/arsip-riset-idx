@@ -1825,7 +1825,7 @@ APP_JS = r"""
       tile('', 'Pemegang &gt;1%', countText(holdersAt(c, to)), delta(holdersAt(c, from), holdersAt(c, to), countDelta)) +
       reportTile('s4', 'Jumlah pemegang saham', c.c, countText, countDelta) + '</div>' +
       '<p class="own-note">Akumulasi &gt;1% = jumlah persen semua pemegang di atas 1% menurut KSEI. Sisa &lt;1% = 100 − akumulasi, perkiraan kasar porsi pemegang kecil. ' +
-      'Pemegang ≥5% = saham semua pemegang ≥5% (termasuk direksi/komisaris ≥5%) dibagi total saham menurut laporan emiten; kalau laporan bulan itu tidak terbaca, jumlah baris KSEI ≥5%; kalau total saham laporan tidak terbaca (umumnya sebelum April 2026), jumlah persen yang tertulis di laporan (garis putus-putus). ' +
+      'Pemegang ≥5% = saham semua pemegang ≥5% (termasuk direksi/komisaris ≥5%) dibagi total saham menurut laporan emiten; kalau laporan bulan itu tidak terbaca, jumlah baris KSEI ≥5%; kalau total saham laporan tidak terbaca (umumnya sebelum April 2026), jumlah persen yang tertulis di laporan (titik kosong, belum terverifikasi). ' +
       'Free float resmi dan jumlah pemegang berasal dari laporan bulanan emiten; free float resmi memakai definisi lain (mengecualikan pengendali, afiliasi, direksi/komisaris, treasuri), jadi angkanya berbeda dari sisa &lt;1%.</p>';
 
     var dom = chartDomain(c);
