@@ -238,6 +238,8 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   memperluas ke riwayat sumber itu, tetap dalam batas bahan. CSV dengan kembaran Markdown bernama sama tidak dibaca dua kali.
   Tahun boleh dihilangkan bila seluruh arsip berada dalam satu tahun. "Stockbit 25 September dan KI 26 September"
   memasangkan tiap tanggal dengan sumbernya; "SGX soal delisting" tetap mencari topik dalam sumber SGX.
+  Rentang dua tanggal lengkap ("3 Oktober 2026 sampai tanggal 5 Oktober 2026") mencakup hari di antaranya,
+  termasuk lintas bulan/tahun. Tanggal tidak valid atau urutan terbalik meminta koreksi tanpa membaca bahan lewat AI.
 - Permintaan kandidat/rumor yang jarang dibahas dapat dijawab tanpa ticker. Tanpa sumber atau tanggal, mode biasa
   mulai dari potret KI Indonesia dan Stockbit terbaru, lalu menyebut cakupannya. Ini penemuan kandidat dari bahan tersebut,
   bukan screening seluruh pasar; jumlah temuan tidak dipaksakan bila bukti kurang.
@@ -262,9 +264,23 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   bulan/tahun meminta penjelasan tanpa panggilan model; tanggal lengkap dari pertanyaan sebelumnya
   dapat menjadi konteks. Filter ini konservatif, bukan jaminan seluruh tanggal telah dikenali.
 - Bahan sampai 350 KB (±100 ribu token) dibaca model sebagai teks asli dalam satu panggilan jawaban.
+  Khusus permintaan dokumen utuh, teks asli sampai 900 KB dibaca langsung; batas pesan jalur ini 1 MB
+  termasuk instruksi/metadata. Kapasitas model yang dipakai telah diperiksa melalui katalog OpenRouter
+  (1 juta token konteks); evaluasi ulang batas ini jika model diganti. Batas total analisis dan harian tetap berlaku.
   Bahan di atas itu memakai catatan sumber bersama untuk unit di atas 24 KB, maksimal dua pembaca bersamaan.
   Catatan membahas bukti emiten tanpa pertanyaan atau riwayat pengguna. Jika model menyatakan catatan belum cukup, satu pemeriksaan tambahan atas
   maksimal dua dokumen lengkap diperbolehkan; seluruh batas biaya/koneksi tetap berlaku.
+  Permintaan dokumen utuh mengemas teks asli berurutan, dengan identitas sumber dan lokasi per potongan;
+  judul/header tabel tidak diulang pada setiap baris indeks. Seluruh teks dan hash sumber tetap sama.
+  Sebelum membaca, sistem menghitung kebutuhan awal seluruh catatan dan menyisihkan 6.500 token untuk jawaban.
+  Jika permintaan seluruh temuan dapat membaca teks asli langsung, jawaban mendapat maksimal 24.000 token,
+  tanpa panggilan catatan perantara. Semua teks sumber masuk ke model, tetapi ringkasan tetap dapat menghilangkan rincian
+  atau keliru mengaitkan fakta; tersedianya seluruh teks bukan jaminan setiap detail termuat atau setiap klaim benar.
+  Jalur dokumen utuh membatasi teks keluaran 160 ribu karakter, aliran provider 6 MB, dan waktu panggilan 6 menit;
+  antarmuka menerima sampai 200 ribu karakter termasuk catatan validasi. Jalur biasa mempertahankan batas lamanya.
+  Catatan dokumen utuh dibaca sekali, maksimal 5.000 token per unit (dibagi sesuai sisa anggaran, minimal 1.800).
+  Catatan pencarian topik memakai 1.800 token dan boleh diulang sampai 3.600 bila sisa anggaran tetap cukup bagi bagian lain dan jawaban akhir.
+  Jika tidak cukup, catatan yang terpotong ditandai; jawaban dari catatan tersebut juga ditandai parsial dan tidak disimpan sebagai jawaban lengkap.
 - Kalimat penyangkalan ("Tidak ada aksi korporasi seperti rights issue…", "belum merencanakan delisting") tidak
   dihitung sebagai kecocokan kata topik. Dokumen yang hanya menyebut topik dalam penyangkalan tidak dibaca.
 - **Topik terlalu luas** (tanpa kode saham, bahan di atas 350 KB):
@@ -291,6 +307,8 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   ada dalam dokumen. Fakta, rumor/pernyataan penulis, angka, tanggal dan ketidakpastian tetap dibedakan.
   Jawaban dimulai dengan kesimpulan, memakai rujukan `[D…]` yang ditautkan ke arsip, dan menyebut batas bukti.
   Jika diminta singkat, targetnya sekitar 150–250 kata kecuali pengguna menentukan panjang lain.
+  Permintaan "semua/seluruh temuan" atau "jangan hilangkan detail" tidak dibatasi ke 3–5 pilihan atau panjang ringkasan umum.
+  Ini tetap ringkasan dengan batas keluaran: model harus menyebut rincian yang belum termuat, bukan mengklaim seluruh detail selesai.
 - Pembacaan gagal/terpotong tidak masuk cache. Retry pemotongan catatan hanya satu kali dan tetap memakai
   anggaran. Catatan yang masih terpotong setelah retry (mis. katalog 1.535 kode SGX) dipakai apa adanya dengan tanda
   "Catatan terpotong" dan tidak disimpan di cache, supaya satu unit panjang tidak menggagalkan seluruh jawaban. Jawaban akhir yang mencapai batas panjang tetap ditampilkan dengan tanda terpotong, tidak masuk
@@ -494,9 +512,9 @@ Batas backend tetap berlaku walaupun JavaScript browser diubah:
 | HTTP body | 4.096 byte, JSON saja, unggahan maksimal 5 detik |
 | Riwayat dari browser | Ditolak; hanya token konteks acak 256 bit |
 | Topik | Maksimal 4 ticker/istilah, 4 MB bahan, 14 kelompok |
-| Satu panggilan model | Maksimal 480.000 byte JSON pesan; tidak sama dengan jumlah token |
+| Satu panggilan model | Maksimal 480.000 byte JSON pesan; 1.000.000 khusus teks asli dokumen utuh yang dipilih server; tidak sama dengan jumlah token |
 | Satu analisis | 8 MB total pesan termasuk retry, 20 panggilan, alokasi keluaran 36.000 token |
-| Keluaran per panggilan | Catatan 1.800 token, retry sekali 3.600; jawaban akhir 5.000 |
+| Keluaran per panggilan | Catatan topik 1.800 token, retry sekali 3.600 bila anggaran cukup; catatan dokumen utuh 1.800–5.000 sekali baca; jawaban akhir 6.500, atau 24.000 untuk seluruh temuan dari teks asli dokumen utuh; termasuk penalaran |
 | Anggaran global/hari UTC | 80 MB pesan model dan alokasi keluaran 500.000 token, dicadangkan sebelum setiap panggilan |
 | Permintaan masuk termasuk invalid | 12/IP/menit dan 120 global/menit |
 | Analisis diterima | 120/IP/jam, 3.000 global/hari |

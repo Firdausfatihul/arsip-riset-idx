@@ -105,7 +105,14 @@ export function documentFacts(doc, records, tickers) {
 // Numbers in the answer that the material does not support. Values are compared, not digits:
 // "Rp372,6 miliar" is supported by "Rp372.605.750.000". Counts ("18 emiten") must appear as written
 // or as a table cell ("| 18 |"); a total the model counted itself is exactly what this should catch.
-const COUNT = /\b(\d{1,4})[ \t]+(emiten|perusahaan|pengumuman|kasus|dokumen|postingan|transaksi|entri|baris)\b/gi;
+const COUNT = /(?<![\w.,])(\d{1,3}(?:\.\d{3})+|\d{1,3}(?:,\d{3})+|\d{1,4})[ \t]+(emiten|perusahaan|pengumuman|kasus|dokumen|postingan|transaksi|entri|baris)\b/gi;
+// Counts stay exact, but "1.603", "1,603" and "1603" are equivalent integer
+// spellings. Never match the suffix "603" inside a larger or decimal value.
+function countPattern(raw) {
+  const digits = raw.replace(/[.,]/g, '').replace(/^0+(?=\d)/, '');
+  const group = separator => digits.replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+  return '(?:' + [...new Set([digits,group('\\.'),group(',')])].join('|') + ')';
+}
 const NUMBER = /(?:(~|±|>|<|≥|≤|sekitar|hampir|lebih dari|kurang dari)\s*)?(?:Rp|USD|US\$)?\s?(\d[\d.,]*\d|\d)(\s?%|\s*(?:ribu|juta|miliar|milyar|triliun|thousand|million|billion|trillion|tn|bn|mn|jt|rb|t|b|m|k)\b)?/gi;
 // Sources mix Indonesian words and English abbreviations ("Rp20,817tn", "215,096bn", "465,224m");
 // a single letter is ambiguous (M = miliar or million), so every reading is tried.
@@ -142,10 +149,12 @@ export function unverifiedNumbers(answer, material, question = '') {
   const found = new Set();
   for (const m of text.matchAll(COUNT)) {
     if (/^20\d\d$/.test(m[1])) continue;
-    if (source.includes((m[1] + ' ' + m[2]).toLowerCase()) || new RegExp('\\|\\s*' + m[1] + '\\s*\\|').test(sourceText)) continue;
+    const number = countPattern(m[1]);
+    if (new RegExp('(?<![\\w.,])' + number + '\\s+' + m[2] + '\\b','i').test(source) ||
+        new RegExp('\\|\\s*' + number + '\\s*\\|').test(sourceText)) continue;
     // A table value next to the issuer it describes ("GTSI 124 98", "<td>GTSI</td><td>124</td>").
     const codes = text.slice(Math.max(0, m.index - 200), m.index).match(/\b[A-Z][A-Z0-9]{3}\b/g) || [];
-    if (codes.some(c => new RegExp('\\b' + c + '\\b[^\\n]{0,80}?(?<![\\d.,])' + m[1] + '(?![\\d.,])').test(sourceText))) continue;
+    if (codes.some(c => new RegExp('\\b' + c + '\\b[^\\n]{0,80}?(?<![\\d.,])' + number + '(?![\\d.,])').test(sourceText))) continue;
     found.add(m[0].trim());
   }
   for (const m of text.matchAll(NUMBER)) {

@@ -12,6 +12,10 @@
   var count = document.getElementById('chat-count');
   var modeBox = document.getElementById('chat-mode'), agenticInput = document.getElementById('chat-agentic');
   var agenticLeft = document.getElementById('chat-agentic-left'), agenticLimit = 10;
+  // Full-document answers allow 160k characters on the server, plus any appended validation notices.
+  var ANSWER_LIMIT = 200000;
+  // Cached answers can arrive in one delta; JSON may escape one character as six characters.
+  var STREAM_LINE_LIMIT = ANSWER_LIMIT * 6 + 1024;
   // datacat pages are the only external links an answer may carry; the server assigns them.
   var DATACAT = /^https:\/\/quant\.renr\.ai\/[A-Za-z0-9\/_.%-]+$/;
   function showLeft(left){
@@ -168,8 +172,9 @@
           summary = sourceList(reply.block, sources);
         }
         if (event.type === 'delta'){
+          if (typeof event.text !== 'string') throw new Error('Aliran jawaban tidak valid.');
+          if (event.text.length > ANSWER_LIMIT - text.length) throw new Error('Jawaban melampaui batas ukuran.');
           text += event.text;
-          if (text.length > 40000) throw new Error('Jawaban melampaui batas ukuran.');
           reply.content.textContent = text;
         }
         if (event.type === 'error') throw new Error(event.text);
@@ -185,7 +190,7 @@
         var part = await stream.read();
         pending += decoder.decode(part.value || new Uint8Array(), {stream: !part.done});
         var lines = pending.split('\n'); pending = lines.pop();
-        if (pending.length > 100000 || lines.some(function(line){ return line.length > 100000; })) throw new Error('Aliran jawaban tidak valid.');
+        if (pending.length > STREAM_LINE_LIMIT || lines.some(function(line){ return line.length > STREAM_LINE_LIMIT; })) throw new Error('Aliran jawaban tidak valid.');
         lines.forEach(receive);
         if (part.done){ receive(pending); break; }
       }

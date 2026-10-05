@@ -14,24 +14,25 @@ const source = data.docs.find(x => x.name === 'stockbit_19092026.md');
 const record = {source_id: source.id.toUpperCase(), path: source.path, title: source.title, label: source.label};
 w.marked = marked; w.DOMPurify = purify(w); w.TextDecoder = TextDecoder;
 const requests = [];
-let mode = 'success';
+let mode = 'success', events = null;
 w.fetch = async (url, options) => {
   assert.equal(url, data.chatApi);
   requests.push(JSON.parse(options.body));
   assert.ok(!options.headers.Authorization);
   if (mode === 'error') return new Response(JSON.stringify({error: 'Batas sementara tercapai.'}), {status: 429});
   if (mode === 'cancel') return new Promise((resolve, reject) => options.signal.addEventListener('abort', () => reject(new w.DOMException('Aborted', 'AbortError'))));
-  const payload = [
+  const payload = (events || [
     {type: 'status', text: 'Membaca dokumen…'},
     {type: 'sources', sources: [record], batches: 1},
     {type: 'delta', text: 'Bukti SOCI 🚢 [' + record.source_id + ']. <img src="https://bad.example/pixel"><script>window.hacked=1</script>'},
     {type: 'delta', text: '\n\n[tautan palsu](https://bad.example/) <div style="position:fixed;inset:0">overlay</div><style>body{display:none}</style><form><input name=chat-question></form><svg onload=bad></svg><a href="javascript:bad()">bad</a>'},
     {type: 'progress', completed:1, total:1, text:'Selesai membaca'},
     {type: 'done', documents: 1, batches: 1, context:'a'.repeat(64)}
-  ].map(e => JSON.stringify(e) + '\n').join('');
+  ]).map(e => JSON.stringify(e) + '\n').join('');
   const bytes = new TextEncoder().encode(payload);
   return new Response(new ReadableStream({start(c) {
-    for (let i = 0; i < bytes.length; i += 11) c.enqueue(bytes.slice(i, i + 11));
+    const chunkSize = events ? 4096 : 11;
+    for (let i = 0; i < bytes.length; i += chunkSize) c.enqueue(bytes.slice(i, i + chunkSize));
     c.close();
   }}), {headers: {'Content-Type': 'application/x-ndjson'}});
 };
@@ -76,6 +77,44 @@ async function submit(text) {
   assert.equal(d.querySelector('#chat-history').children.length, 0);
   mode = 'success'; await submit('SOCI');
   assert.equal(requests.at(-1).context, undefined);
-  console.log('PASS: question, streamed Unicode, verified citation links, sanitization, follow-up history, error/retry, cancellation, new conversation');
+
+  function answerEvents(chunks, nextContext = 'b'.repeat(64)) {
+    return [{type: 'sources', sources: [record]}, ...chunks.map(text => ({type: 'delta', text})),
+      {type: 'done', context: nextContext}];
+  }
+  d.querySelector('#chat-new').click();
+  events = answerEvents(['x'.repeat(30000), 'y'.repeat(30000)]);
+  await submit('Ringkas seluruh dokumen');
+  assert.equal(d.querySelector('.chat-error'), null);
+  assert.equal(d.querySelector('.chat-answer.rendered').textContent.trim(), 'x'.repeat(30000) + 'y'.repeat(30000));
+
+  d.querySelector('#chat-new').click();
+  const escapedAnswer = '"'.repeat(200000);
+  events = answerEvents([escapedAnswer]); // One cached delta exceeds the old serialized-line cap after JSON escaping.
+  await submit('Tampilkan jawaban tersimpan');
+  assert.equal(d.querySelector('.chat-error'), null);
+  assert.equal(d.querySelector('.chat-answer.rendered').textContent.trim(), escapedAnswer);
+
+  events = answerEvents(['x'.repeat(60000), 'y'.repeat(140001)], 'c'.repeat(64));
+  await submit('Jawaban terlalu panjang');
+  let lastReply = d.querySelector('.chat-message.assistant:last-child');
+  assert.match(lastReply.querySelector('.chat-error').textContent, /Jawaban melampaui batas ukuran/);
+  assert.equal(lastReply.querySelector('.chat-answer').textContent, 'x'.repeat(60000));
+  events = answerEvents(['Jawaban berikutnya']);
+  await submit('Lanjutkan setelah gagal');
+  assert.equal(requests.at(-1).context, 'b'.repeat(64)); // Oversized answers never update conversation context.
+
+  d.querySelector('#chat-new').click();
+  events = answerEvents([{text: 'bukan string'}]);
+  await submit('Delta tidak valid');
+  assert.match(d.querySelector('.chat-error').textContent, /Aliran jawaban tidak valid/);
+  assert.equal(d.querySelector('.chat-answer').textContent, '');
+
+  d.querySelector('#chat-new').click();
+  events = answerEvents(['x'.repeat(1201025)]);
+  await submit('Bingkai aliran terlalu panjang');
+  assert.match(d.querySelector('.chat-error').textContent, /Aliran jawaban tidak valid/);
+  assert.equal(d.querySelector('.chat-answer').textContent, '');
+  console.log('PASS: question, streamed Unicode, verified citation links, sanitization, follow-up history, error/retry, cancellation, new conversation, long answers, escaped cached answers, bounded text and stream lines, invalid deltas');
   w.close();
 })().catch(error => { console.error(error); w.close(); process.exitCode = 1; });

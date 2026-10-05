@@ -7,8 +7,36 @@ function validDate(y,m,d) {
   const parsed = new Date(date + 'T00:00:00Z');
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0,10) === date ? date : null;
 }
+// Keep complete endpoints together: "3 October 2026 sampai tanggal 5 October 2026"
+// is one inclusive range, while "3 October dan 5 October" is still a date list.
+function dateRanges(question, year) {
+  const endpoint = '(?:20\\d{2}-\\d{1,2}-\\d{1,2}|\\d{1,2}[/-]\\d{1,2}(?:[/-]20\\d{2})?|\\d{1,2}\\s+(?:' + monthNames + ')(?:\\s+20\\d{2})?)';
+  const range = new RegExp('\\b(' + endpoint + ')\\s*(?:sampai|hingga|s/d|[–—-])\\s*(?:(?:tanggal|tgl|tggl)\\s*)?(' + endpoint + ')\\b', 'gi');
+  const parts = text => {
+    let m = text.match(/^(20\d{2})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return {year:m[1], month:m[2], day:m[3]};
+    m = text.match(/^(\d{1,2})[/-](\d{1,2})(?:[/-](20\d{2}))?$/);
+    if (m) return {year:m[3], month:m[2], day:m[1]};
+    m = text.match(new RegExp('^(\\d{1,2})\\s+(' + monthNames + ')(?:\\s+(20\\d{2}))?$', 'i'));
+    return {year:m[3], month:months[m[2].toLowerCase()], day:m[1]};
+  };
+  const dates = [];
+  let invalid = false;
+  const rest = question.replace(range, (text, first, last) => {
+    const a = parts(first), b = parts(last), fromYear = a.year || b.year || year, toYear = b.year || a.year || year;
+    if (fromYear && toYear) {
+      const from = validDate(+fromYear,+a.month,+a.day), to = validDate(+toYear,+b.month,+b.day);
+      if (from && to && from <= to) dates.push({from,to});
+      else invalid = true;
+    }
+    return ' '.repeat(text.length);
+  });
+  return {dates, rest, invalid};
+}
 export function dateQuery(question, history = [], years = []) {
   question = dateOrder(question);
+  const ranges = dateRanges(question, years.length === 1 ? years[0] : undefined);
+  if (ranges.invalid) return {clarification:'Rentang tanggal tidak valid. Pastikan kedua tanggal benar dan tanggal awal tidak melewati tanggal akhir.', filter:false};
   const full = text => {
     text = dateOrder(text);
     let m = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
@@ -23,7 +51,7 @@ export function dateQuery(question, history = [], years = []) {
   const previousDay = previous?.content.match(/\b(?:tanggal|tgl|tggl)\s*(\d{1,2})(?!\d)/i);
   const suppliedMonth = question.match(new RegExp('\\b(' + monthNames + ')\\s+(20\\d{2})\\b','i'));
   if (!date && previousDay && suppliedMonth) date=validDate(+suppliedMonth[2],months[suppliedMonth[1].toLowerCase()],+previousDay[1]);
-  const range = /\b(sebelum|sesudah|setelah|sampai|hingga|sejak|antara|before|after|between|until)\b/i.test(question) ||
+  const range = ranges.dates.length > 0 || /\b(sebelum|sesudah|setelah|sampai|hingga|sejak|antara|before|after|between|until)\b/i.test(question) ||
     new RegExp('\\b\\d{1,2}\\s*[–-]\\s*\\d{1,2}\\s+(?:'+monthNames+')\\b','i').test(question) ||
     (question.match(/\b20\d{2}-\d{1,2}-\d{1,2}\b/g) || []).length > 1;
   if (date) return {date, filter:!range};
@@ -103,7 +131,9 @@ const span = d => d.covers || [d.start,d.end];
 // Every date the user wrote: "25 september", "22 dan 25 sept", "23-24 sept" (range), "26/9", "2026-09-26".
 export function requestedDates(question, year) {
   question = dateOrder(question);
-  const out = [], add = (y,m,d) => { const v = validDate(+y,+m,+d); if (v) out.push({from:v, to:v}); };
+  const ranges = dateRanges(question, year);
+  question = ranges.rest;
+  const out = [...ranges.dates], add = (y,m,d) => { const v = validDate(+y,+m,+d); if (v) out.push({from:v, to:v}); };
   for (const m of question.matchAll(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/g)) add(m[1],m[2],m[3]);
   for (const m of question.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(20\d{2}))?\b/g)) if (m[3] || year) add(m[3] || year,m[2],m[1]);
   const list = new RegExp('\\b(\\d{1,2})((?:\\s*(?:,|&|dan|-|–|sampai|hingga|s/d)\\s*\\d{1,2})*)\\s+(' + monthNames + ')\\b(?:\\s+(20\\d{2}))?','gi');
@@ -166,6 +196,8 @@ function titledDocuments(question, index) {
 }
 const SUMMARY_WORDS = /\b(dokumen|laporan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|isi|simpulkan|kesimpulan|baca|keterbukaan|stockbit|digest)\b/i;
 export function documentRequest(question, scope, index, request = requestScope(question, index, scope.date?.slice(0,4))) {
+  // An empty selection still routes agent mode to the archive's zero-call date clarification.
+  if (scope.clarification) return [];
   const titled = dedupeDocuments(titledDocuments(question, index));
   if (titled.length && titled.length <= 6) return titled;
   const cats = request.categories;

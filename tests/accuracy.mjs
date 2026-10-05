@@ -191,6 +191,25 @@ test('document requests get code-computed counts; numbers absent from the source
     ['18 emiten', '99,9%']);
 });
 
+test('counts recognize thousands separators without accepting numeric suffixes or rounded counts', async () => {
+  const {unverifiedNumbers} = await import('../worker/screening.mjs');
+  for (const answer of ['1.603','1,603','1603']) for (const source of ['1.603','1,603','1603']) {
+    assert.deepEqual(unverifiedNumbers(`Ada ${answer} postingan.`,`${source} postingan.`),[],answer+' / '+source);
+    assert.deepEqual(unverifiedNumbers(`Ada ${answer} postingan.`,`| Postingan | ${source} |`),[],answer+' / table '+source);
+  }
+  assert.deepEqual(unverifiedNumbers('Ada 1.604 postingan.','| Postingan | 1.603 |'),['1.604 postingan']);
+  assert.deepEqual(unverifiedNumbers('Ada 603 postingan dan 18 emiten.','1.603 postingan dan 118 emiten.'),
+    ['603 postingan','18 emiten']);
+  assert.deepEqual(unverifiedNumbers('Ada 1.603 postingan.','Nilai Rp1603.'),['1.603 postingan'],
+    'An unrelated amount cannot validate an exact count');
+  assert.deepEqual(unverifiedNumbers('GTSI: 1.603 transaksi.','GTSI 1603 98'),[],
+    'Existing issuer-table counts accept equivalent integer spellings');
+  const doc = manifest.docs.find(d => d.name === 'stockbit_05102026.md');
+  const material = (await read(doc.asset)).parts.map(p => p.text).join('');
+  assert.deepEqual(unverifiedNumbers('Dokumen mencakup 1.603 postingan unik.',material),[],
+    'The reported live answer must not emit a warning about 603 postingan');
+});
+
 test('a name the user wrote is searched even when the model "corrects" it', async () => {
   const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
   const model = {complete:async () => '{"terms":["Tanoto","TPI"]}', answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};

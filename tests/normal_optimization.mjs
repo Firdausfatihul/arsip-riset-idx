@@ -6,16 +6,17 @@ import {converse,CacheStore,hash} from '../worker/core.mjs';
 function fixture() {
   const db=new DatabaseSync(':memory:');
   const sql={exec(q,...args){const s=db.prepare(q),rows=s.columns().length?s.all(...args):(s.run(...args),[]);return {toArray:()=>rows};}};
-  const cache=new CacheStore(sql),bodies=['ALFA alpha beta. '.repeat(22500),'SGX temuan singkat.','Stockbit tambahan.'];
+  const cache=new CacheStore(sql),bodies=['ALFA alpha beta. '.repeat(55000),'SGX temuan singkat.','Stockbit tambahan.'];
+  const pieces=body=>body.match(/[\s\S]{1,95000}/g)||[];
   const docs=bodies.map((body,i)=>({source_id:'D'+(i+2),document_id:'stable-'+i,document_hash:'hash-'+i,
     name:'document-'+i+'.md',title:'Document '+i,cat:i===2?'stockbit':'keterbukaan-singapura',
     path:'files/document-'+i+'.md',start:'2026-09-20',end:'2026-09-20',label:'20 September 2026',
-    asset:'raw-'+i,evidence_asset:'evidence-'+i,sizes:[body.length]}));
+    asset:'raw-'+i,evidence_asset:'evidence-'+i,sizes:pieces(body).map(p=>p.length+100)}));
   const index={docs,tickers:['ALFA'],commonWords:[],handles:[],postings:{},system:'Gunakan bukti.',
     version:'archive-v1',retrieval_version:'evidence-v1',asset_hashes:{'events.json':'events-v1'}};
   const archive={manifest:async()=>index,search:async terms=>docs.filter((d,i)=>terms.some(t=>bodies[i].includes(t))),
     read:async asset=>{const i=docs.findIndex(d=>d.asset===asset||d.evidence_asset===asset),d=docs[i];assert.ok(d);
-      return asset===d.asset?{parts:[{source_id:d.source_id,part:1,text:bodies[i]}]}:
+      return asset===d.asset?{parts:pieces(bodies[i]).map((text,n)=>({source_id:d.source_id,part:n+1,text}))}:
         {version:index.retrieval_version,document_hash:d.document_hash,coverage:'full-source-partition',records:[{
           section_id:'section',line:1,kind:'context',context:'',content:bodies[i],tickers:['ALFA'],event_date:null}]};},
     events:async()=>({names:{},types:[],events:[]})};

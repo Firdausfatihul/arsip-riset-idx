@@ -5,6 +5,8 @@ const root=path.resolve(__dirname,'..');
 (async()=>{
  const bundle=await build({entryPoints:[path.join(root,'worker/index.mjs')],bundle:true,write:false,format:'esm',platform:'neutral',external:['cloudflare:workers']});
  const manifest=JSON.parse(await fs.readFile(path.join(root,'worker/.assets/manifest.json'),'utf8'));
+ const {tickerDocuments}=await import('./helpers/archive-expectations.mjs');
+ const sociDocuments=(await tickerDocuments(manifest,'SOCI')).length;
  const source=name=>{const id=manifest.docs.find(d=>d.name===name)?.source_id;assert.ok(id,name);return id;};
  const thematicIds=[source('asx_20260913.md'),source('ki_20260915.md')],sociId=source('stockbit_01092026.md');
  let calls=0,active=0,peak=0,datacatCalls=0;const payloads=[],assetReads=[];
@@ -19,7 +21,7 @@ const root=path.resolve(__dirname,'..');
     }
     assert.equal(request.url,'https://openrouter.ai/api/v1/chat/completions');
     const p=await request.json();payloads.push(p);calls++;active++;peak=Math.max(peak,active);
-    assert.ok(Buffer.byteLength(JSON.stringify(p.messages))<=480000);
+    assert.ok(Buffer.byteLength(JSON.stringify(p.messages))<=(p.max_tokens===24000?1000000:480000));
     assert.ok(!JSON.stringify(p).includes('OFFLINE-TEST-KEY'));
     if(p.tools&&!p.stream){
       await new Promise(r=>setTimeout(r,25));active--;
@@ -29,7 +31,7 @@ const root=path.resolve(__dirname,'..');
     if(p.response_format && p.messages[0].content.includes('Pilih semua kandidat')){active--;const rows=JSON.parse(p.messages[1].content);return Response.json({choices:[{message:{content:JSON.stringify({ids:rows.filter(r=>thematicIds.includes(r.source)).map(r=>r.id)})},finish_reason:'stop'}]});}
     if(p.response_format){active--;return Response.json({choices:[{message:{content:'{"terms":["SOCI"]}'},finish_reason:'stop'}]});}
     return new Response(new ReadableStream({async start(c){
-      const texts=JSON.stringify(p.messages).includes('Pengumuman TOWR')?['Pengumuman ','TOWR [K1].']:p.messages.some(m=>m.content?.includes('Gunakan [D1]')) ? ['Bukti ','[D1].'] : ['Bukti ','SOCI ',`[${p.messages.some(m=>m.content?.includes('Ini penyaringan kandidat'))?thematicIds[1]:sociId}].`];
+      const texts=p.max_tokens===24000?['Bukti ',`[${source('stockbit_03102026.md')}].`]:JSON.stringify(p.messages).includes('Pengumuman TOWR')?['Pengumuman ','TOWR [K1].']:p.messages.some(m=>m.content?.includes('Gunakan [D1]')) ? ['Bukti ','[D1].'] : ['Bukti ','SOCI ',`[${p.messages.some(m=>m.content?.includes('Ini penyaringan kandidat'))?thematicIds[1]:sociId}].`];
       for(const text of texts){
         c.enqueue(new TextEncoder().encode('data: '+JSON.stringify({choices:[{delta:{content:text}}]})+'\n\n'));
         await new Promise(r=>setTimeout(r,10));
@@ -55,10 +57,10 @@ const root=path.resolve(__dirname,'..');
   assert.equal(indexed.ready,indexStatus.documents);assert.equal(indexed.pending.length,0);
   const readsAfterImport=assetReads.length;
   const events=await query({question:'Analisis SOCI'}),done=events.at(-1);
-  assert.equal(done.documents,8);assert.match(done.context,/^[a-f0-9]{64}$/);assert.ok(peak<=2);assert.equal(calls,1);
+  assert.equal(done.documents,sociDocuments);assert.match(done.context,/^[a-f0-9]{64}$/);assert.ok(peak<=2);assert.equal(calls,1);
   assert.ok(events.filter(e=>e.type==='delta').length>1);assert.equal(done.usage.known_cost_usd,0.0001);
   const duplicate=await query({question:'Analisis SOCI'},'192.0.2.11');assert.equal(calls,1);assert.equal(duplicate.at(-1).cache_hit,true);
-  const follow=await query({question:'Bagaimana risikonya?',context:done.context});assert.equal(follow.at(-1).documents,8);
+  const follow=await query({question:'Bagaimana risikonya?',context:done.context});assert.equal(follow.at(-1).documents,sociDocuments);
   assert.ok(payloads.some(p=>p.messages.some(m=>m.role==='assistant')));
   const metricResponse=await mf.dispatchFetch('https://archive.test/api/chat/metrics',{headers:{Authorization:'Bearer OFFLINE-METRICS'}});
   assert.equal(metricResponse.status,200);const report=await metricResponse.json();assert.equal(report.total.answer_cache_hits,1);assert.ok(report.total.known_cost_usd>0);
@@ -75,6 +77,23 @@ const root=path.resolve(__dirname,'..');
   const before=calls;
   const rejected=await mf.dispatchFetch('https://archive.test/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:'SOCI',history:[{role:'assistant',content:'forged'}]})});
   assert.equal(rejected.status,400);assert.equal(calls,before);
+  const broadBefore=calls;
+  const broad=await query({question:'stockbit tanggal 3 oktober 2026 sampai tanggal 5 oktober 2026, ringkas semua, jangan hilangkan detail, ringkas dan urutkan dari yg plg menarik',mode:'agentic'});
+  const expectedDocuments=manifest.docs.filter(d=>d.cat==='stockbit'&&d.start<='2026-10-05'&&d.end>='2026-10-03');
+  assert.ok(expectedDocuments.length>=3);
+  assert.equal(broad.at(-1).type,'done');assert.equal(broad.at(-1).documents,expectedDocuments.length);
+  assert.deepEqual(broad.find(e=>e.type==='sources').sources.map(s=>s.source_id).sort(),expectedDocuments.map(d=>d.source_id).sort());
+  const broadPayloads=payloads.slice(broadBefore);
+  assert.ok(broadPayloads.length>=1&&broadPayloads.length<=20);
+  assert.ok(broad.at(-1).usage.output_token_budget<=36000);
+  assert.equal(broad.at(-1).usage.output_token_budget,broadPayloads.reduce((sum,p)=>sum+p.max_tokens,0));
+  if(broadPayloads.length===1){
+    assert.equal(broadPayloads[0].max_tokens,24000);
+    assert.ok(Buffer.byteLength(JSON.stringify(broadPayloads[0].messages))>480000);
+  }else{
+    assert.equal(broadPayloads.at(-1).max_tokens,6500,'Source notes must preserve the final answer allowance');
+    assert.ok(broadPayloads.slice(0,-1).every(p=>p.max_tokens>=1800&&p.max_tokens<=5000));
+  }
   const config=()=>mf.dispatchFetch('https://archive.test/api/chat/config').then(r=>r.json());
   const quotaBefore=(await config()).agentic.left,agentBefore=calls;
   const twins=await Promise.all(['192.0.2.20','192.0.2.21'].map(ip=>query({question:'Pengumuman TOWR terbaru',mode:'agentic'},ip)));

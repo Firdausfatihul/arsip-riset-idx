@@ -18,7 +18,7 @@ function fixture({large=false}={}) {
     const d={source_id:'D'+(i+1),document_id:'stable-'+name,document_hash:'hash-'+name,asset:name+'.json',
       evidence_asset:name+'.evidence.json',name,title:name,label:date,start:date,end:date,cat,path:'files/'+name,sizes:[body.length]};
     if(name==='stockbit_28.md')d.covers=['2026-09-26','2026-09-28'];
-    bodies.set(d.asset,body+(large ? ('\n'+body).repeat(25000) : ''));
+    bodies.set(d.asset,body+(large ? ('\n'+body).repeat(70000) : ''));
     return d;
   });
   const index={docs,tickers:['HELI','ENRG','INDO'],wordTickers:['INDO'],commonWords:['jelaskan','apa','yang'],
