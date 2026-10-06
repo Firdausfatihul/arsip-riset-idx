@@ -20,7 +20,7 @@
   var DATACAT = /^https:\/\/quant\.renr\.ai\/[A-Za-z0-9\/_.%-]+$/;
   function showLeft(left){
     if (typeof left !== 'number' || !isFinite(left)) return;
-    agenticLeft.textContent = 'Sisa ' + left + ' dari ' + agenticLimit + ' pertanyaan hari ini untuk seluruh situs.';
+    agenticLeft.textContent = 'Sisa ' + left + ' dari ' + agenticLimit + ' pertanyaan agen hari ini (seluruh situs).';
     agenticInput.disabled = left <= 0;
     if (left <= 0) agenticInput.checked = false;
   }
@@ -43,7 +43,7 @@
   function message(role, text, agentic){
     var block = document.createElement('section'), label = document.createElement('h3');
     block.className = 'chat-message ' + role;
-    label.textContent = role === 'user' ? 'Kamu' : agentic ? 'Jawaban mode agen' : 'Jawaban dari arsip';
+    label.textContent = role === 'user' ? 'Kamu' : agentic ? 'Jawaban (agen)' : 'Jawaban';
     block.appendChild(label);
     var content = document.createElement(role === 'user' ? 'p' : 'div');
     content.textContent = text;
@@ -107,7 +107,7 @@
       var scroll = document.createElement('div');
       scroll.className = 'chat-table-scroll'; scroll.tabIndex = 0;
       scroll.setAttribute('role', 'region');
-      scroll.setAttribute('aria-label', 'Tabel jawaban; geser ke samping untuk melihat kolom lainnya');
+      scroll.setAttribute('aria-label', 'Tabel, geser ke samping');
       table.replaceWith(scroll); scroll.appendChild(table);
     });
     target.replaceChildren(fragment);
@@ -118,15 +118,15 @@
     send.disabled = value; input.disabled = value; stop.hidden = !value; reset.disabled = value; agenticInput.disabled = value;
     log.setAttribute('aria-busy', String(value));
     progress.hidden = !value;
-    if (value){ meter.removeAttribute('value'); activity.textContent = 'Asisten mulai bekerja…'; elapsed.textContent = '0 detik'; }
+    if (value){ meter.removeAttribute('value'); activity.textContent = 'Memulai…'; elapsed.textContent = '0 detik'; }
   }
 
   form.addEventListener('submit', async function(event){
     event.preventDefault();
     var question = input.value.trim();
     if (!question || controller) return;
-    if (question.length > 600){ status.textContent = 'Maksimal 600 karakter per pertanyaan.'; return; }
-    if (turns >= 20){ status.textContent = 'Percakapan sudah panjang. Pilih Percakapan baru untuk melanjutkan.'; return; }
+    if (question.length > 600){ status.textContent = 'Maksimal 600 karakter.'; return; }
+    if (turns >= 20){ status.textContent = 'Batas 20 pertanyaan tercapai. Mulai Percakapan baru.'; return; }
     controller = new AbortController();
     busy(true); reset.hidden = false;
     var agentic = !modeBox.hidden && agenticInput.checked;
@@ -135,7 +135,7 @@
     var reply = message('assistant', '', agentic), text = '', sources = [], summary = null, done = false, usage = null, cacheHit = false, clarification = false;
     reply.block.insertBefore(progress, reply.content);
     reply.block.scrollIntoView?.({block: 'nearest'});
-    status.textContent = 'Menghubungkan ke asisten arsip…';
+    status.textContent = 'Menghubungkan…';
     var started = Date.now(), ticker = setInterval(function(){
       elapsed.textContent = Math.floor((Date.now() - started) / 1000) + ' detik';
     }, 1000);
@@ -145,10 +145,10 @@
         headers: {'Content-Type': 'application/json'}, body: JSON.stringify({question: question, context: context || undefined, mode: agentic ? 'agentic' : undefined})});
       if (!response.ok){
         var problem = await response.json().catch(function(){ return {}; });
-        throw new Error(problem.error || 'Percakapan belum tersedia. Silakan coba lagi nanti.');
+        throw new Error(problem.error || 'Belum tersedia. Coba lagi nanti.');
       }
       if (!response.body || !/application\/x-ndjson/.test(response.headers.get('Content-Type') || '')){
-        throw new Error('Percakapan belum diaktifkan oleh pengelola. Pencarian dokumen tetap bisa dipakai.');
+        throw new Error('Percakapan belum aktif.');
       }
       var stream = response.body.getReader(), decoder = new TextDecoder(), pending = '';
       function receive(line){
@@ -156,7 +156,7 @@
         var event = JSON.parse(line);
         if (event.type === 'status'){
           status.textContent = event.text;
-          if (event.phase === 'answer'){ meter.removeAttribute('value'); activity.textContent = 'Asisten sedang menulis jawaban…'; }
+          if (event.phase === 'answer'){ meter.removeAttribute('value'); activity.textContent = 'Menulis jawaban…'; }
         }
         if (event.type === 'progress'){
           meter.max = event.total; meter.value = event.completed;
@@ -168,12 +168,12 @@
             return (/^D\d+$/.test(s.source_id) && knownPaths.has(s.path)) || (/^K\d+$/.test(s.source_id) && DATACAT.test(s.url || ''))
               || (/^O\d+$/.test(s.source_id) && OWN.test(s.url || ''));
           });
-          if (sources.length !== event.sources.length) throw new Error('Daftar arsip sudah diperbarui. Muat ulang halaman lalu coba lagi.');
+          if (sources.length !== event.sources.length) throw new Error('Arsip diperbarui. Muat ulang halaman.');
           summary = sourceList(reply.block, sources);
         }
         if (event.type === 'delta'){
           if (typeof event.text !== 'string') throw new Error('Aliran jawaban tidak valid.');
-          if (event.text.length > ANSWER_LIMIT - text.length) throw new Error('Jawaban melampaui batas ukuran.');
+          if (event.text.length > ANSWER_LIMIT - text.length) throw new Error('Jawaban terlalu panjang.');
           text += event.text;
           reply.content.textContent = text;
         }
@@ -182,7 +182,7 @@
           if (!/^[a-f0-9]{64}$/.test(event.context || '')) throw new Error('Konteks jawaban tidak valid. Muat ulang halaman.');
           nextContext = event.context; done = true;
           usage = event.usage; cacheHit = !!event.cache_hit; clarification = !!event.clarification;
-          if (summary) summary.textContent = sources.length + ' sumber dirujuk · lihat sumber';
+          if (summary) summary.textContent = sources.length + ' sumber dirujuk';
           if (typeof event.agentic_left === 'number') showLeft(event.agentic_left);
         }
       }
@@ -194,28 +194,28 @@
         lines.forEach(receive);
         if (part.done){ receive(pending); break; }
       }
-      if (!done || !text.trim()) throw new Error('Jawaban terputus sebelum selesai. Silakan coba lagi.');
+      if (!done || !text.trim()) throw new Error('Jawaban terputus. Coba lagi.');
       renderAnswer(reply.content, text, sources);
       if (usage && typeof usage.known_cost_usd === 'number' && Number.isFinite(usage.known_cost_usd)){
         var cost = document.createElement('details'), costTitle = document.createElement('summary'), detail = document.createElement('p');
-        costTitle.textContent = cacheHit ? 'Jawaban tersimpan · tanpa panggilan AI baru' : 'Pemakaian AI permintaan ini';
-        detail.textContent = 'Biaya tercatat: US$' + usage.known_cost_usd.toFixed(6) +
+        costTitle.textContent = cacheHit ? 'Dari cache' : 'Biaya AI';
+        detail.textContent = 'Biaya: US$' + usage.known_cost_usd.toFixed(6) +
           ' · Input: ' + Number(usage.prompt_tokens || 0).toLocaleString('id-ID') +
           ' token · Output: ' + Number(usage.completion_tokens || 0).toLocaleString('id-ID') +
-          ' token · Input dari cache provider: ' + Number(usage.cached_tokens || 0).toLocaleString('id-ID') +
-          ' token.' + (usage.missing_usage_calls ? ' Rincian biaya sebagian panggilan belum tersedia; angka ini belum total lengkap.' : '');
+          ' token · Input cache: ' + Number(usage.cached_tokens || 0).toLocaleString('id-ID') +
+          ' token.' + (usage.missing_usage_calls ? ' Sebagian biaya belum dilaporkan; total belum lengkap.' : '');
         cost.className = 'chat-sources'; cost.appendChild(costTitle); cost.appendChild(detail); reply.block.appendChild(cost);
       }
       context = nextContext; turns++;
-      input.value = ''; input.placeholder = 'Tanyakan lanjutannya, misalnya: bagaimana risiko pendanaannya?';
-      status.textContent = clarification ? 'Lengkapi tanggal untuk melanjutkan.' : 'Jawaban selesai berdasarkan ' + sources.length + ' sumber. Kamu bisa bertanya lagi.';
+      input.value = ''; input.placeholder = 'Pertanyaan lanjutan…';
+      status.textContent = clarification ? 'Lengkapi tanggalnya.' : 'Selesai · ' + sources.length + ' sumber.';
     } catch (error){
       var aborted = controller.signal.aborted;
-      var description = aborted ? (controller.signal.reason === 'timeout' ? 'Proses terlalu lama. Coba pertanyaan yang lebih spesifik.' : 'Proses dihentikan.') :
-        (error instanceof TypeError ? 'Koneksi ke asisten terputus. Periksa koneksi lalu coba lagi.' : error.message);
+      var description = aborted ? (controller.signal.reason === 'timeout' ? 'Terlalu lama. Persempit pertanyaan.' : 'Dihentikan.') :
+        (error instanceof TypeError ? 'Koneksi terputus. Coba lagi.' : error.message);
       controller.abort();
       var warning = document.createElement('p'); warning.className = 'chat-error';
-      warning.textContent = description + (text ? ' Teks di atas belum menjadi jawaban lengkap.' : '');
+      warning.textContent = description + (text ? ' Jawaban tidak lengkap.' : '');
       reply.block.appendChild(warning);
       var retry = document.createElement('button'); retry.type = 'button'; retry.textContent = 'Coba lagi';
       retry.addEventListener('click', function(){
@@ -234,7 +234,7 @@
   reset.addEventListener('click', function(){
     if (controller) return;
     context = null; turns = 0; form.after(progress); log.replaceChildren(); status.textContent = ''; input.value = '';
-    input.placeholder = 'Contoh: Analisis SOCI dari semua dokumen yang tersedia';
+    input.placeholder = 'Contoh: analisis SOCI';
     reset.hidden = true; countInput(); input.focus();
   });
 })();

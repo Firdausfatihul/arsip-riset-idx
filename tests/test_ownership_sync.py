@@ -106,8 +106,42 @@ class OwnershipTrustTests(unittest.TestCase):
                            holder("DIREKTUR", 20, 2, roles=["director"])], public=200)
         self.assertEqual(sync.blockholders(source, True), (60, 0))
         rows = sync.report_holders(source, lambda name: name)["h"]
-        self.assertEqual(next(row for row in rows if row[0] == "Afiliasi"), ["Afiliasi", 1, 180, 18, 0])
+        self.assertEqual(next(row for row in rows if row[0] == "Afiliasi"), ["Afiliasi", 1, 180, 18, 0, 2])
+        self.assertEqual(next(row for row in rows if row[0] == "PT ALPHA"), ["PT ALPHA", 1, 600, 60, 1, 1])
         self.assertEqual(source["holders"][1]["shares"], 180, "raw shares must be preserved")
+
+    def test_derivable_only_for_role_and_missing_total_issues(self):
+        def review(issues, **extra):
+            return dict({"validation": "review", "issues": issues, "holders": [holder("PT ALPHA", 600, 60, "review", ["shareholder_5plus", "unknown"])]}, **extra)
+        ok = review(["holder_needs_review:PT ALPHA", "required_metric_missing:total_shares"])
+        self.assertTrue(sync.derivable(ok, [ok], False))
+        # Server conflict can come from other metrics; agreeing holder numbers stay usable.
+        self.assertTrue(sync.derivable(ok, [ok, dict(ok, metrics={"free_float_pct": {"value": 12}})], True))
+        other = dict(ok, holders=[holder("PT ALPHA", 500, 50)])
+        self.assertFalse(sync.derivable(ok, [ok, other], False), "versions disagree on holder numbers")
+        extra = dict(ok, holders=ok["holders"] + [holder("DIREKTUR", 10, 1, roles=["director"]), holder("Total Pengendali", None, 60)])
+        self.assertTrue(sync.derivable(ok, [ok, extra], True), "rows present in one version only are not contradictions")
+        totals = [dict(ok, metrics={"total_shares": {"value": n}}) for n in (1000, 5000)]
+        self.assertFalse(sync.derivable(ok, [ok] + totals, False), "written total shares disagree")
+        for bad in ("holder_percentage_mismatch:PT ALPHA", "conflicting_holder:PT ALPHA", "report_period_implausible:x",
+                    "issuer_mismatch:ABCD", "holder_headers_unverified:page2", "invalid_numeric_cell:page3"):
+            self.assertFalse(sync.derivable(review([bad]), [], False), bad)
+        self.assertFalse(sync.derivable(review([], import_status="quarantined"), [], False))
+        listed = sync.report_holders(ok, lambda name: name, trusted=False, usable=True)
+        self.assertEqual(listed["v"], 1)
+        self.assertEqual(listed["h"][0][4:], [0, 1])
+        self.assertEqual(sync.report_holders(ok, lambda name: name, trusted=False)["v"], 0)
+        # comparable() is not enough: v follows derivable() only.
+        self.assertEqual(sync.report_holders(ok, lambda name: name, trusted=True, usable=False)["v"], 0)
+
+    def test_row_named_by_non_derivable_issue_is_not_derivable(self):
+        source = snapshot([holder("PT ALPHA", 600, 60), holder("PT BETA", 937, 9.37, "review"), holder("PT ALPHA", 10, 1)])
+        source["issues"] = ["holder_percentage_mismatch:PT BETA"]
+        source["holders"].append(holder("PT GAMMA", 100, 10))
+        rows = {r[0]: r for r in sync.report_holders(source, lambda name: name)["h"]}
+        self.assertEqual(rows["PT BETA"][5], 0)
+        self.assertEqual(rows["PT ALPHA"][5], 0, "duplicate name")
+        self.assertEqual(rows["PT GAMMA"][5], 1)
 
     def test_clean_verified_snapshot_uses_actual_five_percent_threshold(self):
         source = snapshot([holder("PT ALPHA", 600, 60), holder("AFFILIATE NAMED", 20, 2)], public=380)

@@ -776,6 +776,14 @@ a.chip:hover{outline:1px solid var(--c)}
 .own-chart text.v{font:600 12px var(--mono);fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
 .own-chart text.sel{font-weight:600;fill:var(--ink)}
 .own-range{fill:var(--own-soft)}
+.own-pick{fill:var(--own);fill-opacity:.16;stroke:var(--own);stroke-width:1.5;display:none;pointer-events:none}
+.own-pick.on{display:inline}
+.own-chart svg{touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.own-presets{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px}
+.own-presets a{font:500 12.5px var(--mono);padding:4px 10px;border:1px solid var(--line-strong);border-radius:3px;color:var(--ink);text-decoration:none}
+.own-presets a:hover{border-color:var(--own)}
+.own-presets a[aria-current]{background:var(--own-soft);border-color:var(--own);font-weight:600}
+.own-presets .own-pick-msg{font:12.5px var(--mono);color:var(--own)}
 .own-grid{stroke:var(--line);stroke-width:1}
 .own-axis{stroke:var(--line-strong);stroke-width:1}
 .own-leg{stroke-width:3;stroke-linecap:round}
@@ -823,7 +831,6 @@ a.chip:hover{outline:1px solid var(--c)}
 .own-bar-track i{position:absolute;top:2px;bottom:2px;min-width:2px;border-radius:2px}
 .own-bar-track i.up{left:50%;background:var(--up)}
 .own-bar-track i.down{right:50%;background:var(--down)}
-.own-bar-track i.approx{opacity:.4}
 .own-bar-val{font:12.5px/1.3 var(--mono);text-align:right}
 .own-bar-val small{display:block;color:var(--muted);font-size:11.5px;margin-top:3px}
 .own-sources{display:grid;gap:6px;margin:0;padding-left:18px;font-size:16px}
@@ -845,6 +852,7 @@ a.chip:hover{outline:1px solid var(--c)}
   a.chip{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}
   .toc ol a,.own-code{min-height:44px}
   .own-more button,.hit-note button,.own-zoom{min-height:44px;font-size:14px}
+  .own-presets a{display:inline-flex;align-items:center;min-height:44px;font-size:14px}
 }
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 """
@@ -958,7 +966,7 @@ APP_JS = r"""
         endRow(); if (c === '\r' && text[i + 1] === '\n') i++;
       } else { cell += c; started = true; }
     }
-    if (quoted) return '<p>Tabel belum bisa dibaca: ada tanda kutip yang belum ditutup. Buka file CSV asli untuk memeriksa isinya.</p>';
+    if (quoted) return '<p>CSV tidak terbaca: tanda kutip tidak ditutup.</p>';
     endRow();
     if (!rows.length) return '<p>File CSV kosong.</p>';
     return '<table tabindex="0" aria-label="Isi CSV"><thead><tr>' +
@@ -1146,10 +1154,10 @@ APP_JS = r"""
     if (hit.hidden) return;
     if (res.total){
       hit.innerHTML = '<span>“' + esc(q) + '” muncul ' + (res.total >= 500 ? '500+' : res.total) + '× di dokumen ini</span>' +
-        (res.first ? '<button type="button">Lompat ke temuan pertama</button>' : '');
+        (res.first ? '<button type="button">Ke temuan pertama</button>' : '');
       if (res.first) hit.querySelector('button').addEventListener('click', function(){ res.first.scrollIntoView({behavior: 'instant', block: 'center'}); });
     } else {
-      hit.textContent = '“' + q + '” tidak muncul di isi dokumen ini';
+      hit.textContent = '“' + q + '” tidak ada di dokumen ini';
     }
   }
 
@@ -1189,7 +1197,7 @@ APP_JS = r"""
       (doc.kind === 'csv' ? 'Unduh CSV asli' : doc.kind === 'md' ? 'Buka .md mentah' : 'Buka halaman penuh') + '</a>');
     reader.setAttribute('data-cat', doc.cat);
     var head =
-      '<nav class="crumbs" aria-label="Lokasi"><a href="#">← Kembali ke daftar</a><span>/</span><span>' + esc(doc.catName) + '</span><span>/</span><span>' + esc(doc.label) + '</span></nav>' +
+      '<nav class="crumbs" aria-label="Lokasi"><a href="#">← Daftar</a><span>/</span><span>' + esc(doc.catName) + '</span><span>/</span><span>' + esc(doc.label) + '</span></nav>' +
       '<header class="doc-head"><p class="kicker"><span class="swatch"></span>' + esc(doc.catName) + '<span>·</span><time datetime="' + doc.end + '">' + esc(doc.label) + '</time></p>' +
       '<h1>' + esc(doc.title) + '</h1><p class="meta">' + meta.join('') + '</p><p class="hit-note" hidden></p></header>';
     if (doc.kind === 'html'){
@@ -1213,8 +1221,8 @@ APP_JS = r"""
       }, function(){
         doc.waiting = false;
         if (current !== doc) return;
-        reader.querySelector('.prose').innerHTML = '<div class="doc-loading" role="status"><p>Dokumen belum berhasil dimuat. Periksa koneksi lalu coba lagi.</p>' +
-          '<button type="button" data-retry-doc>Coba lagi</button> <a href="' + esc(doc.path) + '">Buka file dokumen</a></div>';
+        reader.querySelector('.prose').innerHTML = '<div class="doc-loading" role="status"><p>Gagal memuat dokumen.</p>' +
+          '<button type="button" data-retry-doc>Coba lagi</button> <a href="' + esc(doc.path) + '">Buka file</a></div>';
       });
       return;
     }
@@ -1333,7 +1341,7 @@ APP_JS = r"""
     var online = document.querySelector('.stat-online');
     if (online){
       online.hidden = !stats.room;
-      online.innerHTML = stats.room ? '<span class="live">' + fmtNum(stats.online) + ' online di arsip</span>' : '';
+      online.innerHTML = stats.room ? '<span class="live">' + fmtNum(stats.online) + ' online</span>' : '';
     }
   }
 
@@ -1402,7 +1410,7 @@ APP_JS = r"""
   var own = data.own, ownView = document.getElementById('own'), ownBody = document.getElementById('own-body'),
       ownSearch = document.getElementById('own-cari'), ownPick = document.getElementById('own-emiten'),
       ownFrom = document.getElementById('own-dari'), ownTo = document.getElementById('own-sampai');
-  var ownData = null, ownLoading = null, ownState = {t: '', from: 0, to: 0, sort: 'besar', all: false, chartAll: false, refocus: null};
+  var ownData = null, ownLoading = null, ownState = {t: '', from: 0, to: 0, sort: 'besar', all: false, chartAll: true, refocus: null};
   var DEF_FROM = 0;
   if (own) for (var di = 0; di < own.months.length; di++) if (own.months[di].asOf){ DEF_FROM = di; break; }
   var BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -1541,7 +1549,7 @@ APP_JS = r"""
     function index(v, table){ require(Number.isSafeInteger(v) && v >= 0 && v < table.length); }
     function url(v){ require(v === null || (typeof v === 'string' && v.length <= 4096)); }
     var n = own.months.length, count = 0;
-    require(d && d.format === 1 && /^https:\/\/[^\s]{1,200}$/.test(d.base) && d.companies && typeof d.companies === 'object' && !Array.isArray(d.companies));
+    require(d && (d.format === 1 || d.format === 2) && /^https:\/\/[^\s]{1,200}$/.test(d.base) && d.companies && typeof d.companies === 'object' && !Array.isArray(d.companies));
     array(d.months, 240); require(d.months.length === n && d.months.every(function(m, i){ return m === own.months[i].p; }));
     [d.names, d.categories].forEach(function(a){ array(a, 200000).forEach(function(v){ require(typeof v === 'string' && v.length <= 4000); }); });
     function rows(a, length, check){ array(a, 200000).forEach(function(row){ require(Array.isArray(row) && row.length === length); require(++count <= 2000000); check(row); }); }
@@ -1555,7 +1563,9 @@ APP_JS = r"""
         c.d.forEach(function(v, i){
           if (v === null) return;
           if (typeof v === 'number'){ require(Number.isSafeInteger(v) && v >= 0 && v < i && c.d[v] && typeof c.d[v] === 'object'); return; }
-          require(typeof v === 'object'); number(v.s); rows(v.h, 5, function(r){ index(r[0], d.names); r.slice(1, 4).forEach(number); flag(r[4]); });
+          require(typeof v === 'object'); number(v.s); if (v.v !== undefined) flag(v.v);
+          // Format 2: v = laporan derivable(), baris ke-6 = 1 boleh diturunkan / 2 agregat / 0 lainnya (report_holders di tools/sync_idx.py).
+          rows(v.h, d.format === 2 ? 6 : 5, function(r){ index(r[0], d.names); r.slice(1, 4).forEach(number); flag(r[4]); require(r.length === 5 || r[5] === 0 || r[5] === 1 || r[5] === 2); });
         });
         c.u.forEach(function(v){ require(v === null || (typeof v === 'string' && v.length <= 4096 && (/^https:\/\//.test(v) || /^[A-Za-z0-9_.\/-]+$/.test(v)))); });
       }
@@ -1591,7 +1601,7 @@ APP_JS = r"""
       var v = raw.d ? raw.d[i] : null, u = raw.u ? link(raw.u[i]) : null;
       if (typeof v === 'number') v = raw.d[v];
       out.u.push(u);
-      out.d.push(v ? {h: v.h, s: v.s, u: u} : null);
+      out.d.push(v ? {h: v.h, s: v.s, v: v.v, u: u} : null);
     }
     return (d.decoded[t] = out);
   }
@@ -1618,7 +1628,7 @@ APP_JS = r"""
     var k = c.k[i];
     if (!own.months[i].asOf || !k) return ['snapshot KSEI >1% belum tersedia'];
     var issues = (k.i || []).slice();
-    if (!k.h.length && !issues.length) issues.push('tidak ada baris pemegang untuk emiten ini');
+    if (!k.h.length && !issues.length) issues.push('tanpa baris pemegang');
     if (k.tp == null && k.h.length && !issues.length) issues.push('akumulasi KSEI belum terbaca');
     if (k.tp != null && (k.tp < 0 || k.tp > 100.05)) issues.push('akumulasi KSEI di luar 0–100%');
     var ids = new Set(), duplicate = false, badPct = false, badShares = false;
@@ -1628,9 +1638,9 @@ APP_JS = r"""
       if (r[4] != null && (r[4] < 0 || r[4] > 100.05)) badPct = true;
       if (r[5] != null && (!Number.isSafeInteger(r[5]) || r[5] < 0)) badShares = true;
     });
-    if (duplicate) issues.push('identitas investor berulang dalam satu snapshot');
+    if (duplicate) issues.push('identitas investor berulang');
     if (badPct) issues.push('porsi investor di luar 0–100%');
-    if (badShares) issues.push('jumlah lembar investor tidak valid');
+    if (badShares) issues.push('lembar investor tidak valid');
     return issues;
   }
   function tpOk(c, i){ return kseiIssues(c, i).length === 0; }
@@ -1700,7 +1710,7 @@ APP_JS = r"""
     ownBody.innerHTML = '<p class="doc-loading">Memuat data kepemilikan…</p>';
     loadOwn().then(renderOwn, function(){
       if (ownView.hidden) return;
-      ownBody.innerHTML = '<div class="doc-loading" role="status"><p>Data kepemilikan belum berhasil dimuat. Periksa koneksi lalu coba lagi.</p>' +
+      ownBody.innerHTML = '<div class="doc-loading" role="status"><p>Data kepemilikan gagal dimuat.</p>' +
         '<button type="button" id="own-retry">Coba lagi</button></div>';
     });
   }
@@ -1715,7 +1725,7 @@ APP_JS = r"""
       if (own.reports) fillReports(c);
       if (own.changes) fillChanges(c);
     } else {
-      ownBody.innerHTML = (st.t ? '<p class="own-note">Kode ' + esc(st.t) + ' tidak ada di data kepemilikan. Pilih dari daftar di bawah.</p>' : '') + listHtml();
+      ownBody.innerHTML = (st.t ? '<p class="own-note">Kode ' + esc(st.t) + ' tidak ada. Pilih dari daftar.</p>' : '') + listHtml();
     }
   }
 
@@ -1734,35 +1744,34 @@ APP_JS = r"""
       'pemegang-turun': function(r){ return r.hc.pct == null ? -1e9 : -r.hc.pct; }
     }[st.sort === 'kode' || (same && st.sort.indexOf('pemegang') !== 0) ? 'kode' : st.sort];
     rows.sort(function(x, y){ return (score ? score(y) - score(x) : 0) || (x.c.t < y.c.t ? -1 : 1); });
-    var sorts = [['besar', 'Akumulasi >1%: perubahan terbesar'], ['naik', 'Akumulasi >1%: naik paling banyak'], ['turun', 'Akumulasi >1%: turun paling banyak'],
-                 ['pemegang-naik', 'Jumlah pemegang: bertambah (%)'], ['pemegang-turun', 'Jumlah pemegang: berkurang (%)'], ['kode', 'Kode']];
+    var sorts = [['besar', 'Akumulasi >1%: perubahan terbesar'], ['naik', 'Akumulasi >1%: naik'], ['turun', 'Akumulasi >1%: turun'],
+                 ['pemegang-naik', 'Jumlah pemegang: naik (%)'], ['pemegang-turun', 'Jumlah pemegang: turun (%)'], ['kode', 'Kode']];
     var h = '<section class="own-card"><div class="own-card-head"><h3>' +
-      (same ? 'Akumulasi di atas 1% per ' + esc(monthText(st.to)) : 'Perubahan akumulasi di atas 1%, ' + esc(monthText(st.from)) + ' → ' + esc(monthText(st.to))) + '</h3>' +
+      (same ? 'Akumulasi &gt;1%, ' + esc(monthText(st.to)) : 'Akumulasi &gt;1%, ' + esc(monthText(st.from)) + ' → ' + esc(monthText(st.to))) + '</h3>' +
       '<label class="own-field own-inline">Urutkan<select id="own-urut">' + sorts.map(function(o){
         return '<option value="' + o[0] + '"' + (o[0] === st.sort ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
       }).join('') + '</select></label></div>';
-    if (!rows.length) return h + '<p class="empty">Tidak ada emiten yang cocok dengan “' + esc(raw) + '”.</p></section>';
+    if (!rows.length) return h + '<p class="empty">Tidak ada emiten “' + esc(raw) + '”.</p></section>';
     var shown = st.all || q ? rows : rows.slice(0, 100);
     h += '<div class="own-scroll"><table class="own-table"><thead><tr><th scope="col">Emiten</th>' +
       (same ? '' : '<th scope="col">' + esc(monthText(st.from, true)) + '</th>') + '<th scope="col">' + esc(monthText(st.to, true)) + '</th>' +
-      (same ? '' : '<th scope="col">Perubahan</th>') + '<th scope="col">Pemegang &gt;1%</th><th scope="col">Jumlah pemegang saham</th><th scope="col">Free float resmi</th>' +
+      (same ? '' : '<th scope="col">Perubahan</th>') + '<th scope="col">Pemegang &gt;1%</th><th scope="col">Jumlah pemegang</th><th scope="col">Free float resmi</th>' +
       (same ? '' : '<th scope="col">Tren</th>') + '</tr></thead><tbody>' +
       shown.map(function(r){
         var c = r.c;
         return '<tr><th scope="row"><a class="own-code" href="' + ownHref(c.t, st.from, st.to) + '"><span class="ticker">' + esc(c.t) + '</span>' +
           (c.n ? '<span class="own-name">' + esc(c.n) + '</span>' : '') + '</a></th>' +
           (same ? '' : '<td>' + pctText(r.a) + '</td>') + '<td><strong>' + pctText(r.b) + '</strong></td>' +
-          (same ? '' : '<td class="' + tone(r.d) + '">' + poinText(r.d) + (kseiPairOk(c, st.from, st.to) ? '' : '<span class="own-tags">belum dapat dibandingkan</span>') + '</td>') +
+          (same ? '' : '<td class="' + tone(r.d) + '">' + poinText(r.d) + (kseiPairOk(c, st.from, st.to) ? '' : '<span class="own-tags">tidak dibandingkan</span>') + '</td>') +
           '<td>' + countText(holdersAt(c, st.to)) + '</td><td>' + lastCell(c.c, st.to, countText) +
           (r.hc.pct != null ? '<span class="own-tags ' + tone(r.hc.d) + '">' + (r.hc.d ? signed(r.hc.pct, 1) + '% vs ' + esc(shortMonth(r.hc.pair.cmp)) : 'tetap vs ' + esc(shortMonth(r.hc.pair.cmp))) + '</span>' : '') +
           '</td><td>' + lastCell(c.f, st.to, pctText) + '</td>' +
           (same ? '' : '<td>' + spark(series(function(i){ return tpOk(c, i) ? tpAt(c, i) : null; }, st.from, st.to)) + '</td>') + '</tr>';
       }).join('') + '</tbody></table></div>';
     if (shown.length < rows.length) h += '<p class="own-more"><button type="button" id="own-semua">Tampilkan semua ' + rows.length + ' emiten</button></p>';
-    return h + '<p class="own-note">' + rows.length + ' emiten' + (q ? ' cocok' : '') + '. Klik kode untuk grafik, perubahan per pemegang, dan daftar pemegang. ' +
-      'Akumulasi &gt;1% = jumlah persen semua pemegang di atas 1% menurut KSEI. Jumlah pemegang saham dan free float resmi dari laporan bulanan emiten ' + esc(monthName(st.to)) +
-      ', atau laporan terakhir sebelumnya (bulannya ditulis di bawah angka); perubahan jumlah pemegang dibanding laporan terakhir sampai ' + esc(monthName(st.from)) + '.' +
-      (own.months[st.from].asOf ? '' : ' Data KSEI &gt;1% baru tersedia sejak ' + esc(monthText(DEF_FROM)) + ', jadi kolom akumulasi ' + esc(monthName(st.from)) + ' kosong.') + '</p></section>';
+    return h + '<p class="own-note">' + rows.length + ' emiten' + (q ? ' cocok' : '') + '. Akumulasi &gt;1%: total porsi pemegang &gt;1% (KSEI). ' +
+      'Jumlah pemegang dan free float: laporan emiten terakhir sampai ' + esc(monthName(st.to)) + '; perubahan jumlah pemegang vs laporan sampai ' + esc(monthName(st.from)) + '.' +
+      (own.months[st.from].asOf ? '' : ' Data KSEI &gt;1% mulai ' + esc(monthText(DEF_FROM)) + '; kolom ' + esc(monthName(st.from)) + ' kosong, bukan nol.') + '</p></section>';
   }
 
   function investors(c, from, to){
@@ -1787,20 +1796,20 @@ APP_JS = r"""
   function detailHtml(c){
     var st = ownState, from = st.from, to = st.to, same = from === to, vs = ' vs ' + esc(monthText(from, true)), comparable = kseiPairOk(c, from, to);
     function delta(a, b, fmt){
-      if (!tpOk(c, to) || (!same && !comparable)) return 'belum dapat dibandingkan · lihat catatan KSEI';
+      if (!tpOk(c, to) || (!same && !comparable)) return 'tidak dibandingkan';
       if (same) return 'per ' + esc(monthText(to));
-      if (a == null || b == null) return 'tidak ada pembanding per ' + esc(monthText(from, true));
+      if (a == null || b == null) return 'tanpa data per ' + esc(monthText(from, true));
       return '<span class="' + tone(b - a) + '">' + fmt(b - a) + '</span>' + vs;
     }
     function countDelta(d){ return d ? signed(d, 0) : 'tetap'; }
     // Pemegang ≥5%: dari daftar laporan emiten bulan itu, atau baris KSEI ≥5% kalau laporannya tidak terbaca.
     function b5Tile(){
       var pr = reportPair(c.p, from, to);
-      if (pr.cur == null) return tile('s5', 'Pemegang ≥5%', '—', 'belum terbaca sampai ' + esc(monthName(to)));
+      if (pr.cur == null) return tile('s5', 'Pemegang ≥5%', '—', 'laporan emiten sampai ' + esc(monthName(to)) + ' belum terbaca');
       var a = pr.cmp == null ? null : c.p[pr.cmp][0], v = c.p[pr.cur];
-      return tile('s5', 'Pemegang ≥5%', pctText(r2(v[0])), (v[2] === 'K' ? 'baris KSEI ≥5% ' : v[2] === 'P' ? 'persen tertulis laporan ' : 'laporan ') + esc(monthName(pr.cur)) +
-        (a == null ? '' : v[2] !== c.p[pr.cmp][2] ? ' · sumber berbeda; perubahan tidak dibandingkan' : (v[1] && c.p[pr.cmp][1] ? ' · <span class="' + tone(v[0] - a) + '">' + poinText(v[0] - a) + '</span> vs ' + esc(shortMonth(pr.cmp)) : ' · perubahan belum dapat dibandingkan')) +
-        (v[1] ? '' : v[2] === 'P' ? ' · belum dicocokkan ke total saham' : ' · angka belum terverifikasi'));
+      return tile('s5', 'Pemegang ≥5%', pctText(r2(v[0])), (v[2] === 'K' ? 'KSEI ≥5% ' : v[2] === 'P' ? 'persen tertulis ' : 'laporan ') + esc(monthName(pr.cur)) +
+        (a == null ? '' : v[2] !== c.p[pr.cmp][2] ? ' · sumber beda, tidak dibandingkan' : (v[1] && c.p[pr.cmp][1] ? ' · <span class="' + tone(v[0] - a) + '">' + poinText(v[0] - a) + '</span> vs ' + esc(shortMonth(pr.cmp)) : ' · tidak dibandingkan')) +
+        (v[1] ? '' : ' · belum terverifikasi'));
     }
     // Angka laporan emiten: laporan terakhir sampai Sampai, selisih dengan laporan pembanding (lihat reportPair).
     function reportTile(key, label, list, fmt, fmtDelta){
@@ -1808,11 +1817,11 @@ APP_JS = r"""
       if (pr.cur == null) return tile(key, label, '—', 'laporan emiten sampai ' + esc(monthName(to)) + ' belum terbaca');
       var a = pr.cmp == null ? null : list[pr.cmp][0], b = list[pr.cur][0];
       return tile(key, label, fmt(b), 'laporan ' + esc(monthName(pr.cur)) +
-        (a == null ? '' : (list[pr.cur][1] && list[pr.cmp][1] && (key !== 's4' || (a > 0 && b > 0)) ? ' · <span class="' + tone(b - a) + '">' + fmtDelta(b - a) + '</span> vs ' + esc(shortMonth(pr.cmp)) : ' · perubahan belum dapat dibandingkan')) +
-        (list[pr.cur][1] ? '' : ' · angka belum terverifikasi'));
+        (a == null ? '' : (list[pr.cur][1] && list[pr.cmp][1] && (key !== 's4' || (a > 0 && b > 0)) ? ' · <span class="' + tone(b - a) + '">' + fmtDelta(b - a) + '</span> vs ' + esc(shortMonth(pr.cmp)) : ' · tidak dibandingkan')) +
+        (list[pr.cur][1] ? '' : ' · belum terverifikasi'));
     }
     var ffAtTo = latestAt(c.f, to), ff = c.f[ffAtTo] || null, rs = c.r.charAt(to);
-    var pills = '<span class="own-pill' + (tpOk(c, to) ? ' ok">KSEI ✓ per ' + esc(monthText(to)) : '">KSEI ◐ belum dapat dibandingkan per ' + esc(monthText(to))) + '</span>' +
+    var pills = '<span class="own-pill' + (tpOk(c, to) ? ' ok">KSEI ✓ per ' + esc(monthText(to)) : '">KSEI ◐ ' + esc(monthText(to)) + ' · lihat catatan') + '</span>' +
       '<span class="own-pill' + (rs === 'v' ? ' ok">Laporan emiten ✓ ' + esc(monthName(to)) : rs === 'x' ? '">Laporan emiten ◐ ' + esc(monthName(to)) + ' belum terbaca' :
         '">Laporan emiten ○ ' + esc(monthName(to)) + ' belum ada') + '</span>';
 
@@ -1821,39 +1830,45 @@ APP_JS = r"""
       '<div class="own-tiles">' +
       tile('s1', 'Akumulasi &gt;1%', pctText(tpAt(c, to)), delta(tpAt(c, from), tpAt(c, to), poinText)) + b5Tile() +
       tile('s2', 'Sisa &lt;1% (perkiraan)', pctText(restAt(c, to)), delta(restAt(c, from), restAt(c, to), poinText)) +
-      reportTile('s3', 'Free float resmi IDX', c.f, pctText, poinText) +
+      reportTile('s3', 'Free float resmi', c.f, pctText, poinText) +
       tile('', 'Pemegang &gt;1%', countText(holdersAt(c, to)), delta(holdersAt(c, from), holdersAt(c, to), countDelta)) +
       reportTile('s4', 'Jumlah pemegang saham', c.c, countText, countDelta) + '</div>' +
-      '<p class="own-note">Akumulasi &gt;1% = jumlah persen semua pemegang di atas 1% menurut KSEI. Sisa &lt;1% = 100 − akumulasi, perkiraan kasar porsi pemegang kecil. ' +
-      'Pemegang ≥5% = saham semua pemegang ≥5% (termasuk direksi/komisaris ≥5%) dibagi total saham menurut laporan emiten; kalau laporan bulan itu tidak terbaca, jumlah baris KSEI ≥5%; kalau total saham laporan tidak terbaca (umumnya sebelum April 2026), jumlah persen yang tertulis di laporan (titik kosong, belum terverifikasi). ' +
-      'Free float resmi dan jumlah pemegang berasal dari laporan bulanan emiten; free float resmi memakai definisi lain (mengecualikan pengendali, afiliasi, direksi/komisaris, treasuri), jadi angkanya berbeda dari sisa &lt;1%.</p>';
+      '<p class="own-note">Akumulasi &gt;1%: total porsi pemegang &gt;1% (KSEI). Sisa &lt;1% = 100 − akumulasi. ' +
+      'Pemegang ≥5%: dari laporan emiten; tanpa laporan, baris KSEI ≥5%; tanpa total saham, persen tertulis (belum terverifikasi). ' +
+      'Free float resmi mengecualikan pengendali, afiliasi, direksi/komisaris, treasuri, jadi berbeda dari sisa &lt;1%.</p>';
 
     var dom = chartDomain(c);
     function cell(v, ok, fmt){ return fmt(v) + (v != null && !ok ? ' <span class="own-tags">⚠ belum terverifikasi</span>' : ''); }
     h += '<section class="own-card"><div class="own-card-head"><h3>Tren bulanan</h3><span id="own-trend-note"></span></div>' +
-      '<div class="own-chart" id="own-trend"></div><p class="own-legend"><span>○ titik kosong = angka belum terverifikasi, tidak disambung</span>' +
-      '<span id="own-est-legend" hidden>putus-putus = pemegang ≥5% dari persen tertulis laporan, belum dicocokkan ke total saham</span>' +
-      '<span>celah = bulan tanpa data; garis ≥5% juga terputus saat sumber berubah</span></p>' +
+      '<div class="own-presets" id="own-presets"></div><div class="own-chart" id="own-trend"></div><p class="own-legend"><span>○ = belum terverifikasi</span>' +
+      '<span id="own-est-legend" hidden>putus-putus = ≥5% dari persen tertulis</span>' +
+      '<span>celah = tanpa data (bukan nol) atau sumber ≥5% berganti</span></p>' +
       '<details class="own-twin"><summary>Lihat angka per bulan</summary><div class="own-scroll"><table class="own-table"><thead><tr>' +
       '<th scope="col">Bulan (tanggal KSEI)</th><th scope="col">Akumulasi &gt;1%</th><th scope="col">Pemegang ≥5%</th><th scope="col">Sisa &lt;1%</th><th scope="col">Free float resmi</th><th scope="col">Pemegang &gt;1%</th><th scope="col">Jumlah pemegang</th></tr></thead><tbody>' +
       (dom ? series(function(i){ return i; }, dom[0], dom[1]) : []).reverse().map(function(i){
         var p5 = c.p[i];
         return '<tr' + (i >= from && i <= to ? ' class="in-range"' : '') + '><th scope="row">' + esc(monthText(i)) + '</th><td>' + cell(tpAt(c, i), tpOk(c, i), pctText) +
-          '</td><td>' + (p5 ? (p5[2] === 'P' ? pctText(r2(p5[0])) : cell(r2(p5[0]), p5[1], pctText)) + '<span class="own-tags">' + (p5[2] === 'K' ? 'KSEI' : p5[2] === 'P' ? 'persen tertulis laporan' : 'laporan') + '</span>' : '—') +
+          '</td><td>' + (p5 ? (p5[2] === 'P' ? pctText(r2(p5[0])) : cell(r2(p5[0]), p5[1], pctText)) + '<span class="own-tags">' + (p5[2] === 'K' ? 'KSEI' : p5[2] === 'P' ? 'persen tertulis' : 'laporan') + '</span>' : '—') +
           '</td><td>' + cell(restAt(c, i), tpOk(c, i), pctText) + '</td><td>' + cell(ffAt(c, i), okAt(c.f, i), pctText) + '</td><td>' + countText(holdersAt(c, i)) +
           '</td><td>' + cell(countAt(c, i), okAt(c.c, i), countText) + '</td></tr>';
       }).join('') + '</tbody></table></div></details></section>';
 
     var rows = investors(c, from, to);
-    h += '<section class="own-card"><div class="own-card-head"><h3>Siapa menambah, siapa mengurangi</h3><span>' + esc(monthText(from)) + ' → ' + esc(monthText(to)) + ' · lembar saham</span></div>';
+    h += '<section class="own-card"><div class="own-card-head"><h3>Siapa menambah, siapa mengurangi</h3><span>' + esc(monthText(from)) + ' → ' + esc(monthText(to)) + ' · lembar</span></div>';
     if (!comparable){
-      h += '<p class="own-note own-unavailable">Perubahan belum dapat dibandingkan. ' + kseiPairNote(c, from, to) + '. Data yang tidak tersedia atau belum terverifikasi tidak berarti kepemilikan nol.</p>';
+      h += '<p class="own-note own-unavailable">KSEI &gt;1% tidak dibandingkan. ' + kseiPairNote(c, from, to) + '.';
+      // Snapshot KSEI valid pertama di dalam rentang, supaya pembaca bisa langsung membandingkan pemegang 1–5%.
+      var k0 = null;
+      for (var ki = from + 1; ki < to; ki++) if (tpOk(c, ki)){ k0 = ki; break; }
+      if (k0 != null && tpOk(c, to)) h += ' <a href="' + esc(ownHref(c.t, k0, to)) + '">Bandingkan KSEI ' + esc(monthText(k0)) + ' → ' + esc(monthText(to)) + ' →</a>';
+      h += '</p>';
+      if (!same && own.reports) h += '<div id="own-moves-dps"><p class="own-note">Memuat laporan emiten…</p></div>';
     } else if (same){
-      h += '<p class="own-note">Pilih tanggal Dari yang berbeda dari Sampai untuk melihat perubahan per pemegang.</p>';
+      h += '<p class="own-note">Pilih Dari dan Sampai yang berbeda untuk melihat perubahan.</p>';
     } else {
       var moved = rows.filter(function(r){ return r.ds || r.d; }).sort(function(x, y){ return (y.ds || 0) - (x.ds || 0); });
       var max = Math.max.apply(null, moved.map(function(r){ return Math.abs(r.ds || 0); }).concat([1]));
-      h += !moved.length ? '<p class="own-note">Tidak ada perubahan yang terukur pada pemegang yang tercatat di kedua snapshot.</p>' :
+      h += !moved.length ? '<p class="own-note">Tidak ada perubahan pada pemegang yang tercatat di kedua snapshot.</p>' :
         '<div class="own-bars">' + moved.map(function(r){
           var width = Math.min(50, Math.abs(r.ds || 0) / max * 50);
           var label = r.ds == null ? 'Lembar belum terbaca' : r.ds ? signed(r.ds, 0, 'lembar') : 'Lembar tetap';
@@ -1862,25 +1877,25 @@ APP_JS = r"""
             '<span class="own-bar-val ' + tone(r.ds) + '">' + label + '<small>Porsi: ' + poinText(r.d) + '</small></span></div>';
         }).join('') + '</div>';
       var threshold = rows.filter(function(r){ return r.status; });
-      if (threshold.length) h += '<p class="own-note">Perubahan daftar >1% (selisih lembar tidak diketahui):</p><ul class="own-sources own-threshold">' + threshold.map(function(r){
+      if (threshold.length) h += '<p class="own-note">Masuk/keluar daftar >1% (selisih lembar tidak diketahui):</p><ul class="own-sources own-threshold">' + threshold.map(function(r){
         return '<li>' + esc(r.cur.name) + ': ' + (r.status === 'baru' ? 'baru tercatat >1%, akhir ' + pctText(r.b.pct) : 'tidak lagi tercatat >1%, awal ' + pctText(r.a.pct)) + '.</li>';
       }).join('') + '</ul>';
-      if (rows.some(function(r){ return r.a && r.b && r.ds == null; })) h += '<p class="own-note">Sebagian jumlah lembar belum terbaca di kedua snapshot; perubahan lembarnya belum dapat disimpulkan.</p>';
+      if (rows.some(function(r){ return r.a && r.b && r.ds == null; })) h += '<p class="own-note">Sebagian lembar belum terbaca; perubahannya tidak dihitung.</p>';
     }
-    h += '<p class="own-note">Perubahan neto antara dua snapshot KSEI >1%, bukan riwayat transaksi beli/jual atau transfer selama periode. Lembar dan porsi persen dapat bergerak berbeda karena total saham berubah; aksi korporasi seperti stock split juga dapat mengubah lembar. Pemegang yang tidak tercatat di salah satu snapshot tidak dianggap memiliki nol saham.</p>';
+    if (comparable) h += '<p class="own-note">Perubahan neto dua snapshot KSEI, bukan transaksi. Porsi bisa beda arah dari lembar bila total saham berubah; stock split menambah lembar tanpa transaksi. Tidak tercatat bukan berarti nol.</p>';
     h += '</section>';
 
     var list = rows.slice().sort(function(x, y){ return (x.b ? 0 : 1) - (y.b ? 0 : 1) || (y.cur.pct || 0) - (x.cur.pct || 0); });
     h += '<section class="own-card"><div class="own-card-head"><h3>Pemegang saham di atas 1%</h3><span>per ' + esc(monthText(to)) + (same ? '' : ' · dibanding ' + esc(monthText(from))) + '</span></div>';
-    if (!comparable) h += '<p class="own-note">Perubahan belum dapat dibandingkan. ' + kseiPairNote(c, from, to) + '. Angka snapshot yang tersedia tetap ditampilkan.</p>';
-    h += !list.length ? '<p class="own-note">Tidak ada baris pemegang KSEI yang tersedia untuk tanggal yang dipilih.</p>' :
+    if (!comparable) h += '<p class="own-note">Perubahan tidak dibandingkan (lihat catatan di atas).</p>';
+    h += !list.length ? '<p class="own-note">Tidak ada data pemegang KSEI untuk tanggal ini.</p>' :
       '<div class="own-scroll"><table class="own-table"><thead><tr><th scope="col">Pemegang</th>' +
       (same ? '' : '<th scope="col">' + esc(monthText(from, true)) + '</th>') + '<th scope="col">' + esc(monthText(to, true)) + '</th>' +
       (same ? '' : '<th scope="col">Perubahan</th>') + '<th scope="col">Lembar saham</th>' + (same ? '' : '<th scope="col">Perubahan lembar</th><th scope="col">Tren</th>') +
       '</tr></thead><tbody>' + list.map(function(r){
         var cur = r.cur, notes = [cur.cls, ORIGIN[cur.lf] || cur.lf].filter(Boolean);
         if (r.a && r.b && r.a.name !== r.b.name) notes.push(monthText(from, true) + ' tertulis ' + r.a.name);
-        if (cur.rows > 1) notes.push('jumlah dari ' + cur.rows + ' baris KSEI');
+        if (cur.rows > 1) notes.push('gabungan ' + cur.rows + ' baris KSEI');
         var dl = r.ds;
         return '<tr' + (r.b || !comparable ? '' : ' class="gone"') + '><th scope="row">' + esc(cur.name) + '<span class="own-tags">' + esc(notes.join(' · ')) + '</span></th>' +
           (same ? '' : '<td>' + (r.a ? pctText(r.a.pct) : '—') + '</td>') +
@@ -1889,7 +1904,7 @@ APP_JS = r"""
           '<td>' + (r.b && r.b.total != null ? num(r.b.total, 0) : '—') + '</td>' +
           (same ? '' : '<td class="' + tone(dl) + '">' + (dl == null ? '—' : dl ? signed(dl, 0) : 'tetap') + '</td>' +
             '<td>' + spark(series(function(i){ var g = tpOk(c, i) ? groupsAt(c, i) : null; return g && g[r.inv] ? g[r.inv].pct : null; }, from, to)) + '</td>') + '</tr>';
-      }).join('') + '</tbody></table></div><p class="own-note">Nama investor dicocokkan secara unik setelah penyeragaman ejaan dan bentuk badan hukum. Baris nama sama dijumlahkan; nama yang hanya mirip atau jumlah saham yang kebetulan sama tidak cukup untuk menyamakan identitas.</p>';
+      }).join('') + '</tbody></table></div><p class="own-note">Ejaan nama diseragamkan; nama sama dijumlahkan, nama yang hanya mirip tidak digabung.</p>';
     h += '</section>';
 
     h += (own.reports ? '<div id="own-reports"><section class="own-card"><div class="own-card-head"><h3>Daftar pemegang saham (laporan emiten)</h3></div><p class="own-note">Memuat laporan emiten…</p></section></div>' : '') +
@@ -1901,27 +1916,150 @@ APP_JS = r"""
       var m = ownData.months[i], url = safeUrl(m.url);
       if (url) notes.push('<li>KSEI: <a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(m.desc || 'Pemegang Saham di Atas 1% per ' + monthText(i)) + '</a></li>');
     });
-    if (ff) notes.push('<li>Free float resmi ' + esc(monthName(ffAtTo)) + ': ' + pctText(ff[0]) + (ff[1] ? '' : ' (angka belum terverifikasi)') +
-      (ff[2].length ? ' · versi laporan lain: ' + ff[2].map(pctText).join(', ') : '') + '<span id="own-ff-link" data-i="' + ffAtTo + '"></span></li>');
+    if (ff) notes.push('<li>Free float resmi ' + esc(monthName(ffAtTo)) + ': ' + pctText(ff[0]) + (ff[1] ? '' : ' (belum terverifikasi)') +
+      (ff[2].length ? ' · versi lain: ' + ff[2].map(pctText).join(', ') : '') + '<span id="own-ff-link" data-i="' + ffAtTo + '"></span></li>');
     (same ? [to] : [from, to]).forEach(function(i){
-      kseiIssues(c, i).forEach(function(x){ notes.push('<li>Catatan data KSEI per ' + esc(monthText(i, true)) + ': ' + esc(x) + '</li>'); });
+      kseiIssues(c, i).forEach(function(x){ notes.push('<li>Catatan KSEI ' + esc(monthText(i, true)) + ': ' + esc(x) + '</li>'); });
     });
     h += '<section class="own-card"><div class="own-card-head"><h3>Sumber dan catatan</h3></div><ul class="own-sources">' + notes.join('') +
-      '<li>Disalin dari IDX Signal Desk.</li></ul></section>';
+      '<li>Data: IDX Signal Desk.</li></ul></section>';
     return h;
   }
 
   // Daftar pemegang saham dari laporan bulanan emiten (pemegang >=5%, pengendali, afiliasi, direksi, komisaris).
+  // Total saham laporan bulan i; laporan lama sering tanpa total, jadi pakai laporan terdekat yang menuliskannya.
+  function reportTotal(list, i){
+    for (var d = 0; d < list.length; d++){
+      if (list[i - d] && list[i - d].s > 0) return {s: list[i - d].s, i: i - d};
+      if (list[i + d] && list[i + d].s > 0) return {s: list[i + d].s, i: i + d};
+    }
+    return null;
+  }
+  // Lembar dan persen tertulis cocok dengan total saham, sampai ketelitian desimal persen yang tertulis (minimal 2 desimal).
+  function pctFits(r, total){
+    if (!(total > 0) || r[2] == null || r[3] == null) return false;
+    var t = String(r[3]), dot = t.indexOf('.'), dec = dot < 0 ? 0 : t.length - dot - 1;
+    // Tepat di tengah (9,375 tertulis 9,37) ditolak, seperti pemeriksaan pembulatan Signal Desk.
+    return Math.abs(r[2] / total * 100 - r[3]) < 0.5 * Math.pow(10, -Math.max(2, dec)) - 1e-12;
+  }
+  // Di bawah 0,1% toleransi pembulatan terlalu besar untuk menangkap salah baca lembar, jadi baris itu tidak diturunkan.
+  function pctChecks(r, total){ return r[3] != null && r[3] >= 0.1 && pctFits(r, total); }
+  // Seluruh baris ≥1% laporan itu cocok dengan total yang sama.
+  function reportFits(rep, total){
+    var big = rep.h.filter(function(r){ return r[2] != null && r[3] != null && r[3] >= 1; });
+    return big.length > 0 && big.every(function(r){ return pctFits(r, total); });
+  }
+  // Pasangan baris DPS Dari–Sampai. Perubahan dihitung kalau kedua baris terverifikasi Signal Desk, atau (derived) kalau:
+  // kedua laporan ditandai v (derivable() di tools/sync_idx.py: versi sepakat, sumber tidak diblokir, masalahnya hanya
+  // peran/total saham tidak tertulis), kedua baris bertanda 1 (bukan agregat/nama berulang/baris bercatatan), total saham sama
+  // di seluruh rentang, dan lembar/persen kedua baris serta semua baris ≥1% kedua laporan cocok dengan total itu.
+  function dpsCompare(rep, from, to){
+    var list = rep.d, readable = list.map(function(x){ return x && x.h.length ? x : null; });
+    var pr = reportPair(readable, from, to), out = {list: list, pr: pr, newest: latestAt(list, to), cur: null, cmp: null, rows: [], totals: null};
+    if (pr.cur == null) return out;
+    var cur = out.cur = readable[pr.cur], cmp = out.cmp = pr.cmp == null ? null : readable[pr.cmp];
+    var tc = reportTotal(list, pr.cur), tp = cmp ? reportTotal(list, pr.cmp) : null, same = false;
+    if (tc && tp){
+      // Total pinjaman tidak boleh melewati bulan yang total sahamnya berubah (stock split, rights issue).
+      var lo = Math.min(pr.cmp, tp.i, tc.i), hi = Math.max(pr.cur, tp.i, tc.i), seen = [];
+      for (var i = lo; i <= hi; i++) if (list[i] && list[i].s > 0 && seen.indexOf(list[i].s) === -1) seen.push(list[i].s);
+      same = seen.length === 1;
+      out.totals = {cur: tc.s, cmp: tp.s, same: same, all: seen};
+    }
+    var fits = !!(cmp && same && cur.v && cmp.v && reportFits(cur, tc.s) && reportFits(cmp, tp.s));
+    // Cocokkan baris antarlaporan per nama + peran; kalau peran berubah, per nama selama nama itu hanya sekali muncul.
+    function index(rep){
+      var byKey = Object.create(null), byName = Object.create(null);
+      (rep ? rep.h : []).forEach(function(r){ var k = r[0] + '#' + r[1]; (byKey[k] = byKey[k] || []).push(r); (byName[r[0]] = byName[r[0]] || []).push(r); });
+      return {key: byKey, name: byName};
+    }
+    var ic = index(cur), ip = index(cmp), used = [], rows = out.rows;
+    cur.h.forEach(function(r){
+      var k = r[0] + '#' + r[1], exact = ip.key[k], ambiguous = ic.key[k].length > 1 || (exact && exact.length > 1);
+      var old = !ambiguous && exact && exact.length === 1 ? exact[0] : (!ambiguous && ip.name[r[0]] && ip.name[r[0]].length === 1 && ic.name[r[0]].length === 1 ? ip.name[r[0]][0] : null);
+      if (old) used.push(old);
+      // Nama yang muncul lebih dari sekali di laporan lain tanpa pasangan unik: bukan pemegang baru.
+      rows.push({r: r, old: old, ambiguous: ambiguous || (!old && !!ip.name[r[0]])});
+    });
+    if (cmp) cmp.h.forEach(function(r){ if (used.indexOf(r) === -1){ var k = r[0] + '#' + r[1]; rows.push({r: null, old: r, ambiguous: ip.key[k].length > 1 || (ic.key[k] && ic.key[k].length > 1) || !!ic.name[r[0]]}); } });
+    rows.forEach(function(x){
+      var pair = x.r && x.old && !x.ambiguous;
+      x.valid = !!(pair && x.r[4] && x.old[4]);
+      x.derived = !x.valid && !!(pair && fits && x.r[5] === 1 && x.old[5] === 1 && x.r[1] && x.old[1] && pctChecks(x.r, tc.s) && pctChecks(x.old, tp.s));
+      var ok = x.valid || x.derived;
+      x.dp = ok && x.r[3] != null && x.old[3] != null ? Math.round((x.r[3] - x.old[3]) * 1e4) / 1e4 : null;
+      x.ds = ok && x.r[2] != null && x.old[2] != null ? x.r[2] - x.old[2] : null;
+    });
+    return out;
+  }
+  var DERIVED_NOTE = 'belum terverifikasi; cocok dengan total saham';
+
+  // Pengganti "Siapa menambah" saat snapshot KSEI tidak tersedia: perubahan antar laporan bulanan emiten.
+  function dpsMovesHtml(c, rep){
+    var st = ownState, cp = dpsCompare(rep, st.from, st.to), pr = cp.pr;
+    var h = '<p class="own-note"><b>Dari laporan bulanan emiten</b> (≥5%, pengendali, afiliasi, direksi, komisaris)' +
+      (cp.cmp ? ': laporan ' + esc(monthName(pr.cmp)) + ' → ' + esc(monthName(pr.cur)) + '.' : '.') + '</p>';
+    if (!cp.cur || !cp.cmp) return h + '<p class="own-note">Belum ada dua laporan terbaca di rentang ini.</p>';
+    var names = reportsData.names;
+    var moved = cp.rows.filter(function(x){ return x.ds; }).sort(function(a, b){ return b.ds - a.ds; });
+    var max = Math.max.apply(null, moved.map(function(x){ return Math.abs(x.ds); }).concat([1]));
+    h += !moved.length ? '<p class="own-note">Tidak ada perubahan lembar yang terhitung.</p>' :
+      '<div class="own-bars">' + moved.map(function(x){
+        var width = Math.min(50, Math.abs(x.ds) / max * 50), name = names[x.r[0]];
+        return '<div class="own-bar-row"><span class="own-bar-name" title="' + esc(name) + '">' + esc(name) + '</span>' +
+          '<span class="own-bar-track" aria-hidden="true"><i class="' + tone(x.ds) + '" style="width:' + width.toFixed(2) + '%"></i></span>' +
+          '<span class="own-bar-val ' + tone(x.ds) + '">' + signed(x.ds, 0, 'lembar') + '<small>Porsi: ' + (x.dp == null ? '—' : x.dp ? signed(x.dp, 4, 'poin') : 'tetap') +
+          (x.derived ? ' · belum terverifikasi' : '') + '</small></span></div>';
+      }).join('') + '</div>';
+    // Daftar masuk/keluar hanya dari dua laporan derivable (format 2); format lama tidak menandai baris agregat.
+    var listed = cp.cur.v === 1 && cp.cmp.v === 1;
+    function sig(i){
+      return String(names[i] || '').toUpperCase().split(/[^A-Z0-9]+/).filter(function(t){ return t && !/^(PT|TBK|PERSERO|LTD|LIMITED|PTE|INC|CO|CORP|DRS|DRA|IR|DR|SE|SH)$/.test(t); }).sort();
+    }
+    function holder(r){ return r[5] !== 2 && r[5] !== undefined && r[1] && r[2] != null && r[2] > 0; }
+    var onlyCur = cp.rows.filter(function(x){ return x.r && !x.old && !x.ambiguous && holder(x.r); });
+    var onlyCmp = cp.rows.filter(function(x){ return !x.r && x.old && !x.ambiguous && holder(x.old); });
+    // Ejaan berbeda: kata inti sama, atau lembar sama persis dan berbagi kata pertama (salah ketik, nama terpotong).
+    function variant(a, b){
+      var x = sig(a.r[0]), y = sig(b.old[0]);
+      return x.join(' ') === y.join(' ') || (a.r[2] === b.old[2] && x.some(function(t){ return y.indexOf(t) !== -1 || y.some(function(u){ return u.length >= 4 && t.length >= 4 && (u.indexOf(t) === 0 || t.indexOf(u) === 0); }); }));
+    }
+    var spelled = [], added = [], gone = [];
+    onlyCur.forEach(function(x){
+      var b = onlyCmp.filter(function(y){ return !y.spelled && variant(x, y); });
+      var a = b.length === 1 ? onlyCur.filter(function(z){ return variant(z, b[0]); }) : [];
+      if (b.length === 1 && a.length === 1){ spelled.push(names[x.r[0]] + ' / ' + names[b[0].old[0]]); b[0].spelled = true; }
+      else added.push(names[x.r[0]]);
+    });
+    onlyCmp.forEach(function(x){ if (!x.spelled) gone.push(names[x.old[0]]); });
+    var sameV = cp.rows.filter(function(x){ return x.ds === 0 && x.valid; }).map(function(x){ return names[x.r[0]]; });
+    var sameD = cp.rows.filter(function(x){ return x.ds === 0 && x.derived; }).map(function(x){ return names[x.r[0]]; });
+    var open = !listed ? [] : cp.rows.filter(function(x){ var r = x.r || x.old; return r[5] !== 2 && r[1] && ((x.r && x.old && x.ds == null) || x.ambiguous); })
+      .map(function(x){ return names[(x.r || x.old)[0]]; }).filter(function(n, i, a){ return a.indexOf(n) === i; });
+    var items = [];
+    if (sameV.length) items.push('Tetap: ' + sameV.map(esc).join(', ') + '.');
+    if (sameD.length) items.push('Tetap (belum terverifikasi): ' + sameD.map(esc).join(', ') + '.');
+    if (!listed) items.push('Daftar nama antarlaporan tidak dibandingkan: laporan tidak lolos pemeriksaan sumber.');
+    if (listed && added.length) items.push('Baru tercantum di laporan ' + esc(monthName(pr.cur)) + ': ' + added.map(esc).join(', ') + '.');
+    if (listed && gone.length) items.push('Tidak tercantum lagi di laporan ' + esc(monthName(pr.cur)) + ' (bukan nol): ' + gone.map(esc).join(', ') + '.');
+    if (listed && spelled.length) items.push('Ejaan nama berbeda, tidak dihitung: ' + spelled.map(esc).join('; ') + '.');
+    if (open.length) items.push('Belum dihitung (belum terverifikasi atau nama berulang): ' + open.map(esc).join(', ') + '.');
+    if (items.length) h += '<ul class="own-sources own-threshold">' + items.map(function(t){ return '<li>' + t + '</li>'; }).join('') + '</ul>';
+    var t = cp.totals;
+    if (t && !t.same) h += '<p class="own-note">Total saham berubah di rentang ini (' + t.all.map(countText).join(' → ') + '), mis. stock split atau rights issue. Angka belum terverifikasi tidak dibandingkan.</p>';
+    if (cp.rows.some(function(x){ return x.derived; })) h += '<p class="own-note">Belum terverifikasi: dihitung karena lembar dan persen cocok dengan total saham ' + countText(t.cur) + ' (tetap di rentang ini).</p>';
+    return h + '<p class="own-note">Perubahan neto dua laporan, bukan transaksi (lihat Laporan perubahan kepemilikan). Pemegang 1–5% lain tidak tercantum.</p>';
+  }
+
   function dpsHtml(c, rep){
-    var st = ownState, list = rep.d, readable = list.map(function(x){ return x && x.h.length ? x : null; });
-    var pr = reportPair(readable, st.from, st.to), newest = latestAt(list, st.to);
+    var st = ownState, cp = dpsCompare(rep, st.from, st.to), list = cp.list, pr = cp.pr, newest = cp.newest;
     var h = '<section class="own-card"><div class="own-card-head"><h3>Daftar pemegang saham (laporan emiten)</h3>';
     if (pr.cur == null){
       return h + '</div><p class="own-note">' + (newest != null ?
-        'Laporan bulanan emiten ' + esc(monthName(newest)) + ' ada, tetapi tabel pemegangnya belum terbaca oleh Signal Desk. ' + sourceLink(list[newest].u, 'Buka laporannya di IDX') + '.' :
-        'Belum ada laporan bulanan registrasi pemegang efek sampai ' + esc(monthName(st.to)) + ' untuk emiten ini di Signal Desk.') + '</p></section>';
+        'Laporan ' + esc(monthName(newest)) + ' belum terbaca Signal Desk. ' + sourceLink(list[newest].u, 'Buka di IDX') + '.' :
+        'Belum ada laporan emiten di Signal Desk sampai ' + esc(monthName(st.to)) + '.') + '</p></section>';
     }
-    var cur = readable[pr.cur], cmp = pr.cmp == null ? null : readable[pr.cmp], hc = countChange(c, st.from, st.to);
+    var cur = cp.cur, cmp = cp.cmp, hc = countChange(c, st.from, st.to);
     h += '<span>laporan ' + esc(monthName(pr.cur)) + (cmp ? ' · dibanding ' + esc(monthName(pr.cmp)) : '') + '</span></div>';
     var facts = [];
     if (hc.cur != null) facts.push('Jumlah pemegang saham: <b>' + countText(hc.cur) + '</b>' +
@@ -1930,34 +2068,20 @@ APP_JS = r"""
     if (cur.s != null) facts.push('Total saham: <b>' + countText(cur.s) + '</b>');
     if (safeUrl(cur.u)) facts.push(sourceLink(cur.u, 'laporan di IDX'));
     if (facts.length) h += '<p class="own-facts">' + facts.join('<span class="sep">·</span>') + '</p>';
-    // Cocokkan baris antarlaporan per nama + peran; kalau peran berubah, per nama selama nama itu hanya sekali muncul.
-    function index(rep){
-      var byKey = Object.create(null), byName = Object.create(null);
-      (rep ? rep.h : []).forEach(function(r){ var k = r[0] + '#' + r[1]; (byKey[k] = byKey[k] || []).push(r); (byName[r[0]] = byName[r[0]] || []).push(r); });
-      return {key: byKey, name: byName};
-    }
-    var ic = index(cur), ip = index(cmp), used = [], rows = [];
-    cur.h.forEach(function(r){
-      var k = r[0] + '#' + r[1], exact = ip.key[k], ambiguous = ic.key[k].length > 1 || (exact && exact.length > 1);
-      var old = !ambiguous && exact && exact.length === 1 ? exact[0] : (!ambiguous && ip.name[r[0]] && ip.name[r[0]].length === 1 && ic.name[r[0]].length === 1 ? ip.name[r[0]][0] : null);
-      if (old) used.push(old);
-      rows.push({r: r, old: old, ambiguous: ambiguous});
-    });
-    if (cmp) cmp.h.forEach(function(r){ if (used.indexOf(r) === -1){ var k = r[0] + '#' + r[1]; rows.push({r: null, old: r, ambiguous: ip.key[k].length > 1 || (ic.key[k] && ic.key[k].length > 1)}); } });
+    var rows = cp.rows;
     function pct4(v){ return v == null ? '—' : num(v, 4) + '%'; }
     h += '<div class="own-scroll"><table class="own-table"><thead><tr><th scope="col">Nama</th><th scope="col">Peran</th>' +
       (cmp ? '<th scope="col">' + esc(shortMonth(pr.cmp)) + '</th>' : '') + '<th scope="col">' + esc(shortMonth(pr.cur)) + '</th>' +
       (cmp ? '<th scope="col">Perubahan</th>' : '') + '<th scope="col">Lembar saham</th>' + (cmp ? '<th scope="col">Perubahan lembar</th>' : '') + '</tr></thead><tbody>' +
       rows.map(function(x){
-        var r = x.r || x.old, valid = x.r && x.old && x.r[4] && x.old[4] && !x.ambiguous;
-        var dp = valid && x.r[3] != null && x.old[3] != null ? Math.round((x.r[3] - x.old[3]) * 1e4) / 1e4 : null;
-        var ds = valid && x.r[2] != null && x.old[2] != null ? x.r[2] - x.old[2] : null;
+        var r = x.r || x.old, dp = x.dp, ds = x.ds;
         var tags = [];
         if (x.r && x.old && x.r[1] !== x.old[1]) tags.push(shortMonth(pr.cmp) + ': ' + roleText(x.old[1]));
-        if (!r[4] || (x.old && !x.old[4])) tags.push('angka perlu dicek di laporan; perubahan tidak dihitung');
-        if (x.ambiguous) tags.push('nama dan peran berulang; perubahan belum dapat dipastikan');
-        if (cmp && !x.old && !x.ambiguous) tags.push('tidak disebut di laporan ' + monthName(pr.cmp));
-        if (!x.r && !x.ambiguous) tags.push('tidak disebut di laporan ' + monthName(pr.cur));
+        if (x.derived) tags.push(DERIVED_NOTE);
+        else if (!r[4] || (x.old && !x.old[4])) tags.push('perlu dicek');
+        if (x.ambiguous) tags.push('nama dan peran berulang');
+        if (cmp && !x.old && !x.ambiguous) tags.push('tidak tercantum di ' + monthName(pr.cmp));
+        if (!x.r && !x.ambiguous) tags.push('tidak tercantum di ' + monthName(pr.cur));
         return '<tr' + (x.r ? '' : ' class="gone"') + '><th scope="row">' + esc(reportsData.names[r[0]]) + (tags.length ? '<span class="own-tags">' + esc(tags.join(' · ')) + '</span>' : '') + '</th>' +
           '<td class="own-role">' + esc(roleText(r[1])) + '</td>' +
           (cmp ? '<td>' + (x.old ? pct4(x.old[3]) : '—') + '</td>' : '') +
@@ -1966,9 +2090,8 @@ APP_JS = r"""
           '<td>' + (x.r && x.r[2] != null ? num(x.r[2], 0) : (x.old && x.old[2] != null ? '<span class="own-tags">' + num(x.old[2], 0) + '</span>' : '—')) + '</td>' +
           (cmp ? '<td class="' + tone(ds) + '">' + (ds == null ? '—' : ds ? signed(ds, 0) : 'tetap') + '</td>' : '') + '</tr>';
       }).join('') + '</tbody></table></div>';
-    var note = 'Sesuai laporan bulanan registrasi pemegang efek: pemegang saham ≥5% (termasuk pengendali dan afiliasi), lalu direksi dan komisaris beserta sahamnya. ' +
-      'Peran menurut laporan, bukan riwayat jabatan. Nama yang tidak disebut di salah satu laporan berarti tidak tercantum di laporan itu, bukan nol.';
-    if (newest != null && newest > pr.cur) note += ' Laporan ' + monthName(newest) + ' ada tetapi tabelnya belum terbaca oleh Signal Desk' + (safeUrl(list[newest].u) ? ' (' + sourceLink(list[newest].u, 'buka di IDX') + ')' : '') + '.';
+    var note = 'Pemegang ≥5%, pengendali, afiliasi, direksi, dan komisaris menurut laporan emiten. Tidak tercantum bukan berarti nol.';
+    if (newest != null && newest > pr.cur) note += ' Laporan ' + monthName(newest) + ' belum terbaca Signal Desk' + (safeUrl(list[newest].u) ? ' (' + sourceLink(list[newest].u, 'buka di IDX') + ')' : '') + '.';
     return h + '<p class="own-note">' + note + '</p></section>';
   }
 
@@ -1978,12 +2101,15 @@ APP_JS = r"""
     loadReports().then(function(){
       if (!current()) return;
       var rep = reportsFor(c.t), el = document.getElementById('own-reports'), bae = document.getElementById('own-bae'), ffl = document.getElementById('own-ff-link');
+      var mv = document.getElementById('own-moves-dps');
       if (el) el.innerHTML = dpsHtml(c, rep);
+      if (mv) mv.innerHTML = dpsMovesHtml(c, rep);
       if (bae) bae.innerHTML = baeHtml(c, rep);
       if (ffl && safeUrl(rep.u[+ffl.getAttribute('data-i')])) ffl.innerHTML = ' · ' + sourceLink(rep.u[+ffl.getAttribute('data-i')], 'laporan emiten di IDX');
     }, function(){
-      var el = current() && document.getElementById('own-reports');
-      if (el) el.innerHTML = '<section class="own-card"><div class="own-card-head"><h3>Daftar pemegang saham (laporan emiten)</h3></div><p class="own-note">Laporan emiten belum berhasil dimuat. Buka ulang emiten ini untuk mencoba lagi.</p></section>';
+      var el = current() && document.getElementById('own-reports'), mv = current() && document.getElementById('own-moves-dps');
+      if (mv) mv.innerHTML = '<p class="own-note">Laporan emiten belum berhasil dimuat.</p>';
+      if (el) el.innerHTML ='<section class="own-card"><div class="own-card-head"><h3>Daftar pemegang saham (laporan emiten)</h3></div><p class="own-note">Laporan emiten belum berhasil dimuat. Buka ulang emiten ini.</p></section>';
     });
   }
 
@@ -1994,7 +2120,7 @@ APP_JS = r"""
       if (el && ownState.t === c.t && c.t + '|' + ownState.from + '|' + ownState.to === key) el.innerHTML = html;
     }
     loadChanges().then(function(d){ put(changesHtml(c, d)); }, function(){
-      put('<div class="own-card-head"><h3>Laporan perubahan kepemilikan</h3></div><p class="own-note">Laporan perubahan belum berhasil dimuat. Buka ulang emiten ini untuk mencoba lagi.</p>');
+      put('<div class="own-card-head"><h3>Laporan perubahan kepemilikan</h3></div><p class="own-note">Laporan perubahan belum berhasil dimuat. Buka ulang emiten ini.</p>');
     });
   }
 
@@ -2026,17 +2152,17 @@ APP_JS = r"""
         }).join('') + '</tbody></table></div>';
     }
     var inside = rows.filter(function(r){ return r[0] && (fm.asOf ? r[0] > lo : r[0] >= lo) && r[0] <= hi; }), other = rows.filter(function(r){ return inside.indexOf(r) === -1; });
-    var h = '<div class="own-card-head"><h3>Laporan perubahan kepemilikan</h3><span>' + inside.length + ' laporan di rentang' + (rows.length ? ' · ' + rows.length + ' total' : '') + '</span></div>';
-    if (!rows.length) h += '<p class="own-note">Belum ada laporan perubahan kepemilikan untuk emiten ini di Signal Desk.</p>';
+    var h = '<div class="own-card-head"><h3>Laporan perubahan kepemilikan</h3><span>' + inside.length + ' laporan di rentang' + (rows.length > inside.length ? ' · ' + rows.length + ' total' : '') + '</span></div>';
+    if (!rows.length) h += '<p class="own-note">Belum ada laporan perubahan kepemilikan di Signal Desk.</p>';
     else {
-      h += inside.length ? table(inside) : '<p class="own-note">Tidak ada laporan perubahan dengan tanggal di rentang ' + esc(monthText(st.from)) + ' → ' + esc(monthText(st.to)) + '.</p>';
-      if (other.length) h += '<details class="own-twin"><summary>Laporan lain di luar rentang (' + other.length + ')</summary>' + table(other) + '</details>';
+      h += inside.length ? table(inside) : '<p class="own-note">Tidak ada laporan di rentang ' + esc(monthText(st.from)) + ' → ' + esc(monthText(st.to)) + '.</p>';
+      if (other.length) h += '<details class="own-twin"><summary>Di luar rentang (' + other.length + ')</summary>' + table(other) + '</details>';
     }
-    var note = 'Formulir perubahan kepemilikan (KSEI/IDX) dan surat BAE pemegang ≥5%, dibaca otomatis dari PDF. Angka persis seperti dilaporkan; "Perlu dicek" menandai angka yang tidak saling cocok, tanpa mengoreksinya. ' +
-      'Tanggal = tanggal transaksi terakhir di laporan. Rentang laporan: ' + (fm.asOf ? 'setelah ' : 'mulai ') + dayText(lo) + ' sampai ' + dayText(hi) + '; satu formulir dapat memuat transaksi lain di luar rentang.';
+    var note = 'Formulir KSEI/IDX dan surat BAE ≥5%, dibaca otomatis dari PDF; angka apa adanya. "Perlu dicek" = angka tidak saling cocok. ' +
+      'Tanggal = transaksi terakhir; satu formulir bisa memuat transaksi lain di luar rentang. Data: ' + (fm.asOf ? 'setelah ' : 'mulai ') + dayText(lo) + ' sampai ' + dayText(hi) + '.';
     if (cov && cov.listed){
-      note += ' Cakupan: ' + (cov.from ? esc(cov.from) + ' s/d ' + esc(cov.to || '') + ', ' : '') + num(cov.downloaded, 0) + ' dari ' + num(cov.listed, 0) + ' PDF laporan sudah diunduh' +
-        (cov.downloaded < cov.listed ? '; daftar ini belum lengkap.' : '.');
+      note += ' Cakupan: ' + (cov.from ? esc(cov.from) + ' sampai ' + esc(cov.to || '') + ', ' : '') + num(cov.downloaded, 0) + '/' + num(cov.listed, 0) + ' PDF diunduh' +
+        (cov.downloaded < cov.listed ? ' (belum lengkap).' : '.');
     }
     return h + '<p class="own-note">' + note + '</p>';
   }
@@ -2060,8 +2186,8 @@ APP_JS = r"""
       '<th scope="col">Pemegang ' + esc(shortMonth(pr.cur)) + '</th>' + (cmp ? '<th scope="col">Perubahan</th>' : '') + '<th scope="col">Lembar saham</th><th scope="col">Porsi</th></tr></thead><tbody>' +
       cur.r.map(function(r){ return row(reportsData.categories[r[1]], r[0], r.slice(2), old['r' + r[0] + r[1]] && old['r' + r[0] + r[1]].slice(2)); }).join('') +
       cur.t.map(function(r){ return row({L: 'Total lokal', F: 'Total asing', A: 'Total'}[r[0]] || 'Total', r[0], r.slice(1), old['t' + r[0]] && old['t' + r[0]].slice(1), true); }).join('') +
-      '</tbody></table></div><p class="own-note">Label dan persentase persis dari laporan BAE. Jumlah pemegang adalah hitungan registrasi BAE, bukan jumlah investor unik. ' +
-      sourceLink(cur.u, 'Buka laporan di IDX') + '</p></section>';
+      '</tbody></table></div><p class="own-note">Angka apa adanya dari laporan BAE. Jumlah pemegang menurut registrasi BAE, bukan investor unik. ' +
+      sourceLink(cur.u, 'Buka di IDX') + '</p></section>';
   }
 
   function niceTicks(lo, hi){
@@ -2085,14 +2211,27 @@ APP_JS = r"""
   function trendChart(el, c){
     var st = ownState, ms = own.months, n = ms.length, W = Math.max(300, Math.floor(el.clientWidth || 720)), narrow = W < 560;
     var known = chartDomain(c), dom = known || [0, n - 1], a = dom[0], b = dom[1];
-    // Bawaan: grafik diperbesar ke Dari–Sampai plus satu bulan di tiap sisi (supaya klik di luar rentang tetap bisa memperluasnya),
-    // agar bulan KSEI tidak terjepit di ujung riwayat laporan sejak 2023. Tombol hanya muncul kalau memang ada bulan yang tersembunyi.
+    // Bawaan: semua bulan tampil supaya rentang mudah diseret. Tombol "Perbesar ke rentang" menampilkan Dari–Sampai plus satu bulan
+    // di tiap sisi; tombol hanya muncul kalau ada bulan yang bisa disembunyikan.
     var za = Math.max(a, st.from - 1), zb = Math.min(b, st.to + 1), before = za > a, after = zb < b;
     var canZoom = !!known && za < zb && (before || after), zoom = canZoom && !st.chartAll;
     if (zoom){ a = za; b = zb; }
     var m = b - a + 1, note = document.getElementById('own-trend-note');
-    if (note) note.innerHTML = 'Rentang terpilih diarsir · klik bulan untuk mengubah rentang' + (!canZoom ? '' :
-      ' <button type="button" id="own-zoom" class="own-zoom">' + (!zoom ? 'Perbesar ke rentang terpilih' :
+    // Rentang cepat dari Sampai ke belakang; "Sejak KSEI" dan "Semua" memakai bulan yang punya data.
+    var presets = document.getElementById('own-presets'), lo = known ? known[0] : 0, hi = known ? known[1] : n - 1;
+    if (presets){
+      var opts = [[1, '1 bln'], [3, '3 bln'], [6, '6 bln'], [12, '1 thn']].filter(function(o){ return st.to - o[0] >= lo; })
+        .map(function(o){ return [st.to - o[0], st.to, o[1]]; });
+      if (DEF_FROM > lo && DEF_FROM < st.to) opts.push([DEF_FROM, st.to, 'Sejak KSEI']);
+      if (lo < hi) opts.push([lo, hi, 'Semua']);
+      opts = opts.filter(function(o, i){ return !opts.slice(0, i).some(function(x){ return x[0] === o[0] && x[1] === o[1]; }); });
+      presets.innerHTML = opts.map(function(o){
+        return '<a href="' + esc(ownHref(st.t, o[0], o[1])) + '"' + (o[0] === st.from && o[1] === st.to ? ' aria-current="true"' : '') +
+          ' title="' + esc(monthText(o[0]) + ' → ' + monthText(o[1])) + '">' + o[2] + '</a>';
+      }).join('') + '<span class="own-pick-msg" aria-live="polite"></span>';
+    }
+    if (note) note.innerHTML = 'Seret di chart, atau klik bulan awal lalu bulan akhir' + (!canZoom ? '' :
+      ' <button type="button" id="own-zoom" class="own-zoom">' + (!zoom ? 'Perbesar ke rentang' :
         before && after ? 'Tampilkan semua bulan (' + esc(monthText(dom[0])) + ' – ' + esc(monthText(dom[1])) + ')' :
         before ? 'Tampilkan sejak ' + esc(monthText(dom[0])) : 'Tampilkan sampai ' + esc(monthText(dom[1]))) + '</button>');
     function vals(fn){ return series(fn, 0, n - 1); }
@@ -2101,9 +2240,9 @@ APP_JS = r"""
                               {cls: 's5', label: 'Pemegang ≥5%', v: vals(function(i){ return b5At(c, i) == null ? null : r2(b5At(c, i)); }), ok: vals(function(i){ return okAt(c.p, i); }),
                                src: vals(function(i){ return c.p[i] && c.p[i][2]; }), est: vals(function(i){ return !!c.p[i] && c.p[i][2] === 'P'; })}]},
       {fmt: pctText, series: [{cls: 's2', label: 'Sisa <1% (perkiraan)', v: vals(function(i){ return restAt(c, i); }), ok: vals(function(i){ return tpOk(c, i); })},
-                              {cls: 's3', label: 'Free float resmi IDX', v: vals(function(i){ return ffAt(c, i); }), ok: vals(function(i){ return okAt(c.f, i); })}]}];
+                              {cls: 's3', label: 'Free float resmi', v: vals(function(i){ return ffAt(c, i); }), ok: vals(function(i){ return okAt(c.f, i); })}]}];
     var counts = vals(function(i){ return countAt(c, i); });
-    if (counts.some(function(v){ return v != null; })) panes.push({fmt: countText, series: [{cls: 's4', label: 'Jumlah pemegang saham (laporan emiten)', v: counts, ok: vals(function(i){ return okAt(c.c, i); })}]});
+    if (counts.some(function(v){ return v != null; })) panes.push({fmt: countText, series: [{cls: 's4', label: 'Jumlah pemegang saham', v: counts, ok: vals(function(i){ return okAt(c.c, i); })}]});
     var padL = narrow ? 58 : 70, padR = narrow ? 12 : 24, paneH = narrow ? 100 : 120, gap = 16, axisH = 38, band = (W - padL - padR) / m;
     function X(i){ return padL + band * (i - a + 0.5); }
     function has(se, i){ return i >= a && i <= b && se.v[i] != null; }
@@ -2121,6 +2260,7 @@ APP_JS = r"""
     panes.forEach(function(p, pi){ H += p.legendH + paneH + (pi ? gap : 0); });
     var axY = H - axisH, r0 = Math.max(st.from, a), r1 = Math.min(st.to, b);
     if (r0 <= r1) s += '<rect class="own-range" x="' + (X(r0) - band / 2).toFixed(1) + '" y="0" width="' + (band * (r1 - r0 + 1)).toFixed(1) + '" height="' + axY + '"/>';
+    s += '<rect class="own-pick" x="0" y="0" width="0" height="' + axY + '"/>';
     panes.forEach(function(p){
       p.series.forEach(function(se){
         s += '<line class="own-leg ' + se.cls + '" x1="' + se.lx + '" x2="' + (se.lx + 18) + '" y1="' + (y0 + se.ly - 4) + '" y2="' + (y0 + se.ly - 4) + '"/>' +
@@ -2166,15 +2306,21 @@ APP_JS = r"""
           if (edge) (labels[i] = labels[i] || []).push({x: x, y: y, text: (se.est && se.est[i] ? '≈' : '') + p.fmt(v) + (usable(se, i) ? '' : ' ⚠') + (v > hi ? ' ↑' : v < lo ? ' ↓' : '')});
         }
       });
-      Object.keys(labels).forEach(function(k){
-        var i = +k, anchor = i === a ? 'start' : (i === b ? 'end' : 'middle'), last = null;
+      // Label Sampai digambar dulu; label Dari yang akan menabraknya (rentang sempit, layar HP) digeser ke kiri titik atau dilewati.
+      var placed = [], tight = st.from !== st.to && X(st.to) - X(st.from) < 90;
+      Object.keys(labels).map(Number).sort(function(x, y){ return (y === st.to) - (x === st.to); }).forEach(function(i){
+        var anchor = i === a ? 'start' : (i === b ? 'end' : 'middle'), shift = anchor === 'start' ? -6 : anchor === 'end' ? 6 : 0, last = null;
+        if (tight && i === st.from && i !== a){ anchor = 'end'; shift = -8; }
         // Titik tertinggi diberi label di atas; titik di bawahnya yang labelnya akan menabrak diberi label di bawah titik.
-        labels[k].sort(function(p1, p2){ return p1.y - p2.y; }).forEach(function(l){
+        labels[i].sort(function(p1, p2){ return p1.y - p2.y; }).forEach(function(l){
           var ly = l.y - 10 < top + 4 ? l.y + 19 : l.y - 10;
           if (last != null && ly - last < 15) ly = l.y + 19;
           if (last != null && ly - last < 15) return;
+          var w = l.text.length * 7.4, x = l.x + shift, x0 = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
+          if (placed.some(function(q){ return Math.abs(q.y - ly) < 15 && x0 < q.x1 + 4 && x0 + w > q.x0 - 4; })) return;
+          placed.push({x0: x0, x1: x0 + w, y: ly});
           last = ly;
-          s += '<text class="v" x="' + (l.x + (anchor === 'start' ? -6 : anchor === 'end' ? 6 : 0)).toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="' + anchor + '">' + esc(l.text) + '</text>';
+          s += '<text class="v" x="' + x.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="' + anchor + '">' + esc(l.text) + '</text>';
         });
       });
       y0 = bottom + gap;
@@ -2200,7 +2346,7 @@ APP_JS = r"""
     function tipLines(i){
       return panes.map(function(p){ return p.series.map(function(se){
         var v = se.v[i], est = !!(se.est && se.est[i]), note = v == null ? '' : (se.ok[i] || est ? '' : ' ⚠ belum terverifikasi') +
-          (se.cls === 's5' && c.p[i] ? (c.p[i][2] === 'K' ? ' (KSEI)' : est ? ' (persen tertulis laporan, belum dicocokkan ke total saham)' : ' (laporan)') : '');
+          (se.cls === 's5' && c.p[i] ? (c.p[i][2] === 'K' ? ' (KSEI)' : est ? ' (persen tertulis laporan, belum terverifikasi)' : ' (laporan)') : '');
         return [se, p.fmt(v) + note];
       }); }).reduce(function(x, y){ return x.concat(y); }, []);
     }
@@ -2213,41 +2359,79 @@ APP_JS = r"""
     if (estLegend) estLegend.hidden = !shownEst;  // hanya kalau ada titik perkiraan di jendela yang tampil
     el.setAttribute('data-w', W);
     el.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="group" aria-label="Grafik bulanan ' + esc(c.t) +
-      '. Panah kiri/kanan untuk berpindah bulan, Enter untuk mengubah rentang.">' + s + '</svg><div class="own-tip" hidden></div>';
+      '. Panah kiri/kanan: pindah bulan. Enter: pilih bulan awal, lalu bulan akhir. Esc: batal.">' + s + '</svg><div class="own-tip" hidden></div>';
 
     var svg = el.querySelector('svg'), tip = el.querySelector('.own-tip');
     function showTip(rect){
       var i = +rect.getAttribute('data-i');
       tip.innerHTML = '<strong>' + esc(monthText(i)) + '</strong>' + tipLines(i).map(function(l){
         return '<span><i class="own-key ' + l[0].cls + '"></i>' + esc(l[0].label) + ': ' + esc(l[1]) + '</span>';
-      }).join('') + '<em>' + (i === st.from && i === st.to ? 'rentang satu bulan' : i === st.from ? 'awal rentang (Dari)' : i === st.to ? 'akhir rentang (Sampai)' :
-        'klik untuk menjadikan ' + (i < st.from ? 'Dari' : 'Sampai')) + '</em>';
+      }).join('') + '<em>' + (anchor != null ? 'klik: ' + esc(monthText(Math.min(anchor, i), true) + ' → ' + monthText(Math.max(anchor, i), true)) :
+        'klik: mulai dari bulan ini · seret: pilih rentang') + '</em>';
       tip.hidden = false;
       var left = X(i) + band / 2 + 6;
       if (left + tip.offsetWidth > el.clientWidth) left = X(i) - band / 2 - 6 - tip.offsetWidth;
       tip.style.left = Math.max(4, left) + 'px';
     }
-    function pick(i){
-      var from = st.from, to = st.to;
-      if (i < from) from = i; else to = i;
-      if (from === st.from && to === st.to) return;
-      location.hash = ownHref(st.t, from, to);
+    // Pilih rentang: seret dari bulan awal ke bulan akhir, atau klik/Enter bulan awal lalu bulan akhir (Esc batal).
+    var anchor = null, drag = null, pickRect = svg.querySelector('.own-pick'), msg = document.getElementById('own-pick-msg') || (presets && presets.querySelector('.own-pick-msg'));
+    function preview(f, t){
+      if (f == null){ pickRect.classList.remove('on'); return; }
+      pickRect.setAttribute('x', (X(f) - band / 2).toFixed(1)); pickRect.setAttribute('width', (band * (t - f + 1)).toFixed(1)); pickRect.classList.add('on');
     }
-    svg.addEventListener('pointermove', function(e){ var r = e.target.closest('.own-hit'); if (r) showTip(r); });
-    svg.addEventListener('pointerleave', function(){ tip.hidden = true; });
+    function say(text){ if (msg) msg.textContent = text; }
+    function apply(f, t){
+      anchor = null; preview(null); say('');
+      if (f !== st.from || t !== st.to) location.hash = ownHref(st.t, f, t);
+    }
+    function press(i){
+      if (anchor == null){ anchor = i; preview(i, i); say('Dari ' + monthText(i, true) + ' · pilih bulan akhir (Esc batal)'); return false; }
+      apply(Math.min(anchor, i), Math.max(anchor, i));
+      return true;
+    }
+    function monthAt(e){
+      var box = svg.getBoundingClientRect(), x = (e.clientX - box.left) * W / (box.width || W);
+      return Math.max(a, Math.min(b, a + Math.floor((x - padL) / band)));
+    }
+    svg.addEventListener('pointerdown', function(e){
+      var r = e.target.closest('.own-hit');
+      if (!r || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      var i = +r.getAttribute('data-i');
+      drag = {i0: i, i1: i, id: e.pointerId};
+      try { svg.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    svg.addEventListener('pointermove', function(e){
+      if (drag && e.pointerId === drag.id){
+        var i = monthAt(e);
+        if (i !== drag.i1){ drag.i1 = i; drag.moved = true; }
+        if (drag.moved){ preview(Math.min(drag.i0, i), Math.max(drag.i0, i)); say(monthText(Math.min(drag.i0, i), true) + ' → ' + monthText(Math.max(drag.i0, i), true)); }
+        var hit = svg.querySelector('.own-hit[data-i="' + i + '"]');
+        if (hit) showTip(hit);
+        return;
+      }
+      var r = e.target.closest('.own-hit'); if (r) showTip(r);
+    });
+    svg.addEventListener('pointerup', function(e){
+      if (!drag || e.pointerId !== drag.id) return;
+      var d = drag; drag = null;
+      if (d.moved) apply(Math.min(d.i0, d.i1), Math.max(d.i0, d.i1)); else press(d.i0);
+    });
+    svg.addEventListener('pointercancel', function(){ drag = null; if (anchor != null) preview(anchor, anchor); else preview(null); });
+    svg.addEventListener('pointerleave', function(){ if (!drag) tip.hidden = true; });
     svg.addEventListener('focusin', function(e){ if (e.target.classList.contains('own-hit')) showTip(e.target); });
     svg.addEventListener('focusout', function(){ tip.hidden = true; });
-    svg.addEventListener('click', function(e){ var r = e.target.closest('.own-hit'); if (r) pick(+r.getAttribute('data-i')); });
     svg.addEventListener('keydown', function(e){
       var r = e.target.closest('.own-hit');
       if (!r) return;
       var i = +r.getAttribute('data-i');
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
         var next = svg.querySelector('.own-hit[data-i="' + (i + (e.key === 'ArrowLeft' ? -1 : 1)) + '"]');
-        if (next){ r.setAttribute('tabindex', '-1'); next.setAttribute('tabindex', '0'); next.focus(); }
+        if (next){ r.setAttribute('tabindex', '-1'); next.setAttribute('tabindex', '0'); next.focus(); if (anchor != null) preview(Math.min(anchor, +next.getAttribute('data-i')), Math.max(anchor, +next.getAttribute('data-i'))); }
         e.preventDefault();
       } else if (e.key === 'Enter' || e.key === ' '){
-        st.refocus = i; pick(i); e.preventDefault();
+        st.refocus = i; if (!press(i)) st.refocus = null; else showTip(r); e.preventDefault();
+      } else if (e.key === 'Escape' && anchor != null){
+        anchor = null; preview(null); say(''); showTip(r); e.preventDefault();
       }
     });
     if (st.refocus != null){
@@ -2335,10 +2519,10 @@ APP_JS = r"""
     lazyDocs.forEach(function(d){ if (d.content == null){ if (d.failed) failed++; else waiting++; } });
     var code = raw.toUpperCase(), ownHint = own && own.tickers.indexOf(code) !== -1 ?
       ' · <a href="#kepemilikan=' + encodeURIComponent(code) + '">Kepemilikan saham ' + esc(code) + ' →</a>' : '';
-    note.innerHTML = q ? esc(shown + ' dari ' + docs.length + ' dokumen di semua sumber memuat “' + raw + '”' +
+    note.innerHTML = q ? esc(shown + ' dari ' + docs.length + ' dokumen (semua sumber) memuat “' + raw + '”' +
       (raw.length >= 2 && waiting ? ' · memuat isi ' + waiting + ' dokumen besar…' : '') +
-      (raw.length >= 2 && failed ? ' · isi ' + failed + ' dokumen besar belum ikut dicari' : '')) + ownHint +
-      (!reader.hidden ? ' · <a href="#">Lihat daftar hasil pencarian →</a>' : '') : '';
+      (raw.length >= 2 && failed ? ' · isi ' + failed + ' dokumen besar belum dicari' : '')) + ownHint +
+      (!reader.hidden ? ' · <a href="#">Daftar hasil pencarian →</a>' : '') : '';
     empty.hidden = shown > 0;
     if (current && !reader.hidden && renderedQuery !== raw){
       var frame = reader.querySelector('.doc-frame');
@@ -2455,8 +2639,8 @@ def build_page(docs, by_cat, own=None):
     "own": own and {k: own[k] for k in ("path", "changes", "reports", "months", "count", "tickers")}
     }
     data_json = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
-    desc = ("Arsip riset pasar modal: laporan Stockbit, keterbukaan informasi Indonesia, Australia, dan Singapura, serta digest per emiten, dikelompokkan per sumber "
-            "dan tanggal, plus grafik kepemilikan saham KSEI per emiten.")
+    desc = ("Arsip riset pasar modal: Stockbit, keterbukaan informasi Indonesia, Australia, Singapura, "
+            "dan kepemilikan saham KSEI.")
     canonical = f'<link rel="canonical" href="{esc(BASE_URL)}/">' if BASE_URL else ""
 
     head = (f"<title>{SITE_NAME}</title>"
@@ -2479,8 +2663,8 @@ def build_page(docs, by_cat, own=None):
         report_span = f'laporan emiten sejak {BULAN[int(first_p[5:7]) - 1]} {first_p[:4]}' if len(own["months"]) > len(ksei_m) else ""
         own_view = ('<section class="own" id="own" data-cat="kepemilikan" aria-labelledby="own-title" hidden>'
                     '<header class="own-hero"><h1 id="own-title">Kepemilikan saham</h1>'
-                    '<p class="lede">Siapa memegang saham emiten dan bagaimana porsinya bergeser dari satu tanggal ke tanggal lain. '
-                    "Pemegang di atas 1% dari KSEI; pemegang ≥5%, free float resmi, dan jumlah pemegang dari laporan bulanan emiten. Disalin dari IDX Signal Desk.</p>"
+                    '<p class="lede">'
+                    "KSEI: pemegang &gt;1%. Laporan bulanan emiten: pemegang ≥5%, free float resmi, jumlah pemegang. Data: IDX Signal Desk.</p>"
                     f'<p class="tally"><span><b>{angka(own["count"])}</b> emiten</span><span><b>{len(ksei_m)}</b> bulan data KSEI</span>'
                     f"<span>{esc(span_own)}</span>" + (f'<span><b>{len(own["months"])}</b> bulan {esc(report_span)}</span>' if report_span else "") + stat_span("kepemilikan", live_label="melihat", always_live=True) + "</p></header>"
                     '<div class="own-bar">'
@@ -2491,32 +2675,32 @@ def build_page(docs, by_cat, own=None):
                     '<div id="own-body" aria-live="polite"></div></section>')
     body = (tabs + '<div class="app"><main class="stage">'
             f'<nav class="category-nav" aria-label="Sumber dokumen">{"".join(category_links)}</nav>'
-            '<div class="search"><label for="cari">Cari di semua arsip</label>'
-            '<div class="search-controls"><input id="cari" type="search" maxlength="128" autocomplete="off" placeholder="Kode saham, nama, kata, atau tanggal…" aria-describedby="cari-catatan">'
+            '<div class="search"><label for="cari">Cari arsip</label>'
+            '<div class="search-controls"><input id="cari" type="search" maxlength="128" autocomplete="off" placeholder="Kode, nama, kata, atau tanggal…" aria-describedby="cari-catatan">'
             '<button id="hapus-cari" type="button" hidden>Hapus pencarian</button></div>'
             '<p class="search-note" id="cari-catatan" aria-live="polite"></p></div>'
             '<section class="chat" aria-labelledby="chat-title">'
             '<header class="chat-head"><h2 id="chat-title">Tanya arsip</h2><button id="chat-new" type="button" hidden>Percakapan baru</button></header>'
-            '<p class="chat-intro">Tanyakan saham atau topik. Jawaban memakai dokumen dalam arsip dan menyertakan sumbernya.</p>'
+            '<p class="chat-intro">Tanya saham atau topik; jawaban menyertakan sumber dari arsip.</p>'
             '<div id="chat-history" role="log" aria-label="Percakapan tentang arsip" aria-live="polite"></div>'
-            '<form id="chat-form" class="chat-form"><textarea id="chat-question" rows="2" maxlength="600" aria-describedby="chat-count" required aria-label="Pertanyaan tentang arsip" placeholder="Contoh: Analisis SOCI dari semua dokumen yang tersedia"></textarea>'
+            '<form id="chat-form" class="chat-form"><textarea id="chat-question" rows="2" maxlength="600" aria-describedby="chat-count" required aria-label="Pertanyaan tentang arsip" placeholder="Contoh: analisis SOCI"></textarea>'
             '<div class="chat-actions"><button id="chat-send" type="submit">Tanyakan</button><button id="chat-stop" type="button" hidden>Hentikan</button></div></form>'
-            '<label id="chat-mode" class="chat-mode" hidden><input id="chat-agentic" type="checkbox"> <span><strong>Mode agen</strong>: telusuri juga data resmi BEI (kepemilikan, RUPS, pengurus, transaksi) lewat datacat. '
+            '<label id="chat-mode" class="chat-mode" hidden><input id="chat-agentic" type="checkbox"> <span><strong>Mode agen</strong>: tambah data BEI dari datacat. '
             '<span id="chat-agentic-left"></span></span></label>'
             '<p id="chat-count" class="chat-count">0 / 600 karakter</p>'
-            '<p class="chat-count">Pertanyaan dan pemakaian dicatat secara privat oleh pengelola untuk evaluasi layanan.</p>'
+            '<p class="chat-count">Pertanyaan dan pemakaian dicatat privat oleh pengelola.</p>'
             '<div id="chat-progress" class="chat-progress" hidden><div class="chat-working"><span class="chat-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="chat-activity">Asisten mulai bekerja…</span><span id="chat-elapsed"></span></div><progress id="chat-meter" aria-label="Progres pembacaan dokumen"></progress></div>'
             '<p id="chat-status" class="chat-status" role="status"></p></section>'
             '<div id="overview">'
             '<header class="masthead">'
             "<h1>Arsip riset pasar modal</h1>"
-            '<p class="lede">Stockbit dan keterbukaan emiten Indonesia, Australia, serta Singapura. Cari kode atau kata untuk menelusuri isi arsip.</p>'
+            '<p class="lede">Stockbit dan keterbukaan informasi Indonesia, Australia, Singapura.</p>'
             f'<p class="tally"><span><b>{len(docs)}</b> dokumen</span><span><b>{len(by_cat)}</b> sumber</span>'
             f"<span>{esc(span)}</span>"
             + stat_span("home", live_label="di beranda", always_live=True)
             + '<span class="stat stat-online" hidden></span></p></header>'
             + f'<div class="cats">{"".join(sections)}</div>'
-            + '<p class="empty" id="kosong" hidden>Tidak ada dokumen yang cocok. Coba kode saham 4 huruf, nama orang, atau nama bulan.</p>'
+            + '<p class="empty" id="kosong" hidden>Tidak ada yang cocok. Coba kode 4 huruf, nama, atau bulan.</p>'
             f'<noscript><p class="empty">JavaScript mati. Buka berkas mentahnya:</p><ul>{raw_links}</ul></noscript>'
             f'<footer class="foot"><span>{SITE_NAME}</span><span>dibangun {esc(date_label(date.today(), date.today()))}</span>'
             + (f"<span>data terbaru {esc(date_label(last, last))}</span>" if last else "") + "</footer></div>"

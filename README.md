@@ -148,13 +148,20 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
     jumlah pemegang saham (dengan perubahan %), free float resmi (dua yang terakhir dari laporan emiten terakhir sampai Sampai, bulannya ditulis),
     tren kecil. Bisa diurutkan per perubahan akumulasi atau per perubahan jumlah pemegang; 100 baris pertama, lalu "Tampilkan semua".
   - Satu emiten: kotak angka per tanggal Sampai dibanding Dari; grafik bulanan (akumulasi >1% + pemegang ≥5%, sisa <1% + free float resmi,
-    jumlah pemegang), mula-mula diperbesar ke rentang Dari–Sampai plus satu bulan di tiap sisi (supaya bulan KSEI tidak terjepit di ujung riwayat sejak 2023); tombol **Tampilkan sejak/sampai/semua bulan** memperlihatkan semua bulan yang punya angka (pilihan ini berlaku untuk emiten lain sampai halaman dimuat ulang), tombol hanya muncul kalau ada bulan tersembunyi; rentang diarsir; klik bulan untuk mengubah rentang (sebelum rentang = Dari, sesudahnya = Sampai), panah + Enter dari keyboard;
+    jumlah pemegang), mula-mula menampilkan semua bulan yang punya angka; tombol **Perbesar ke rentang** menampilkan Dari–Sampai plus satu bulan di tiap sisi (pilihan ini berlaku untuk emiten lain sampai halaman dimuat ulang); rentang diarsir; pilih rentang dengan menyeret di chart, atau klik bulan awal lalu bulan akhir (keyboard: panah, Enter dua kali, Esc batal); tombol cepat 1 bln/3 bln/6 bln/1 thn (mundur dari Sampai), Sejak KSEI, Semua;
     batang "siapa menambah, siapa mengurangi" berdasarkan perubahan **lembar saham** antara Dari dan Sampai, dengan perubahan porsi sebagai angka pendamping;
     hanya dibandingkan bila kedua snapshot KSEI tersedia dan lolos validasi. Bulan tanpa data tidak dianggap nol atau tidak berubah.
+    Kalau pasangan KSEI tidak tersedia (mis. Dari sebelum Feb 2026), bagian ini menampilkan perubahan antar laporan bulanan emiten
+    (pemegang ≥5%, direksi, komisaris; aturan turunan di bawah) dan tautan untuk membandingkan dari snapshot KSEI valid pertama di rentang.
     Pemegang yang hanya tercatat pada satu ujung rentang diberi status tercatat/tidak lagi tercatat >1%, tanpa menganggap jumlah sebelumnya/sesudahnya nol.
     Ini perubahan posisi antara dua tanggal, bukan catatan seluruh transaksi beli/jual. Tabel pemegang >1% tetap menampilkan angka sumber serta tren kecil;
     **daftar pemegang saham (DPS) dari laporan emiten**: pemegang ≥5%/pengendali/afiliasi, direksi dan komisaris dengan lembar dan persen,
-    dibanding laporan sebelumnya, plus jumlah pemegang saham dan total saham; **jenis pemilik (laporan BAE)** dengan jumlah pemegang per jenis
+    dibanding laporan sebelumnya, plus jumlah pemegang saham dan total saham. Baris yang belum terverifikasi Signal Desk tetap diberi perubahan
+    (ditandai "belum terverifikasi", batang pucat) hanya bila: kedua laporan `derivable()` di `tools/sync_idx.py` (versi sepakat, sumber tidak
+    diblokir, masalahnya hanya peran "unknown"/total saham tidak tertulis; format laporan 2), kedua baris bukan agregat/nama berulang/bercatatan,
+    punya peran, porsinya ≥0,1%, total saham sama di seluruh rentang, dan lembar/persen kedua baris serta seluruh baris ≥1% kedua laporan cocok
+    dengan total itu (kurang dari setengah satuan desimal yang tertulis; laporan tanpa total memakai total laporan terdekat). Data format 1 tidak
+    pernah diturunkan. Selain itu tetap "perlu dicek"; **jenis pemilik (laporan BAE)** dengan jumlah pemegang per jenis
     (hanya ±30 emiten yang tabelnya terbaca); **laporan perubahan kepemilikan** (formulir KSEI/IDX dan surat BAE ≥5%, Jul 2023–):
     tanggal, pemegang, lembar/persen sebelum dan sesudah, transaksi, PDF, dan catatan "Perlu dicek" dari audit Signal Desk tanpa mengoreksi angka;
     laporan di rentang Dari–Sampai tampil, sisanya di balik "Laporan lain"; batas akhir tetap berlaku pada bulan terakhir data KSEI;

@@ -120,7 +120,8 @@ async function test(name,fn){await fn();checks++;console.log('PASS',name);}
   let {dom,d,route,errors}=setup(null,null,null,r=>{r.names.fill('<img src=x onerror=bad>');r.companies[t].u=r.companies[t].u.map(()=>'javascript:alert(1)');});
   route('#kepemilikan='+t);await delay(10);
   assert.equal(d.querySelector('#own-body img,#own-body a[href^="javascript:"]'),null);dom.window.close();
-  for(const attack of [r=>r.format=2,r=>{r.companies[t].d[0]=5;},r=>r.companies[t].u[0]='../x?<',r=>r.months.pop(),r=>r.base='http://x/']){
+  const firstReport=r=>r.companies[t].d.find(x=>x&&typeof x==='object');
+  for(const attack of [r=>r.format=3,r=>r.format=1,r=>{firstReport(r).h[0][5]=3;},r=>{firstReport(r).v=2;},r=>{r.companies[t].d[0]=5;},r=>r.companies[t].u[0]='../x?<',r=>r.months.pop(),r=>r.base='http://x/']){
    ({dom,d,route}=setup(null,null,null,attack));route('#kepemilikan='+t);await delay(10);
    assert.equal(d.querySelector('#own-reports table'),null);assert.match(d.getElementById('own-reports').textContent,/belum berhasil dimuat/);dom.window.close();
   }

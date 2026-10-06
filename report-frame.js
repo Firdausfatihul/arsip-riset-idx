@@ -20,7 +20,7 @@
     if (!button || !/^\d{1,24}$/.test(button.getAttribute('data-copy'))) return;
     event.preventDefault(); event.stopImmediatePropagation();
     var field = document.createElement('input'); field.readOnly = true;
-    field.value = button.getAttribute('data-copy'); field.setAttribute('aria-label', 'Nomor postingan untuk disalin');
+    field.value = button.getAttribute('data-copy'); field.setAttribute('aria-label', 'Nomor postingan');
     button.after(field); field.select();
     try { if (document.execCommand && document.execCommand('copy')) { button.textContent = 'Tersalin'; field.remove(); } }
     catch (_) { /* Selected text remains available for manual copying. */ }

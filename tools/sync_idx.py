@@ -48,7 +48,7 @@ FILINGS_JSON = DEST / "kepemilikan-perubahan.json"
 REPORTS_JSON = DEST / "kepemilikan-laporan.json"
 # Naikkan kalau bentuk kepemilikan.json / kepemilikan-laporan.json berubah, supaya sinkron berikutnya membuatnya ulang.
 OWNERSHIP_FORMAT = 6
-REPORTS_FORMAT = 1
+REPORTS_FORMAT = 2
 # Tautan laporan emiten di IDX hampir selalu diawali ini; kepemilikan-laporan.json menyimpan sisanya saja.
 IDX_REPORT_BASE = "https://www.idx.co.id/StaticData/NewsAndAnnouncement/ANNOUNCEMENTSTOCK/"
 
@@ -245,6 +245,35 @@ SOURCE_BLOCKED = re.compile(r"^(issuer_mismatch|previous_parse_retained|issuer_c
 SKIPPED_TABLE = re.compile(r"^(required_metric_missing|holder_needs_review|holder_percentage_mismatch|holder_headers_unverified|"
                            r"conflicting_holder|composition_rows_incomplete_or_out_of_order):")
 HOLDER_REVIEW = re.compile(r"^(holder_needs_review|conflicting_holder)(:|$)")
+# Masalah laporan yang tidak menyentuh angka lembar/persen pemegang: peran "unknown" di laporan lama, total saham tidak tertulis.
+DERIVABLE_ISSUE = re.compile(r"^(holder_needs_review|required_metric_missing):")
+
+
+def derivable(chosen, versions, conflict):
+    """Laporan belum terverifikasi yang angka pemegangnya tetap boleh dipakai viewer untuk menghitung perubahan,
+    asalkan viewer juga mencocokkan lembar/persen dengan total saham. Tidak untuk sumber diblokir, tabel/angka yang gagal
+    dibaca, atau periode meragukan: hanya masalah yang terdaftar di DERIVABLE_ISSUE.
+
+    Flag conflict server juga menyala karena metrik lain (free float, jumlah pemegang) dan hanya membandingkan pemegang
+    tervalidasi, jadi versi diperiksa langsung: setiap nama pemegang (bukan agregat) yang disebut lebih dari satu versi harus
+    punya lembar dan persen yang sama, dan total saham yang tertulis tidak boleh berbeda. Nama yang hanya ada di satu versi
+    (mis. tabel direksi tidak terbaca di versi lain) tidak dianggap bertentangan.
+    """
+    if not chosen or chosen.get("import_status") in ("quarantined", "previous_parse_retained"):
+        return False
+    if chosen.get("validation") == "missing" or not chosen.get("holders"):
+        return False
+    if not all(DERIVABLE_ISSUE.match(str(x)) for x in chosen.get("issues") or []):
+        return False
+    seen, totals = {}, set()
+    for v in [chosen] + [v for v in versions or [] if v is not chosen]:
+        if metric(v, "total_shares") is not None:
+            totals.add(metric(v, "total_shares"))
+        for h in v.get("holders") or []:
+            if aggregate_holder(h.get("name"), include_public=True):
+                continue
+            seen.setdefault(str(h.get("name") or "").strip().casefold(), set()).add((h.get("shares"), h.get("pct")))
+    return len(totals) <= 1 and all(len(x) == 1 for x in seen.values())
 
 
 def number(v):
@@ -406,10 +435,13 @@ def report_url(url):
     return url[len(IDX_REPORT_BASE):] if url and url.startswith(IDX_REPORT_BASE) else url
 
 
-def report_holders(chosen, name_ref, trusted=True):
+def report_holders(chosen, name_ref, trusted=True, usable=False):
     """Daftar pemegang saham di laporan emiten: pemegang >=5%/pengendali/afiliasi, lalu direksi dan komisaris.
 
-    {h: [[nama, peran (bit ROLE_BITS), lembar, persen, 1 kalau tervalidasi]], s: total saham}.
+    {h: [[nama, peran (bit ROLE_BITS), lembar, persen, 1 kalau tervalidasi, turunan]], s: total saham, v: 1 kalau derivable()}.
+    turunan: 1 = baris boleh dipakai viewer untuk menghitung perubahan (lembar dan persen terbaca, nama tidak berulang, dan
+    satu-satunya catatan untuk nama ini dari DERIVABLE_ISSUE); 2 = baris agregat (Masyarakat, subtotal); 0 = pemegang lain.
+    v tidak sama dengan tervalidasi: laporan comparable() bisa saja punya versi yang angka pemegang review-nya berbeda.
     h kosong = laporan ada tetapi tabelnya belum terbaca oleh Signal Desk (mis. teks PDF acak).
     Alamat dan kutipan halaman laporan sengaja tidak disalin.
     """
@@ -417,12 +449,20 @@ def report_holders(chosen, name_ref, trusted=True):
         return None
     holders = chosen.get("holders") or []
     duplicates = duplicate_holder_names(holders)
-    rows = [[name_ref(redact(h.get("name") or "")), sum(ROLE_BITS.get(r, 0) for r in h.get("roles") or []),
-             h.get("shares"), h.get("pct"), int(trusted and h.get("validation") == "ok" and
-                 investor_signature(h.get("name")) not in duplicates and
-                 not aggregate_holder(h.get("name"), include_public=True))] for h in holders]
+    # Nama yang disebut catatan selain DERIVABLE_ISSUE (holder_percentage_mismatch, conflicting_holder, ...).
+    flagged = {str(x).split(":", 1)[1].strip().casefold() for x in chosen.get("issues") or []
+               if ":" in str(x) and not DERIVABLE_ISSUE.match(str(x))}
+    rows = []
+    for h in holders:
+        aggregate = aggregate_holder(h.get("name"), include_public=True)
+        plain = investor_signature(h.get("name")) not in duplicates and not aggregate
+        derive = plain and number(h.get("shares")) is not None and number(h.get("pct")) is not None and \
+            str(h.get("name") or "").strip().casefold() not in flagged
+        rows.append([name_ref(redact(h.get("name") or "")), sum(ROLE_BITS.get(r, 0) for r in h.get("roles") or []),
+                     h.get("shares"), h.get("pct"), int(trusted and h.get("validation") == "ok" and plain),
+                     2 if aggregate else int(derive)])
     rows.sort(key=lambda r: (not r[1] & 7, -(r[3] or 0), r[0]))
-    return {"h": rows, "s": metric(chosen, "total_shares")}
+    return {"h": rows, "s": metric(chosen, "total_shares"), "v": int(bool(usable))}
 
 
 def report_categories(chosen, category_ref):
@@ -672,7 +712,7 @@ def ownership_data(server, index, ledger, pid):
     unik di kedua sisi (lihat assign_investor_ids). Pasangan ambigu ditandai dan tidak dipaksakan sama.
 
     Hasil kedua (kepemilikan-laporan.json, diambil saat satu emiten dibuka):
-      {months: [p], base: awalan url, names, categories, companies: {KODE: {d: [daftar pemegang | nomor bulan dengan
+      {months: [p], base: awalan url, names, categories, companies: {KODE: {d: [daftar pemegang (report_holders) | nomor bulan dengan
        daftar yang persis sama | null], u: [url laporan, tanpa base kalau diawali base], b: [jenis pemilik BAE]}}}
     Hasil ketiga: laporan perubahan kepemilikan per emiten (lihat filing_rows).
     """
@@ -705,7 +745,8 @@ def ownership_data(server, index, ledger, pid):
             free_float, holders = report_metrics(chosen, versions, trusted)
             f.append(free_float)
             c.append(holders)
-            listed = report_holders(chosen, lambda v: ref(dps_names, v), trusted=trusted)
+            listed = report_holders(chosen, lambda v: ref(dps_names, v), trusted=trusted,
+                                    usable=derivable(chosen, versions, conflict))
             status += "-" if not chosen else "v" if listed["h"] else "x"
             same = next((j for j in range(i - 1, -1, -1) if isinstance(dps[j], dict)), None)
             dps.append(same if listed and same is not None and dps[same] == listed else listed)

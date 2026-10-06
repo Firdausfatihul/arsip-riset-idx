@@ -61,7 +61,7 @@ async function submit(text) {
   assert.equal(d.querySelector('.chat-answer a').getAttribute('href'), '#doc=' + source.path);
   assert.equal(d.querySelector('.chat-answer a[href^="https:"]'), null);
   assert.ok(d.querySelector('.chat-answer').textContent.includes('🚢'));
-  assert.equal(d.querySelector('.chat-sources summary').textContent, '1 sumber dirujuk · lihat sumber');
+  assert.equal(d.querySelector('.chat-sources summary').textContent, '1 sumber dirujuk');
   await submit('Bagaimana risikonya?');
   assert.equal(requests[1].context, 'a'.repeat(64));
   mode = 'error'; await submit('Tolong lanjutkan');
@@ -72,7 +72,7 @@ async function submit(text) {
   form.dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
   assert.equal(d.querySelector('#chat-progress').hidden, false);
   d.querySelector('#chat-stop').click(); await settled();
-  assert.equal(d.querySelector('#chat-status').textContent, 'Proses dihentikan.');
+  assert.equal(d.querySelector('#chat-status').textContent, 'Dihentikan.');
   d.querySelector('#chat-new').click();
   assert.equal(d.querySelector('#chat-history').children.length, 0);
   mode = 'success'; await submit('SOCI');
@@ -98,7 +98,7 @@ async function submit(text) {
   events = answerEvents(['x'.repeat(60000), 'y'.repeat(140001)], 'c'.repeat(64));
   await submit('Jawaban terlalu panjang');
   let lastReply = d.querySelector('.chat-message.assistant:last-child');
-  assert.match(lastReply.querySelector('.chat-error').textContent, /Jawaban melampaui batas ukuran/);
+  assert.match(lastReply.querySelector('.chat-error').textContent, /Jawaban terlalu panjang/);
   assert.equal(lastReply.querySelector('.chat-answer').textContent, 'x'.repeat(60000));
   events = answerEvents(['Jawaban berikutnya']);
   await submit('Lanjutkan setelah gagal');
