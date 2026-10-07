@@ -3,7 +3,7 @@
 
 Sumber: <BROKSUM_DIR>/stockbit_<KODE>_metrics.csv (kolom `date`, `Close 1D`), dibaca saja, tidak diubah.
 Hasil: needtobeindexed/harga/harga.json
-  {format: 1, source, updated, d: [tanggal snapshot KSEI...], c: {KODE: [harga per tanggal d | null]}}
+  {format: 1, source, d: [tanggal snapshot KSEI...], c: {KODE: [harga per tanggal d | null]}}; isi sama bila harga sama.
 Harga per tanggal = baris terakhir dengan tanggal <= tanggal snapshot, paling lama 7 hari sebelumnya; selain itu null.
 Dataset menulis ulang nilai terakhir pada hari tanpa perdagangan, jadi ini harga "as-of", belum disesuaikan aksi korporasi.
 
@@ -11,7 +11,7 @@ Dataset menulis ulang nilai terakhir pada hari tanpa perdagangan, jadi ini harga
     BROKSUM_DIR=/path/ke/dataset python3 tools/sync_prices.py
 """
 import csv
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 import json
 import os
 from pathlib import Path
@@ -59,8 +59,7 @@ def main():
     dates = sorted({m["asOf"] for m in own["months"] if m.get("asOf")})
     tickers = {c["t"] for c in own["companies"]}
     wanted = [date.fromisoformat(d) for d in dates]
-    data = {"format": 1, "source": "Stockbit, dataset broker summary riset (Close 1D)",
-            "updated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "d": dates, "c": {}}
+    data = {"format": 1, "source": "Stockbit, dataset broker summary riset (Close 1D)", "d": dates, "c": {}}
     for path in sorted(src.glob("stockbit_*_metrics.csv")):
         m = FILE.fullmatch(path.name)
         if not m or m.group(1) not in tickers:

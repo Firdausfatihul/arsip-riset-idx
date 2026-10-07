@@ -11,3 +11,6 @@ node_modules/
 __pycache__/
 reports/private/
 /output/
+
+# Hasil build lokal (GitHub Pages memakai docs/)
+site/

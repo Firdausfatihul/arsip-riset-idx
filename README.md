@@ -150,7 +150,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   - Tanpa emiten: tabel semua emiten, akumulasi >1% di tanggal Dari dan Sampai, perubahan (poin), jumlah pemegang >1%,
     jumlah pemegang saham (dengan perubahan %), free float resmi (dua yang terakhir dari laporan emiten terakhir sampai Sampai, bulannya ditulis),
     tren kecil. Bisa diurutkan per perubahan akumulasi atau per perubahan jumlah pemegang; 100 baris pertama, lalu "Tampilkan semua".
-  - **Struktur pemegang** (per Sampai, deskriptif, belum diuji terhadap harga; persentil dibanding semua emiten bulan itu): jumlah dan porsi pemegang >1%;
+  - Satu emiten, kartu **Struktur pemegang** (per Sampai, deskriptif, belum diuji terhadap harga; persentil dibanding semua emiten bulan itu): jumlah dan porsi pemegang >1%;
     sisa (100 − akumulasi) dibagi jumlah pemegang terverifikasi (rata-rata % dan rupiah per pihak = lembar rata-rata × harga penutupan di tanggal snapshot;
     tanpa harga, lot); HHI pemegang >1% (setara N pemegang sama besar, terbesar);
     free float resmi vs di luar pemegang >1% (selisih = porsi pemegang 1–5%, tanpa rekening kustodian/nominee); perubahan jumlah pemegang 1/3/6/12 bulan
@@ -168,11 +168,11 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
     (ditandai "belum terverifikasi") hanya bila: kedua laporan `derivable()` di `tools/sync_idx.py` (versi sepakat, sumber tidak
     diblokir, masalahnya hanya peran "unknown"/total saham tidak tertulis; format laporan 2), kedua baris bukan agregat/nama berulang/bercatatan,
     punya peran, porsinya ≥0,1%, total saham sama di seluruh rentang, dan lembar/persen kedua baris serta seluruh baris ≥1% kedua laporan cocok
-    dengan total itu (kurang dari setengah satuan desimal yang tertulis; laporan tanpa total memakai total laporan terdekat). Data format 1 tidak
+    dengan total itu (kurang dari setengah satuan desimal yang tertulis, minimal 2 desimal; laporan tanpa total memakai total laporan terdekat). Data format 1 tidak
     pernah diturunkan. Selain itu tetap "perlu dicek"; **jenis pemilik (laporan BAE)** dengan jumlah pemegang per jenis
     (hanya ±30 emiten yang tabelnya terbaca); **laporan perubahan kepemilikan** (formulir KSEI/IDX dan surat BAE ≥5%, Jul 2023–):
     tanggal, pemegang, lembar/persen sebelum dan sesudah, transaksi, PDF, dan catatan "Perlu dicek" dari audit Signal Desk tanpa mengoreksi angka;
-    laporan di rentang Dari–Sampai tampil, sisanya di balik "Laporan lain"; batas akhir tetap berlaku pada bulan terakhir data KSEI;
+    laporan di rentang Dari–Sampai tampil, sisanya di balik "Di luar rentang"; batas akhir tetap berlaku pada bulan terakhir data KSEI;
     tautan file KSEI dan laporan emiten di IDX.
   - Laporan emiten tidak terbit tiap bulan, jadi angka laporan memakai laporan terakhir sampai Sampai, dibanding laporan terakhir sampai Dari
     (atau laporan paling awal di dalam rentang). Laporan yang ada tetapi tabelnya belum terbaca Signal Desk ditandai, dengan tautan ke PDF-nya.
@@ -659,7 +659,7 @@ NODE_PATH="$chat_test_deps/node_modules" node tests/chat_ui.cjs
 
 Membaca `Close 1D` dari `../chatgptrisetkeystat/dataset_broksum_20261003_recovered/stockbit_<KODE>_metrics.csv` (ubah dengan `BROKSUM_DIR`), hanya baca,
 untuk setiap tanggal snapshot KSEI di `kepemilikan.json`: harga as-of (baris terakhir ≤ tanggal, maksimal 7 hari sebelumnya), belum disesuaikan aksi korporasi.
-Hasil `needtobeindexed/harga/harga.json` (±50 KB) disalin build ke `files/kepemilikan/harga.json` dan dimuat bersama data kepemilikan; file tidak ada,
+Hasil `needtobeindexed/harga/harga.json` (±35 KB) disalin build ke `files/kepemilikan/harga.json` dan dimuat bersama data kepemilikan; file tidak ada,
 rusak, atau emiten tanpa harga (±650 dari ±980 emiten punya harga) membuat viewer memakai lot. Jalankan setelah `tools/sync_idx.py` bila ada bulan KSEI baru:
 
 ```bash

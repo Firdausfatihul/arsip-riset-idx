@@ -19,9 +19,10 @@ const prices = JSON.parse(fs.readFileSync(path.join(root, source ? 'needtobeinde
 const tickers = new Set(['BBCA', 'ABMM', 'ATIC', 'CNTX', 'ARII']);
 ownership.companies = ownership.companies.filter(c => tickers.has(c.t));
 for (const dataset of [reports, changes]) dataset.companies = Object.fromEntries(Object.entries(dataset.companies).filter(([ticker]) => tickers.has(ticker)));
-const html = (source ? execFileSync('python3', ['-B', '-c',
+const rawHtml = source ? execFileSync('python3', ['-B', '-c',
   'import build; h,b=build.build_page([], {}, build.ownership_meta()); print("<!doctype html><html><head>"+h+"</head><body>"+b+"</body></html>")'
-], {cwd: root, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024}) : fs.readFileSync(path.join(root, 'site/index.html'), 'utf8')).replace(/<style>[\s\S]*?<\/style>/g, '');
+], {cwd: root, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024}) : fs.readFileSync(path.join(root, 'site/index.html'), 'utf8');
+const html = rawHtml.replace(/<style>[\s\S]*?<\/style>/g, '');
 const index = month => ownership.months.findIndex(m => m.p === month);
 const f = index('2026-07'), t = index('2026-08');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -79,7 +80,7 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
   assert.equal(reports.format, 2, 'Regenerate kepemilikan-laporan.json with REPORTS_FORMAT 2 (tools/sync_idx.py) before this test.');
   {
     // Built CSS: new chart/struct classes must not restyle existing controls (Emiten select, filing notes).
-    const page = new JSDOM(fs.readFileSync(path.join(root, 'site/index.html'), 'utf8')), w = page.window, d = w.document;
+    const page = new JSDOM(rawHtml), w = page.window, d = w.document;
     const label = d.getElementById('own-emiten').closest('label');
     assert.notEqual(w.getComputedStyle(label).display, 'none', 'Emiten select stays visible');
     const flag = d.body.appendChild(d.createElement('span')); flag.className = 'own-flag';
@@ -219,7 +220,7 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     }
     assert.match(c.textContent, /belum terverifikasi; cocok dengan total saham/);
   }));
-  await test('unverified DPS rows stay uncounted without source trust, row eligibility, matching totals or checkable size', fixture((own, rep) => {
+  await test('one unverified ≥1% row that does not fit the total blocks all derived changes in the pair', fixture((own, rep) => {
     const nm = x => rep.names.push(x) - 1;
     const k = nm('Anchor Holder'), a = nm('Mismatch Holder'), b = nm('Tiny Holder'), g = nm('Masyarakat'), d = nm('Duplicate Signature');
     const raw = rep.companies.BBCA;
@@ -227,20 +228,21 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     raw.d[t] = {h: [[k, 1, 1000, 20, 0, 1], [a, 1, 900, 6, 0, 1], [b, 8, 4, 0.08, 0, 1], [g, 1, 1000, 20, 0, 2], [d, 1, 750, 15, 0, 0]], s: 5000, v: 1};
   }, async s => {
     await s.route('BBCA', '2026-07', '2026-08');
-    // Mismatch Holder breaks reportFits for both reports, so even Anchor Holder stays uncounted.
+    // Mismatch Holder no longer fits the total in the Sampai report, so the whole pair is not derivable, Anchor Holder included.
     for (const [, dp, ds] of dpsCells(s)) { assert.equal(dp, '—'); assert.equal(ds, '—'); }
   }));
   await test('untrusted report or changed total shares blocks derived changes', fixture((own, rep) => {
     const k = rep.names.push('Anchor Holder') - 1, raw = rep.companies.BBCA, j = own.months.findIndex(x => x.p === '2026-06');
     raw.d = raw.d.map(() => null);
-    raw.d[j] = {h: [[k, 1, 1000, 20, 0, 1]], s: null, v: 0};
-    raw.d[f] = {h: [[k, 1, 1000, 20, 0, 1]], s: null, v: 1};
+    // Jun–Jul: same written total and every row fits, so only v=0 can block. Jul–Aug: v=1 and rows fit their own totals, only the total change blocks.
+    raw.d[j] = {h: [[k, 1, 1000, 20, 0, 1]], s: 5000, v: 0};
+    raw.d[f] = {h: [[k, 1, 1000, 20, 0, 1]], s: 5000, v: 1};
     raw.d[t] = {h: [[k, 1, 5000, 20, 0, 1]], s: 25000, v: 1};
   }, async s => {
     await s.route('BBCA', '2026-06', '2026-07');
     assert.deepEqual(dpsCells(s), [['Anchor Holder', '—', '—']], 'v=0 report');
     await s.route('BBCA', '2026-07', '2026-08');
-    assert.deepEqual(dpsCells(s), [['Anchor Holder', '—', '—']], 'Jul borrows Aug total 25000: 1000 shares no longer fit 20%');
+    assert.deepEqual(dpsCells(s), [['Anchor Holder', '—', '—']], 'total shares 5000 → 25000 (split) blocks the pair');
   }));
   // Each guard alone decides: a base pair where every gate passes, then one gate broken per case.
   const gate = (name, mutate, expectDerived) => test('derive gate: ' + name, fixture((own, rep) => {
@@ -248,7 +250,7 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     raw.d = raw.d.map(() => null);
     const a = {h: [[k, 1, 1000, 20, 0, 1], [z, 1, 500, 10, 0, 1]], s: 5000, v: 1};
     const b = {h: [[k, 1, 1000, 20, 0, 1], [z, 1, 750, 15, 0, 1]], s: 5000, v: 1};
-    mutate(a, b, nm, raw);
+    mutate(a, b);
     raw.d[f] = a; raw.d[t] = b;
   }, async s => {
     await s.route('BBCA', '2026-07', '2026-08');
@@ -301,6 +303,7 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     assert.match(t, /15 pemegang = 87,91%/);
     assert.match(t, /12,09% dipegang ±1\.489 pihak · rata-rata 0,0081% \(±Rp88,9 jt\) per pihak/);
     assert.match(t, /harga 292 per 31 Agu 2026/);
+    assert.match(s.card('Sumber dan catatan').textContent, /Harga penutupan 31 Agu 2026: Stockbit, dataset broker summary riset \(Close 1D\), belum disesuaikan aksi korporasi/);
     assert.match(t, /HHI1\.212 · setara ±8,2 pemegang sama besar · terbesar 29,08%/);
     assert.match(t, /resmi 40,34%, di luar pemegang >1% 12,09% · selisih 28,25 poin/);
     assert.match(t, /belum diuji terhadap harga/);
@@ -312,7 +315,7 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
   }));
   await test('Struktur pemegang: accumulation needs same-holder share gain and fewer holders; custodians excluded', fixture(own => {
     const c = company(own, 'ARII'), a = idx => own.months.findIndex(m => m.p === idx);
-    const f0 = a('2026-07'), t0 = a('2026-08'), base = c.k[t0];
+    const f0 = a('2026-07'), t0 = a('2026-08');
     const custodian = newName(own, 'UBS AG SINGAPORE S/A CLIENTS'), plain = newName(own, 'PT AKUMULATOR');
     const shares = 10_000_000_000;
     c.k[f0] = {tp: 50, h: [row(9001, plain, 10, shares * 0.10), row(9002, custodian, 20, shares * 0.20)]};

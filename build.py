@@ -773,7 +773,7 @@ a.chip:hover{outline:1px solid var(--c)}
 .own-card-head>span{font:12.5px/1.4 var(--mono);color:var(--faint)}
 .own-zoom{margin-left:8px;font:500 12.5px var(--mono);color:var(--own);background:none;border:1px solid var(--own);border-radius:3px;padding:4px 9px;cursor:pointer}
 .own-chart{position:relative;padding-block:10px 2px;background:var(--surface);border:1px solid var(--line)}
-.own-chart svg{display:block;max-width:100%;height:auto}
+.own-chart svg{display:block;max-width:100%;height:auto;touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .own-chart text{font:11.5px var(--mono);fill:var(--muted)}
 .own-chart text.t{font:500 12.5px var(--sans);fill:var(--ink)}
 .own-chart text.v{font:600 12px var(--mono);fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
@@ -781,7 +781,6 @@ a.chip:hover{outline:1px solid var(--c)}
 .own-range{fill:var(--own-soft)}
 .own-pickband{fill:var(--own);fill-opacity:.16;stroke:var(--own);stroke-width:1.5;display:none;pointer-events:none}
 .own-pickband.on{display:inline}
-.own-chart svg{touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .own-presets{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px}
 .own-presets a{font:500 12.5px var(--mono);padding:4px 10px;border:1px solid var(--line-strong);border-radius:3px;color:var(--ink);text-decoration:none}
 .own-presets a:hover{border-color:var(--own)}
@@ -1505,7 +1504,7 @@ APP_JS = r"""
           var v = p.c[t]; return /^[A-Z0-9]{2,12}$/.test(t) && Array.isArray(v) && v.length === p.d.length &&
             v.every(function(x){ return x === null || (typeof x === 'number' && Number.isFinite(x) && x > 0 && x < 1e9); });
         });
-      if (ok) d.prices = {byDate: Object.create(null), c: p.c};
+      if (ok) d.prices = {byDate: Object.create(null), c: p.c, src: typeof p.source === 'string' ? p.source.slice(0, 200) : ''};
       if (ok) p.d.forEach(function(x, i){ d.prices.byDate[x] = i; });
     }).catch(function(){});
   }
@@ -1834,7 +1833,7 @@ APP_JS = r"""
   var NOMINEE_RE = /\b(A\/C|S\/A|PLEDGED?|CLIENTS?|NOMINEES?|CUSTOD(?:Y|IAN)|FOR THE ACCOUNT|OMNIBUS)\b|\bQQ\b/;
   var CUSTODIAN_RE = /\b(PANIN|DBS|LGT|UBS|CITIBANK|HSBC|STANDARD CHARTERED|DEUTSCHE|BNY|STATE STREET|JPMORGAN|JP MORGAN|BANK OF NEW YORK|NORTHERN TRUST|BNP PARIBAS|SOCIETE GENERALE|CREDIT SUISSE|MORGAN STANLEY|GOLDMAN|CGS|KGI|MAYBANK|UOB|OCBC|NOMURA|CLEARSTREAM|EUROCLEAR|BANK OF SINGAPORE)\b/;
   function pooled(name){ var u = String(name || '').toUpperCase(); return NOMINEE_RE.test(u) || CUSTODIAN_RE.test(u); }
-  // Jumlah pemegang terverifikasi terakhir sampai bulan i (maks. 2 bulan ke belakang); 0 berarti tidak ada.
+  // Jumlah pemegang terverifikasi terakhir sampai bulan i (maks. 2 bulan ke belakang); hitungan 0 dianggap tidak ada, null bila tidak ditemukan.
   function holderCount(c, i){
     for (var j = i; j >= Math.max(0, i - 2); j--) if (c.c[j] && c.c[j][1] && c.c[j][0] > 0) return {n: c.c[j][0], i: j};
     return null;
@@ -2065,12 +2064,12 @@ APP_JS = r"""
     (same ? [to] : [from, to]).forEach(function(i){
       kseiIssues(c, i).forEach(function(x){ notes.push('<li>Catatan KSEI ' + esc(monthText(i, true)) + ': ' + esc(x) + '</li>'); });
     });
+    if (priceAt(c.t, to) && ownData.prices.src) notes.push('<li>Harga penutupan ' + esc(monthText(to, true)) + ': ' + esc(ownData.prices.src) + ', belum disesuaikan aksi korporasi.</li>');
     h += '<section class="own-card"><div class="own-card-head"><h3>Sumber dan catatan</h3></div><ul class="own-sources">' + notes.join('') +
       '<li>Data: IDX Signal Desk.</li></ul></section>';
     return h;
   }
 
-  // Daftar pemegang saham dari laporan bulanan emiten (pemegang >=5%, pengendali, afiliasi, direksi, komisaris).
   // Total saham laporan bulan i; laporan lama sering tanpa total, jadi pakai laporan terdekat yang menuliskannya.
   function reportTotal(list, i){
     for (var d = 0; d < list.length; d++){
@@ -2139,7 +2138,7 @@ APP_JS = r"""
   var DERIVED_NOTE = 'belum terverifikasi; cocok dengan total saham';
 
   // Pengganti "Siapa menambah" saat snapshot KSEI tidak tersedia: perubahan antar laporan bulanan emiten.
-  function dpsMovesHtml(c, rep){
+  function dpsMovesHtml(rep){
     var st = ownState, cp = dpsCompare(rep, st.from, st.to), pr = cp.pr;
     var h = '<p class="own-note"><b>Dari laporan bulanan emiten</b> (≥5%, pengendali, afiliasi, direksi, komisaris)' +
       (cp.cmp ? ': laporan ' + esc(monthName(pr.cmp)) + ' → ' + esc(monthName(pr.cur)) + '.' : '.') + '</p>';
@@ -2195,6 +2194,7 @@ APP_JS = r"""
     return h + '<p class="own-note">Perubahan neto dua laporan, bukan transaksi (lihat Laporan perubahan kepemilikan). Pemegang 1–5% lain tidak tercantum.</p>';
   }
 
+  // Daftar pemegang saham dari laporan bulanan emiten (pemegang >=5%, pengendali, afiliasi, direksi, komisaris).
   function dpsHtml(c, rep){
     var st = ownState, cp = dpsCompare(rep, st.from, st.to), list = cp.list, pr = cp.pr, newest = cp.newest;
     var h = '<section class="own-card"><div class="own-card-head"><h3>Daftar pemegang saham (laporan emiten)</h3>';
@@ -2247,7 +2247,7 @@ APP_JS = r"""
       var rep = reportsFor(c.t), el = document.getElementById('own-reports'), bae = document.getElementById('own-bae'), ffl = document.getElementById('own-ff-link');
       var mv = document.getElementById('own-moves-dps');
       if (el) el.innerHTML = dpsHtml(c, rep);
-      if (mv) mv.innerHTML = dpsMovesHtml(c, rep);
+      if (mv) mv.innerHTML = dpsMovesHtml(rep);
       if (bae) bae.innerHTML = baeHtml(c, rep);
       if (ffl && safeUrl(rep.u[+ffl.getAttribute('data-i')])) ffl.innerHTML = ' · ' + sourceLink(rep.u[+ffl.getAttribute('data-i')], 'laporan emiten di IDX');
     }, function(){
@@ -2833,7 +2833,7 @@ def build_page(docs, by_cat, own=None):
             '<span id="chat-agentic-left"></span></span></label>'
             '<p id="chat-count" class="chat-count">0 / 600 karakter</p>'
             '<p class="chat-count">Pertanyaan dan pemakaian dicatat privat oleh pengelola.</p>'
-            '<div id="chat-progress" class="chat-progress" hidden><div class="chat-working"><span class="chat-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="chat-activity">Asisten mulai bekerja…</span><span id="chat-elapsed"></span></div><progress id="chat-meter" aria-label="Progres pembacaan dokumen"></progress></div>'
+            '<div id="chat-progress" class="chat-progress" hidden><div class="chat-working"><span class="chat-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="chat-activity">Memulai…</span><span id="chat-elapsed"></span></div><progress id="chat-meter" aria-label="Progres pembacaan dokumen"></progress></div>'
             '<p id="chat-status" class="chat-status" role="status"></p></section>'
             '<div id="overview">'
             '<header class="masthead">'
