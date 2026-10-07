@@ -770,6 +770,7 @@ Membuka `site/index.html` langsung dengan dobel klik (`file://`) juga bisa, tapi
 
 | Gejala | Penyebab / solusi |
 |---|---|
+| `publish_chat.py` macet/timeout di `sync_chat_index.py` setelah deploy | DNS ISP (mis. XL) mengarahkan `*.workers.dev` ke halaman blokir. Skrip otomatis memakai IP dari DNS-over-HTTPS; pengunjung di jaringan itu tetap tidak bisa memakai chat sampai API dipindah ke domain sendiri. |
 | Chat tidak menemukan dokumen baru, padahal tampil di situs | Worker belum diperbarui: `build.py --out docs` hanya memperbarui situs. Jalankan `python3 tools/publish_chat.py`. |
 | Dokumen masuk "Lainnya" | Nama file tidak cocok `prefixes`/`keywords`. Ganti nama file atau tambah kata kunci di `CATEGORIES`. |
 | Tanggal salah / hari ini | Tidak ada pola tanggal di nama file, jadi dipakai mtime. Tambahkan `YYYYMMDD` ke nama. |
