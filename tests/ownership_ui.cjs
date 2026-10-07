@@ -14,8 +14,9 @@ const read = name => JSON.parse(fs.readFileSync(path.join(base, name), 'utf8'));
 const ownership = read('kepemilikan.json');
 const reports = read('kepemilikan-laporan.json');
 const changes = read('kepemilikan-perubahan.json');
+const prices = JSON.parse(fs.readFileSync(path.join(root, source ? 'needtobeindexed/harga/harga.json' : 'site/files/kepemilikan/harga.json'), 'utf8'));
 // Keep real rows and name tables; limit each isolated DOM to the issuers under test.
-const tickers = new Set(['BBCA', 'ABMM', 'ATIC', 'CNTX']);
+const tickers = new Set(['BBCA', 'ABMM', 'ATIC', 'CNTX', 'ARII']);
 ownership.companies = ownership.companies.filter(c => tickers.has(c.t));
 for (const dataset of [reports, changes]) dataset.companies = Object.fromEntries(Object.entries(dataset.companies).filter(([ticker]) => tickers.has(ticker)));
 const html = (source ? execFileSync('python3', ['-B', '-c',
@@ -32,8 +33,8 @@ function setup(mutate) {
   const dom = new JSDOM(html, {url: 'https://archive.test/', runScripts: 'outside-only', virtualConsole: vc});
   const w = dom.window, d = w.document;
   const data = JSON.parse(d.getElementById('arsip-data').textContent);
-  const own = structuredClone(ownership), rep = structuredClone(reports), ch = structuredClone(changes);
-  if (mutate) mutate(own, rep, ch);
+  const own = structuredClone(ownership), rep = structuredClone(reports), ch = structuredClone(changes), pr = structuredClone(prices);
+  if (mutate) mutate(own, rep, ch, pr);
   w.marked = marked; w.DOMPurify = purify(w); w.TextDecoder = TextDecoder;
   w.matchMedia = () => ({matches: false, addEventListener() {}});
   w.scrollTo = () => {}; w.HTMLElement.prototype.scrollIntoView = () => {};
@@ -43,6 +44,7 @@ function setup(mutate) {
     if (p === data.own.path) return Response.json(own);
     if (p === data.own.reports) return Response.json(rep);
     if (p === data.own.changes) return Response.json(ch);
+    if (p === data.own.prices) return Response.json(pr);
     throw new Error('Network forbidden in ownership test: ' + url);
   };
   w.eval([...d.querySelectorAll('script')].at(-1).textContent);
@@ -74,6 +76,16 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
 
 (async () => {
   assert.equal(ownership.format, 6, 'Regenerate ownership with identity/validation format 6 before this test.');
+  assert.equal(reports.format, 2, 'Regenerate kepemilikan-laporan.json with REPORTS_FORMAT 2 (tools/sync_idx.py) before this test.');
+  {
+    // Built CSS: new chart/struct classes must not restyle existing controls (Emiten select, filing notes).
+    const page = new JSDOM(fs.readFileSync(path.join(root, 'site/index.html'), 'utf8')), w = page.window, d = w.document;
+    const label = d.getElementById('own-emiten').closest('label');
+    assert.notEqual(w.getComputedStyle(label).display, 'none', 'Emiten select stays visible');
+    const flag = d.body.appendChild(d.createElement('span')); flag.className = 'own-flag';
+    assert.equal(w.getComputedStyle(flag).display, 'block', 'filing notes keep block layout');
+    w.close(); checks++; console.log('PASS built CSS keeps toolbar and filing notes intact');
+  }
   await test('BBCA January–August cannot infer new holders from missing baseline', async s => {
     await s.route('BBCA', '2026-01', '2026-08');
     assert.match(section(s).textContent, /KSEI >1% tidak dibandingkan/);
@@ -178,14 +190,6 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     const line = s.d.querySelector('.own-line.s5:not(.est)'); assert.ok(line);
     assert.doesNotMatch(line.getAttribute('d'), /L/);
   }));
-  // Format 2 marks each report v (trusted or derivable) and each row r[5] (derivable); pad untouched rows for fixtures.
-  const v2 = rep => {
-    rep.format = 2;
-    for (const c of Object.values(rep.companies)) for (const x of c.d || []) if (x && typeof x === 'object') {
-      if (x.v === undefined) x.v = 1;
-      x.h = x.h.map(r => r.length === 5 ? [...r, 1] : r);
-    }
-  };
   const dpsCells = s => [...s.card('Daftar pemegang saham (laporan emiten)').querySelectorAll('tbody tr')]
     .map(tr => [tr.querySelector('th').firstChild.textContent, tr.cells[4].textContent, tr.cells[6].textContent]);
   await test('format 1 reports never derive unverified changes', fixture((own, rep) => {
@@ -204,7 +208,6 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     const raw = rep.companies.BBCA;
     raw.d[f] = {h: [[n, 1, 100, 2, 1, 0], [n, 1, 200, 4, 1, 0], [v, 1, 100, 2, 0, 1]], s: 5000, v: 1};
     raw.d[t] = {h: [[n, 1, 400, 8, 1, 1], [v, 1, 200, 4, 1, 1]], s: 5000, v: 1};
-    v2(rep);
   }, async s => {
     await s.route('BBCA', '2026-07', '2026-08');
     const c = s.card('Daftar pemegang saham (laporan emiten)');
@@ -222,7 +225,6 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     const raw = rep.companies.BBCA;
     raw.d[f] = {h: [[k, 1, 1000, 20, 0, 1], [a, 1, 300, 6, 0, 1], [b, 8, 2, 0.04, 0, 1], [g, 1, 1500, 30, 0, 2], [d, 1, 500, 10, 0, 0]], s: 5000, v: 1};
     raw.d[t] = {h: [[k, 1, 1000, 20, 0, 1], [a, 1, 900, 6, 0, 1], [b, 8, 4, 0.08, 0, 1], [g, 1, 1000, 20, 0, 2], [d, 1, 750, 15, 0, 0]], s: 5000, v: 1};
-    v2(rep);
   }, async s => {
     await s.route('BBCA', '2026-07', '2026-08');
     // Mismatch Holder breaks reportFits for both reports, so even Anchor Holder stays uncounted.
@@ -234,7 +236,6 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     raw.d[j] = {h: [[k, 1, 1000, 20, 0, 1]], s: null, v: 0};
     raw.d[f] = {h: [[k, 1, 1000, 20, 0, 1]], s: null, v: 1};
     raw.d[t] = {h: [[k, 1, 5000, 20, 0, 1]], s: 25000, v: 1};
-    v2(rep);
   }, async s => {
     await s.route('BBCA', '2026-06', '2026-07');
     assert.deepEqual(dpsCells(s), [['Anchor Holder', '—', '—']], 'v=0 report');
@@ -249,7 +250,6 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     const b = {h: [[k, 1, 1000, 20, 0, 1], [z, 1, 750, 15, 0, 1]], s: 5000, v: 1};
     mutate(a, b, nm, raw);
     raw.d[f] = a; raw.d[t] = b;
-    v2(rep);
   }, async s => {
     await s.route('BBCA', '2026-07', '2026-08');
     const probe = dpsCells(s).find(r => r[0] === 'Probe Holder');
@@ -272,7 +272,6 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     raw.d[j] = {h: [[k, 1, 1000, 20, 0, 1]], s: null, v: 1};
     raw.d[m] = {h: [[k, 1, 1000, 20, 0, 1]], s: 5000, v: 1};
     raw.d[t] = {h: [[k, 1, 5000, 20, 0, 1]], s: 25000, v: 1};
-    v2(rep);
   }, async s => {
     await s.route('BBCA', '2025-06', '2026-08');
     const fb = section(s).querySelector('#own-moves-dps');
@@ -286,7 +285,6 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     raw.d[m] = {h: [[k, 1, 1000, 20, 0, 1], [d, 1, 300, 6, 0, 0], [d, 8, 300, 6, 0, 0]], s: 5000, v: 0};
     raw.d[j] = {h: [[k, 1, 1000, 20, 0, 1], [d, 1, 300, 6, 0, 0], [d, 8, 300, 6, 0, 0]], s: 5000, v: 1};
     raw.d[t] = {h: [[k, 1, 1000, 20, 0, 1], [d, 16, 300, 6, 0, 1]], s: 5000, v: 1};
-    v2(rep);
   }, async s => {
     await s.route('BBCA', '2025-06', '2026-08');
     let fb = section(s).querySelector('#own-moves-dps');
@@ -296,6 +294,34 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     fb = section(s).querySelector('#own-moves-dps');
     assert.match(fb.textContent, /Daftar nama antarlaporan tidak dibandingkan/);
     assert.equal(fb.querySelectorAll('.own-bar-row').length, 0);
+  }));
+  await test('Struktur pemegang: ARII concentration, rest, HHI and hidden float match the source numbers', async s => {
+    await s.route('ARII', '2026-02', '2026-08');
+    const t = s.card('Struktur pemegang').textContent;
+    assert.match(t, /15 pemegang = 87,91%/);
+    assert.match(t, /12,09% dipegang ±1\.489 pihak · rata-rata 0,0081% \(±Rp88,9 jt\) per pihak/);
+    assert.match(t, /harga 292 per 31 Agu 2026/);
+    assert.match(t, /HHI1\.212 · setara ±8,2 pemegang sama besar · terbesar 29,08%/);
+    assert.match(t, /resmi 40,34%, di luar pemegang >1% 12,09% · selisih 28,25 poin/);
+    assert.match(t, /belum diuji terhadap harga/);
+  });
+  await test('Struktur pemegang: malformed price file falls back to lots', fixture((own, rep, ch, pr) => { pr.c.ARII[6] = -5; }, async s => {
+    await s.route('ARII', '2026-02', '2026-08');
+    const t = s.card('Struktur pemegang').textContent;
+    assert.match(t, /\(±3\.045 lot\) per pihak/); assert.doesNotMatch(t, /Rp/);
+  }));
+  await test('Struktur pemegang: accumulation needs same-holder share gain and fewer holders; custodians excluded', fixture(own => {
+    const c = company(own, 'ARII'), a = idx => own.months.findIndex(m => m.p === idx);
+    const f0 = a('2026-07'), t0 = a('2026-08'), base = c.k[t0];
+    const custodian = newName(own, 'UBS AG SINGAPORE S/A CLIENTS'), plain = newName(own, 'PT AKUMULATOR');
+    const shares = 10_000_000_000;
+    c.k[f0] = {tp: 50, h: [row(9001, plain, 10, shares * 0.10), row(9002, custodian, 20, shares * 0.20)]};
+    c.k[t0] = {tp: 55, h: [row(9001, plain, 13, shares * 0.13), row(9002, custodian, 30, shares * 0.30)]};
+    c.c[f0] = [10000, 1]; c.c[t0] = [9000, 1];
+  }, async s => {
+    await s.route('ARII', '2026-07', '2026-08');
+    const t = s.card('Struktur pemegang').textContent;
+    assert.match(t, /blok >1% \+3 poin · pemegang −10% → pola akumulasi/, 'custodian +10 poin is not counted');
   }));
   await test('chart range: drag, two clicks, keyboard with Escape, and quick presets', async s => {
     const {w, d} = s;
@@ -308,7 +334,7 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     // Drag Apr → Jun.
     fire(hit(idx('2026-04')), 'pointerdown', mid(idx('2026-04')));
     fire(d.querySelector('#own-trend svg'), 'pointermove', mid(idx('2026-06')));
-    assert.ok(d.querySelector('.own-pick.on'), 'live preview while dragging');
+    assert.ok(d.querySelector('.own-pickband.on'), 'live preview while dragging');
     fire(d.querySelector('#own-trend svg'), 'pointerup', mid(idx('2026-06')));
     await settle();
     assert.equal(w.location.hash, '#kepemilikan=BBCA&dari=2026-04&sampai=2026-06');
@@ -338,7 +364,6 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     raw.d = raw.d.map(() => null);
     raw.d[i23] = {h: [[k, 1, 1500, 30, 0, 1], [m, 3, 500, 10, 0, 1], [z, 1, 400, 8, 0, 1], [p1, 1, 300, 6, 0, 1], [q, 1, 900, 18, 0, 2]], s: null, v: 1};
     raw.d[t] = {h: [[k, 1, 1000, 20, 1, 1], [m, 3, 1000, 20, 1, 1], [z, 1, 400, 8, 1, 1], [p2, 1, 300, 6, 1, 1], [q, 1, 900, 18, 0, 2]], s: 5000, v: 1};
-    v2(rep);
   }, async s => {
     await s.route('BBCA', '2025-06', '2026-08');
     assert.equal(kseiMoves(s).length, 0);
@@ -347,7 +372,6 @@ const row = (id, name, pct, shares) => [id, name, 0, 'L', pct, shares, 1];
     const rows = [...fb.querySelectorAll('.own-bar-row')].map(el => el.textContent);
     assert.equal(rows.length, 2);
     assert.match(rows[0], /Buyer Holder\+500 lembar/); assert.match(rows[1], /Seller Holder−500 lembar/);
-    assert.equal(fb.querySelectorAll('i.approx').length, 0, 'unverified bars are not styled differently');
     assert.equal([...fb.querySelectorAll('.own-bar-val')].filter(el => /belum terverifikasi/.test(el.textContent)).length, 2);
     assert.match(fb.textContent, /Tetap \(belum terverifikasi[^)]*\): Same Holder/);
     assert.match(fb.textContent, /Ejaan nama berbeda[^:]*: Beta Alpha Tbk \/ PT Alpha Beta/);

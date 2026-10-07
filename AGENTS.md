@@ -8,3 +8,4 @@ Ringkas:
 - Setelah build, cek baris output (kategori + tanggal tiap file) sebelum deploy.
 - Jangan ubah isi file di `needtobeindexed/`, karena itu arsip riset milik user.
   Pengecualian: `needtobeindexed/idx-signal-desk/` dikelola `tools/sync_idx.py` (salinan dari IDX Signal Desk lokal). Jangan edit manual; jalankan skripnya.
+  `needtobeindexed/harga/harga.json` dibuat `tools/sync_prices.py` dari dataset broksum lokal. Jangan edit manual; jalankan skripnya.

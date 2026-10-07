@@ -116,6 +116,9 @@ CHANGES_PATH = "files/kepemilikan/kepemilikan-perubahan.json"
 # Daftar pemegang saham, jenis pemilik BAE, dan tautan laporan bulanan emiten; diambil saat satu emiten dibuka.
 REPORTS_SRC = SRC / "idx-signal-desk" / "kepemilikan-laporan.json"
 REPORTS_PATH = "files/kepemilikan/kepemilikan-laporan.json"
+# Harga penutupan per tanggal snapshot KSEI (tools/sync_prices.py), dimuat bersama data kepemilikan.
+PRICES_SRC = SRC / "harga" / "harga.json"
+PRICES_PATH = "files/kepemilikan/harga.json"
 
 
 # ---------------------------------------------------------------- helpers
@@ -776,8 +779,8 @@ a.chip:hover{outline:1px solid var(--c)}
 .own-chart text.v{font:600 12px var(--mono);fill:var(--ink);paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
 .own-chart text.sel{font-weight:600;fill:var(--ink)}
 .own-range{fill:var(--own-soft)}
-.own-pick{fill:var(--own);fill-opacity:.16;stroke:var(--own);stroke-width:1.5;display:none;pointer-events:none}
-.own-pick.on{display:inline}
+.own-pickband{fill:var(--own);fill-opacity:.16;stroke:var(--own);stroke-width:1.5;display:none;pointer-events:none}
+.own-pickband.on{display:inline}
 .own-chart svg{touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .own-presets{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 8px}
 .own-presets a{font:500 12.5px var(--mono);padding:4px 10px;border:1px solid var(--line-strong);border-radius:3px;color:var(--ink);text-decoration:none}
@@ -836,6 +839,18 @@ a.chip:hover{outline:1px solid var(--c)}
 .own-sources{display:grid;gap:6px;margin:0;padding-left:18px;font-size:16px}
 .own-facts{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0 0 10px;font:13.5px/1.5 var(--mono);color:var(--muted)}
 .own-facts b{font-weight:600;color:var(--ink)}
+.own-struct{display:grid;grid-template-columns:minmax(150px,max-content) 1fr;gap:0;margin:0;background:var(--surface);border:1px solid var(--line)}
+.own-struct dt,.own-struct dd{margin:0;padding:10px 14px;border-top:1px solid var(--line)}
+.own-struct dt:first-of-type,.own-struct dt:first-of-type+dd{border-top:0}
+.own-struct dt{font:500 13px/1.45 var(--mono);color:var(--muted)}
+.own-struct dd{font-size:15.5px;line-height:1.5}
+.own-struct dd b{font-weight:600}
+.own-struct .own-tags{display:inline;margin-left:4px}
+.own-badge{display:inline-block;margin-left:6px;padding:1px 7px;border:1px solid var(--down);border-radius:3px;font:500 12px var(--mono);color:var(--down)}
+.own-info{position:relative;cursor:help;border-bottom:1px dotted currentColor;outline:none}
+.own-info:focus-visible{box-shadow:0 0 0 2px var(--focus)}
+.own-info:hover::after,.own-info:focus::after{content:attr(data-tip);position:absolute;left:0;top:calc(100% + 6px);z-index:3;width:min(300px,80vw);padding:9px 11px;font:13px/1.5 var(--sans);color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:3px;box-shadow:0 6px 18px rgb(0 0 0 / .14);white-space:normal}
+@media (max-width:640px){.own-struct{grid-template-columns:1fr}.own-struct dd{border-top:0;padding-top:0}}
 .own-facts .sep{opacity:.5}
 .own-facts a,.own-note a{color:var(--own)}
 .own-table td.own-role{text-align:left;font:12.5px var(--mono);color:var(--muted)}
@@ -1478,6 +1493,32 @@ APP_JS = r"""
     });
   }
 
+  // Harga penutupan opsional: gagal dimuat atau tidak valid berarti indikator memakai lot, bukan rupiah.
+  function loadPrices(d){
+    if (!own.prices) return Promise.resolve();
+    return fetch(own.prices + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function(p){
+      var ok = p && p.format === 1 && Array.isArray(p.d) && p.d.length <= 240 && p.d.every(function(x){ return /^\d{4}-\d{2}-\d{2}$/.test(x); }) &&
+        p.c && typeof p.c === 'object' && Object.keys(p.c).length <= 5000 && Object.keys(p.c).every(function(t){
+          var v = p.c[t]; return /^[A-Z0-9]{2,12}$/.test(t) && Array.isArray(v) && v.length === p.d.length &&
+            v.every(function(x){ return x === null || (typeof x === 'number' && Number.isFinite(x) && x > 0 && x < 1e9); });
+        });
+      if (ok) d.prices = {byDate: Object.create(null), c: p.c};
+      if (ok) p.d.forEach(function(x, i){ d.prices.byDate[x] = i; });
+    }).catch(function(){});
+  }
+  // Harga penutupan as-of tanggal snapshot KSEI bulan i, atau null.
+  function priceAt(t, i){
+    var p = ownData && ownData.prices, day = own.months[i].asOf;
+    if (!p || !day || p.byDate[day] == null || !p.c[t]) return null;
+    return p.c[t][p.byDate[day]];
+  }
+  function rupiah(v){
+    var a = Math.abs(v), u = a >= 1e12 ? [1e12, ' T'] : a >= 1e9 ? [1e9, ' M'] : a >= 1e6 ? [1e6, ' jt'] : a >= 1e3 ? [1e3, ' rb'] : [1, ''];
+    return 'Rp' + num(v / u[0], u[0] === 1 ? 0 : a / u[0] >= 100 ? 0 : 1) + u[1];
+  }
   function loadOwn(){
     if (ownData) return Promise.resolve(ownData);
     if (!ownLoading){
@@ -1494,7 +1535,7 @@ APP_JS = r"""
           return '<option value="' + esc(c.t) + '">' + esc(c.t + (c.n ? ' · ' + c.n : '')) + '</option>';
         }).join('');
         ownData = d; ownLoading = null;
-        return d;
+        return loadPrices(d).then(function(){ return d; });
       }).catch(function(e){ ownLoading = null; throw e; });
     }
     return ownLoading;
@@ -1788,6 +1829,108 @@ APP_JS = r"""
     return rows;
   }
 
+  // Struktur pemegang: indikator turunan dari KSEI >1% dan laporan emiten. Deskriptif; belum diuji terhadap harga.
+  // Rekening kustodian/nominee (dari tools/ksei_signals.py) menampung banyak pemilik, jadi tidak dihitung sebagai blok.
+  var NOMINEE_RE = /\b(A\/C|S\/A|PLEDGED?|CLIENTS?|NOMINEES?|CUSTOD(?:Y|IAN)|FOR THE ACCOUNT|OMNIBUS)\b|\bQQ\b/;
+  var CUSTODIAN_RE = /\b(PANIN|DBS|LGT|UBS|CITIBANK|HSBC|STANDARD CHARTERED|DEUTSCHE|BNY|STATE STREET|JPMORGAN|JP MORGAN|BANK OF NEW YORK|NORTHERN TRUST|BNP PARIBAS|SOCIETE GENERALE|CREDIT SUISSE|MORGAN STANLEY|GOLDMAN|CGS|KGI|MAYBANK|UOB|OCBC|NOMURA|CLEARSTREAM|EUROCLEAR|BANK OF SINGAPORE)\b/;
+  function pooled(name){ var u = String(name || '').toUpperCase(); return NOMINEE_RE.test(u) || CUSTODIAN_RE.test(u); }
+  // Jumlah pemegang terverifikasi terakhir sampai bulan i (maks. 2 bulan ke belakang); 0 berarti tidak ada.
+  function holderCount(c, i){
+    for (var j = i; j >= Math.max(0, i - 2); j--) if (c.c[j] && c.c[j][1] && c.c[j][0] > 0) return {n: c.c[j][0], i: j};
+    return null;
+  }
+  // Total saham tersirat dari baris KSEI (lembar / persen), median antarbaris.
+  function impliedShares(g){
+    var v = Object.keys(g).map(function(k){ return g[k].pct > 0 && g[k].total > 0 ? g[k].total / g[k].pct * 100 : null; }).filter(Boolean).sort(function(x, y){ return x - y; });
+    return v.length ? v[Math.floor(v.length / 2)] : null;
+  }
+  function structAt(c, i){
+    if (!tpOk(c, i)) return null;
+    var g = groupsAt(c, i), keys = Object.keys(g || {});
+    if (!keys.length) return null;
+    var tp = tpAt(c, i), hhi = 0, top = 0, shadow = 0, shadowN = 0;
+    keys.forEach(function(k){ var p = g[k].pct || 0; hhi += p * p; top = Math.max(top, p); if (p >= 1 && p < 5 && !pooled(g[k].name)){ shadow += p; shadowN++; } });
+    var hc = holderCount(c, i), ff = null;
+    for (var j = i; j >= Math.max(0, i - 2); j--) if (c.f[j] && c.f[j][1]){ ff = {v: c.f[j][0], i: j}; break; }
+    var s = {n: keys.length, tp: tp, rest: r2(100 - tp), hhi: hhi, eff: hhi > 0 ? 10000 / hhi : null, top: top, hc: hc, ff: ff, shadow: shadow, shadowN: shadowN, shares: impliedShares(g)};
+    if (hc && hc.n > s.n){ s.nRest = hc.n - s.n; s.avg = s.rest / s.nRest; s.avgShares = s.shares ? s.shares * s.rest / 100 / s.nRest : null; }
+    if (ff) s.gap = r2(ff.v - s.rest);
+    return s;
+  }
+  // Perubahan jumlah pemegang k bulan (kedua ujung terverifikasi, tepat k bulan).
+  function breadthAt(c, i, k){
+    var a = c.c[i - k], b = c.c[i];
+    return a && b && a[1] && b[1] && a[0] > 0 && b[0] > 0 ? b[0] / a[0] - 1 : null;
+  }
+  // Nilai pembanding seluruh emiten per bulan, dihitung sekali.
+  function marketAt(i){
+    ownData.market = ownData.market || {};
+    if (ownData.market[i]) return ownData.market[i];
+    var m = {tp: [], hhi: [], gap: [], b3: []};
+    ownData.companies.forEach(function(c){
+      var x = structAt(c, i), b = breadthAt(c, i, 3);
+      if (x){ m.tp.push(x.tp); m.hhi.push(x.hhi); if (x.gap != null) m.gap.push(x.gap); }
+      if (b != null) m.b3.push(b);
+    });
+    Object.keys(m).forEach(function(k){ m[k].sort(function(x, y){ return x - y; }); });
+    return (ownData.market[i] = m);
+  }
+  // Persen emiten dengan nilai lebih kecil (seri dihitung setengah).
+  function rankPct(arr, v){
+    if (!arr.length || v == null) return null;
+    var lo = 0, eq = 0;
+    arr.forEach(function(x){ if (x < v) lo++; else if (x === v) eq++; });
+    return Math.round((lo + eq / 2) / arr.length * 100);
+  }
+  function rankText(p, more, less){ return p == null ? '' : p >= 50 ? more + ' dari ' + p + '% emiten' : less + ' dari ' + (100 - p) + '% emiten'; }
+  // Akumulasi/distribusi Dari–Sampai: perubahan lembar pemegang >1% yang sama (tanpa kustodian) vs perubahan jumlah pemegang.
+  function flowAt(c, from, to){
+    if (from === to || !kseiPairOk(c, from, to)) return null;
+    var ga = groupsAt(c, from) || {}, gb = groupsAt(c, to) || {}, sb = impliedShares(gb), na = holderCount(c, from), nb = holderCount(c, to);
+    if (!sb || !na || !nb || na.i === nb.i) return null;
+    var d = 0, matched = 0;
+    Object.keys(gb).forEach(function(k){
+      var a = ga[k], b = gb[k];
+      if (a && b && a.total != null && b.total != null && !pooled(b.name)){ d += (b.total - a.total) / sb * 100; matched++; }
+    });
+    if (!matched) return null;
+    var dn = nb.n / na.n - 1, kind = d >= 1 && dn <= -0.05 ? 'akumulasi' : d <= -1 && dn >= 0.05 ? 'distribusi' : 'netral';
+    return {block: r2(d), dn: dn, kind: kind};
+  }
+  var HHI_TIP = 'Herfindahl-Hirschman Index: jumlah kuadrat porsi tiap pemegang >1%. 10.000 = satu pemilik 100%; 5.000 = dua pemegang 50%; 1.000 = sepuluh pemegang 10%. ' +
+    'Setara N pemegang = 10.000 ÷ HHI. Hanya pemegang >1%, jadi batas bawah; pemegang terafiliasi yang tercatat terpisah membuatnya tampak lebih rendah.';
+  function structHtml(c, from, to){
+    var x = structAt(c, to);
+    var h = '<section class="own-card"><div class="own-card-head"><h3>Struktur pemegang</h3><span>per ' + esc(monthText(to)) + '</span></div>';
+    if (!x) return h + '<p class="own-note">Butuh snapshot KSEI &gt;1% yang valid di bulan Sampai.</p></section>';
+    var m = marketAt(to), rows = [];
+    function pc(v){ return num(v * 100, 1) + '%'; }
+    rows.push(['Pemegang &gt;1%', '<b>' + x.n + ' pemegang = ' + pctText(x.tp) + '</b> <span class="own-tags">' + rankText(rankPct(m.tp, x.tp), 'lebih terkonsentrasi', 'lebih tersebar') + '</span>']);
+    rows.push(['Sisa', x.nRest ? '<b>' + pctText(x.rest) + '</b> dipegang ±' + countText(x.nRest) + ' pihak · rata-rata ' + num(x.avg, 4) + '%' +
+      (x.avgShares ? (priceAt(c.t, to) ? ' (±' + rupiah(x.avgShares * priceAt(c.t, to)) + ')' : ' (±' + countText(Math.round(x.avgShares / 100)) + ' lot)') : '') + ' per pihak' +
+      (x.avgShares && priceAt(c.t, to) ? ' <span class="own-tags">harga ' + num(priceAt(c.t, to), 0) + ' per ' + esc(monthText(to, true)) + '</span>' : '') +
+      (x.hc.i !== to ? ' <span class="own-tags">jumlah pemegang ' + esc(monthName(x.hc.i)) + '</span>' : '')
+      : '<b>' + pctText(x.rest) + '</b> <span class="own-tags">jumlah pemegang terverifikasi belum ada</span>']);
+    rows.push(['<span class="own-info" tabindex="0" data-tip="' + esc(HHI_TIP) + '" aria-label="HHI: ' + esc(HHI_TIP) + '">HHI</span>', '<b>' + countText(Math.round(x.hhi)) + '</b> · setara ±' + num(x.eff, 1) + ' pemegang sama besar · terbesar ' + pctText(x.top) +
+      ' <span class="own-tags">' + rankText(rankPct(m.hhi, x.hhi), 'lebih tinggi', 'lebih rendah') + '</span>']);
+    if (x.gap != null) rows.push(['Free float', 'resmi <b>' + pctText(x.ff.v) + '</b>, di luar pemegang &gt;1% <b>' + pctText(x.rest) + '</b>' +
+      (x.rest < 7.5 ? '<span class="own-badge">float riil &lt; 7,5%</span>' : '') +
+      (x.gap > 0.5 ? ' · selisih ' + num(x.gap, 2) + ' poin, ' + x.shadowN + ' pemegang 1–5% di luar kustodian memegang ' + pctText(r2(x.shadow)) +
+        ' <span class="own-tags">' + rankText(rankPct(m.gap, x.gap), 'selisih lebih besar', 'selisih lebih kecil') + '</span>' :
+        x.gap < -1 ? ' <span class="own-tags">tidak sinkron (tanggal/definisi berbeda)</span>' : '') +
+      (x.ff.i !== to ? ' <span class="own-tags">free float ' + esc(monthName(x.ff.i)) + '</span>' : '')]);
+    var bs = [1, 3, 6, 12].map(function(k){ var b = breadthAt(c, to, k); return b == null ? null : k + ' bln ' + (b > 0 ? '+' : b < 0 ? '−' : '') + pc(Math.abs(b)); }).filter(Boolean);
+    var b3 = breadthAt(c, to, 3);
+    if (bs.length) rows.push(['Jumlah pemegang', bs.join(' · ') + (b3 != null ? ' <span class="own-tags">3 bln ' + rankText(rankPct(m.b3, b3), 'lebih tinggi', 'lebih rendah') + '</span>' : '')]);
+    var f = flowAt(c, from, to);
+    if (f) rows.push(['Akumulasi / distribusi', 'blok &gt;1% ' + (f.block > 0 ? '+' : f.block < 0 ? '−' : '') + num(Math.abs(f.block), 2) + ' poin · pemegang ' +
+      (f.dn > 0 ? '+' : f.dn < 0 ? '−' : '') + pc(Math.abs(f.dn)) + ' → <b>' + (f.kind === 'netral' ? 'netral' : 'pola ' + f.kind) + '</b>' +
+      ' <span class="own-tags">' + esc(monthText(from, true)) + ' → ' + esc(monthText(to, true)) + '</span>']);
+    h += '<dl class="own-struct">' + rows.map(function(r){ return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('') + '</dl>';
+    return h + '<p class="own-note">Deskriptif, belum diuji terhadap harga. Jumlah pemegang menghitung rekening; rekening kustodian dihitung satu. ' +
+      'Akumulasi: blok pemegang &gt;1% yang sama naik ≥1 poin dan pemegang turun ≥5% (distribusi sebaliknya); bukan bukti transaksi.</p></section>';
+  }
+
   function tile(key, label, value, sub){
     return '<div class="own-tile"><div class="own-tile-label">' + (key ? '<span class="own-key ' + key + '"></span>' : '') + label + '</div>' +
       '<div class="own-tile-value">' + value + '</div><div class="own-tile-delta">' + sub + '</div></div>';
@@ -1836,6 +1979,7 @@ APP_JS = r"""
       '<p class="own-note">Akumulasi &gt;1%: total porsi pemegang &gt;1% (KSEI). Sisa &lt;1% = 100 − akumulasi. ' +
       'Pemegang ≥5%: dari laporan emiten; tanpa laporan, baris KSEI ≥5%; tanpa total saham, persen tertulis (belum terverifikasi). ' +
       'Free float resmi mengecualikan pengendali, afiliasi, direksi/komisaris, treasuri, jadi berbeda dari sisa &lt;1%.</p>';
+    h += structHtml(c, from, to);
 
     var dom = chartDomain(c);
     function cell(v, ok, fmt){ return fmt(v) + (v != null && !ok ? ' <span class="own-tags">⚠ belum terverifikasi</span>' : ''); }
@@ -1964,7 +2108,7 @@ APP_JS = r"""
       var lo = Math.min(pr.cmp, tp.i, tc.i), hi = Math.max(pr.cur, tp.i, tc.i), seen = [];
       for (var i = lo; i <= hi; i++) if (list[i] && list[i].s > 0 && seen.indexOf(list[i].s) === -1) seen.push(list[i].s);
       same = seen.length === 1;
-      out.totals = {cur: tc.s, cmp: tp.s, same: same, all: seen};
+      out.totals = {cur: tc.s, same: same, all: seen};
     }
     var fits = !!(cmp && same && cur.v && cmp.v && reportFits(cur, tc.s) && reportFits(cmp, tp.s));
     // Cocokkan baris antarlaporan per nama + peran; kalau peran berubah, per nama selama nama itu hanya sekali muncul.
@@ -2260,7 +2404,7 @@ APP_JS = r"""
     panes.forEach(function(p, pi){ H += p.legendH + paneH + (pi ? gap : 0); });
     var axY = H - axisH, r0 = Math.max(st.from, a), r1 = Math.min(st.to, b);
     if (r0 <= r1) s += '<rect class="own-range" x="' + (X(r0) - band / 2).toFixed(1) + '" y="0" width="' + (band * (r1 - r0 + 1)).toFixed(1) + '" height="' + axY + '"/>';
-    s += '<rect class="own-pick" x="0" y="0" width="0" height="' + axY + '"/>';
+    s += '<rect class="own-pickband" x="0" y="0" width="0" height="' + axY + '"/>';
     panes.forEach(function(p){
       p.series.forEach(function(se){
         s += '<line class="own-leg ' + se.cls + '" x1="' + se.lx + '" x2="' + (se.lx + 18) + '" y1="' + (y0 + se.ly - 4) + '" y2="' + (y0 + se.ly - 4) + '"/>' +
@@ -2374,7 +2518,7 @@ APP_JS = r"""
       tip.style.left = Math.max(4, left) + 'px';
     }
     // Pilih rentang: seret dari bulan awal ke bulan akhir, atau klik/Enter bulan awal lalu bulan akhir (Esc batal).
-    var anchor = null, drag = null, pickRect = svg.querySelector('.own-pick'), msg = document.getElementById('own-pick-msg') || (presets && presets.querySelector('.own-pick-msg'));
+    var anchor = null, drag = null, pickRect = svg.querySelector('.own-pickband'), msg = presets && presets.querySelector('.own-pick-msg');
     function preview(f, t){
       if (f == null){ pickRect.classList.remove('on'); return; }
       pickRect.setAttribute('x', (X(f) - band / 2).toFixed(1)); pickRect.setAttribute('width', (band * (t - f + 1)).toFixed(1)); pickRect.classList.add('on');
@@ -2636,7 +2780,7 @@ def build_page(docs, by_cat, own=None):
     "version": BUILD_ID,
     "chatApi": CHAT_API_URL,
     "docs": entries,
-    "own": own and {k: own[k] for k in ("path", "changes", "reports", "months", "count", "tickers")}
+    "own": own and {k: own[k] for k in ("path", "changes", "reports", "prices", "months", "count", "tickers")}
     }
     data_json = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     desc = ("Arsip riset pasar modal: Stockbit, keterbukaan informasi Indonesia, Australia, Singapura, "
@@ -2726,14 +2870,17 @@ def ownership_meta():
         raise ValueError("Tanggal metadata kepemilikan tidak valid.")
     if not months or not companies:
         return None
-    changes = reports = None
+    changes = reports = prices = None
+    if PRICES_SRC.is_file():
+        check_source(PRICES_SRC, SRC)
+        prices = PRICES_PATH
     if CHANGES_SRC.is_file():
         check_source(CHANGES_SRC, SRC)
         changes = CHANGES_PATH
     if REPORTS_SRC.is_file():
         check_source(REPORTS_SRC, SRC)
         reports = REPORTS_PATH
-    return {"path": OWN_PATH, "changes": changes, "reports": reports, "months": months, "count": len(companies),
+    return {"path": OWN_PATH, "changes": changes, "reports": reports, "prices": prices, "months": months, "count": len(companies),
             "tickers": [c["t"] for c in companies]}
 
 
@@ -2791,6 +2938,8 @@ def main():
             shutil.copy2(CHANGES_SRC, out / CHANGES_PATH)
         if own["reports"]:
             shutil.copy2(REPORTS_SRC, out / REPORTS_PATH)
+        if own["prices"]:
+            shutil.copy2(PRICES_SRC, out / PRICES_PATH)
     head, body = build_page(docs, by_cat, own)
     chat_js = (ROOT / "chat.js").read_text()
     endpoint = urlsplit(CHAT_API_URL)

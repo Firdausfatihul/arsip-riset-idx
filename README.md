@@ -27,6 +27,7 @@ Sumber build: `needtobeindexed/`, `build.py`, `chat.js`, dan `chat.config.json` 
 ```
 archivescrapingweb/
 ├── needtobeindexed/      # SUMBER: taruh file .md, .html, atau .csv di sini
+│   ├── harga/harga.json  # DIBUAT tools/sync_prices.py: harga penutupan per tanggal snapshot KSEI (jangan edit manual)
 │   └── idx-signal-desk/  # DISALIN OTOMATIS oleh tools/sync_idx.py (jangan isi manual; isinya ditimpa)
 │       ├── kepemilikan.json  # data tab Kepemilikan Saham
 │       ├── kepemilikan-laporan.json    # daftar pemegang saham, jenis pemilik BAE, tautan laporan emiten
@@ -46,6 +47,7 @@ archivescrapingweb/
 ├── tools/publish_chat.py # build dan perbarui backend + docs/ (tidak git push)
 ├── tools/chat_archive.py # pembaca arsip dan pemisah teks untuk build Worker (Python 3.9+, stdlib)
 ├── tools/sync_idx.py     # salin data dari IDX Signal Desk lokal (http://127.0.0.1:8787) lalu build
+├── tools/sync_prices.py  # harga penutupan per tanggal snapshot KSEI dari dataset broker summary riset → needtobeindexed/harga/harga.json
 ├── README.md             # file ini
 ├── AGENTS.md / CLAUDE.md # penunjuk ke README ini untuk agent
 └── site/                 # HASIL BUILD, jangan diedit manual, dihapus & dibuat ulang tiap build
@@ -54,6 +56,7 @@ archivescrapingweb/
     ├── files/kepemilikan/kepemilikan.json            # salinan data kepemilikan, diambil viewer saat tab dibuka
     ├── files/kepemilikan/kepemilikan-laporan.json    # daftar pemegang laporan emiten, diambil saat satu emiten dibuka
     ├── files/kepemilikan/kepemilikan-perubahan.json  # laporan perubahan, diambil saat satu emiten dibuka
+    ├── files/kepemilikan/harga.json                  # harga penutupan per snapshot KSEI, dimuat bersama data kepemilikan
     ├── robots.txt
     ├── sitemap.xml       # hanya dibuat kalau BASE_URL di-set
     └── .nojekyll         # supaya GitHub Pages tidak memproses folder
@@ -147,6 +150,11 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   - Tanpa emiten: tabel semua emiten, akumulasi >1% di tanggal Dari dan Sampai, perubahan (poin), jumlah pemegang >1%,
     jumlah pemegang saham (dengan perubahan %), free float resmi (dua yang terakhir dari laporan emiten terakhir sampai Sampai, bulannya ditulis),
     tren kecil. Bisa diurutkan per perubahan akumulasi atau per perubahan jumlah pemegang; 100 baris pertama, lalu "Tampilkan semua".
+  - **Struktur pemegang** (per Sampai, deskriptif, belum diuji terhadap harga; persentil dibanding semua emiten bulan itu): jumlah dan porsi pemegang >1%;
+    sisa (100 − akumulasi) dibagi jumlah pemegang terverifikasi (rata-rata % dan rupiah per pihak = lembar rata-rata × harga penutupan di tanggal snapshot;
+    tanpa harga, lot); HHI pemegang >1% (setara N pemegang sama besar, terbesar);
+    free float resmi vs di luar pemegang >1% (selisih = porsi pemegang 1–5%, tanpa rekening kustodian/nominee); perubahan jumlah pemegang 1/3/6/12 bulan
+    (kedua ujung terverifikasi); pola akumulasi/distribusi Dari–Sampai (lembar pemegang >1% yang sama tanpa kustodian ≥ +1 poin dan pemegang ≤ −5%, atau sebaliknya).
   - Satu emiten: kotak angka per tanggal Sampai dibanding Dari; grafik bulanan (akumulasi >1% + pemegang ≥5%, sisa <1% + free float resmi,
     jumlah pemegang), mula-mula menampilkan semua bulan yang punya angka; tombol **Perbesar ke rentang** menampilkan Dari–Sampai plus satu bulan di tiap sisi (pilihan ini berlaku untuk emiten lain sampai halaman dimuat ulang); rentang diarsir; pilih rentang dengan menyeret di chart, atau klik bulan awal lalu bulan akhir (keyboard: panah, Enter dua kali, Esc batal); tombol cepat 1 bln/3 bln/6 bln/1 thn (mundur dari Sampai), Sejak KSEI, Semua;
     batang "siapa menambah, siapa mengurangi" berdasarkan perubahan **lembar saham** antara Dari dan Sampai, dengan perubahan porsi sebagai angka pendamping;
@@ -157,7 +165,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
     Ini perubahan posisi antara dua tanggal, bukan catatan seluruh transaksi beli/jual. Tabel pemegang >1% tetap menampilkan angka sumber serta tren kecil;
     **daftar pemegang saham (DPS) dari laporan emiten**: pemegang ≥5%/pengendali/afiliasi, direksi dan komisaris dengan lembar dan persen,
     dibanding laporan sebelumnya, plus jumlah pemegang saham dan total saham. Baris yang belum terverifikasi Signal Desk tetap diberi perubahan
-    (ditandai "belum terverifikasi", batang pucat) hanya bila: kedua laporan `derivable()` di `tools/sync_idx.py` (versi sepakat, sumber tidak
+    (ditandai "belum terverifikasi") hanya bila: kedua laporan `derivable()` di `tools/sync_idx.py` (versi sepakat, sumber tidak
     diblokir, masalahnya hanya peran "unknown"/total saham tidak tertulis; format laporan 2), kedua baris bukan agregat/nama berulang/bercatatan,
     punya peran, porsinya ≥0,1%, total saham sama di seluruh rentang, dan lembar/persen kedua baris serta seluruh baris ≥1% kedua laporan cocok
     dengan total itu (kurang dari setengah satuan desimal yang tertulis; laporan tanpa total memakai total laporan terdekat). Data format 1 tidak
@@ -647,6 +655,17 @@ npm install --prefix "$chat_test_deps" jsdom@26.1.0 marked@15.0.7 dompurify@3.4.
 NODE_PATH="$chat_test_deps/node_modules" node tests/chat_ui.cjs
 ```
 
+## Harga penutupan (`tools/sync_prices.py`)
+
+Membaca `Close 1D` dari `../chatgptrisetkeystat/dataset_broksum_20261003_recovered/stockbit_<KODE>_metrics.csv` (ubah dengan `BROKSUM_DIR`), hanya baca,
+untuk setiap tanggal snapshot KSEI di `kepemilikan.json`: harga as-of (baris terakhir ≤ tanggal, maksimal 7 hari sebelumnya), belum disesuaikan aksi korporasi.
+Hasil `needtobeindexed/harga/harga.json` (±50 KB) disalin build ke `files/kepemilikan/harga.json` dan dimuat bersama data kepemilikan; file tidak ada,
+rusak, atau emiten tanpa harga (±650 dari ±980 emiten punya harga) membuat viewer memakai lot. Jalankan setelah `tools/sync_idx.py` bila ada bulan KSEI baru:
+
+```bash
+python3 tools/sync_prices.py && python3 build.py
+```
+
 ## Sinkron dari IDX Signal Desk (`tools/sync_idx.py`)
 
 Menyalin data dari aplikasi lokal `idx-digest gui` (default `http://127.0.0.1:8787`, ubah dengan `--server` atau env `IDX_SIGNAL_DESK`)
@@ -719,7 +738,7 @@ Langkah untuk Claude Code:
      }
      ```
      `.md` **wajib** `"contentType": "text/plain"` (persis, tanpa `; charset=...`). Selain itu publish ditolak.
-     `files/kepemilikan/*.json` (kepemilikan, kepemilikan-laporan, kepemilikan-perubahan) pakai `"contentType": "application/json"`.
+     `files/kepemilikan/*.json` (kepemilikan, kepemilikan-laporan, kepemilikan-perubahan, harga) pakai `"contentType": "application/json"`.
      File yang sudah dihapus dari sumber harus dikirim sebagai `null` supaya ikut hilang.
 4. Kalau mau diindeks mesin pencari, jangan pakai opsi ini karena artifact privat. Pakai B/C/D.
 

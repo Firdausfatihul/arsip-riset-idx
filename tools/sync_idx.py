@@ -249,7 +249,7 @@ HOLDER_REVIEW = re.compile(r"^(holder_needs_review|conflicting_holder)(:|$)")
 DERIVABLE_ISSUE = re.compile(r"^(holder_needs_review|required_metric_missing):")
 
 
-def derivable(chosen, versions, conflict):
+def derivable(chosen, versions):
     """Laporan belum terverifikasi yang angka pemegangnya tetap boleh dipakai viewer untuk menghitung perubahan,
     asalkan viewer juga mencocokkan lembar/persen dengan total saham. Tidak untuk sumber diblokir, tabel/angka yang gagal
     dibaca, atau periode meragukan: hanya masalah yang terdaftar di DERIVABLE_ISSUE.
@@ -746,7 +746,7 @@ def ownership_data(server, index, ledger, pid):
             f.append(free_float)
             c.append(holders)
             listed = report_holders(chosen, lambda v: ref(dps_names, v), trusted=trusted,
-                                    usable=derivable(chosen, versions, conflict))
+                                    usable=derivable(chosen, versions))
             status += "-" if not chosen else "v" if listed["h"] else "x"
             same = next((j for j in range(i - 1, -1, -1) if isinstance(dps[j], dict)), None)
             dps.append(same if listed and same is not None and dps[same] == listed else listed)

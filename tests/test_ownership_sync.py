@@ -114,19 +114,19 @@ class OwnershipTrustTests(unittest.TestCase):
         def review(issues, **extra):
             return dict({"validation": "review", "issues": issues, "holders": [holder("PT ALPHA", 600, 60, "review", ["shareholder_5plus", "unknown"])]}, **extra)
         ok = review(["holder_needs_review:PT ALPHA", "required_metric_missing:total_shares"])
-        self.assertTrue(sync.derivable(ok, [ok], False))
+        self.assertTrue(sync.derivable(ok, [ok]))
         # Server conflict can come from other metrics; agreeing holder numbers stay usable.
-        self.assertTrue(sync.derivable(ok, [ok, dict(ok, metrics={"free_float_pct": {"value": 12}})], True))
+        self.assertTrue(sync.derivable(ok, [ok, dict(ok, metrics={"free_float_pct": {"value": 12}})]))
         other = dict(ok, holders=[holder("PT ALPHA", 500, 50)])
-        self.assertFalse(sync.derivable(ok, [ok, other], False), "versions disagree on holder numbers")
+        self.assertFalse(sync.derivable(ok, [ok, other]), "versions disagree on holder numbers")
         extra = dict(ok, holders=ok["holders"] + [holder("DIREKTUR", 10, 1, roles=["director"]), holder("Total Pengendali", None, 60)])
-        self.assertTrue(sync.derivable(ok, [ok, extra], True), "rows present in one version only are not contradictions")
+        self.assertTrue(sync.derivable(ok, [ok, extra]), "rows present in one version only are not contradictions")
         totals = [dict(ok, metrics={"total_shares": {"value": n}}) for n in (1000, 5000)]
-        self.assertFalse(sync.derivable(ok, [ok] + totals, False), "written total shares disagree")
+        self.assertFalse(sync.derivable(ok, [ok] + totals), "written total shares disagree")
         for bad in ("holder_percentage_mismatch:PT ALPHA", "conflicting_holder:PT ALPHA", "report_period_implausible:x",
                     "issuer_mismatch:ABCD", "holder_headers_unverified:page2", "invalid_numeric_cell:page3"):
-            self.assertFalse(sync.derivable(review([bad]), [], False), bad)
-        self.assertFalse(sync.derivable(review([], import_status="quarantined"), [], False))
+            self.assertFalse(sync.derivable(review([bad]), []), bad)
+        self.assertFalse(sync.derivable(review([], import_status="quarantined"), []))
         listed = sync.report_holders(ok, lambda name: name, trusted=False, usable=True)
         self.assertEqual(listed["v"], 1)
         self.assertEqual(listed["h"][0][4:], [0, 1])
