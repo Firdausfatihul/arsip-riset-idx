@@ -1,3 +1,4 @@
 User-agent: *
+Disallow: /files/stockbit
 Allow: /
 Sitemap: https://arsip.seekingomega.capital/sitemap.xml
