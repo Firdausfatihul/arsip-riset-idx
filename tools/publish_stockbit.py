@@ -18,7 +18,7 @@ Urutan:
   4. `build.py --out <folder sementara>`: setiap sb*.md harus masuk kategori stockbit-* yang benar dengan tanggal yang benar.
   5. `tools/publish_chat.py` (build site/, Worker, deploy, indeks chat, docs/). Kalau gagal setelah deploy,
      `tools/sync_chat_index.py` (dan build docs/) diulang sekali.
-  6. `git add` hanya berkas Stockbit di atas plus docs/ dan site/; berhenti kalau ada berkas sb* terhapus; commit
+  6. `git add` hanya berkas Stockbit di atas plus hasil build yang masih dilacak Git; berhenti kalau ada berkas sb* terhapus; commit
      "Stockbit: ringkasan <tanggal>", push (sekali `git pull --rebase` kalau ditolak), lalu tag beranotasi
      stockbit-publish-YYYYMMDD-HHMMSS dan push tag.
   7. Catatan ke .stockbit-publish/log.jsonl (dipakai tools/rollback_stockbit.py) dan satu baris JSON ringkasan di akhir.
@@ -52,8 +52,8 @@ DEST_REL = "needtobeindexed/idx-signal-desk"
 LOG = ROOT / ".stockbit-publish" / "log.jsonl"
 WRANGLER = ["npx", "--yes", "wrangler@4.135.0"]
 WRANGLER_CONFIG = ["--config", "worker/wrangler.jsonc"]
-# Hasil build yang ikut dilacak git: boleh kotor dan ikut di-commit (publish_chat membangunnya ulang dari nol).
-# Kalau tidak di-commit, putaran berikutnya (dan `git pull --rebase`) terhalang site/ yang kotor.
+# Folder hasil build yang diizinkan; hanya folder yang masih dilacak Git boleh di-stage.
+# main terbaru mengabaikan site/, sedangkan publikasi lama mungkin masih melacaknya.
 DERIVED_PATHS = ("docs", "site")
 # Di DEST_REL hanya berkas Stockbit ini (plus SB_FILE) yang boleh kotor dan di-commit; digest/kepemilikan tidak.
 STOCKBIT_NAMES = ("stockbit-index.json", ".sync-stockbit.json", ".stockbit-hold.json")
@@ -161,6 +161,12 @@ def dirty_kind(path):
     if folder == DEST_REL and name.startswith("."):
         return "ignored"
     return "other"
+
+
+def tracked_derived_paths(runner):
+    """Keep legacy tracked site/ compatible without staging today's ignored local build."""
+    tracked = git_ok(runner, "ls-files", "-z", "--", *DERIVED_PATHS).split("\0")
+    return [folder for folder in DERIVED_PATHS if any(inside(path, (folder,)) for path in tracked if path)]
 
 
 def stockbit_changes(runner):
@@ -454,7 +460,7 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
             record["status"] = "deployed_index_pending"
             raise Failure(6, "Worker sudah ter-deploy tetapi indeks chat/docs belum selesai; belum di-commit")
         say("5/6 commit")
-        paths = [*stockbit_changes(runner), *DERIVED_PATHS]
+        paths = [*stockbit_changes(runner), *tracked_derived_paths(runner)]
         git_ok(runner, "add", "--", *paths, code=7)
         deleted = [n for n in git_ok(runner, "diff", "--cached", "--diff-filter=D", "--name-only", code=7).splitlines() if SB_FILE.search(n)]
         if deleted:

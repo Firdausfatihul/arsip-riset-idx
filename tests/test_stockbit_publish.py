@@ -55,6 +55,8 @@ class FakeRunner:
             return r(0, "main\n")
         if line == "git diff --cached --quiet":
             return r(1 if self.state["added"] and not self.state["committed"] else 0)
+        if line == "git ls-files -z -- docs site":
+            return r(0, "docs/index.html\0site/index.html\0")
         if line.startswith("git status"):
             return r(0, " M docs/index.html\0?? needtobeindexed/idx-signal-desk/sbringkas_2026-10-05_2026-10-05.md\0")
         if line.startswith("git rev-list --count"):
@@ -106,6 +108,14 @@ class PublishTests(unittest.TestCase):
 
     def records(self):
         return [json.loads(l) for l in self.log.read_text().splitlines()] if self.log.exists() else []
+
+    def test_publish_omits_ignored_site_from_staging(self):
+        runner = FakeRunner(**{"git ls-files -z -- docs site": lambda r, l: r.result(0, "docs/index.html\0")})
+        code, _ = self.publish(runner)
+        self.assertEqual(code, 0, self.output)
+        add = next(c for c in runner.calls if c.startswith("git add --"))
+        self.assertTrue(add.endswith(" docs"), add)
+        self.assertNotIn(" site", add)
 
     def test_happy_path_order_commit_tag_and_log(self):
         runner = FakeRunner()
@@ -495,6 +505,32 @@ class RollbackTests(unittest.TestCase):
         self.assertEqual(self.rollback(runner)[0], 3)
         self.assertIn("git revert --abort", runner.calls)
         self.assertFalse([c for c in runner.calls if "push" in c or "wrangler" in c])
+
+
+class IgnoredBuildGitTests(unittest.TestCase):
+    def test_current_and_legacy_build_folders_with_real_git(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            def runner(argv, timeout, **kwargs):
+                return subprocess.run(argv, cwd=root, capture_output=True, text=True, timeout=timeout)
+            def run(*args):
+                result = runner(list(args), 10)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return result
+            run("git", "init", "-q")
+            for name in ("docs", "site"):
+                (root / name).mkdir()
+                (root / name / "index.html").write_text("original")
+            (root / ".gitignore").write_text("site/\n")
+            run("git", "add", ".gitignore", "docs")
+            run("git", "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "fixture")
+            self.assertEqual(pub.tracked_derived_paths(runner), ["docs"])
+            (root / "docs/index.html").write_text("changed")
+            rb.discard_derived(runner, 3)
+            self.assertEqual((root / "docs/index.html").read_text(), "original")
+            self.assertEqual((root / "site/index.html").read_text(), "original")
+            run("git", "add", "-f", "site")
+            self.assertEqual(pub.tracked_derived_paths(runner), ["docs", "site"])
 
 
 if __name__ == "__main__":

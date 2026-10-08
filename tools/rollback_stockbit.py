@@ -194,8 +194,10 @@ def write_hold(days, key):
 
 def discard_derived(runner, code):
     """docs/ dan site/ hanya hasil build (build.py menghapus dan membangun ulang folder itu)."""
-    pub.git_ok(runner, "checkout", "--", *pub.DERIVED_PATHS, code=code, what="git checkout -- docs site")
-    pub.git_ok(runner, "clean", "-fdq", "--", *pub.DERIVED_PATHS, code=code, what="git clean docs site")
+    paths = pub.tracked_derived_paths(runner)
+    if paths:
+        pub.git_ok(runner, "checkout", "--", *paths, code=code, what="git checkout hasil build terlacak")
+        pub.git_ok(runner, "clean", "-fdq", "--", *paths, code=code, what="git clean hasil build terlacak")
 
 
 def restore_tree(runner):

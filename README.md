@@ -747,8 +747,8 @@ python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
   deploy tanpa commit, versi sebelum publish itu dicatat sebagai `rollback_to`), sinkron `--stockbit-only --no-build` (tidak ada berkas Stockbit yang
   berubah → selesai "tidak ada perubahan", tanpa build/deploy/commit), `build.py --out <folder sementara>` lalu cek tiap `sb*` masuk kategori dan
   tanggal yang benar (tabelnya dicetak), `tools/publish_chat.py` (gagal setelah deploy → `sync_chat_index.py`/build `docs/` diulang sekali),
-  `git add` hanya berkas Stockbit tadi plus `docs/` dan `site/`, berhenti kalau ada `sb*` terhapus, commit `Stockbit: ringkasan <tanggal>`, push (sekali `git pull --rebase` bila ditolak),
-  tag beranotasi `stockbit-publish-YYYYMMDD-HHMMSS`, push tag. `site/` ikut di-commit karena repo ini melacaknya.
+  `git add` hanya berkas Stockbit tadi plus folder hasil build yang masih dilacak Git (`docs/`; `site/` hanya pada checkout lama), berhenti kalau ada `sb*` terhapus, commit `Stockbit: ringkasan <tanggal>`, push (sekali `git pull --rebase` bila ditolak),
+  tag beranotasi `stockbit-publish-YYYYMMDD-HHMMSS`, push tag. `site/` kini diabaikan Git; hanya `docs/` yang di-commit. Kompatibilitas `site/` terlacak dipertahankan untuk checkout lama.
   Exit: 0 ok/tidak ada perubahan, 2 preflight, 3 sinkron, 4 cek build, 5 gagal sebelum deploy, 6 Worker ter-deploy tapi indeks/docs belum,
   7 ada `sb*` terhapus, 8 push gagal, 1 lain-lain. Baris terakhir keluaran = ringkasan JSON.
 - Titik rollback dicatat di `.stockbit-publish/log.jsonl` (diabaikan git): `pre_sha`, `post_sha` (tepat satu commit publish), tag,
