@@ -775,6 +775,8 @@ a.chip:hover{outline:1px solid var(--c)}
 .sb-badge{display:inline-block;margin-right:4px;padding:2px 6px;font:600 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--c);background:var(--c-soft);border-radius:2px;vertical-align:1px}
 .sb-note{margin:0;padding:8px 12px;max-width:68ch;font-size:15px;line-height:1.5;color:var(--muted);background:var(--c-soft);border-left:3px solid var(--c)}
 .sb-view{max-width:980px}
+.sb-body{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;padding-top:24px}
+.sb-body>table{width:100%;min-width:0;max-width:100%}
 .sb-view table{display:block;overflow-x:auto;border-collapse:collapse;margin:0 0 18px;font-size:15px}
 .sb-view th,.sb-view td{padding:7px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}
 .sb-view th{background:var(--c-soft);font-weight:600}
@@ -2786,7 +2788,7 @@ APP_JS = r"""
       [fmtNum(rows.length) + ' hari', fmtNum(posts) + ' posting', fmtNum(found) + ' temuan']));
     var links = [];
     if (own && own.tickers.indexOf(code) !== -1) links.push(sbEl('a', {href: '#kepemilikan=' + encodeURIComponent(code)}, 'Kepemilikan saham ' + code + ' →'));
-    var body = sbEl('div', {'class': 'doc-grid'});
+    var body = sbEl('div', {'class': 'sb-body'});
     if (links.length) body.append(sbEl('p', null, links));
     if (!rows.length){
       body.append(sbEl('p', {'class': 'doc-loading'}, code + ' belum muncul di ringkasan Stockbit yang terindeks.'));
@@ -2816,7 +2818,7 @@ APP_JS = r"""
     var name = '@' + (key || handle);
     var view = sbEl('div', {'class': 'sb-view'}, sbHead('Pengguna', name,
       [fmtNum(rows.length) + ' hari', fmtNum(posts) + ' posting', fmtNum(ids) + ' temuan']));
-    var body = sbEl('div', {'class': 'doc-grid'});
+    var body = sbEl('div', {'class': 'sb-body'});
     var note = key && hasKey(d.user_notes, key) ? d.user_notes[key] : null, pen = note && typeof note === 'object' ? note.penilaian : null;
     if (pen && typeof pen === 'object' && typeof pen.text === 'string' && pen.text.trim()){
       var refs = sbIds(pen.finding_ids), box = sbEl('section', {'class': 'sb-judgement', 'aria-label': SB_JUDGEMENT}, [
