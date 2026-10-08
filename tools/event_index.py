@@ -99,9 +99,14 @@ def digest_events(doc, tickers):
     return events
 
 
+# Stockbit summaries are user discussion too: screening labels them 'diskusi Stockbit', never official.
+KINDS = {'keterbukaan-informasi': 'ki', 'stockbit': 'stockbit', 'stockbit-ringkasan': 'stockbit',
+         'stockbit-detail': 'stockbit', 'stockbit-pekan': 'stockbit'}
+
+
 def text_events(doc, tickers, records):
     """Sentences/rows naming a capitalised ticker; a KI heading ticker also counts for its prose."""
-    kind = {'keterbukaan-informasi': 'ki', 'stockbit': 'stockbit'}.get(doc['cat'], 'other')
+    kind = KINDS.get(doc['cat'], 'other')
     events = []
     for record in records:
         text = plain(record['content']) if doc['kind'] == 'html' else record['content']

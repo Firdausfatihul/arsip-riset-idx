@@ -23,6 +23,7 @@ import json
 import os
 import re
 import shutil
+import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from html.parser import HTMLParser
@@ -46,9 +47,34 @@ CATEGORIES = {
     "stockbit": {
         "name": "Stockbit",
         "nav": "Stockbit",
-        "blurb": "Penelusuran postingan Stockbit Ideas: aksi korporasi, hubungan orang–perusahaan, kode, dan rumor.",
+        "blurb": ("Penelusuran postingan Stockbit Ideas: aksi korporasi, hubungan orang–perusahaan, kode, dan rumor. "
+                  "Laporan lama ini dikumpulkan dengan kursor lama sebelum 7 Oktober 2026 dan tidak lengkap; "
+                  "isinya diskusi pengguna Stockbit, belum diverifikasi, bukan keterbukaan resmi."),
         "prefixes": ("stockbit",),
         "keywords": ("stockbit",),
+    },
+    # Diisi tools/sync_idx.py --stockbit-only dari ekspor IDX Signal Desk (sbringkas_/sbdetail_/sbpekan_).
+    "stockbit-ringkasan": {
+        "name": "Ringkasan Stockbit",
+        "nav": "Stockbit harian",
+        "blurb": ("Ringkasan harian otomatis Stockbit Ideas, satu bagian per emiten, tiap klaim bertaut ke posting aslinya. "
+                  "Isinya diskusi pengguna Stockbit, belum diverifikasi, bukan keterbukaan resmi."),
+        "prefixes": ("sbringkas",),
+        "keywords": (),
+    },
+    "stockbit-detail": {
+        "name": "Detail Stockbit",
+        "blurb": ("Semua temuan harian per emiten, lebih lengkap dari ringkasan harian. "
+                  "Isinya diskusi pengguna Stockbit, belum diverifikasi, bukan keterbukaan resmi."),
+        "prefixes": ("sbdetail",),
+        "keywords": (),
+    },
+    "stockbit-pekan": {
+        "name": "Stockbit mingguan",
+        "blurb": ("Rekap Senin–Minggu dari ringkasan harian, disusun tanpa LLM. "
+                  "Isinya diskusi pengguna Stockbit, belum diverifikasi, bukan keterbukaan resmi."),
+        "prefixes": ("sbpekan",),
+        "keywords": (),
     },
     "keterbukaan-informasi": {
         "name": "Keterbukaan Informasi",
@@ -119,6 +145,15 @@ REPORTS_PATH = "files/kepemilikan/kepemilikan-laporan.json"
 # Harga penutupan per tanggal snapshot KSEI (tools/sync_prices.py), dimuat bersama data kepemilikan.
 PRICES_SRC = SRC / "harga" / "harga.json"
 PRICES_PATH = "files/kepemilikan/harga.json"
+# Indeks lintas hari ringkasan Stockbit (tools/sync_idx.py --stockbit-only); viewer mengambilnya untuk #emiten= / #pengguna=.
+SB_INDEX_SRC = SRC / "idx-signal-desk" / "stockbit-index.json"
+SB_INDEX_PATH = "files/stockbit-index/stockbit-index.json"
+# Ringkasan Stockbit yang lebih tua dari ini (dihitung dari hari ringkasan terbaru) diambil saat dibuka, tidak di-embed.
+SB_EMBED_DAYS = 7
+# Peringatan build kalau index.html melewati ukuran ini (konten di-embed bisa membengkak tanpa terasa).
+PAGE_WARN_BYTES = 15 * 1024 * 1024
+# Semua berkas Stockbit (files/stockbit/, files/stockbit-ringkasan/, files/stockbit-index/, …) keluar dari mesin pencari.
+ROBOTS_DISALLOW = ("/files/stockbit",)
 
 
 # ---------------------------------------------------------------- helpers
@@ -503,6 +538,7 @@ a{color:inherit}
 a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 mark{background:var(--mark);color:var(--mark-ink);border-radius:2px;padding:0 1px}
 [data-cat="stockbit"]{--c:var(--sb);--c-soft:var(--sb-soft)}
+[data-cat="stockbit-ringkasan"],[data-cat="stockbit-detail"],[data-cat="stockbit-pekan"]{--c:var(--sb);--c-soft:var(--sb-soft)}
 [data-cat="keterbukaan-informasi"]{--c:var(--kip);--c-soft:var(--kip-soft)}
 [data-cat="digest-emiten"]{--c:var(--dg);--c-soft:var(--dg-soft)}
 [data-cat="keterbukaan-australia"]{--c:var(--asx);--c-soft:var(--asx-soft)}
@@ -730,6 +766,28 @@ a.chip:hover{outline:1px solid var(--c)}
   .crumbs a{display:inline-flex;align-items:center;min-height:44px}
 }
 
+/* ringkasan Stockbit: pencarian emiten/@pengguna, lencana cakupan, halaman lintas hari */
+.sb-find{display:grid;gap:6px;max-width:520px;margin:0 0 16px}
+.sb-find label{font:500 14px/1.3 var(--sans);color:var(--muted)}
+.sb-find-row{display:flex;gap:6px}
+.sb-find input{flex:1;min-width:0;min-height:44px;padding:8px 10px;font:16px/1.3 var(--mono);color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:3px}
+.sb-find button,.sb-retry{min-height:44px;padding:8px 14px;font:600 15px var(--sans);color:var(--ink);background:var(--c-soft);border:1px solid var(--c);border-radius:3px;cursor:pointer}
+.sb-badge{display:inline-block;margin-right:4px;padding:2px 6px;font:600 11px/1.4 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--c);background:var(--c-soft);border-radius:2px;vertical-align:1px}
+.sb-note{margin:0;padding:8px 12px;max-width:68ch;font-size:15px;line-height:1.5;color:var(--muted);background:var(--c-soft);border-left:3px solid var(--c)}
+.sb-view{max-width:980px}
+.sb-view table{display:block;overflow-x:auto;border-collapse:collapse;margin:0 0 18px;font-size:15px}
+.sb-view th,.sb-view td{padding:7px 10px;border:1px solid var(--line);text-align:left;vertical-align:top}
+.sb-view th{background:var(--c-soft);font-weight:600}
+.sb-view td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.sb-view td.d{white-space:nowrap}
+.sb-view a{color:var(--c)}
+.sb-chips{display:flex;flex-wrap:wrap;gap:4px}
+.sb-judgement{display:grid;gap:6px;margin:0 0 22px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:4px;background:var(--surface)}
+.sb-judgement h2{margin:0;font:600 15px/1.4 var(--sans);color:var(--muted)}
+.sb-judgement p{margin:0}
+.sb-refs{font:13px/1.6 var(--mono);color:var(--faint)}
+.prose .sb-hist{font:500 13px var(--mono)}
+
 /* kepemilikan saham */
 .own-flag{display:block;margin-top:4px;font:500 13px/1.4 var(--sans);color:var(--down)}
 .own-flag.note{color:var(--muted)}
@@ -888,9 +946,9 @@ APP_JS = r"""
     })
     .catch(function(){});
 
-  var docs = data.docs, byPath = Object.create(null);
+  var docs = data.docs, byPath = Object.create(null), byName = Object.create(null);
   docs.forEach(function(d){
-    byPath[d.path] = d;
+    byPath[d.path] = d; byName[d.name] = d;
     d.hay = [d.title, d.desc, d.label, d.catName, d.name].concat(d.tickers).join(' ').toLowerCase();
     d.body = (d.content || d.text || '').toLowerCase();
     // Daftar arsip tetap; simpan elemen sekali agar pencarian tidak memindai DOM laporan panjang berulang kali.
@@ -898,6 +956,8 @@ APP_JS = r"""
   });
   // Markdown/CSV besar diambil saat dibuka atau saat pencarian pertama.
   var lazyDocs = docs.filter(function(d){ return d.lazy; }), bulk = null;
+  // Detail Stockbit (semua temuan per hari) tidak ikut diambil massal saat mencari; kodenya tetap tercari lewat d.tickers.
+  var searchLazy = lazyDocs.filter(function(d){ return d.cat !== 'stockbit-detail'; });
   function loadDoc(d){
     if (d.content != null) return Promise.resolve(d);
     if (!d.loading){
@@ -916,7 +976,7 @@ APP_JS = r"""
   function loadForSearch(){
     if (bulk) return;
     // Yang gagal dicoba lagi paling cepat 30 detik kemudian (dari file:// tiap percobaan pasti gagal).
-    var queue = lazyDocs.filter(function(d){ return d.content == null && (!d.failed || Date.now() - d.failedAt > 30000); });
+    var queue = searchLazy.filter(function(d){ return d.content == null && (!d.failed || Date.now() - d.failedAt > 30000); });
     if (!queue.length) return;
     function worker(){
       var d = queue.shift();
@@ -1131,7 +1191,7 @@ APP_JS = r"""
     root.querySelectorAll('a[href^="http"]').forEach(function(a){ a.target = '_blank'; a.rel = 'noopener noreferrer'; });
     root.querySelectorAll('a[href^="#"]').forEach(function(a){
       var section = a.getAttribute('href').slice(1);
-      if (!section || /^(doc|kepemilikan)=/.test(section)) return;
+      if (!section || /^(doc|kepemilikan|emiten|pengguna)=/.test(section)) return;
       try { section = decodeURIComponent(section); } catch (e) { /* Pertahankan fragmen asli yang bukan URL-encoded. */ }
       a.setAttribute('href', docRoute(doc.path, section));
     });
@@ -1255,6 +1315,7 @@ APP_JS = r"""
     } else {
       prose.innerHTML = html;
       var info = enhance(prose, doc);
+      sbDecorate(prose, doc);
       doc.codeMap = Object.create(null);
       info.emiten.forEach(function(e){ doc.codeMap[e[1].toLowerCase()] = e[0]; });
       prose.insertAdjacentHTML('beforebegin', tocHtml(info, doc));
@@ -1311,7 +1372,9 @@ APP_JS = r"""
       input.value = '';
       window.scrollTo(0, 0);
     }
-    if (doc) show(doc, p.get('s')); else showOverview();
+    if (doc) show(doc, p.get('s'));
+    else if (p.has('emiten') || p.has('pengguna')) showStockbit(p);
+    else showOverview();
     if (fromOwn && !p.get('s')) window.scrollTo(0, 0);
   }
 
@@ -2634,6 +2697,213 @@ APP_JS = r"""
     });
   }
 
+  // ---- ringkasan Stockbit lintas hari ----------------------------------------
+  // #emiten=KODE dan #pengguna=nama membaca files/stockbit-index/stockbit-index.json (tools/sync_idx.py --stockbit-only),
+  // diambil sekali saat rute pertama dibuka. Nama berkas hari diubah ke path lewat daftar dokumen (byName), bukan ditulis tetap.
+  // Semua string dari indeks masuk lewat textContent/atribut DOM, tidak pernah sebagai HTML.
+  var sbMeta = data.stockbit, sbData = null, sbLoading = null, sbRoute = '';
+  var SB_EP = {D: 'keterbukaan', A: 'hitungan', C: 'klaim', R: 'rumor', Q: 'pertanyaan', J: 'guyon'};
+  var SB_NOTE = 'Klaim pengguna Stockbit, belum diverifikasi, bukan keterbukaan resmi.';
+  var SB_JUDGEMENT = 'Penilaian otomatis atas argumen di posting, bukan atas orangnya';
+  function hasKey(o, k){ return o != null && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k); }
+  function sbEl(tag, attrs, kids){
+    var el = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function(k){ if (attrs[k] != null) el.setAttribute(k, attrs[k]); });
+    (kids == null ? [] : [].concat(kids)).forEach(function(c){ if (c != null) el.append(typeof c === 'object' ? c : String(c)); });
+    return el;
+  }
+  function sbText(v, max){ return typeof v === 'string' ? v.slice(0, max || 600) : (typeof v === 'number' && Number.isFinite(v) ? String(v) : ''); }
+  function sbNum(v){ return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 0; }
+  function sbDayText(iso){ return +iso.slice(8, 10) + ' ' + BULAN[+iso.slice(5, 7) - 1] + ' ' + iso.slice(0, 4); }
+  function sbHref(v){
+    v = String(v || '').trim().slice(0, 65);
+    if (/^@/.test(v)) return '#pengguna=' + encodeURIComponent(v.replace(/^@+/, ''));
+    if (/^[A-Za-z]{4}$/.test(v)) return '#emiten=' + v.toUpperCase();
+    return '#pengguna=' + encodeURIComponent(v);
+  }
+  function sbDoc(name){ return typeof name === 'string' && hasKey(byName, name) ? byName[name] : null; }
+  function validateSb(d){
+    function require(ok){ if (!ok) throw new Error('Struktur indeks Stockbit tidak valid.'); }
+    function map(v){ return v != null && typeof v === 'object' && !Array.isArray(v); }
+    require(map(d) && d.format === 1 && Array.isArray(d.days) && d.days.length <= 20000 && map(d.tickers) && map(d.users));
+    require(d.user_notes == null || map(d.user_notes));
+    d.days.forEach(function(x){ require(map(x) && typeof x.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.d)); });
+  }
+  function loadSb(){
+    if (sbData) return Promise.resolve(sbData);
+    if (!sbLoading){
+      sbLoading = fetch(sbMeta.path + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function(d){ validateSb(d); sbData = d; sbLoading = null; return d; })
+        .catch(function(e){ sbLoading = null; throw e; });
+    }
+    return sbLoading;
+  }
+  // Baris [hariIdx, ...] yang hari-nya ada di indeks, terbaru dulu.
+  function sbRows(d, list){
+    if (!Array.isArray(list)) return [];
+    return list.filter(function(r){ return Array.isArray(r) && Number.isSafeInteger(r[0]) && r[0] >= 0 && r[0] < d.days.length; })
+      .sort(function(a, b){ return d.days[a[0]].d < d.days[b[0]].d ? 1 : d.days[a[0]].d > d.days[b[0]].d ? -1 : 0; });
+  }
+  function sbIds(v){ return Array.isArray(v) ? v.filter(function(x){ return typeof x === 'string' && x; }).slice(0, 500).map(function(x){ return x.slice(0, 80); }) : []; }
+  function sbDayLink(day, section){
+    var ring = sbDoc(day.f), label = sbDayText(day.d);
+    return ring ? sbEl('a', {href: docRoute(ring.path, section)}, label) : sbEl('span', null, label);
+  }
+  function sbFindingLink(day, id){
+    var doc = sbDoc(day.detail) || sbDoc(day.f);
+    return doc ? sbEl('a', {href: docRoute(doc.path), title: sbDayText(day.d)}, id) : sbEl('span', null, id);
+  }
+  function sbHead(kicker, title, meta){
+    var back = document.getElementById('stockbit-ringkasan') ? '#stockbit-ringkasan' : '#';
+    return [
+      sbEl('nav', {'class': 'crumbs', 'aria-label': 'Lokasi'}, [sbEl('a', {href: back}, '← Ringkasan Stockbit'), sbEl('span', null, '/'), sbEl('span', null, kicker)]),
+      sbEl('header', {'class': 'doc-head'}, [
+        sbEl('p', {'class': 'kicker'}, [sbEl('span', {'class': 'swatch'}), 'Ringkasan Stockbit', sbEl('span', null, '·'), kicker]),
+        sbEl('h1', null, title),
+        meta ? sbEl('p', {'class': 'meta'}, meta.map(function(m){ return sbEl('span', null, m); })) : null,
+        sbEl('p', {'class': 'sb-note'}, SB_NOTE)
+      ])
+    ];
+  }
+  function sbTable(heads, rows){
+    return sbEl('table', null, [
+      sbEl('thead', null, sbEl('tr', null, heads.map(function(t){ return sbEl('th', {scope: 'col'}, t); }))),
+      sbEl('tbody', null, rows)
+    ]);
+  }
+  function sbEp(v){
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return '';
+    return Object.keys(v).filter(function(k){ return sbNum(v[k]) > 0; }).slice(0, 12).map(function(k){
+      return fmtNum(v[k]) + ' ' + (hasKey(SB_EP, k) ? SB_EP[k] : k.slice(0, 20));
+    }).join(' · ');
+  }
+  function sbEmitenView(d, code){
+    var rows = sbRows(d, hasKey(d.tickers, code) ? d.tickers[code] : null), posts = 0, found = 0;
+    rows.forEach(function(r){ posts += sbNum(r[1]); found += sbNum(r[3]); });
+    var view = sbEl('div', {'class': 'sb-view'}, sbHead('Emiten', code,
+      [fmtNum(rows.length) + ' hari', fmtNum(posts) + ' posting', fmtNum(found) + ' temuan']));
+    var links = [];
+    if (own && own.tickers.indexOf(code) !== -1) links.push(sbEl('a', {href: '#kepemilikan=' + encodeURIComponent(code)}, 'Kepemilikan saham ' + code + ' →'));
+    var body = sbEl('div', {'class': 'doc-grid'});
+    if (links.length) body.append(sbEl('p', null, links));
+    if (!rows.length){
+      body.append(sbEl('p', {'class': 'doc-loading'}, code + ' belum muncul di ringkasan Stockbit yang terindeks.'));
+    } else {
+      body.append(sbTable(['Tanggal', 'Posting', 'Akun', 'Temuan', 'Inti (diskusi pengguna, belum diverifikasi)', 'Bahan'], rows.map(function(r){
+        var day = d.days[r[0]], found = sbNum(r[3]), date = sbEl('td', {'class': 'd'}, sbDayLink(day, found ? code.toLowerCase() : 'disebut-tanpa-temuan'));
+        var det = sbDoc(day.detail);
+        if (day.k && day.k !== 'final') date.append(' · ' + sbText(day.k, 20));
+        if (det && found) date.append(sbEl('br'), sbEl('a', {href: docRoute(det.path, code.toLowerCase())}, 'detail'));
+        var inti = r[4] && typeof r[4] === 'object' ? r[4].text : r[4];
+        return sbEl('tr', null, [date, sbEl('td', {'class': 'n'}, fmtNum(sbNum(r[1]))), sbEl('td', {'class': 'n'}, fmtNum(sbNum(r[2]))),
+          sbEl('td', {'class': 'n'}, fmtNum(found)), sbEl('td', null, sbText(inti)), sbEl('td', null, sbEp(r[5]))]);
+      })));
+    }
+    view.append(body);
+    return view;
+  }
+  function sbUserKey(d, handle){
+    if (hasKey(d.users, handle)) return handle;
+    var low = handle.toLowerCase(), hit = null;
+    Object.keys(d.users).some(function(k){ if (k.toLowerCase() === low){ hit = k; return true; } return false; });
+    return hit;
+  }
+  function sbPenggunaView(d, handle){
+    var key = sbUserKey(d, handle), rows = sbRows(d, key ? d.users[key] : null), posts = 0, ids = 0, dayOf = Object.create(null);
+    rows.forEach(function(r){ posts += sbNum(r[1]); sbIds(r[3]).forEach(function(id){ ids++; if (!dayOf[id]) dayOf[id] = d.days[r[0]]; }); });
+    var name = '@' + (key || handle);
+    var view = sbEl('div', {'class': 'sb-view'}, sbHead('Pengguna', name,
+      [fmtNum(rows.length) + ' hari', fmtNum(posts) + ' posting', fmtNum(ids) + ' temuan']));
+    var body = sbEl('div', {'class': 'doc-grid'});
+    var note = key && hasKey(d.user_notes, key) ? d.user_notes[key] : null, pen = note && typeof note === 'object' ? note.penilaian : null;
+    if (pen && typeof pen === 'object' && typeof pen.text === 'string' && pen.text.trim()){
+      var refs = sbIds(pen.finding_ids), box = sbEl('section', {'class': 'sb-judgement', 'aria-label': SB_JUDGEMENT}, [
+        sbEl('h2', null, SB_JUDGEMENT), sbEl('p', null, sbText(pen.text, 1200))]);
+      if (refs.length){
+        var line = sbEl('p', {'class': 'sb-refs'}, 'Rujukan temuan: ');
+        refs.forEach(function(id, i){ if (i) line.append(', '); line.append(dayOf[id] ? sbFindingLink(dayOf[id], id) : id); });
+        box.append(line);
+      }
+      var win = note.window, winText = typeof win === 'string' ? win : (win && typeof win === 'object' && typeof win.start === 'string' && typeof win.end === 'string' ? win.start + ' – ' + win.end : '');
+      if (winText) box.append(sbEl('p', {'class': 'sb-refs'}, 'Jendela: ' + winText.slice(0, 60)));
+      body.append(box);
+    }
+    if (!rows.length){
+      body.append(sbEl('p', {'class': 'doc-loading'}, name + ' tidak ada di indeks ringkasan Stockbit. Indeks hanya memuat akun yang punya temuan publik.'));
+    } else {
+      body.append(sbTable(['Tanggal', 'Posting', 'Emiten', 'Temuan'], rows.map(function(r){
+        var day = d.days[r[0]], codes = Array.isArray(r[2]) ? r[2].filter(function(t){ return typeof t === 'string' && t; }).slice(0, 60) : [];
+        var ring = sbDoc(day.f), chips = sbEl('div', {'class': 'sb-chips'}, codes.map(function(t){
+          t = t.slice(0, 12);
+          return ring ? sbEl('a', {'class': 'chip', href: docRoute(ring.path, t.toLowerCase())}, t) : sbEl('span', {'class': 'chip'}, t);
+        }));
+        var found = sbEl('td', {'class': 'sb-refs'});
+        sbIds(r[3]).forEach(function(id, i){ if (i) found.append(', '); found.append(sbFindingLink(day, id)); });
+        var date = sbEl('td', {'class': 'd'}, sbDayLink(day));
+        if (day.k && day.k !== 'final') date.append(' · ' + sbText(day.k, 20));
+        return sbEl('tr', null, [date, sbEl('td', {'class': 'n'}, fmtNum(sbNum(r[1]))), sbEl('td', null, chips), found]);
+      })));
+    }
+    view.append(body);
+    return view;
+  }
+  function showStockbit(p){
+    var kind = p.has('emiten') ? 'emiten' : 'pengguna', key = (p.get(kind) || '').trim().slice(0, 64);
+    key = kind === 'emiten' ? key.toUpperCase() : key.replace(/^@+/, '');
+    var routeKey = kind + '=' + key, fresh = routeKey !== sbRoute || reader.hidden || current;
+    sbRoute = routeKey; current = null; renderedQuery = null;
+    overview.hidden = true; reader.hidden = false;
+    reader.setAttribute('data-cat', 'stockbit-ringkasan');
+    selectedCategory = 'stockbit-ringkasan'; markSource();
+    document.title = (kind === 'emiten' ? key : '@' + key) + ' · Ringkasan Stockbit · ' + siteTitle;
+    if (fresh) window.scrollTo(0, 0);
+    function status(text, retry){
+      reader.replaceChildren(sbEl('div', {'class': 'sb-view'}, sbHead(kind === 'emiten' ? 'Emiten' : 'Pengguna', kind === 'emiten' ? key : '@' + key)
+        .concat(sbEl('div', {'class': 'doc-loading', role: 'status'}, [sbEl('p', null, text), retry ? sbEl('button', {type: 'button', 'class': 'sb-retry', 'data-sb-retry': ''}, 'Coba lagi') : null]))));
+    }
+    function paint(){
+      if (sbRoute !== routeKey || reader.hidden || current) return;
+      reader.replaceChildren(kind === 'emiten' ? sbEmitenView(sbData, key) : sbPenggunaView(sbData, key));
+    }
+    if (!key){ status('Tulis kode emiten atau @pengguna.'); return; }
+    if (!sbMeta){ status('Indeks ringkasan Stockbit belum tersedia di arsip ini.'); return; }
+    if (sbData){ paint(); return; }
+    status('Memuat indeks ringkasan Stockbit…');
+    loadSb().then(paint, function(){ if (sbRoute === routeKey && !reader.hidden && !current) status('Indeks ringkasan Stockbit gagal dimuat.', true); });
+  }
+  // Tautan "@nama" dan "riwayat lintas hari" di dokumen Stockbit baru, dibuat dengan DOM (teks tetap teks).
+  function sbDecorate(root, doc){
+    if (!sbMeta || !/^stockbit-/.test(doc.cat)) return;
+    root.querySelectorAll('.emiten-top, .emiten > h3').forEach(function(hd){
+      var t = hd.querySelector('.ticker');
+      if (t && TICK.test(t.textContent)) hd.append(sbEl('a', {'class': 'sb-hist', href: '#emiten=' + t.textContent}, 'riwayat lintas hari →'));
+    });
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), nodes = [], n;
+    while ((n = walker.nextNode())) if (n.nodeValue.indexOf('@') !== -1 && !n.parentNode.closest('a,code,pre')) nodes.push(n);
+    var re = /(^|[^\w@.])@([A-Za-z0-9_](?:[A-Za-z0-9_.]{0,38}[A-Za-z0-9_])?)/g;
+    nodes.forEach(function(node){
+      var text = node.nodeValue, frag = document.createDocumentFragment(), last = 0, m;
+      re.lastIndex = 0;
+      while ((m = re.exec(text))){
+        var at = m.index + m[1].length;
+        frag.append(text.slice(last, at), sbEl('a', {href: '#pengguna=' + encodeURIComponent(m[2])}, '@' + m[2]));
+        last = at + 1 + m[2].length;
+      }
+      if (!last) return;
+      frag.append(text.slice(last));
+      node.replaceWith(frag);
+    });
+  }
+  document.querySelectorAll('[data-sb-find]').forEach(function(form){
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var v = form.querySelector('input').value.trim();
+      if (v) location.hash = sbHref(v);
+    });
+  });
+
   function markSource(){
     sourceNav.querySelectorAll('a').forEach(function(a){
       if (!input.value.trim() && a.getAttribute('data-cat') === selectedCategory) a.setAttribute('aria-current', 'true');
@@ -2660,12 +2930,16 @@ APP_JS = r"""
     clearSearch.hidden = !q;
     if (raw.length >= 2) loadForSearch();
     var waiting = 0, failed = 0;
-    lazyDocs.forEach(function(d){ if (d.content == null){ if (d.failed) failed++; else waiting++; } });
+    searchLazy.forEach(function(d){ if (d.content == null){ if (d.failed) failed++; else waiting++; } });
     var code = raw.toUpperCase(), ownHint = own && own.tickers.indexOf(code) !== -1 ?
       ' · <a href="#kepemilikan=' + encodeURIComponent(code) + '">Kepemilikan saham ' + esc(code) + ' →</a>' : '';
+    var sbHint = '';
+    if (sbMeta && /^@[A-Za-z0-9_.]{2,64}$/.test(raw)) sbHint = ' · <a href="' + esc(sbHref(raw)) + '">' + esc(raw) + ' di ringkasan Stockbit →</a>';
+    else if (sbMeta && TICK.test(code) && docs.some(function(d){ return d.cat === 'stockbit-ringkasan' && d.tickers.indexOf(code) !== -1; }))
+      sbHint = ' · <a href="#emiten=' + encodeURIComponent(code) + '">' + esc(code) + ' di ringkasan Stockbit →</a>';
     note.innerHTML = q ? esc(shown + ' dari ' + docs.length + ' dokumen (semua sumber) memuat “' + raw + '”' +
       (raw.length >= 2 && waiting ? ' · memuat isi ' + waiting + ' dokumen besar…' : '') +
-      (raw.length >= 2 && failed ? ' · isi ' + failed + ' dokumen besar belum dicari' : '')) + ownHint +
+      (raw.length >= 2 && failed ? ' · isi ' + failed + ' dokumen besar belum dicari' : '')) + ownHint + sbHint +
       (!reader.hidden ? ' · <a href="#">Daftar hasil pencarian →</a>' : '') : '';
     empty.hidden = shown > 0;
     if (current && !reader.hidden && renderedQuery !== raw){
@@ -2686,6 +2960,7 @@ APP_JS = r"""
   });
   reader.addEventListener('click', function(e){
     if (e.target.closest('[data-retry-doc]') && current) renderDoc(current, input.value.trim());
+    if (e.target.closest('[data-sb-retry]')){ route(); return; }
     var btn = e.target.closest('[data-sort-col]'), table = btn && btn.closest('table');
     if (!table || !current) return;
     // Klik pertama: angka terbesar dulu (teks A–Z); klik kedua: sebaliknya; klik ketiga: urutan asli.
@@ -2732,9 +3007,14 @@ def overview_item(doc):
                      else f'<span class="chip">{esc(code)}</span>')
     if len(doc["codes"]) > limit:
         chips.append(f'<span class="chip-more">+{len(doc["codes"]) - limit} kode</span>')
+    desc = f'<p class="doc-desc">{esc(doc["desc"])}</p>' if doc["desc"] else ""
+    cov = re.match(r"Cakupan:\s*(.+)", doc["desc"]) if doc["cat"] == "stockbit-ringkasan" else None
+    if cov:
+        # Paragraf "Cakupan: …" dari DESK jadi lencana cakupan di kartu ringkasan harian.
+        desc = f'<p class="doc-desc sb-cov"><span class="sb-badge">Cakupan</span> {esc(cov[1])}</p>'
     return (f'<li class="doc" data-id="{doc["id"]}">'
             f'<a class="doc-title" href="{esc(doc_href(doc))}">{esc(doc["title"])}</a>'
-            + (f'<p class="doc-desc">{esc(doc["desc"])}</p>' if doc["desc"] else "")
+            + desc
             + f'<p class="doc-meta">{"".join(meta)}</p><span class="hits"></span>'
             + (f'<div class="chips">{"".join(chips)}</div>' if chips else "") + "</li>")
 
@@ -2747,7 +3027,30 @@ def groups_by_day(docs):
             for k in sorted(groups, key=lambda k: (k[1], k[0]), reverse=True)]
 
 
-def build_page(docs, by_cat, own=None):
+def embed_entries(docs):
+    """Rekaman dokumen untuk payload halaman; isi besar dan Stockbit lama/detail diambil saat dibuka (lazy)."""
+    newest_sb = max((d["_end"] for d in docs if d["cat"] == "stockbit-ringkasan"), default=None)
+    entries = []
+    for d in docs:
+        entry = {k: v for k, v in d.items() if not k.startswith("_") and k != "raw"}
+        lazy = d["kind"] != "html" and (
+            d["size"] > EMBED_LIMIT
+            or d["cat"] == "stockbit-detail"
+            or (d["cat"] == "stockbit-ringkasan" and d["_end"] < newest_sb - timedelta(days=SB_EMBED_DAYS)))
+        if lazy:
+            del entry["content"]
+            entry["lazy"] = True
+        entries.append(entry)
+    return entries
+
+
+def sb_find_form(key):
+    return (f'<form class="sb-find" data-sb-find role="search"><label for="sb-cari-{key}">Cari emiten atau @pengguna di ringkasan Stockbit</label>'
+            f'<div class="sb-find-row"><input id="sb-cari-{key}" type="search" maxlength="64" autocomplete="off" spellcheck="false" '
+            'placeholder="Mis. BBCA atau @nama"><button type="submit">Buka</button></div></form>')
+
+
+def build_page(docs, by_cat, own=None, sb=None):
     chat_js = (ROOT / "chat.js").read_text(encoding="utf-8")
     first = min((d["_start"] for d in docs), default=None)
     last = max((d["_end"] for d in docs), default=None)
@@ -2766,21 +3069,18 @@ def build_page(docs, by_cat, own=None):
         sections.append(f'<section class="cat" data-cat="{key}" id="{key}"><div class="cat-head">'
                         f'<h2><span class="swatch"></span>{esc(cat["name"])}</h2>'
                         f'<span class="cat-count">{len(cdocs)} dokumen</span></div>'
-                        f'<p class="cat-blurb">{esc(cat["blurb"])}</p><div class="ledger">{"".join(days_main)}</div></section>')
+                        f'<p class="cat-blurb">{esc(cat["blurb"])}</p>'
+                        + (sb_find_form(key) if sb and key in ("stockbit", "stockbit-ringkasan") else "")
+                        + f'<div class="ledger">{"".join(days_main)}</div></section>')
 
     raw_links = "".join(f'<li><a href="{esc(d["path"])}">{esc(d["title"])}</a> ({esc(d["label"])})</li>' for d in docs)
-    entries = []
-    for d in docs:
-        entry = {k: v for k, v in d.items() if not k.startswith("_") and k != "raw"}
-        if d["kind"] != "html" and d["size"] > EMBED_LIMIT:
-            del entry["content"]
-            entry["lazy"] = True
-        entries.append(entry)
+    entries = embed_entries(docs)
     payload = {
     "version": BUILD_ID,
     "chatApi": CHAT_API_URL,
     "docs": entries,
-    "own": own and {k: own[k] for k in ("path", "changes", "reports", "prices", "months", "count", "tickers")}
+    "own": own and {k: own[k] for k in ("path", "changes", "reports", "prices", "months", "count", "tickers")},
+    "stockbit": sb and {k: sb[k] for k in ("path", "days", "tickers", "users")},
     }
     data_json = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     desc = ("Arsip riset pasar modal: Stockbit, keterbukaan informasi Indonesia, Australia, Singapura, "
@@ -2884,6 +3184,36 @@ def ownership_meta():
             "tickers": [c["t"] for c in companies]}
 
 
+def stockbit_meta():
+    """Ringkasan stockbit-index.json untuk payload halaman, atau None kalau belum disinkron."""
+    if not SB_INDEX_SRC.is_file():
+        return None
+    check_source(SB_INDEX_SRC, SRC)
+    raw = json.loads(SB_INDEX_SRC.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or raw.get("format") != 1:
+        raise ValueError("Format stockbit-index.json tidak dikenal.")
+    days, tickers, users = raw.get("days") or [], raw.get("tickers") or {}, raw.get("users") or {}
+    if (not isinstance(days, list) or not isinstance(tickers, dict) or not isinstance(users, dict)
+            or any(not isinstance(d, dict) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(d.get("d", ""))) for d in days)):
+        raise ValueError("Struktur stockbit-index.json tidak valid.")
+    return {"path": SB_INDEX_PATH, "days": len(days), "tickers": len(tickers), "users": len(users)}
+
+
+def robots_txt(base_url=""):
+    rules = "".join(f"Disallow: {p}\n" for p in ROBOTS_DISALLOW)
+    return "User-agent: *\n" + rules + "Allow: /\n" + (f"Sitemap: {base_url}/sitemap.xml\n" if base_url else "")
+
+
+def sitemap_xml(docs, base_url):
+    """Sitemap tanpa dokumen Stockbit (tetap terbaca di situs dan chat, tetapi tidak diumumkan ke mesin pencari)."""
+    listed = [d for d in docs if not d["cat"].startswith("stockbit")]
+    latest = max((d["end"] for d in docs), default=date.today().isoformat())
+    urls = [(f"{base_url}/", latest)] + [(f"{base_url}/{quote(d['path'])}", d["end"]) for d in listed]
+    return ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            + "".join(f"<url><loc>{esc(u)}</loc><lastmod>{m}</lastmod></url>" for u, m in urls)
+            + "</urlset>\n")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=Path, default=OUT)
@@ -2940,7 +3270,11 @@ def main():
             shutil.copy2(REPORTS_SRC, out / REPORTS_PATH)
         if own["prices"]:
             shutil.copy2(PRICES_SRC, out / PRICES_PATH)
-    head, body = build_page(docs, by_cat, own)
+    sb = stockbit_meta()
+    if sb:
+        (out / SB_INDEX_PATH).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(SB_INDEX_SRC, out / SB_INDEX_PATH)
+    head, body = build_page(docs, by_cat, own, sb)
     chat_js = (ROOT / "chat.js").read_text()
     endpoint = urlsplit(CHAT_API_URL)
     if CHAT_API_URL.startswith("/") and not CHAT_API_URL.startswith("//"):
@@ -2964,20 +3298,21 @@ def main():
         args.fragment_index.parent.mkdir(parents=True, exist_ok=True)
         args.fragment_index.write_text(head + body, encoding="utf-8")
 
-    robots = "User-agent: *\nAllow: /\n"
+    page_size = (out / "index.html").stat().st_size
+    if page_size > PAGE_WARN_BYTES:
+        print(f"PERINGATAN: index.html {page_size / 1024 / 1024:.1f} MB, melewati {PAGE_WARN_BYTES // 1024 // 1024} MB. "
+              "Periksa dokumen yang di-embed (EMBED_LIMIT, SB_EMBED_DAYS).", file=sys.stderr)
+
     if BASE_URL:
-        latest = max((d["end"] for d in docs), default=date.today().isoformat())
-        urls = [(f"{BASE_URL}/", latest)] + [(f"{BASE_URL}/{quote(d['path'])}", d["end"]) for d in docs]
-        (out / "sitemap.xml").write_text(
-            '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
-            + "".join(f"<url><loc>{esc(u)}</loc><lastmod>{m}</lastmod></url>" for u, m in urls)
-            + "</urlset>\n", encoding="utf-8")
-        robots += f"Sitemap: {BASE_URL}/sitemap.xml\n"
-    (out / "robots.txt").write_text(robots, encoding="utf-8")
+        (out / "sitemap.xml").write_text(sitemap_xml(docs, BASE_URL), encoding="utf-8")
+    (out / "robots.txt").write_text(robots_txt(BASE_URL), encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")
 
     for d in docs:
         print(f"{d['catName']:<22} {d['label']:<24} {d['name']} -> {d['path']}")
+    if sb:
+        print(f"{'Indeks Stockbit':<22} {sb['days']} hari, {sb['tickers']} emiten, {sb['users']} pengguna "
+              f"{SB_INDEX_SRC.name} -> {SB_INDEX_PATH}")
     if own:
         print(f"{'Kepemilikan Saham':<22} {own['months'][0]['p']} s/d {own['months'][-1]['p']:<12} {OWN_SRC.name} -> {OWN_PATH} "
               f"({own['count']} emiten, {len(own['months'])} bulan, {sum(1 for m in own['months'] if m['asOf'])} bulan KSEI)")

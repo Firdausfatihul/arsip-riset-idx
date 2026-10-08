@@ -17,7 +17,7 @@ from evidence_index import make_evidence, VERSION
 from event_index import make_events, term_tickers
 
 sys.path.insert(0, str(ROOT))
-from build import text_ranges  # noqa: E402  (rentang tanggal yang sama dengan katalog situs)
+from build import text_ranges, EXPLICIT_RANGE  # noqa: E402  (rentang tanggal yang sama dengan katalog situs)
 
 
 def covers(doc):
@@ -26,14 +26,92 @@ def covers(doc):
     Katalog situs memakai tanggal laporan (stockbit_24092026 = 24 Sep), tetapi awal dokumen
     sering menulis periode yang berakhir di tanggal itu ("periode 23–24 September 2026").
     Path dan tanggal situs tidak diubah; hanya chat yang memakai rentang ini.
+    Nama dengan dua tanggal ISO lengkap (sbringkas_2026-10-05_2026-10-05.md) tidak pernah dilebarkan
+    dari isi, sama seperti build.py: judul "naik 1-5 Oktober" bukan periode berkas.
     """
-    if doc['start'] != doc['end']:
+    if doc['start'] != doc['end'] or EXPLICIT_RANGE.search(doc.get('name', '')):
         return [doc['start'], doc['end']]
     day = date.fromisoformat(doc['end'])
     for s, e in text_ranges(doc['body']):
         if e == day and s < e and (e - s).days <= 31:
             return [s.isoformat(), e.isoformat()]
     return [doc['start'], doc['end']]
+
+
+# Kategori Stockbit dari IDX Signal Desk (build.py): ringkasan harian, detail per emiten, dan rekap mingguan.
+STOCKBIT_SUMMARY = 'stockbit-ringkasan'
+STOCKBIT_DETAIL = 'stockbit-detail'
+STOCKBIT_RAW = 'stockbit'
+STOCKBIT_INDEX = ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'stockbit-index.json'
+STOCKBIT_RULE = ('Konten Stockbit (ringkasan, detail, rekap pekan, laporan mentah) adalah klaim pengguna yang belum '
+                 'diverifikasi, bukan keterbukaan resmi atau rekomendasi; balasan (reply) posting tidak dikumpulkan. '
+                 'Baris "penilaian" adalah penilaian otomatis atas argumen di posting, bukan atas orangnya.\n')
+# Stockbit post IDs and other long numbers inflate manifest postings; the SQLite FTS index still finds them.
+LONG_NUMBER = re.compile(r'\d{7,}')
+
+
+def _days(first, last):
+    day, end = date.fromisoformat(first), date.fromisoformat(last)
+    while day <= end:
+        yield day.isoformat()
+        day = date.fromordinal(day.toordinal() + 1)
+
+
+def worker_docs(docs):
+    """Documents the chat indexes, plus raw Stockbit reports left out because summaries cover them.
+
+    A raw 'stockbit' report is excluded only when EVERY day it covers has a stockbit-ringkasan
+    document. It stays on the static site as proof; chat reads the bounded summary instead.
+    """
+    summarized = {day for d in docs if d['cat'] == STOCKBIT_SUMMARY for day in _days(*covers(d))}
+    kept, excluded = [], []
+    for doc in docs:
+        if doc['cat'] == STOCKBIT_RAW and summarized and set(_days(*covers(doc))) <= summarized:
+            excluded.append(doc)
+        else:
+            kept.append(doc)
+    return kept, excluded
+
+
+def posting_words(text):
+    """Lowercase manifest words; digit-only words of 7+ characters are left to full-text search."""
+    return {w for w in re.findall(r'\w+', text.lower()) if not LONG_NUMBER.fullmatch(w)}
+
+
+def stockbit_index(path):
+    """Trim the desk's stockbit-index.json to what the Worker reads: day indexes become dates
+    and file names (never D-numbers, which shift), handles become lowercase keys.
+    {tickers:{KODE:[[date,file,posts,accounts,findings,inti]]}, users:{handle:[[date,file,posts,tickers,findings]]},
+     user_notes:{handle:{...}}, days:{date:{file,n,findings,k}}}"""
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding='utf-8'))
+    days = data.get('days') or []
+
+    def day(i):
+        return days[i] if isinstance(i, int) and 0 <= i < len(days) else None
+
+    out = {'days': {d['d']: {'file': d.get('f'), 'n': d.get('n'), 'findings': d.get('findings'), 'k': d.get('k')}
+                    for d in days if d.get('d')},
+           'tickers': {}, 'users': {}, 'user_notes': {}}
+    for code, rows in sorted((data.get('tickers') or {}).items()):
+        trimmed = [[day(r[0])['d'], day(r[0]).get('f'), r[1], r[2], r[3], r[4] if len(r) > 4 else '']
+                   for r in rows if isinstance(r, list) and len(r) >= 4 and day(r[0])]
+        if trimmed:
+            out['tickers'][code] = sorted(trimmed, key=lambda r: r[0])
+    for handle, rows in sorted((data.get('users') or {}).items()):
+        trimmed = [[day(r[0])['d'], day(r[0]).get('f'), r[1], list(r[2] or []), list(r[3] or [])]
+                   for r in rows if isinstance(r, list) and len(r) >= 4 and day(r[0])]
+        if trimmed:
+            out['users'][handle.lstrip('@').lower()] = sorted(trimmed, key=lambda r: r[0])
+    for handle, note in sorted((data.get('user_notes') or {}).items()):
+        penilaian = (note or {}).get('penilaian') or {}
+        if handle.lstrip('@').lower() in out['users'] and penilaian.get('text'):
+            # Whitelisted fields only: the automatic argument assessment and its supporting finding ids.
+            out['user_notes'][handle.lstrip('@').lower()] = {
+                'penilaian': {'text': str(penilaian['text']), 'finding_ids': list(penilaian.get('finding_ids') or [])},
+                **({'window': note['window']} if note.get('window') else {})}
+    return out
 
 
 ROLE_NAMES = [(1, '>=5%'), (2, 'pengendali'), (4, 'afiliasi'), (8, 'direksi'), (16, 'komisaris')]
@@ -87,7 +165,7 @@ def stockbit_handles(docs):
 def auxiliary_versions(directory):
     """Hash the exact generated bytes the agent reads, independently of document assets."""
     hashes = {}
-    for name in ('events.json', 'ownership.json', 'signals.json', 'ksei_history.json'):
+    for name in ('events.json', 'ownership.json', 'signals.json', 'ksei_history.json', 'stockbit.json'):
         path = directory / name
         if path.exists():
             hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -97,6 +175,10 @@ def auxiliary_versions(directory):
 
 def build(directory, out):
     docs, tickers = read_archive(directory)
+    docs, excluded = worker_docs(docs)
+    for doc in excluded:
+        print(f'Worker: {doc["name"]} ({doc["cat"]}, {"–".join(covers(doc))}) tidak diindeks chat; '
+              f'harinya tercakup ringkasan Stockbit (tetap di situs).')
     out = check_output(out, ROOT, [ROOT / "needtobeindexed", directory], kind="worker")
     if out.exists():
         shutil.rmtree(out)
@@ -120,12 +202,14 @@ def build(directory, out):
         metadata.append({**{k: doc[k] for k in ('source_id', 'title', 'path', 'label', 'start', 'end', 'name', 'cat')},
                          'covers': covers(doc), 'asset': asset, 'evidence_asset': evidence_asset,
                          'document_id': evidence['document_id'], 'document_hash': evidence['document_hash'],
-                         'sizes': [len(json.dumps(p, ensure_ascii=False, separators=(',', ':')).encode()) for p in parts]})
-        for word in set(re.findall(r'\w+', (doc['title'] + '\n' + doc['search_body']).lower())):
+                         'sizes': [len(json.dumps(p, ensure_ascii=False, separators=(',', ':')).encode()) for p in parts],
+                         # Per-ticker detail: read for ticker/handle or "detail" questions, never for date summaries.
+                         **({'priority': 'low'} if doc['cat'] == STOCKBIT_DETAIL else {})})
+        for word in posting_words(doc['title'] + '\n' + doc['search_body']):
             postings.setdefault(word, []).append(source_id)
     manifest = {'version': digest.hexdigest()[:16], 'retrieval_version': VERSION, 'docs': metadata, 'tickers': sorted(tickers),
                 'handles': stockbit_handles(docs),
-                'postings': postings, 'system': SYSTEM, 'commonWords': sorted(COMMON_WORDS),
+                'postings': postings, 'system': SYSTEM + STOCKBIT_RULE, 'commonWords': sorted(COMMON_WORDS),
                 'wordTickers': sorted(t for t in tickers if t.lower() in WORD_TICKERS),
                 'termTickers': term_tickers(tickers)}
     # Month-over-month and cross-issuer KSEI joins for the agentic engine (tools/ksei_signals.py).
@@ -137,6 +221,11 @@ def build(directory, out):
     if ownership:
         (out / 'ownership.json').write_text(json.dumps(ownership, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         manifest['ownership'] = {'asset': 'ownership.json', 'companies': len(ownership['c']), 'month': ownership['m']}
+    stockbit = stockbit_index(STOCKBIT_INDEX)
+    if stockbit:
+        (out / 'stockbit.json').write_text(json.dumps(stockbit, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+        manifest['stockbit'] = {'asset': 'stockbit.json', 'tickers': len(stockbit['tickers']),
+                                'users': len(stockbit['users']), 'days': len(stockbit['days'])}
     events = make_events(docs, tickers, evidences)
     (out / 'events.json').write_text(json.dumps(events, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     manifest.update(auxiliary_versions(out))

@@ -1,7 +1,11 @@
 // Answers that need counting or listing across many issuers. Lists and totals are built by code
 // from the archive; the model only summarises. Nothing here calls a model directly.
 
-const KIND_LABEL = {digest:'digest keterbukaan', ki:'analisis keterbukaan', stockbit:'diskusi Stockbit', other:'arsip lain'};
+const STOCKBIT_SUMMARY_LABEL = 'ringkasan diskusi Stockbit (bukan keterbukaan resmi)';
+const KIND_LABEL = {digest:'digest keterbukaan', ki:'analisis keterbukaan', stockbit:'diskusi Stockbit', other:'arsip lain',
+  'stockbit-ringkasan':STOCKBIT_SUMMARY_LABEL, 'stockbit-detail':STOCKBIT_SUMMARY_LABEL, 'stockbit-pekan':STOCKBIT_SUMMARY_LABEL};
+// Label sent with each source unit of the new Stockbit categories, so the model never reads them as disclosures.
+export const sourceLabel = cat => cat?.startsWith('stockbit-') ? KIND_LABEL[cat] || STOCKBIT_SUMMARY_LABEL : null;
 const OFFICIAL = new Set(['digest', 'ki']);
 const TABLE_ROWS = 80, ITEMS = 4, EXCERPT = 170;
 const monthNames = 'Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember';

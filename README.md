@@ -708,10 +708,63 @@ python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # 
   supaya data profil lain tidak menimpa. Profil aktif dicek lagi sebelum menghapus berkas lama dan sebelum menyimpan status. Ganti sengaja dengan `--profile <id>`.
 - Sinkron menyusun hasil di direktori sementara terlebih dahulu. Penjagaan profil dan keberhasilan seluruh pengambilan diperiksa sebelum menulis tujuan. Perubahan bersamaan pada tujuan membatalkan commit; kegagalan commit biasa dipulihkan dari snapshot. Ini bukan transaksi atomik terhadap mati listrik/SIGKILL di tengah beberapa berkas. Berkas sementara memakai nama acak dan tujuan symlink ditolak.
 - HTTP hanya diizinkan untuk loopback; server jauh harus HTTPS, tanpa kredensial di URL dan tanpa redirect. Respons maksimal 32 MB. Path ledger lokal hanya dipakai untuk server loopback dan SQLite dibuka read-only.
-- Exit code: 0 ok, 1 server tidak bisa dihubungi / HTTP error / data tak terduga, 2 profil beda, 3 build gagal.
+- Exit code: 0 ok, 1 server tidak bisa dihubungi / HTTP error / data tak terduga / ekspor Stockbit ditolak, 2 profil beda, 3 build gagal.
   Mode `--watch` terus jalan walau satu putaran gagal. Dengan `--fragment-index`, build selalu dijalankan supaya fragment Artifact ikut kode terbaru.
 - Publish ke Artifact tetap lewat Claude Code (skrip tidak bisa memanggil tool Artifact): minta "publish" setelah sinkron.
   Untuk host yang bisa di-deploy dari skrip (Cloudflare Pages dll.), jalankan perintah deploy setelah sinkron.
+
+### Ringkasan Stockbit Ideas (`--stockbit-only`, publish sekali klik, rollback)
+
+```bash
+python3 -B tools/sync_idx.py --stockbit-only --no-build   # hanya Stockbit; tanpa profil, digest, kepemilikan
+python3 -B tools/sync_idx.py --with-stockbit              # sinkron biasa, lalu Stockbit (staging terpisah)
+python3 -B tools/publish_stockbit.py --dry-run            # preflight + sinkron + cek build, tanpa deploy/commit
+python3 -B tools/publish_stockbit.py                      # publish live (dipanggil desk saat "Publikasikan live" dicentang)
+python3 -B tools/rollback_stockbit.py --dry-run           # lihat rencana rollback publish terakhir
+python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
+```
+
+- Sumber: endpoint read-only Signal Desk `GET /api/stockbit/export/days|day/<tgl>?kind=ringkas|detail|week/<senin>|index`
+  (tanpa `profile_id`, tanpa LLM). Sinkron biasa tidak menyentuh Stockbit kecuali diberi `--with-stockbit`.
+- Berkas: `sbringkas_<tgl>_<tgl>.md` (ringkasan harian, default chat), `sbdetail_<tgl>_<tgl>.md` (semua temuan per emiten),
+  `sbpekan_<senin>_<minggu>.md` (hanya pekan yang ketujuh harinya final dan server menjawab selain 404), dan `stockbit-index.json`.
+  Status sendiri di `.sync-stockbit.json` (tanpa cap waktu, jadi tidak ada commit kalau isi tidak berubah); ikut staging dan rollback yang sama dengan `.sync.json`.
+- Hanya hari `final` sejak `--stockbit-since` (default 2026-10-01); `--allow-provisional` mengikutkan hari `sementara` (jangan untuk publish;
+  `export/day` dan `export/index` lalu diminta dengan `include_provisional=1`). Indeks desk tidak punya batas awal: hari sebelum
+  `--stockbit-since` (yang belum terbit) dan hari yang ditahan rollback dibuang dari `stockbit-index.json`, dayIdx dipetakan ulang.
+- Tahanan rollback `.stockbit-hold.json` (`{"format":1,"days":{tgl:{"sha256":…}}}`, ditulis `rollback_stockbit.py`): hari itu tidak
+  diterbitkan lagi selama sha di `export/days` sama (atau `"*"`). Desk harus memperbaiki dan memfinalkan ulang hari itu (sha baru), atau
+  hapus entrinya, sebelum hari itu bisa terbit lagi.
+- Ditolak (exit 1, tidak ada berkas yang ditulis) bila: tanggal/nama berkas tidak sesuai pola, `build.categorize()` tidak memberi kategori
+  `stockbit-ringkasan|stockbit-detail|stockbit-pekan` yang cocok, `ok` cakupan bukan true, sha256 tidak cocok dengan teks,
+  teks/indeks masih memuat stream_id karantina (tautan `stockbit.com/post/<id>` atau angka lepas), indeks menunjuk hari yang tidak terbit,
+  `penilaian` di `user_notes` tanpa teks atau `finding_ids`, atau server mengekspor lebih sedikit hari final daripada `sbringkas_*` yang sudah terbit.
+  `REDACTIONS` diterapkan setelah cek hash. Berkas `sb*` **tidak pernah** dihapus otomatis.
+- `publish_stockbit.py` (cwd akar arsip): preflight (git & npx ada, cabang `main`, tidak ada yang di-stage, perubahan hanya berkas Stockbit
+  di `needtobeindexed/idx-signal-desk/` (`sb*.md`, `stockbit-index.json`, `.sync-stockbit.json`, `.stockbit-hold.json`; berkas titik lain seperti
+  `.sync.json` dibiarkan dan tidak di-commit), `docs/`, `site/`; `digest_*`/`kepemilikan*` yang belum di-commit menolak publish, tidak ada commit
+  lokal yang belum dipush, `git fetch` + `git pull --ff-only`, disk ≥ 1,5 GB), catat HEAD dan versi Worker live (kalau publish sebelumnya sudah
+  deploy tanpa commit, versi sebelum publish itu dicatat sebagai `rollback_to`), sinkron `--stockbit-only --no-build` (tidak ada berkas Stockbit yang
+  berubah → selesai "tidak ada perubahan", tanpa build/deploy/commit), `build.py --out <folder sementara>` lalu cek tiap `sb*` masuk kategori dan
+  tanggal yang benar (tabelnya dicetak), `tools/publish_chat.py` (gagal setelah deploy → `sync_chat_index.py`/build `docs/` diulang sekali),
+  `git add` hanya berkas Stockbit tadi plus `docs/` dan `site/`, berhenti kalau ada `sb*` terhapus, commit `Stockbit: ringkasan <tanggal>`, push (sekali `git pull --rebase` bila ditolak),
+  tag beranotasi `stockbit-publish-YYYYMMDD-HHMMSS`, push tag. `site/` ikut di-commit karena repo ini melacaknya.
+  Exit: 0 ok/tidak ada perubahan, 2 preflight, 3 sinkron, 4 cek build, 5 gagal sebelum deploy, 6 Worker ter-deploy tapi indeks/docs belum,
+  7 ada `sb*` terhapus, 8 push gagal, 1 lain-lain. Baris terakhir keluaran = ringkasan JSON.
+- Titik rollback dicatat di `.stockbit-publish/log.jsonl` (diabaikan git): `pre_sha`, `post_sha` (tepat satu commit publish), tag,
+  `worker_version_before/after`, `rollback_to`/`supersedes`, `files`, status. `rollback_stockbit.py` memakai entri terakhir (atau `--tag`, ditolak
+  selama ada publish lebih baru yang belum di-rollback):
+  - `published`: `git revert --no-commit <pre_sha>..<post_sha>` + tahanan + satu commit + push (tanpa force push, riwayat tetap ada). `docs/`/`site/`
+    yang kotor dibuang dulu (hasil build), berkas titik non-Stockbit seperti `.sync.json` dibiarkan, berkas dilacak lain yang kotor menolak;
+    rentang yang menyentuh selain berkas Stockbit/`docs/`/`site/` ditolak.
+  - `push_failed` yang commit-nya tidak pernah sampai ke origin: `git reset --keep <pre_sha>` (tanpa push).
+  - `deployed_index_pending`/`deployed_not_committed`: tanpa cek pohon bersih; berkas Stockbit yang kotor dikembalikan ke HEAD (yang baru dihapus),
+    `docs/`/`site/` dikembalikan. Tahanan di dua cara ini belum di-commit dan ikut publish berikutnya.
+  - Worker: `npx wrangler@4.135.0 rollback <rollback_to atau versi sebelum> --config worker/wrangler.jsonc --message … --yes` hanya kalau versi live
+    masih `worker_version_after`; kalau ada deploy lebih baru, versi tidak tercatat, atau tidak terbaca: Worker tidak disentuh, instruksi manual, exit 5.
+  - Lalu `tools/sync_chat_index.py`. Rollback `partial` boleh dijalankan ulang (langkah git dilewati). Exit: 0 ok, 2 ditolak, 3 revert/reset gagal,
+    4 push gagal, 5 Worker manual, 6 indeks chat gagal.
+  Riwayat GitHub publik tetap menyimpan versi lama; penghapusan isi butuh langkah terpisah.
 
 ---
 

@@ -14,3 +14,4 @@ reports/private/
 
 # Hasil build lokal (GitHub Pages memakai docs/)
 site/
+.stockbit-publish/

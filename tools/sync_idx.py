@@ -4,6 +4,7 @@
     python3 tools/sync_idx.py                  # sekali: sinkron, build kalau ada yang berubah
     python3 tools/sync_idx.py --watch 15       # ulangi tiap 15 menit sampai Ctrl+C
     python3 tools/sync_idx.py --fragment-index /tmp/artifact/index.html   # build juga versi Artifact
+    python3 tools/sync_idx.py --stockbit-only --no-build                  # hanya ringkasan Stockbit (dipakai publish_stockbit.py)
 
 Yang disalin, ke needtobeindexed/idx-signal-desk/ (folder ini milik skrip, isinya boleh ditimpa):
   digest_<awal>_<akhir>[_HHMM-HHMM].md   satu per jendela "Saved Intelligence" (render /api/share/render)
@@ -13,10 +14,14 @@ Yang disalin, ke needtobeindexed/idx-signal-desk/ (folder ini milik skrip, isiny
                                          diambil viewer saat satu emiten dibuka
   kepemilikan-perubahan.json             laporan perubahan kepemilikan pemegang saham per emiten (Jul 2023–),
                                          diambil viewer saat satu emiten dibuka
+  sbringkas_/sbdetail_<tgl>_<tgl>.md,     ringkasan Stockbit Ideas per hari final, rekap pekan lengkap, dan indeksnya
+  sbpekan_<senin>_<minggu>.md,           (hanya dengan --stockbit-only atau --with-stockbit; tidak pernah dihapus otomatis)
+  stockbit-index.json
 Hanya membaca: GET, render tanpa menulis berkas, dan ledger kepemilikan dibuka read-only. Tidak memicu scraping IDX.
 """
 import argparse
 import collections
+import hashlib
 import http.client
 import json
 import math
@@ -29,7 +34,7 @@ import time
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlsplit
@@ -37,7 +42,7 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from build import date_label  # noqa: E402  (satu sumber format tanggal)
+from build import categorize, date_label  # noqa: E402  (satu sumber format tanggal dan kategori)
 
 DEST = ROOT / "needtobeindexed" / "idx-signal-desk"
 STATE = DEST / ".sync.json"
@@ -46,6 +51,19 @@ OWNED = re.compile(r"^(digest|kepemilikan)_[\w\-]+\.md$")
 OWNERSHIP_JSON = DEST / "kepemilikan.json"
 FILINGS_JSON = DEST / "kepemilikan-perubahan.json"
 REPORTS_JSON = DEST / "kepemilikan-laporan.json"
+# Ringkasan Stockbit Ideas (hanya --stockbit-only / --with-stockbit). Berkas sb* tidak pernah dihapus otomatis:
+# arsip ini append-only, jadi pola ini dipakai managed() untuk staging, tidak untuk prune().
+STOCKBIT_STATE = DEST / ".sync-stockbit.json"
+STOCKBIT_INDEX = DEST / "stockbit-index.json"
+# Ditulis tools/rollback_stockbit.py (ikut di-commit bersama revert): {"format":1,"days":{tgl:{"sha256":sha|"*",...}}}.
+# Hari yang ditahan tidak diterbitkan lagi sampai sha ekspor desk berubah (difinalkan ulang) atau entrinya dihapus.
+STOCKBIT_HOLD = DEST / ".stockbit-hold.json"
+STOCKBIT_FILE = re.compile(r"^(sbringkas|sbdetail|sbpekan)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.md$")
+STOCKBIT_CATEGORY = {"sbringkas": "stockbit-ringkasan", "sbdetail": "stockbit-detail", "sbpekan": "stockbit-pekan"}
+STOCKBIT_KIND = {"ringkas": "sbringkas", "detail": "sbdetail"}
+# Keputusan pemilik: backfill dimulai 1 Oktober 2026; hari sebelumnya tidak diterbitkan.
+STOCKBIT_SINCE = "2026-10-01"
+ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 # Naikkan kalau bentuk kepemilikan.json / kepemilikan-laporan.json berubah, supaya sinkron berikutnya membuatnya ulang.
 OWNERSHIP_FORMAT = 6
 REPORTS_FORMAT = 2
@@ -829,10 +847,306 @@ def sync_ownership(server, state, force, profile, guard):
     return changed, removed
 
 
+# ---------------------------------------------------------------- Stockbit Ideas
+
+class StockbitRefused(ValueError):
+    """Ekspor Stockbit tidak lolos pemeriksaan; sinkron dibatalkan tanpa menulis apa pun."""
+
+
+def iso_day(value, what="tanggal"):
+    if not isinstance(value, str) or not ISO_DAY.fullmatch(value):
+        raise StockbitRefused(f"{what} tidak valid: {value!r}")
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise StockbitRefused(f"{what} tidak valid: {value!r}") from None
+
+
+def sha256_text(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def stockbit_ids(ids):
+    """stream_id karantina dari server, sebagai string angka."""
+    if ids is None:
+        return set()
+    if not isinstance(ids, list):
+        raise StockbitRefused("quarantined_stream_ids harus berupa daftar.")
+    out = set()
+    for value in ids:
+        text = str(value) if isinstance(value, int) and not isinstance(value, bool) else value
+        if not isinstance(text, str) or not re.fullmatch(r"[1-9]\d{0,19}", text):
+            raise StockbitRefused(f"stream_id karantina tidak valid: {value!r}")
+        out.add(text)
+    return out
+
+
+def quarantine_hits(text, ids):
+    """stream_id karantina yang masih muncul, baik sebagai tautan stockbit.com/post/<id> maupun angka lepas."""
+    return sorted(ids & set(re.findall(r"(?<!\d)\d{1,20}(?!\d)", text)), key=int) if ids else []
+
+
+def check_stockbit_file(name, expected, text, sha, quarantined):
+    """Tolak berkas yang namanya, kategorinya, hash-nya, atau isinya tidak sesuai kontrak ekspor."""
+    if name != expected:
+        raise StockbitRefused(f"nama berkas dari server {name!r}, seharusnya {expected!r}")
+    match = STOCKBIT_FILE.fullmatch(name)
+    if not match:
+        raise StockbitRefused(f"nama berkas Stockbit tidak dikenal: {name!r}")
+    category = categorize(Path(name).stem)
+    if category != STOCKBIT_CATEGORY[match[1]]:
+        raise StockbitRefused(f"build.py memasukkan {name} ke kategori '{category}', bukan '{STOCKBIT_CATEGORY[match[1]]}'; "
+                              f"tambahkan kategorinya di CATEGORIES build.py dulu")
+    if not isinstance(text, str) or not text.strip():
+        raise StockbitRefused(f"{name} kosong")
+    if not isinstance(sha, str) or sha.lower() != sha256_text(text):
+        raise StockbitRefused(f"sha256 {name} tidak cocok dengan isinya")
+    hits = quarantine_hits(text, quarantined)
+    if hits:
+        raise StockbitRefused(f"{name} masih memuat stream_id karantina {', '.join(hits[:5])}")
+
+
+def filter_stockbit_index(index, drop):
+    """Buang hari `drop` (sebelum --stockbit-since atau ditahan rollback) dari indeks desk dan petakan ulang dayIdx.
+
+    Ekspor desk mendaftar semua hari final di DB-nya tanpa batas awal; baris tickers/users yang menunjuk hari
+    yang dibuang ikut dibuang, begitu juga kunci yang jadi kosong dan user_notes untuk akun yang tidak tersisa.
+    """
+    if not isinstance(index, dict) or index.get("format") != 1 or not isinstance(index.get("days"), list):
+        raise StockbitRefused("stockbit-index.json tidak berformat 1")
+    if not drop:
+        return index
+    remap, days = {}, []
+    for old, row in enumerate(index["days"]):
+        if isinstance(row, dict) and row.get("d") in drop:
+            continue
+        remap[old] = len(days)
+        days.append(row)
+    out = {**index, "days": days}
+    for key in ("tickers", "users"):
+        table = index.get(key, {})
+        if not isinstance(table, dict):
+            continue  # check_stockbit_index menolaknya
+        kept = {}
+        for name, rows in table.items():
+            if not isinstance(rows, list):
+                raise StockbitRefused(f"{key}.{name} di stockbit-index.json harus daftar")
+            new = []
+            for row in rows:
+                if not isinstance(row, list) or not row or not isinstance(row[0], int) or isinstance(row[0], bool) \
+                        or not 0 <= row[0] < len(index["days"]):
+                    raise StockbitRefused(f"baris {key}.{name} di stockbit-index.json tidak menunjuk hari yang valid")
+                if row[0] in remap:
+                    new.append([remap[row[0]], *row[1:]])
+            if new:
+                kept[name] = new
+        out[key] = kept
+    notes = index.get("user_notes")
+    if isinstance(notes, dict):
+        out["user_notes"] = {h: n for h, n in notes.items() if h in out.get("users", {})}
+    return out
+
+
+def check_stockbit_index(index, published, quarantined):
+    """stockbit-index.json hanya boleh menunjuk hari yang terbit, dan penilaian otomatis harus bersumber temuan."""
+    if not isinstance(index, dict) or index.get("format") != 1 or not isinstance(index.get("days"), list):
+        raise StockbitRefused("stockbit-index.json tidak berformat 1")
+    for row in index["days"]:
+        if not isinstance(row, dict):
+            raise StockbitRefused("baris hari di stockbit-index.json tidak valid")
+        day = row.get("d")
+        iso_day(day, "tanggal di stockbit-index.json")
+        if row.get("f") != f"sbringkas_{day}_{day}.md" or day not in published:
+            raise StockbitRefused(f"stockbit-index.json menunjuk hari {day} yang tidak diterbitkan ({row.get('f')!r})")
+        if row.get("detail") not in (None, f"sbdetail_{day}_{day}.md"):
+            raise StockbitRefused(f"berkas detail {row.get('detail')!r} di stockbit-index.json tidak sesuai tanggal {day}")
+    for key in ("tickers", "users"):
+        if not isinstance(index.get(key, {}), dict):
+            raise StockbitRefused(f"{key} di stockbit-index.json harus objek")
+    notes = index.get("user_notes", {})
+    if not isinstance(notes, dict):
+        raise StockbitRefused("user_notes di stockbit-index.json harus objek")
+    for handle, note in notes.items():
+        verdict = note.get("penilaian") if isinstance(note, dict) else None
+        if verdict is None:
+            continue
+        ids = verdict.get("finding_ids") if isinstance(verdict, dict) else None
+        if not isinstance(verdict, dict) or not isinstance(verdict.get("text"), str) or not verdict["text"].strip() \
+                or not isinstance(ids, list) or not ids or not all(isinstance(i, (str, int)) and not isinstance(i, bool) for i in ids):
+            raise StockbitRefused(f"penilaian untuk @{handle} harus punya teks dan finding_ids")
+    text = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
+    hits = quarantine_hits(text, quarantined)
+    if hits:
+        raise StockbitRefused(f"stockbit-index.json masih memuat stream_id karantina {', '.join(hits[:5])}")
+    redacted = redact(text)
+    try:
+        json.loads(redacted)
+    except ValueError:
+        raise StockbitRefused("penyamaran merusak stockbit-index.json") from None
+    return redacted
+
+
+def load_stockbit_state():
+    try:
+        state = json.loads(STOCKBIT_STATE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"format": 1}
+    return state if isinstance(state, dict) and state.get("format") == 1 else {"format": 1}
+
+
+def load_stockbit_hold():
+    """Hari yang ditahan rollback: {tgl: sha256 atau "*"}. Berkas tidak ada = tidak ada yang ditahan."""
+    try:
+        data = json.loads(STOCKBIT_HOLD.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError):
+        raise StockbitRefused(f"{STOCKBIT_HOLD.name} tidak bisa dibaca; perbaiki atau hapus dulu") from None
+    days = data.get("days") if isinstance(data, dict) else None
+    if not isinstance(days, dict):
+        raise StockbitRefused(f"{STOCKBIT_HOLD.name} tidak berisi objek days")
+    hold = {}
+    for day, entry in days.items():
+        iso_day(day, f"tanggal di {STOCKBIT_HOLD.name}")
+        sha = entry.get("sha256") if isinstance(entry, dict) else entry
+        hold[day] = str(sha or "*").lower()
+    return hold
+
+
+def sync_stockbit(server, state, force=False, allow_provisional=False, since=STOCKBIT_SINCE):
+    """Salin hari final Stockbit dari ekspor read-only Signal Desk; kembalikan nama berkas yang berubah.
+
+    Semua respons diperiksa dulu; satu kegagalan menolak seluruh putaran sebelum ada berkas yang ditulis.
+    Berkas sb* tidak pernah dihapus di sini.
+    """
+    since_day = iso_day(since, "--stockbit-since")
+    listing = server.get("/api/stockbit/export/days" + ("?include_provisional=1" if allow_provisional else ""))
+    days = listing.get("days") if isinstance(listing, dict) else None
+    if not isinstance(days, list):
+        raise StockbitRefused("respons export/days tidak berisi daftar days")
+    allowed = {"final", "sementara"} if allow_provisional else {"final"}
+    provisional = "include_provisional=1" if allow_provisional else ""
+    hold = load_stockbit_hold()
+    eligible, held, early = {}, set(), set()
+    for row in days:
+        if not isinstance(row, dict):
+            raise StockbitRefused("baris export/days tidak valid")
+        day = iso_day(row.get("date"), "tanggal export/days")
+        if day < since_day:
+            early.add(row["date"])
+            continue
+        if row.get("state") not in allowed:
+            continue
+        if row["date"] in hold and hold[row["date"]] in ("*", str(row.get("sha256") or "").lower()):
+            held.add(row["date"])  # di-rollback; tunggu desk memfinalkan ulang (sha baru) atau hapus entri tahanan
+            continue
+        if row["date"] in eligible:
+            raise StockbitRefused(f"tanggal {row['date']} muncul dua kali di export/days")
+        if row.get("ok") is not True:
+            raise StockbitRefused(f"cakupan {row['date']} belum klop (ok bukan true); tinjau di Signal Desk dulu")
+        eligible[row["date"]] = row
+
+    published = {m[2] for p in DEST.glob("sbringkas_*.md") if (m := STOCKBIT_FILE.fullmatch(p.name))}
+    for day in sorted(held):
+        print(f"  ditahan rollback: {day} (sha ekspor belum berubah; lihat {STOCKBIT_HOLD.name})")
+    if len(eligible) + len(held & published) < len(published):
+        raise StockbitRefused(f"server hanya mengekspor {len(eligible)} hari final, padahal {len(published)} hari sudah terbit; "
+                              f"tidak ada yang ditulis")
+    for day in sorted(published - eligible.keys() - held):
+        print(f"  peringatan: {day} sudah terbit tetapi tidak lagi diekspor sebagai final; berkasnya dibiarkan")
+
+    day_state, week_state = state.setdefault("days", {}), state.setdefault("weeks", {})
+    pending, new_days, new_weeks, quarantined = {}, {}, {}, {}
+    for day, row in sorted(eligible.items()):
+        fp = f"{row.get('sha256')}|{row.get('updated_at')}|{row.get('state')}"
+        names = {kind: f"{prefix}_{day}_{day}.md" for kind, prefix in STOCKBIT_KIND.items()}
+        prev = day_state.get(day) or {}
+        if not force and prev.get("fp") == fp and all((DEST / n).is_file() for n in names.values()):
+            quarantined[day] = set(prev.get("quarantined") or [])
+            continue
+        responses = {}
+        for kind in names:
+            r = server.get(f"/api/stockbit/export/day/{day}?kind={kind}" + (f"&{provisional}" if provisional else ""))
+            if not isinstance(r, dict):
+                raise StockbitRefused(f"respons export/day {day} {kind} tidak valid")
+            if r.get("state") != row.get("state"):
+                raise StockbitRefused(f"status {day} berubah di tengah sinkron ({row.get('state')} -> {r.get('state')}); ulangi")
+            coverage = r.get("coverage")
+            if isinstance(coverage, dict) and coverage.get("ok") is False:
+                raise StockbitRefused(f"cakupan {day} ({kind}) belum klop")
+            if r.get("llm_calls", 0) != 0:
+                raise StockbitRefused(f"export/day {day} melaporkan panggilan LLM; ekspor harus read-only")
+            responses[kind] = r
+        ids = set().union(*(stockbit_ids(r.get("quarantined_stream_ids")) for r in responses.values()))
+        entry = {"fp": fp, "files": {}, "quarantined": sorted(ids, key=int)}
+        for kind, r in responses.items():
+            check_stockbit_file(r.get("name"), names[kind], r.get("text"), r.get("sha256"), ids)
+            pending[names[kind]] = redact(r["text"])
+            entry["files"][names[kind]] = r["sha256"].lower()
+        quarantined[day], new_days[day] = ids, entry
+
+    mondays = sorted({date.fromisoformat(d) - timedelta(days=date.fromisoformat(d).weekday()) for d in eligible})
+    for monday in mondays:
+        week = [(monday + timedelta(days=i)).isoformat() for i in range(7)]
+        if not all(d in eligible for d in week):
+            continue  # pekan belum lengkap di sisi arsip; jangan terbitkan rekap yang menunjuk hari yang belum terbit
+        name = f"sbpekan_{week[0]}_{week[-1]}.md"
+        fp = "|".join((new_days.get(d) or day_state.get(d) or {}).get("fp", "") for d in week)
+        if not force and (week_state.get(week[0]) or {}).get("fp") == fp and (DEST / name).is_file():
+            continue
+        try:
+            r = server.get(f"/api/stockbit/export/week/{week[0]}")
+        except HTTPError as e:
+            if e.code == 404:  # pekan belum lengkap menurut server
+                e.close()
+                continue
+            raise
+        if not isinstance(r, dict):
+            raise StockbitRefused(f"respons export/week {week[0]} tidak valid")
+        ids = set().union(*(quarantined.get(d, set()) for d in week))
+        check_stockbit_file(r.get("name"), name, r.get("text"), r.get("sha256"), ids)
+        pending[name] = redact(r["text"])
+        new_weeks[week[0]] = {"fp": fp, "file": name, "sha256": r["sha256"].lower()}
+
+    all_ids = set().union(*quarantined.values()) if quarantined else set()
+    # Desk tidak membatasi tanggal awal indeks: buang hari sebelum --stockbit-since (kecuali yang sudah terbit) dan
+    # hari yang ditahan; hari lain yang tidak terbit tetap ditolak.
+    index = server.get("/api/stockbit/export/index" + (f"?{provisional}" if provisional else ""))
+    index = filter_stockbit_index(index, (early - published) | held)
+    index_text = check_stockbit_index(index, published | eligible.keys(), all_ids)
+
+    # Semua lolos: baru menulis (ke folder staging sync_once).
+    changed = [name for name, text in sorted(pending.items()) if write_if_changed(DEST / name, text)]
+    if write_if_changed(STOCKBIT_INDEX, index_text):
+        changed.append(STOCKBIT_INDEX.name)
+    day_state.update(new_days)
+    week_state.update(new_weeks)
+    state["format"] = 1
+    # Tanpa cap waktu: status hanya berubah kalau isi berubah, supaya publish tanpa perubahan tidak membuat commit.
+    write_if_changed(STOCKBIT_STATE, json.dumps(state, ensure_ascii=False, indent=1, sort_keys=True))
+    return changed
+
+
+def _sync_stockbit_once(args):
+    """Mode --stockbit-only: tanpa /api/profiles, penjaga profil, digest, atau kepemilikan."""
+    server = Server(args.server)
+    server.get("/api/health", timeout=10)
+    DEST.mkdir(parents=True, exist_ok=True)
+    changed = sync_stockbit(server, load_stockbit_state(), force=getattr(args, "force", False),
+                            allow_provisional=getattr(args, "allow_provisional", False),
+                            since=getattr(args, "stockbit_since", None) or STOCKBIT_SINCE)
+    print(f"[{datetime.now():%H:%M:%S}] Stockbit: {len(changed)} berkas baru/berubah")
+    for name in changed:
+        print(f"  + {name}")
+    return bool(changed)
+
+
 # ---------------------------------------------------------------- inti
 
 def prune(prefix, keep, allow_empty):
     """Hapus berkas lama milik skrip ini yang tidak lagi dihasilkan server."""
+    if prefix.startswith("sb") or prefix.startswith("stockbit"):
+        raise ValueError("Berkas Stockbit tidak pernah dihapus otomatis.")
     stale = [p for p in DEST.glob(prefix + "*.md") if OWNED.match(p.name) and p.name not in keep]
     if stale and not allow_empty:
         print(f"  server tidak mengembalikan data {prefix.rstrip('_')}; {len(stale)} berkas lama dibiarkan")
@@ -885,13 +1199,16 @@ def _sync_once(args):
 
 
 def sync_once(args):
-    global DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON
+    global DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON, STOCKBIT_STATE, STOCKBIT_INDEX, STOCKBIT_HOLD
     original, old_state, old_ownership, old_filings, old_reports = DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON
+    old_sb_state, old_sb_index, old_sb_hold = STOCKBIT_STATE, STOCKBIT_INDEX, STOCKBIT_HOLD
     if original.is_symlink() or not original.resolve().is_relative_to((ROOT / "needtobeindexed").resolve()):
         raise ValueError("Folder sinkron menunjuk keluar arsip.")
     original.mkdir(parents=True, exist_ok=True)
     def managed(path):
-        return path.name in (".sync.json", "kepemilikan.json", "kepemilikan-perubahan.json", "kepemilikan-laporan.json") or bool(OWNED.fullmatch(path.name))
+        return path.name in (".sync.json", "kepemilikan.json", "kepemilikan-perubahan.json", "kepemilikan-laporan.json",
+                             ".sync-stockbit.json", "stockbit-index.json", ".stockbit-hold.json") \
+            or bool(OWNED.fullmatch(path.name)) or bool(STOCKBIT_FILE.fullmatch(path.name))
     originals = {}
     for path in original.iterdir():
         if managed(path):
@@ -905,9 +1222,13 @@ def sync_once(args):
         try:
             DEST, STATE, OWNERSHIP_JSON = stage, stage / ".sync.json", stage / "kepemilikan.json"
             FILINGS_JSON, REPORTS_JSON = stage / "kepemilikan-perubahan.json", stage / "kepemilikan-laporan.json"
-            changed = _sync_once(args)
+            STOCKBIT_STATE, STOCKBIT_INDEX = stage / ".sync-stockbit.json", stage / "stockbit-index.json"
+            STOCKBIT_HOLD = stage / ".stockbit-hold.json"
+            # --stockbit-only diputuskan di sini, sebelum _sync_once: tidak menyentuh /api/profiles, guard(), atau kepemilikan.
+            changed = _sync_stockbit_once(args) if getattr(args, "stockbit_only", False) else _sync_once(args)
         finally:
             DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON = original, old_state, old_ownership, old_filings, old_reports
+            STOCKBIT_STATE, STOCKBIT_INDEX, STOCKBIT_HOLD = old_sb_state, old_sb_index, old_sb_hold
         staged = {p.name: p.read_bytes() for p in stage.iterdir() if managed(p)}
         # Refuse concurrent edits instead of silently overwriting them.
         current = {p.name: p.read_bytes() for p in original.iterdir() if managed(p) and p.is_file() and not p.is_symlink()}
@@ -943,6 +1264,12 @@ def build(args):
 def run(args):
     try:
         changed = sync_once(args)
+        if getattr(args, "with_stockbit", False) and not getattr(args, "stockbit_only", False):
+            # Putaran terpisah dengan staging sendiri: Stockbit yang ditolak tidak membatalkan digest/kepemilikan.
+            changed = sync_once(argparse.Namespace(**{**vars(args), "stockbit_only": True})) or changed
+    except StockbitRefused as e:
+        print(f"Stockbit ditolak, tidak ada berkas yang ditulis: {e}", file=sys.stderr)
+        return 1
     except HTTPError as e:
         print(f"Signal Desk menjawab HTTP {e.code} untuk {e.url}", file=sys.stderr)
         return 1
@@ -977,7 +1304,15 @@ def main():
     ap.add_argument("--no-build", action="store_true", help="hanya salin berkas")
     ap.add_argument("--ownership-only", action="store_true", help="hanya sinkron data kepemilikan; digest dan statusnya dipertahankan")
     ap.add_argument("--fragment-index", type=Path, help="teruskan ke build.py (versi index untuk Claude Artifact)")
+    ap.add_argument("--stockbit-only", action="store_true",
+                    help="hanya ringkasan Stockbit (sb*.md + stockbit-index.json); tanpa profil, digest, atau kepemilikan")
+    ap.add_argument("--with-stockbit", action="store_true", help="setelah sinkron biasa, jalankan juga sinkron Stockbit")
+    ap.add_argument("--allow-provisional", action="store_true", help="Stockbit: ikutkan hari 'sementara' (default hanya final)")
+    ap.add_argument("--stockbit-since", default=STOCKBIT_SINCE, metavar="YYYY-MM-DD",
+                    help=f"Stockbit: abaikan hari sebelum tanggal ini (default {STOCKBIT_SINCE})")
     args = ap.parse_args()
+    if args.stockbit_only and args.ownership_only:
+        ap.error("--stockbit-only dan --ownership-only tidak bisa digabung")
     if not args.watch:
         raise SystemExit(run(args))
     print(f"Sinkron tiap {args.watch:g} menit dari {args.server}. Ctrl+C untuk berhenti.")
