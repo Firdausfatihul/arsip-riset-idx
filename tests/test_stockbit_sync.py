@@ -36,9 +36,11 @@ def day_text(day, kind, extra=""):
 class FakeDesk:
     """Ekspor read-only Stockbit; mencatat setiap path yang diminta."""
 
-    def __init__(self, days, quarantined=None, weeks=(), user_notes=None):
+    def __init__(self, days, quarantined=None, weeks=(), user_notes=None, withheld=None):
         self.calls, self.days, self.quarantined = [], list(days), quarantined or {}
         self.weeks = set(weeks)
+        # None = desk lama tanpa /export/withheld (404); daftar = hari yang ditahan dari web, disembunyikan di sisi desk.
+        self.withheld = withheld
         self.overrides, self.user_notes = {}, user_notes
         self.listing = [{"date": d, "state": "final", "sha256": "h" + d, "updated_at": "t1", "ok": True,
                          "coverage": {"posts_total": 10}} for d in self.days]
@@ -51,6 +53,9 @@ class FakeDesk:
         r.update(self.overrides.get((day, kind), {}))
         return r
 
+    def hidden(self, day):
+        return day in (self.withheld or ())
+
     def exported(self, day, path):
         """Like the real desk: non-final days only with include_provisional=1."""
         row = next((r for r in self.listing if r["date"] == day), None)
@@ -60,7 +65,7 @@ class FakeDesk:
         # The real desk has no start filter: every final day in its DB, including days before --stockbit-since.
         idx = {"format": 1, "generated_at": "x", "days": [
             {"d": d, "f": f"sbringkas_{d}_{d}.md", "detail": f"sbdetail_{d}_{d}.md", "k": 1, "n": 10}
-            for d in self.days if self.exported(d, path)],
+            for d in self.days if self.exported(d, path) and not self.hidden(d)],
             "tickers": {"BBCA": [[0, 3, 2, 1, "inti", {}]]}, "users": {"alice": [[0, 2, ["BBCA"], ["f1"]]]}}
         if self.user_notes is not None:
             idx["user_notes"] = self.user_notes
@@ -71,20 +76,29 @@ class FakeDesk:
         self.calls.append(path)
         if path == "/api/health":
             return {"ok": True}
+        if path == "/api/stockbit/export/withheld":
+            if "withheld" in self.overrides:
+                return self.overrides["withheld"]
+            if self.withheld is None:
+                raise HTTPError(path, 404, "old desk", {}, None)
+            return {"days": list(self.withheld), "llm_calls": 0}
         if path.startswith("/api/stockbit/export/days"):
-            rows = [r for r in self.listing if r["state"] == "final" or "include_provisional=1" in path]
+            rows = [r for r in self.listing if (r["state"] == "final" or "include_provisional=1" in path) and not self.hidden(r["date"])]
             return {"days": rows}
         if path.startswith("/api/stockbit/export/day/"):
             day, query = path.rsplit("/", 1)[1].split("?kind=")
             kind = query.split("&", 1)[0]
+            if self.hidden(day):
+                raise HTTPError(path, 409, "withheld", {}, None)
             if not self.exported(day, path):
                 raise HTTPError(path, 404, "not final", {}, None)
             return self.day(day, kind)
         if path.startswith("/api/stockbit/export/week/"):
             monday = path.rsplit("/", 1)[1]
-            if monday not in self.weeks:
-                raise HTTPError(path, 404, "not complete", {}, None)
             sunday = (sync.date.fromisoformat(monday) + sync.timedelta(days=6)).isoformat()
+            week = {(sync.date.fromisoformat(monday) + sync.timedelta(days=i)).isoformat() for i in range(7)}
+            if monday not in self.weeks or any(self.hidden(d) for d in week):
+                raise HTTPError(path, 404, "not complete", {}, None)
             text = f"# Rekap pekan {monday}\n\nCakupan: tujuh hari final.\n"
             return {"name": f"sbpekan_{monday}_{sunday}.md", "text": text, "sha256": sha(text)}
         if path.split("?", 1)[0] == "/api/stockbit/export/index":
@@ -181,6 +195,200 @@ class StockbitSyncTests(unittest.TestCase):
         self.assertIn("penilaian", (self.dest / "stockbit-index.json").read_text())
         bad = FakeDesk(["2026-10-05", "2026-10-06"], user_notes={"alice": {"penilaian": {"text": "Lemah.", "finding_ids": []}}})
         self.refused(bad, "finding_ids")
+
+    def test_benang_and_based_on_validated_like_penilaian(self):
+        note = {"penilaian": {"text": "Argumen bersandar angka.", "finding_ids": ["f1"]},
+                "window": {"start": "2026-09-29", "end": "2026-10-05"},
+                "benang": {"text": "Klaim BBCA berulang lintas hari.", "finding_ids": ["f0", "f1"]},
+                "based_on": {"findings": 2, "last_day": "2026-10-05"}}
+        rows = {"users": {"alice": [[0, 2, ["BBCA"], ["f0", "f1"]]]}}
+        desk = FakeDesk(["2026-10-05"], user_notes={"alice": note}); desk.overrides["index"] = rows
+        self.sync(desk)
+        written = json.loads((self.dest / "stockbit-index.json").read_text())["user_notes"]["alice"]
+        self.assertEqual((written["benang"], written["based_on"]), (note["benang"], note["based_on"]))
+        # Notes without the new fields (older desk) stay valid.
+        self.sync(FakeDesk(["2026-10-05"], user_notes={"alice": {"penilaian": note["penilaian"], "window": 7}}))
+        bad = {
+            "benang_not_object": ({"benang": "teks"}, "benang"),
+            "benang_empty_text": ({"benang": {"text": "  ", "finding_ids": ["f1"]}}, "benang"),
+            "benang_no_ids": ({"benang": {"text": "x", "finding_ids": []}}, "benang"),
+            "benang_int_ids": ({"benang": {"text": "x", "finding_ids": [1, 2]}}, "benang"),
+            "benang_ids_not_list": ({"benang": {"text": "x", "finding_ids": "f1"}}, "benang"),
+            "based_on_negative": ({"based_on": {"findings": -1, "last_day": "2026-10-05"}}, "based_on"),
+            "based_on_bool": ({"based_on": {"findings": True, "last_day": "2026-10-05"}}, "based_on"),
+            "based_on_string": ({"based_on": {"findings": "2", "last_day": "2026-10-05"}}, "based_on"),
+            "based_on_bad_day": ({"based_on": {"findings": 2, "last_day": "2026-13-05"}}, "last_day"),
+            "based_on_not_object": ({"based_on": [2, "2026-10-05"]}, "based_on"),
+        }
+        for label, (extra, pattern) in bad.items():
+            with self.subTest(label):
+                desk = FakeDesk(["2026-10-05", "2026-10-06"], user_notes={"alice": {**note, **extra}})
+                desk.overrides["index"] = rows
+                self.refused(desk, pattern)
+        # Ids must be findings of the published users rows.
+        for part in ("penilaian", "benang"):
+            with self.subTest(part):
+                desk = FakeDesk(["2026-10-05", "2026-10-06"], user_notes={"alice": {
+                    **note, part: {"text": "x", "finding_ids": ["f1", "F-unknown"]}}})
+                desk.overrides["index"] = rows
+                self.refused(desk, "F-unknown")
+
+    def test_notes_citing_dropped_days_are_dropped_whole(self):
+        # 2026-10-06 is held by rollback (dropped from the index); 2026-09-30 is before --stockbit-since.
+        (self.dest / ".stockbit-hold.json").write_text(json.dumps({"format": 1, "days": {"2026-10-06": {"sha256": "*", "rollback_of": "t"}}}))
+        desk = FakeDesk(["2026-09-30", "2026-10-05", "2026-10-06"])
+        ok = {"penilaian": {"text": "ok", "finding_ids": ["a5"]}, "benang": {"text": "ok", "finding_ids": ["a5", "a5b"]},
+              "based_on": {"findings": 2, "last_day": "2026-10-05"}}
+        desk.overrides["index"] = {"users": {
+            "alice": [[1, 1, [], ["a5", "a5b"]]],
+            "pen": [[1, 1, [], ["p5"]], [2, 1, [], ["p6"]]],
+            "ben": [[1, 1, [], ["b5"]], [0, 1, [], ["b0"]]],
+            "last": [[1, 1, [], ["l5"]], [2, 1, [], ["l6"]]]}, "user_notes": {
+            "alice": ok,
+            "pen": {"penilaian": {"text": "menyebut 6 Okt", "finding_ids": ["p5", "p6"]}},
+            "ben": {"penilaian": {"text": "ok", "finding_ids": ["b5"]}, "benang": {"text": "30 Sep", "finding_ids": ["b5", "b0"]}},
+            "last": {"penilaian": {"text": "ok", "finding_ids": ["l5"]}, "based_on": {"findings": 2, "last_day": "2026-10-06"}}}}
+        self.sync(desk)
+        index = json.loads((self.dest / "stockbit-index.json").read_text())
+        self.assertEqual(index["user_notes"], {"alice": ok})
+        self.assertEqual(set(index["users"]), {"alice", "pen", "ben", "last"})
+
+    def week_desk(self, **kw):
+        days = [f"2026-10-{d:02d}" for d in range(5, 13)]  # Mon 5 .. Sun 11, plus Mon 12
+        return FakeDesk(days, weeks={"2026-10-05"}, **kw)
+
+    def hold(self):
+        return json.loads((self.dest / ".stockbit-hold.json").read_text())["days"]
+
+    def test_withheld_unpublished_day_is_not_published(self):
+        desk = FakeDesk(["2026-10-05", "2026-10-06"], withheld=["2026-10-06"])
+        self.sync(desk)
+        names = set(self.snapshot())
+        self.assertIn("sbringkas_2026-10-05_2026-10-05.md", names)
+        self.assertFalse({"sbringkas_2026-10-06_2026-10-06.md", "sbdetail_2026-10-06_2026-10-06.md"} & names)
+        self.assertNotIn(".stockbit-hold.json", names, "nothing was published, so nothing to hold")
+        self.assertFalse([c for c in desk.calls if "/export/day/2026-10-06" in c])
+        self.assertEqual([d["d"] for d in json.loads((self.dest / "stockbit-index.json").read_text())["days"]], ["2026-10-05"])
+        # Even a desk that (wrongly) still lists the day does not get it published.
+        desk.hidden = lambda day: False
+        desk.withheld = ["2026-10-06"]
+        desk.overrides["index"] = {"days": [{"d": "2026-10-05", "f": "sbringkas_2026-10-05_2026-10-05.md"},
+                                            {"d": "2026-10-06", "f": "sbringkas_2026-10-06_2026-10-06.md"}]}
+        self.sync(desk)
+        self.assertNotIn("sbringkas_2026-10-06_2026-10-06.md", set(self.snapshot()))
+        self.assertEqual([d["d"] for d in json.loads((self.dest / "stockbit-index.json").read_text())["days"]], ["2026-10-05"])
+
+    def test_withheld_published_day_is_withdrawn_held_filtered_and_restored(self):
+        desk = self.week_desk()
+        self.sync(desk)
+        self.assertTrue((self.dest / "sbpekan_2026-10-05_2026-10-11.md").is_file())
+        rollback = {"sha256": "h2026-10-04", "rollback_of": "stockbit-publish-x"}
+        (self.dest / ".stockbit-hold.json").write_text(json.dumps({"format": 1, "days": {"2026-10-04": rollback}}))
+        desk.withheld = ["2026-10-07"]
+        desk.calls.clear()
+        # The index filter drops the withheld day even if the desk index still listed it (and remaps rows past it).
+        all_days = [{"d": d, "f": f"sbringkas_{d}_{d}.md", "detail": f"sbdetail_{d}_{d}.md"} for d in desk.days]
+        desk.overrides["index"] = {"days": all_days, "tickers": {"BBCA": [[2, 1, 1, 0, "", {}], [3, 1, 1, 0, "", {}]]},
+                                   "users": {"bob": [[2, 1, [], ["f7"]]], "alice": [[3, 2, ["BBCA"], ["f8"]]]},
+                                   "user_notes": {"bob": {"penilaian": {"text": "x", "finding_ids": ["f7"]}}}}
+        self.assertTrue(self.sync(desk))  # 8 days were published, desk exports 7: the shrink guard must not refuse
+        names = set(self.snapshot())
+        for gone in ("sbringkas_2026-10-07_2026-10-07.md", "sbdetail_2026-10-07_2026-10-07.md", "sbpekan_2026-10-05_2026-10-11.md"):
+            self.assertNotIn(gone, names)
+        for kept in ("sbringkas_2026-10-06_2026-10-06.md", "sbdetail_2026-10-08_2026-10-08.md", "sbringkas_2026-10-12_2026-10-12.md"):
+            self.assertIn(kept, names)
+        self.assertEqual(self.hold(), {"2026-10-04": rollback, "2026-10-07": {"sha256": "*", "withheld_by": "desk"}})
+        state = json.loads((self.dest / ".sync-stockbit.json").read_text())
+        self.assertNotIn("2026-10-07", state["days"]); self.assertIn("2026-10-08", state["days"])
+        self.assertNotIn("2026-10-05", state["weeks"])
+        index = json.loads((self.dest / "stockbit-index.json").read_text())
+        self.assertNotIn("2026-10-07", [d["d"] for d in index["days"]])
+        self.assertEqual(index["tickers"], {"BBCA": [[2, 1, 1, 0, "", {}]]})
+        self.assertEqual(index["users"], {"alice": [[2, 2, ["BBCA"], ["f8"]]]})
+        self.assertEqual(index["user_notes"], {})
+        self.assertFalse([c for c in desk.calls if "/export/day/2026-10-07" in c or "/export/week/" in c])
+        # Still withheld: a second sync changes nothing.
+        before = self.snapshot()
+        self.assertFalse(self.sync(desk))
+        self.assertEqual(self.snapshot(), before)
+        # Un-withheld: only the desk entry goes; the day and the week are fetched again because their files are missing.
+        desk.withheld = []
+        del desk.overrides["index"]
+        self.assertTrue(self.sync(desk))
+        names = set(self.snapshot())
+        for back in ("sbringkas_2026-10-07_2026-10-07.md", "sbdetail_2026-10-07_2026-10-07.md", "sbpekan_2026-10-05_2026-10-11.md"):
+            self.assertIn(back, names)
+        self.assertEqual(self.hold(), {"2026-10-04": rollback})
+        state = json.loads((self.dest / ".sync-stockbit.json").read_text())
+        self.assertIn("2026-10-07", state["days"]); self.assertIn("2026-10-05", state["weeks"])
+
+    def test_desk_hold_merges_with_rollback_entries_and_never_drops_them(self):
+        rollback = {"sha256": "abc", "rollback_of": "t1"}
+        merged = sync.desk_hold_entries({"2026-10-05": rollback, "2026-10-06": "*"}, {"2026-10-05", "2026-10-06", "2026-10-07"},
+                                        {"2026-10-05", "2026-10-06", "2026-10-07"})
+        self.assertEqual(merged, {"2026-10-05": {**rollback, "withheld_by": "desk"},
+                                  "2026-10-06": {"sha256": "*", "rollback_of": None, "withheld_by": "desk"},
+                                  "2026-10-07": {"sha256": "*", "withheld_by": "desk"}})
+        released = sync.desk_hold_entries(merged, set(), set())
+        self.assertEqual(released, {"2026-10-05": rollback, "2026-10-06": {"sha256": "*", "rollback_of": None}})
+        # A withheld day whose files are already gone keeps its desk entry while the desk still withholds it.
+        self.assertEqual(sync.desk_hold_entries(merged, {"2026-10-07"}, set())["2026-10-07"], {"sha256": "*", "withheld_by": "desk"})
+
+    def test_refused_withheld_sync_deletes_nothing(self):
+        self.sync(FakeDesk(["2026-10-05", "2026-10-06"]))
+        desk = FakeDesk(["2026-10-05", "2026-10-06"], withheld=["2026-10-06"])
+        desk.overrides["index"] = {"format": 2}
+        self.refused(desk, "format")
+        self.assertTrue((self.dest / "sbringkas_2026-10-06_2026-10-06.md").is_file())
+        for answer, pattern in (({"days": "2026-10-06"}, "withheld"), ({"days": ["2026-13-01"]}, "tanggal"),
+                                (["2026-10-06"], "withheld"), ({"days": ["2026-10-06"], "llm_calls": 1}, "LLM")):
+            with self.subTest(answer):
+                bad = FakeDesk(["2026-10-05", "2026-10-06"], withheld=[])
+                bad.overrides["withheld"] = answer
+                self.refused(bad, pattern)
+        # A desk error other than 404 is not "nothing withheld": the round aborts without touching the archive.
+        broken = FakeDesk(["2026-10-05", "2026-10-06"], withheld=[])
+
+        def get(path, timeout=60):
+            if path.endswith("/withheld"):
+                raise HTTPError(path, 500, "boom", {}, None)
+            return FakeDesk.get(broken, path)
+        before = self.snapshot()
+        with patch.object(broken, "get", side_effect=get):
+            with self.assertRaises(HTTPError):
+                self.sync(broken)
+        self.assertEqual(self.snapshot(), before)
+
+    def test_404_keeps_existing_desk_holds(self):
+        desk = self.week_desk(withheld=[])
+        self.sync(desk)
+        desk.withheld = ["2026-10-07"]
+        self.sync(desk)
+        self.assertEqual(self.hold(), {"2026-10-07": {"sha256": "*", "withheld_by": "desk"}})
+        self.assertNotIn("sbringkas_2026-10-07_2026-10-07.md", set(self.snapshot()))
+        hold_before = self.hold()
+        # The desk now answers 404 (old/unrestarted desk) and lists 2026-10-07 again: unknown is not "released".
+        desk.withheld = None
+        desk.calls.clear()
+        self.sync(desk)
+        names = set(self.snapshot())
+        self.assertNotIn("sbringkas_2026-10-07_2026-10-07.md", names)
+        self.assertNotIn("sbpekan_2026-10-05_2026-10-11.md", names)
+        self.assertEqual(self.hold(), hold_before)
+        self.assertNotIn("2026-10-07", [d["d"] for d in json.loads((self.dest / "stockbit-index.json").read_text())["days"]])
+        self.assertFalse([c for c in desk.calls if "/export/day/2026-10-07" in c or "/export/week/" in c])
+        # Only a desk that supports the endpoint can release it.
+        desk.withheld = []
+        self.sync(desk)
+        self.assertIn("sbringkas_2026-10-07_2026-10-07.md", set(self.snapshot()))
+        self.assertEqual(self.hold(), {})
+
+    def test_old_desk_without_withheld_endpoint(self):
+        desk = FakeDesk(["2026-10-05", "2026-10-06"])  # 404 for /export/withheld
+        self.assertTrue(self.sync(desk))
+        self.assertIn("/api/stockbit/export/withheld", desk.calls)
+        self.assertIn("sbringkas_2026-10-06_2026-10-06.md", set(self.snapshot()))
+        self.assertNotIn(".stockbit-hold.json", set(self.snapshot()))
 
     def test_quarantined_stream_id_refused_as_link_or_bare_id(self):
         for extra in (" lihat [pos](https://stockbit.com/post/36999999)", " (post 36999999)"):

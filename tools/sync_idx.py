@@ -15,8 +15,8 @@ Yang disalin, ke needtobeindexed/idx-signal-desk/ (folder ini milik skrip, isiny
   kepemilikan-perubahan.json             laporan perubahan kepemilikan pemegang saham per emiten (Jul 2023–),
                                          diambil viewer saat satu emiten dibuka
   sbringkas_/sbdetail_<tgl>_<tgl>.md,     ringkasan Stockbit Ideas per hari final, rekap pekan lengkap, dan indeksnya
-  sbpekan_<senin>_<minggu>.md,           (hanya dengan --stockbit-only atau --with-stockbit; tidak pernah dihapus otomatis)
-  stockbit-index.json
+  sbpekan_<senin>_<minggu>.md,           (hanya dengan --stockbit-only atau --with-stockbit; hanya dihapus untuk hari yang
+  stockbit-index.json                    ditahan desk dari web, atau oleh rollback_stockbit.py)
 Hanya membaca: GET, render tanpa menulis berkas, dan ledger kepemilikan dibuka read-only. Tidak memicu scraping IDX.
 """
 import argparse
@@ -51,12 +51,15 @@ OWNED = re.compile(r"^(digest|kepemilikan)_[\w\-]+\.md$")
 OWNERSHIP_JSON = DEST / "kepemilikan.json"
 FILINGS_JSON = DEST / "kepemilikan-perubahan.json"
 REPORTS_JSON = DEST / "kepemilikan-laporan.json"
-# Ringkasan Stockbit Ideas (hanya --stockbit-only / --with-stockbit). Berkas sb* tidak pernah dihapus otomatis:
-# arsip ini append-only, jadi pola ini dipakai managed() untuk staging, tidak untuk prune().
+# Ringkasan Stockbit Ideas (hanya --stockbit-only / --with-stockbit). Berkas sb* tidak pernah di-prune(): arsip ini
+# append-only. Hanya hari yang ditahan desk dari web (export/withheld) dan rollback_stockbit.py yang menghapus sb*;
+# pola ini dipakai managed() untuk staging (tulis dan hapus), tidak untuk prune().
 STOCKBIT_STATE = DEST / ".sync-stockbit.json"
 STOCKBIT_INDEX = DEST / "stockbit-index.json"
 # Ditulis tools/rollback_stockbit.py (ikut di-commit bersama revert): {"format":1,"days":{tgl:{"sha256":sha|"*",...}}}.
 # Hari yang ditahan tidak diterbitkan lagi sampai sha ekspor desk berubah (difinalkan ulang) atau entrinya dihapus.
+# Sinkron menambahkan {"sha256":"*","withheld_by":"desk"} untuk hari terbit yang ditahan desk dari web (berkasnya dicabut),
+# dan membuang hanya entri desk itu saat desk melepasnya; entri rollback tidak pernah dihapus sinkron.
 STOCKBIT_HOLD = DEST / ".stockbit-hold.json"
 STOCKBIT_FILE = re.compile(r"^(sbringkas|sbdetail|sbpekan)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.md$")
 STOCKBIT_CATEGORY = {"sbringkas": "stockbit-ringkasan", "sbdetail": "stockbit-detail", "sbpekan": "stockbit-pekan"}
@@ -907,15 +910,26 @@ def check_stockbit_file(name, expected, text, sha, quarantined):
 
 
 def filter_stockbit_index(index, drop):
-    """Buang hari `drop` (sebelum --stockbit-since atau ditahan rollback) dari indeks desk dan petakan ulang dayIdx.
+    """Buang hari `drop` (sebelum --stockbit-since, ditahan rollback, atau ditahan desk) dari indeks desk dan petakan ulang dayIdx.
 
     Ekspor desk mendaftar semua hari final di DB-nya tanpa batas awal; baris tickers/users yang menunjuk hari
     yang dibuang ikut dibuang, begitu juga kunci yang jadi kosong dan user_notes untuk akun yang tidak tersisa.
+    Catatan akun (penilaian/benang) yang merujuk temuan hari yang dibuang, atau yang based_on.last_day-nya hari yang
+    dibuang, dibuang utuh: teksnya bisa menceritakan hari itu dan tidak bisa dibersihkan.
     """
     if not isinstance(index, dict) or index.get("format") != 1 or not isinstance(index.get("days"), list):
         raise StockbitRefused("stockbit-index.json tidak berformat 1")
     if not drop:
         return index
+    # id temuan -> hari, dari baris users SEBELUM hari dibuang (sesudahnya rujukan ke hari yang dibuang tidak terlihat lagi).
+    dropped_ids = set()
+    users = index.get("users")
+    for rows in (users.values() if isinstance(users, dict) else ()):
+        for row in (rows if isinstance(rows, list) else ()):
+            if isinstance(row, list) and len(row) > 3 and isinstance(row[0], int) and not isinstance(row[0], bool) \
+                    and 0 <= row[0] < len(index["days"]) and isinstance(index["days"][row[0]], dict) \
+                    and index["days"][row[0]].get("d") in drop and isinstance(row[3], list):
+                dropped_ids |= {str(i) for i in row[3] if isinstance(i, (str, int)) and not isinstance(i, bool)}
     remap, days = {}, []
     for old, row in enumerate(index["days"]):
         if isinstance(row, dict) and row.get("d") in drop:
@@ -943,8 +957,25 @@ def filter_stockbit_index(index, drop):
         out[key] = kept
     notes = index.get("user_notes")
     if isinstance(notes, dict):
-        out["user_notes"] = {h: n for h, n in notes.items() if h in out.get("users", {})}
+        out["user_notes"] = {h: n for h, n in notes.items()
+                             if h in out.get("users", {}) and not note_touches(n, dropped_ids, drop)}
     return out
+
+
+def note_ids(note):
+    """id temuan yang dirujuk penilaian dan benang sebuah catatan akun, sebagai string."""
+    out = []
+    for part in ("penilaian", "benang"):
+        sub = note.get(part) if isinstance(note, dict) else None
+        ids = sub.get("finding_ids") if isinstance(sub, dict) else None
+        out += [str(i) for i in ids if isinstance(i, (str, int)) and not isinstance(i, bool)] if isinstance(ids, list) else []
+    return out
+
+
+def note_touches(note, dropped_ids, drop):
+    """True kalau catatan merujuk temuan hari yang dibuang, atau based_on.last_day-nya hari yang dibuang."""
+    based = note.get("based_on") if isinstance(note, dict) else None
+    return any(i in dropped_ids for i in note_ids(note)) or (isinstance(based, dict) and based.get("last_day") in drop)
 
 
 def check_stockbit_index(index, published, quarantined):
@@ -966,14 +997,35 @@ def check_stockbit_index(index, published, quarantined):
     notes = index.get("user_notes", {})
     if not isinstance(notes, dict):
         raise StockbitRefused("user_notes di stockbit-index.json harus objek")
+    published_ids = {str(i) for rows in index.get("users", {}).values() if isinstance(rows, list)
+                     for row in rows if isinstance(row, list) and len(row) > 3 and isinstance(row[3], list)
+                     for i in row[3] if isinstance(i, (str, int)) and not isinstance(i, bool)}
     for handle, note in notes.items():
-        verdict = note.get("penilaian") if isinstance(note, dict) else None
-        if verdict is None:
+        if not isinstance(note, dict):
             continue
-        ids = verdict.get("finding_ids") if isinstance(verdict, dict) else None
-        if not isinstance(verdict, dict) or not isinstance(verdict.get("text"), str) or not verdict["text"].strip() \
-                or not isinstance(ids, list) or not ids or not all(isinstance(i, (str, int)) and not isinstance(i, bool) for i in ids):
-            raise StockbitRefused(f"penilaian untuk @{handle} harus punya teks dan finding_ids")
+        verdict = note.get("penilaian")
+        if verdict is not None:
+            ids = verdict.get("finding_ids") if isinstance(verdict, dict) else None
+            if not isinstance(verdict, dict) or not isinstance(verdict.get("text"), str) or not verdict["text"].strip() \
+                    or not isinstance(ids, list) or not ids or not all(isinstance(i, (str, int)) and not isinstance(i, bool) for i in ids):
+                raise StockbitRefused(f"penilaian untuk @{handle} harus punya teks dan finding_ids")
+        # Opsional (desk baru): benang lintas hari juga harus bersumber temuan; based_on = jumlah temuan s.d. hari terakhir.
+        thread = note.get("benang")
+        if thread is not None:
+            ids = thread.get("finding_ids") if isinstance(thread, dict) else None
+            if not isinstance(thread, dict) or not isinstance(thread.get("text"), str) or not thread["text"].strip() \
+                    or not isinstance(ids, list) or not ids or not all(isinstance(i, str) and i for i in ids):
+                raise StockbitRefused(f"benang untuk @{handle} harus punya teks dan finding_ids")
+        based = note.get("based_on")
+        if based is not None:
+            count = based.get("findings") if isinstance(based, dict) else None
+            if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                raise StockbitRefused(f"based_on untuk @{handle} harus berisi findings (bilangan >= 0) dan last_day")
+            iso_day(based.get("last_day"), f"based_on.last_day untuk @{handle}")
+        # Rujukan harus temuan yang ada di baris users yang terbit (bukan hari yang dibuang atau tidak dikenal).
+        missing = [i for i in note_ids(note) if i not in published_ids]
+        if missing:
+            raise StockbitRefused(f"catatan @{handle} merujuk temuan yang tidak ada di indeks yang terbit: {', '.join(missing[:5])}")
     text = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
     hits = quarantine_hits(text, quarantined)
     if hits:
@@ -994,8 +1046,8 @@ def load_stockbit_state():
     return state if isinstance(state, dict) and state.get("format") == 1 else {"format": 1}
 
 
-def load_stockbit_hold():
-    """Hari yang ditahan rollback: {tgl: sha256 atau "*"}. Berkas tidak ada = tidak ada yang ditahan."""
+def read_stockbit_hold():
+    """Entri mentah .stockbit-hold.json {tgl: entri}, apa adanya. Berkas tidak ada = tidak ada yang ditahan."""
     try:
         data = json.loads(STOCKBIT_HOLD.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -1005,33 +1057,124 @@ def load_stockbit_hold():
     days = data.get("days") if isinstance(data, dict) else None
     if not isinstance(days, dict):
         raise StockbitRefused(f"{STOCKBIT_HOLD.name} tidak berisi objek days")
-    hold = {}
-    for day, entry in days.items():
+    for day in days:
         iso_day(day, f"tanggal di {STOCKBIT_HOLD.name}")
-        sha = entry.get("sha256") if isinstance(entry, dict) else entry
-        hold[day] = str(sha or "*").lower()
-    return hold
+    return dict(days)
+
+
+def hold_sha(entry):
+    sha = entry.get("sha256") if isinstance(entry, dict) else entry
+    return str(sha or "*").lower()
+
+
+def load_stockbit_hold():
+    """Hari yang ditahan (rollback atau desk): {tgl: sha256 atau "*"}."""
+    return {day: hold_sha(entry) for day, entry in read_stockbit_hold().items()}
+
+
+# Entri tahanan yang dibuat sinkron untuk hari terbit yang ditahan desk ("tahan dari web").
+DESK_HOLD = {"sha256": "*", "withheld_by": "desk"}
+
+
+def stockbit_withheld(server):
+    """Hari yang ditahan desk dari web, atau None kalau desk tidak punya endpoint ini (HTTP 404: desk lama/belum di-restart).
+
+    None berarti "tidak diketahui", bukan "tidak ada yang ditahan": pemanggil mempertahankan tahanan desk yang sudah tercatat.
+    """
+    try:
+        r = server.get("/api/stockbit/export/withheld")
+    except HTTPError as e:
+        if e.code == 404:
+            e.close()
+            return None
+        raise
+    days = r.get("days") if isinstance(r, dict) else None
+    if not isinstance(days, list):
+        raise StockbitRefused("respons export/withheld tidak berisi daftar days")
+    if r.get("llm_calls", 0) != 0:
+        raise StockbitRefused("export/withheld melaporkan panggilan LLM; ekspor harus read-only")
+    for day in days:
+        iso_day(day, "tanggal export/withheld")
+    return set(days)
+
+
+def stockbit_file_days(match):
+    """Hari yang dicakup berkas sb*: satu hari untuk sbringkas/sbdetail, tujuh hari untuk sbpekan."""
+    try:
+        start, end = date.fromisoformat(match[2]), date.fromisoformat(match[3])
+    except ValueError:
+        return set()  # nama berpola tanggal tetapi tidak valid: bukan hasil sinkron, dibiarkan
+    if match[1] != "sbpekan":
+        return {match[2]}
+    return {(start + timedelta(days=i)).isoformat() for i in range(min((end - start).days, 6) + 1)}
+
+
+def desk_hold_entries(entries, withheld, withdrawn):
+    """Gabungkan tahanan desk ke entri .stockbit-hold.json; tahanan rollback tidak pernah dihapus.
+
+    Hari yang tidak lagi ditahan desk: entri desk murni dihapus (hari itu terbit lagi), sedangkan entri rollback yang
+    ikut ditandai desk hanya kehilangan withheld_by. Hari terbit yang berkasnya dicabut (`withdrawn`) diberi withheld_by=desk.
+    """
+    out = {}
+    for day, entry in entries.items():
+        if isinstance(entry, dict) and entry.get("withheld_by") == "desk" and day not in withheld:
+            if entry == DESK_HOLD:
+                continue
+            entry = {k: v for k, v in entry.items() if k != "withheld_by"}
+        out[day] = entry
+    for day in withdrawn:
+        prev = out.get(day)
+        if prev is None:
+            out[day] = dict(DESK_HOLD)
+        elif isinstance(prev, dict):
+            out[day] = {**prev, "withheld_by": "desk"}
+        else:  # entri lama berbentuk teks = tahanan rollback; dipertahankan saat desk melepas harinya
+            out[day] = {"sha256": hold_sha(prev), "rollback_of": None, "withheld_by": "desk"}
+    return out
 
 
 def sync_stockbit(server, state, force=False, allow_provisional=False, since=STOCKBIT_SINCE):
     """Salin hari final Stockbit dari ekspor read-only Signal Desk; kembalikan nama berkas yang berubah.
 
-    Semua respons diperiksa dulu; satu kegagalan menolak seluruh putaran sebelum ada berkas yang ditulis.
-    Berkas sb* tidak pernah dihapus di sini.
+    Semua respons diperiksa dulu; satu kegagalan menolak seluruh putaran sebelum ada berkas yang ditulis atau dihapus.
+    Berkas sb* hanya dihapus untuk hari yang ditahan desk dari web (export/withheld): berkas harian dan rekap pekan yang
+    memuat hari itu dicabut, statusnya dibuang, dan harinya dicatat di .stockbit-hold.json dengan withheld_by=desk.
+    Penghapusan lain hanya lewat rollback_stockbit.py.
     """
     since_day = iso_day(since, "--stockbit-since")
+    withheld = stockbit_withheld(server)
+    if withheld is None:
+        # Tanpa daftar dari desk, tahanan desk terakhir tetap berlaku: hari itu tetap tidak terbit dan tidak masuk indeks.
+        withheld = {day for day, entry in read_stockbit_hold().items()
+                    if isinstance(entry, dict) and entry.get("withheld_by") == "desk"}
+        if withheld:
+            print(f"  peringatan: desk tidak punya export/withheld (HTTP 404); {len(withheld)} hari yang ditahan desk tetap ditahan")
     listing = server.get("/api/stockbit/export/days" + ("?include_provisional=1" if allow_provisional else ""))
     days = listing.get("days") if isinstance(listing, dict) else None
     if not isinstance(days, list):
         raise StockbitRefused("respons export/days tidak berisi daftar days")
     allowed = {"final", "sementara"} if allow_provisional else {"final"}
     provisional = "include_provisional=1" if allow_provisional else ""
-    hold = load_stockbit_hold()
+
+    # Berkas terbit yang mencakup hari yang ditahan desk dicabut (sbpekan juga, karena rekapnya memuat hari itu).
+    entries = read_stockbit_hold()
+    withdraw, withdrawn = [], set()
+    for p in sorted(DEST.glob("sb*.md")):
+        m = STOCKBIT_FILE.fullmatch(p.name)
+        hit = stockbit_file_days(m) & withheld if m else set()
+        if hit:
+            withdraw.append(p.name)
+            withdrawn |= hit
+    new_entries = desk_hold_entries(entries, withheld, withdrawn)
+    hold = {day: hold_sha(entry) for day, entry in new_entries.items()}
+
     eligible, held, early = {}, set(), set()
     for row in days:
         if not isinstance(row, dict):
             raise StockbitRefused("baris export/days tidak valid")
         day = iso_day(row.get("date"), "tanggal export/days")
+        if row["date"] in withheld:
+            continue  # desk seharusnya sudah tidak mendaftarnya; tetap tidak diterbitkan
         if day < since_day:
             early.add(row["date"])
             continue
@@ -1046,9 +1189,13 @@ def sync_stockbit(server, state, force=False, allow_provisional=False, since=STO
             raise StockbitRefused(f"cakupan {row['date']} belum klop (ok bukan true); tinjau di Signal Desk dulu")
         eligible[row["date"]] = row
 
-    published = {m[2] for p in DEST.glob("sbringkas_*.md") if (m := STOCKBIT_FILE.fullmatch(p.name))}
+    # Hari yang dicabut karena ditahan desk tidak dihitung sebagai terbit (sama seperti hari yang ditahan rollback),
+    # jadi penjaga jumlah di bawah tidak menolaknya.
+    published = {m[2] for p in DEST.glob("sbringkas_*.md") if (m := STOCKBIT_FILE.fullmatch(p.name)) and p.name not in withdraw}
     for day in sorted(held):
         print(f"  ditahan rollback: {day} (sha ekspor belum berubah; lihat {STOCKBIT_HOLD.name})")
+    for day in sorted(withheld):
+        print(f"  ditahan desk dari web: {day}" + (" (berkas terbit dicabut)" if day in withdrawn else ""))
     if len(eligible) + len(held & published) < len(published):
         raise StockbitRefused(f"server hanya mengekspor {len(eligible)} hari final, padahal {len(published)} hari sudah terbit; "
                               f"tidak ada yang ditulis")
@@ -1110,17 +1257,36 @@ def sync_stockbit(server, state, force=False, allow_provisional=False, since=STO
 
     all_ids = set().union(*quarantined.values()) if quarantined else set()
     # Desk tidak membatasi tanggal awal indeks: buang hari sebelum --stockbit-since (kecuali yang sudah terbit) dan
-    # hari yang ditahan; hari lain yang tidak terbit tetap ditolak.
+    # hari yang ditahan (rollback atau desk); hari lain yang tidak terbit tetap ditolak.
     index = server.get("/api/stockbit/export/index" + (f"?{provisional}" if provisional else ""))
-    index = filter_stockbit_index(index, (early - published) | held)
+    index = filter_stockbit_index(index, (early - published) | held | withheld)
     index_text = check_stockbit_index(index, published | eligible.keys(), all_ids)
 
-    # Semua lolos: baru menulis (ke folder staging sync_once).
+    # Semua lolos: baru menulis dan menghapus (di folder staging sync_once; sinkron yang ditolak tidak menghapus apa pun).
     changed = [name for name, text in sorted(pending.items()) if write_if_changed(DEST / name, text)]
     if write_if_changed(STOCKBIT_INDEX, index_text):
         changed.append(STOCKBIT_INDEX.name)
+    for name in withdraw:
+        path = DEST / name
+        if path.is_symlink() or path.parent.resolve() != DEST.resolve():
+            raise ValueError("Berkas Stockbit yang dicabut bukan berkas biasa dalam folder yang dikelola.")
+        path.unlink()
+        changed.append(name)
+    if new_entries != entries:
+        write_if_changed(STOCKBIT_HOLD, json.dumps({"format": 1, "days": dict(sorted(new_entries.items()))},
+                                                   ensure_ascii=False, indent=1) + "\n")
+        changed.append(STOCKBIT_HOLD.name)
     day_state.update(new_days)
     week_state.update(new_weeks)
+    for day in withheld:
+        day_state.pop(day, None)
+    for monday in list(week_state):
+        try:
+            week = {(date.fromisoformat(monday) + timedelta(days=i)).isoformat() for i in range(7)}
+        except (TypeError, ValueError):
+            continue
+        if week & withheld:
+            del week_state[monday]
     state["format"] = 1
     # Tanpa cap waktu: status hanya berubah kalau isi berubah, supaya publish tanpa perubahan tidak membuat commit.
     write_if_changed(STOCKBIT_STATE, json.dumps(state, ensure_ascii=False, indent=1, sort_keys=True))
@@ -1137,7 +1303,7 @@ def _sync_stockbit_once(args):
                             since=getattr(args, "stockbit_since", None) or STOCKBIT_SINCE)
     print(f"[{datetime.now():%H:%M:%S}] Stockbit: {len(changed)} berkas baru/berubah")
     for name in changed:
-        print(f"  + {name}")
+        print(f"  {'+' if (DEST / name).exists() else '-'} {name}")
     return bool(changed)
 
 
@@ -1146,7 +1312,7 @@ def _sync_stockbit_once(args):
 def prune(prefix, keep, allow_empty):
     """Hapus berkas lama milik skrip ini yang tidak lagi dihasilkan server."""
     if prefix.startswith("sb") or prefix.startswith("stockbit"):
-        raise ValueError("Berkas Stockbit tidak pernah dihapus otomatis.")
+        raise ValueError("Berkas Stockbit tidak pernah di-prune; hanya hari yang ditahan desk (atau rollback) yang dicabut.")
     stale = [p for p in DEST.glob(prefix + "*.md") if OWNED.match(p.name) and p.name not in keep]
     if stale and not allow_empty:
         print(f"  server tidak mengembalikan data {prefix.rstrip('_')}; {len(stale)} berkas lama dibiarkan")

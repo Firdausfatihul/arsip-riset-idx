@@ -54,7 +54,15 @@ def index_json(evil=False):
         "user_notes": {
             "GoldenDirt": {"penilaian": {"text": "Argumen bersandar pada satu sumber tanpa dokumen." + bad,
                                          "finding_ids": ["F20261005-0001", "F20260920-0003", *([bad] if evil else [])]},
-                           "window": "2026-09-20 s/d 2026-10-05" + bad},
+                           "window": "2026-09-20 s/d 2026-10-05" + bad,
+                           "benang": {"text": "Klaim BBCA 20 September diulang 5 Oktober tanpa sumber baru." + bad,
+                                      "finding_ids": ["F20260920-0003", "F20261005-0001", "F20261099-0009", *([bad] if evil else [])]},
+                           "based_on": {"findings": 2, "last_day": "2026-10-05"}},
+            # Bentuk tak terduga: benang/based_on rusak tidak dirender, Jendela tetap tampil.
+            **({bad: {"penilaian": {"text": "Penilaian akun aneh." + bad, "finding_ids": ["F20261005-0002"]},
+                      "benang": {"text": ["bukan teks", bad], "finding_ids": bad},
+                      "based_on": {"findings": "2", "last_day": "2026-13-45" + bad},
+                      "window": {"start": "2026-10-05", "end": "2026-10-05"}}} if evil else {}),
         },
     }
 

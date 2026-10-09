@@ -28,8 +28,11 @@ Setelah itu (semua cara):
 
 Tahanan (needtobeindexed/idx-signal-desk/.stockbit-hold.json, {tgl: sha256 ekspor}) membuat rollback menetap: desk masih
 mengekspor hari itu sebagai final, tetapi sync_idx.py tidak menerbitkannya lagi sampai desk memfinalkan ulang hari itu
-(sha berubah) atau entrinya dihapus dari berkas tahanan. --tag untuk publish lama ditolak selama ada publish yang lebih
+(sha berubah) atau entrinya dihapus dari berkas tahanan. Entri yang ditandai sinkron `withheld_by: "desk"` (hari yang ditahan
+desk dari web) dipertahankan; hari yang berkasnya dihapus oleh publish yang dibatalkan tidak ditahan rollback. --tag untuk publish lama ditolak selama ada publish yang lebih
 baru yang belum di-rollback. Rollback 'partial' (Worker atau indeks gagal) boleh dijalankan ulang: langkah git dilewati.
+Publish yang mencabut hari yang ditahan desk dari web (`withheld` di log) ditolak (exit 2): membatalkannya akan menerbitkan
+lagi hari itu (berkas dan Worker versi sebelumnya). Pakai desk: tahan hari lain yang ingin dicabut, atau lepas tahanannya, lalu publish.
 
 Exit code: 0 berhasil (atau dry-run), 1 kesalahan tak terduga, 2 preflight/rencana ditolak, 3 git revert/reset gagal,
 4 push gagal, 5 Worker tidak di-rollback otomatis (git sudah dikembalikan), 6 sinkron indeks chat gagal.
@@ -146,10 +149,16 @@ def preflight(runner, target, plan, which=shutil.which):
 
 
 def held_days(runner, target, mode):
-    """{tgl: sha256 ekspor desk} untuk hari harian yang dibawa publish ini; "*" kalau sha tidak diketahui."""
+    """{tgl: sha256 ekspor desk} untuk hari harian yang dibawa publish ini; "*" kalau sha tidak diketahui.
+
+    Berkas yang dihapus publish ini (hari yang ditahan desk dari web) tidak dibawa, jadi harinya tidak ditahan rollback:
+    rollback mengembalikan berkasnya, dan sinkron berikutnya mengikuti daftar tahanan desk lagi.
+    """
     names = set(target.get("files") or [])
     if mode == "restore":
-        names |= {p.rsplit("/", 1)[-1] for p in pub.stockbit_changes(runner)}
+        changes = pub.changed_paths(runner)
+        names |= {p.rsplit("/", 1)[-1] for status, p in changes if pub.stockbit_owned(p)}
+        removed = {p.rsplit("/", 1)[-1] for status, p in changes if "D" in status and pub.stockbit_owned(p)}
         try:
             state_text = (pub.ROOT / pub.STATE_REL).read_text(encoding="utf-8")
         except OSError:
@@ -157,13 +166,15 @@ def held_days(runner, target, mode):
     else:
         diff = pub.git(runner, "diff", "--name-only", target["pre_sha"], target["post_sha"]).stdout or ""
         names |= {p.rsplit("/", 1)[-1] for p in diff.splitlines()}
+        gone = pub.git(runner, "diff", "--diff-filter=D", "--name-only", target["pre_sha"], target["post_sha"]).stdout or ""
+        removed = {p.rsplit("/", 1)[-1] for p in gone.splitlines()}
         state_text = pub.git(runner, "show", f"{target['post_sha']}:{pub.STATE_REL}").stdout or ""
     try:
         state_days = json.loads(state_text).get("days") or {}
     except (ValueError, AttributeError):
         state_days = {}
     out = {}
-    for name in names:
+    for name in names - removed:
         match = pub.SB_FILE.search(name)
         if not match or match[1] == "sbpekan":
             continue  # rekap pekan ikut tertahan karena salah satu harinya tidak lagi eligible
@@ -175,7 +186,10 @@ def held_days(runner, target, mode):
 
 
 def write_hold(days, key):
-    """Gabungkan ke .stockbit-hold.json; kembalikan True kalau berkas ditulis."""
+    """Gabungkan ke .stockbit-hold.json; kembalikan True kalau berkas ditulis.
+
+    Entri yang sudah ada dipertahankan; untuk hari yang sama kolom lain (mis. withheld_by=desk dari sinkron) tetap ada.
+    """
     if not days:
         return False
     path = pub.ROOT / pub.HOLD_REL
@@ -185,7 +199,8 @@ def write_hold(days, key):
         data = {}
     hold = data.get("days") if isinstance(data, dict) and isinstance(data.get("days"), dict) else {}
     for day, sha in days.items():
-        hold[day] = {"sha256": sha, "rollback_of": key}
+        prev = hold.get(day)
+        hold[day] = {**(prev if isinstance(prev, dict) else {}), "sha256": sha, "rollback_of": key}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({"format": 1, "days": dict(sorted(hold.items()))}, ensure_ascii=False, indent=1) + "\n",
                     encoding="utf-8")
@@ -280,6 +295,13 @@ def rollback(args, runner=pub.run_command, which=shutil.which, log=None):
         target, previous = choose(read_log(log), args.tag)
         plan = plan_for(target, previous)
         summary["plan"] = plan
+        withheld = target.get("withheld") or []
+        if withheld and not plan["git_done"]:
+            # Membatalkan publish ini mengembalikan berkas hari yang ditahan desk (revert/reset/restore) dan Worker versi
+            # sebelumnya yang masih memuatnya: hari itu terbit lagi padahal desk masih menahannya. Tidak diubah apa pun.
+            raise pub.Failure(2, f"publish {plan['target']} mencabut hari yang ditahan desk dari web ({', '.join(map(str, withheld[:10]))}); "
+                                 "rollback otomatis akan menerbitkannya lagi. Untuk mencabut isi lain dari publish ini, tahan harinya "
+                                 "di Signal Desk lalu publish; untuk menerbitkan lagi hari yang ditahan, lepas tahanannya di desk lalu publish.")
         record.update(tag=plan["target"], covers=[plan["target"], *(target.get("supersedes") or [])],
                       reverted=plan["revert"], worker_rollback_to=plan["worker_rollback_to"])
         pub.say(f"rencana rollback {plan['target']} (status {plan['status']}, cara {plan['mode']}):")

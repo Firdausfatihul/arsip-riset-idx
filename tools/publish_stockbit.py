@@ -18,9 +18,10 @@ Urutan:
   4. `build.py --out <folder sementara>`: setiap sb*.md harus masuk kategori stockbit-* yang benar dengan tanggal yang benar.
   5. `tools/publish_chat.py` (build site/, Worker, deploy, indeks chat, docs/). Kalau gagal setelah deploy,
      `tools/sync_chat_index.py` (dan build docs/) diulang sekali.
-  6. `git add` hanya berkas Stockbit di atas plus hasil build yang masih dilacak Git; berhenti kalau ada berkas sb* terhapus; commit
-     "Stockbit: ringkasan <tanggal>", push (sekali `git pull --rebase` kalau ditolak), lalu tag beranotasi
-     stockbit-publish-YYYYMMDD-HHMMSS dan push tag.
+  6. `git add` hanya berkas Stockbit di atas plus hasil build yang masih dilacak Git; berhenti kalau ada berkas sb* terhapus,
+     kecuali berkas hari yang ditahan desk dari web (entri withheld_by=desk di .stockbit-hold.json yang ikut di-commit);
+     commit "Stockbit: ringkasan <tanggal>" (atau "Stockbit: tahan <tanggal> dari web"), push (sekali `git pull --rebase`
+     kalau ditolak), lalu tag beranotasi stockbit-publish-YYYYMMDD-HHMMSS dan push tag.
   7. Catatan ke .stockbit-publish/log.jsonl (dipakai tools/rollback_stockbit.py) dan satu baris JSON ringkasan di akhir.
 
 Exit code:
@@ -31,12 +32,12 @@ Exit code:
   4 cek build gagal: berkas sb* salah kategori/tanggal (tidak ada yang di-deploy)
   5 publish_chat.py gagal sebelum deploy (Worker tidak berubah, tidak ada commit)
   6 Worker sudah ter-deploy tetapi indeks chat/docs gagal setelah diulang (belum commit/push; bisa di-rollback)
-  7 penjaga commit: ada berkas sb* yang akan terhapus (tidak di-commit)
+  7 penjaga commit: ada berkas sb* yang akan terhapus tanpa tahanan desk (tidak di-commit)
   8 push gagal (commit lokal ada, Worker live; jalankan ulang atau push manual)
 Semua perintah memakai daftar argumen, tanpa shell, dengan batas waktu.
 """
 import argparse
-from datetime import datetime
+from datetime import date, datetime, timedelta
 import json
 import os
 from pathlib import Path
@@ -222,8 +223,68 @@ def unrolled_deploys(records):
     return chain
 
 
+def desk_withheld_days(text):
+    """Hari di isi .stockbit-hold.json yang ditahan desk dari web (withheld_by=desk). Isi rusak/kosong = tidak ada."""
+    try:
+        data = json.loads(text or "")
+    except ValueError:
+        return set()
+    days = data.get("days") if isinstance(data, dict) else None
+    out = set()
+    for day, entry in (days.items() if isinstance(days, dict) else ()):
+        if isinstance(entry, dict) and entry.get("withheld_by") == "desk" and re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+            try:
+                out.add(date.fromisoformat(day).isoformat())
+            except ValueError:
+                continue
+    return out
+
+
+def sb_file_days(path):
+    """Hari yang dicakup berkas sb*: satu hari (sbringkas/sbdetail) atau hari-hari pekannya (sbpekan); kosong kalau tidak valid."""
+    match = SB_FILE.search(path)
+    if not match:
+        return set()
+    try:
+        start, end = date.fromisoformat(match[2]), date.fromisoformat(match[3])
+    except ValueError:
+        return set()
+    span = (end - start).days
+    if match[1] != "sbpekan":
+        return {match[2]} if span == 0 else set()
+    return {(start + timedelta(days=i)).isoformat() for i in range(span + 1)} if 0 <= span <= 6 else set()
+
+
+def withheld_deletion(path, withheld):
+    """True kalau path berkas sb* yang mencakup hari yang ditahan desk (sbpekan: salah satu harinya).
+
+    Berlaku untuk sumbernya di DEST_REL dan untuk salinannya di hasil build (docs/, site/): publish_chat.py membangun ulang
+    docs/ tanpa hari itu, jadi salinan files/stockbit-*/<tgl>/sb*.md ikut terhapus dan harus boleh di-commit.
+    """
+    if not (stockbit_owned(path) or inside(path, DERIVED_PATHS)):
+        return False
+    return bool(sb_file_days(path) & withheld)
+
+
+def withheld_removed(runner, withheld):
+    """Hari yang ditahan desk yang berkas sb*-nya terhapus di pohon kerja (dicatat untuk rollback)."""
+    return sorted({day for status, path in changed_paths(runner) if "D" in status and withheld_deletion(path, withheld)
+                   for day in sb_file_days(path) & withheld})
+
+
+def worktree_withheld():
+    """Tahanan desk di .stockbit-hold.json pohon kerja (berkas yang akan ikut di-commit bersama penghapusannya)."""
+    try:
+        return desk_withheld_days((ROOT / HOLD_REL).read_text(encoding="utf-8"))
+    except OSError:
+        return set()
+
+
 def check_no_deleted_sb(runner, code):
-    deleted = [path for status, path in changed_paths(runner) if "D" in status and SB_FILE.search(path)]
+    """sb* hanya boleh terhapus kalau harinya ditahan desk (withheld_by=desk); penghapusan lain menghentikan publish."""
+    withheld = worktree_withheld()
+    deleted = [path for status, path in changed_paths(runner)
+               if "D" in status and SB_FILE.search(path) and not withheld_deletion(path, withheld)]
     if deleted:
         raise Failure(code, "berkas Stockbit akan terhapus, publish dihentikan: " + ", ".join(deleted[:10]))
 
@@ -383,14 +444,22 @@ def publish_chat(runner, worker_before):
     return True, retry.returncode == 0
 
 
-def commit_message(names):
-    days = sorted({m[2] for n in names if (m := SB_FILE.search(n)) and m[1] == "sbringkas"})
-    weeks = sorted({f"{m[2]}..{m[3]}" for n in names if (m := SB_FILE.search(n)) and m[1] == "sbpekan"})
-    if len(days) > 5:
-        label = f"{days[0]} s/d {days[-1]} ({len(days)} hari)"
-    else:
-        label = ", ".join(days) or "pembaruan indeks/situs"
-    return f"Stockbit: ringkasan {label}" + (f" · pekan {', '.join(weeks)}" if weeks else "")
+def commit_message(names, removed=()):
+    """`removed` = berkas sb* yang dihapus commit ini (hari yang ditahan desk dari web)."""
+    removed = set(removed)
+    kept = [n for n in names if n not in removed]
+
+    def label(days):
+        return f"{days[0]} s/d {days[-1]} ({len(days)} hari)" if len(days) > 5 else ", ".join(days)
+    days = sorted({m[2] for n in kept if (m := SB_FILE.search(n)) and m[1] == "sbringkas"})
+    weeks = sorted({f"{m[2]}..{m[3]}" for n in kept if (m := SB_FILE.search(n)) and m[1] == "sbpekan"})
+    held = sorted({m[2] for n in removed if (m := SB_FILE.search(n)) and m[1] != "sbpekan"})
+    held_weeks = sorted({f"{m[2]}..{m[3]}" for n in removed if (m := SB_FILE.search(n)) and m[1] == "sbpekan"})
+    withheld = f"tahan {label(held) if held else 'pekan ' + ', '.join(held_weeks)} dari web" if removed else ""
+    if withheld and not days and not weeks:
+        return f"Stockbit: {withheld}"
+    return (f"Stockbit: ringkasan {label(days) or 'pembaruan indeks/situs'}" + (f" · pekan {', '.join(weeks)}" if weeks else "")
+            + (f" · {withheld}" if withheld else ""))
 
 
 def push(runner, refspec):
@@ -440,6 +509,10 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         if result.returncode:
             raise Failure(3, f"sync_idx.py --stockbit-only keluar dengan kode {result.returncode}")
         check_no_deleted_sb(runner, 7)
+        # Dicatat sebelum deploy: rollback_stockbit.py menolak membatalkan publish yang mencabut hari yang ditahan desk.
+        withheld = withheld_removed(runner, worktree_withheld())
+        if withheld:
+            record["withheld"] = summary["withheld"] = withheld
         changes = stockbit_changes(runner)
         record["files"] = sorted(p.rsplit("/", 1)[-1] for p in changes)
         if not changes:
@@ -462,7 +535,11 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         say("5/6 commit")
         paths = [*stockbit_changes(runner), *tracked_derived_paths(runner)]
         git_ok(runner, "add", "--", *paths, code=7)
-        deleted = [n for n in git_ok(runner, "diff", "--cached", "--diff-filter=D", "--name-only", code=7).splitlines() if SB_FILE.search(n)]
+        removed = [n for n in git_ok(runner, "diff", "--cached", "--diff-filter=D", "--name-only", code=7).splitlines() if SB_FILE.search(n)]
+        # Penghapusan sb* hanya untuk hari yang ditahan desk menurut .stockbit-hold.json yang di-stage (yang ikut di-commit).
+        staged_hold = git(runner, "show", f":{HOLD_REL}") if removed else None
+        withheld = desk_withheld_days(staged_hold.stdout if staged_hold and staged_hold.returncode == 0 else "")
+        deleted = [n for n in removed if not withheld_deletion(n, withheld)]
         if deleted:
             git(runner, "reset", "-q", "--", *paths)
             raise Failure(7, "berkas Stockbit akan terhapus, tidak di-commit: " + ", ".join(deleted[:10]))
@@ -473,7 +550,7 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
             return 0, summary
         names = git_ok(runner, "diff", "--cached", "--name-only", code=7).splitlines()
         record["files"] = sorted(n.rsplit("/", 1)[-1] for n in names if SB_FILE.search(n) or n.endswith("stockbit-index.json"))
-        message = commit_message(names)
+        message = commit_message(names, removed)
         git_ok(runner, "commit", "-q", "-m", message, "--", *paths, code=7, what="git commit")
         record["post_sha"] = git_ok(runner, "rev-parse", "HEAD")
         say("6/6 push")

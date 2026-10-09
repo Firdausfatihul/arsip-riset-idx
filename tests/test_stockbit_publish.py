@@ -177,6 +177,107 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(self.publish(runner)[0], 2)
         self.assertFalse([c for c in runner.calls if "publish_chat" in c])
 
+    def withheld_runner(self, hold_days, staged_days=None, deleted=None, derived=(), **extra):
+        """Sync removed the files of desk-withheld 2026-10-03 (day files + the week that contains it)."""
+        dest = "needtobeindexed/idx-signal-desk/"
+        deleted = deleted or ["sbringkas_2026-10-03_2026-10-03.md", "sbdetail_2026-10-03_2026-10-03.md",
+                              "sbpekan_2026-09-28_2026-10-04.md"]
+        hold = json.dumps({"format": 1, "days": hold_days})
+        (self.dest / ".stockbit-hold.json").write_text(hold)
+        staged = hold if staged_days is None else json.dumps({"format": 1, "days": staged_days})
+        paths = [dest + n for n in deleted] + list(derived)
+        status = "".join(f" D {n}\0" for n in paths) + f" M {dest}.stockbit-hold.json\0 M docs/index.html\0"
+        names = "".join(f"{n}\n" for n in paths) + f"{dest}.stockbit-hold.json\ndocs/index.html\n"
+        return FakeRunner(**{"git status": lambda r, l: r.result(0, status),
+                             "--diff-filter=D": lambda r, l: r.result(0, "".join(f"{n}\n" for n in paths)),
+                             "git diff --cached --name-only": lambda r, l: r.result(0, names),
+                             f"git show :{dest}.stockbit-hold.json": lambda r, l: r.result(0, staged), **extra})
+
+    DESK = {"sha256": "*", "withheld_by": "desk"}
+
+    def test_desk_withheld_deletions_are_committed(self):
+        rollback = {"sha256": "abc", "rollback_of": "stockbit-publish-x"}
+        runner = self.withheld_runner({"2026-10-03": self.DESK, "2026-10-01": rollback})
+        code, summary = self.publish(runner)
+        self.assertEqual(code, 0, self.output)
+        add = runner.calls[runner.index("git add --")]
+        for name in ("sbringkas_2026-10-03_2026-10-03.md", "sbpekan_2026-09-28_2026-10-04.md", ".stockbit-hold.json"):
+            self.assertIn(f"needtobeindexed/idx-signal-desk/{name}", add)
+        self.assertEqual(summary["message"], "Stockbit: tahan 2026-10-03 dari web")
+        self.assertIn("Stockbit: tahan 2026-10-03 dari web", runner.calls[runner.index("git commit")])
+        rec = self.records()[-1]
+        self.assertEqual((rec["status"], rec["tag"]), ("published", "stockbit-publish-20261007-101500"))
+        self.assertIn("sbringkas_2026-10-03_2026-10-03.md", rec["files"])
+        # Combined with a rollback hold that also carries withheld_by=desk.
+        runner = self.withheld_runner({"2026-10-03": {**rollback, "withheld_by": "desk"}})
+        self.assertEqual(self.publish(runner)[0], 0, self.output)
+
+    def test_withheld_copies_in_rebuilt_docs_are_committed(self):
+        # publish_chat.py rebuilds tracked docs/ without the day: its copies become staged deletions too.
+        copies = ["docs/files/stockbit-ringkasan/2026-10-03/sbringkas_2026-10-03_2026-10-03.md",
+                  "docs/files/stockbit-detail/2026-10-03/sbdetail_2026-10-03_2026-10-03.md",
+                  "docs/files/stockbit-pekan/2026-09-28/sbpekan_2026-09-28_2026-10-04.md",
+                  "site/files/stockbit-ringkasan/2026-10-03/sbringkas_2026-10-03_2026-10-03.md"]
+        runner = self.withheld_runner({"2026-10-03": self.DESK}, derived=copies)
+        code, summary = self.publish(runner)
+        self.assertEqual(code, 0, self.output)
+        self.assertEqual(summary["message"], "Stockbit: tahan 2026-10-03 dari web")
+        rec = self.records()[-1]
+        self.assertEqual((rec["status"], rec["withheld"]), ("published", ["2026-10-03"]))
+        # A docs copy of a day that is not withheld is still refused (staged only -> commit guard, exit 7).
+        other = "docs/files/stockbit-ringkasan/2026-10-02/sbringkas_2026-10-02_2026-10-02.md"
+        dest = "needtobeindexed/idx-signal-desk/"
+        runner = self.withheld_runner({"2026-10-03": self.DESK}, derived=copies, **{
+            "--diff-filter=D": lambda r, l: r.result(0, "".join(f"{n}\n" for n in [dest + "sbringkas_2026-10-03_2026-10-03.md", other]))})
+        self.assertEqual(self.publish(runner)[0], 7)
+        self.assertFalse([c for c in runner.calls if c.startswith(("git commit", "git push"))])
+        self.assertIn(other, self.output)
+        self.assertFalse(pub.withheld_deletion("notes/sbringkas_2026-10-03_2026-10-03.md", {"2026-10-03"}))
+        self.assertTrue(pub.withheld_deletion(copies[2], {"2026-10-03"}))
+
+    def test_other_sb_deletions_still_refused(self):
+        cases = {
+            # Hold entry without withheld_by=desk (rollback only): not a desk withholding.
+            "rollback_only": (dict(hold_days={"2026-10-03": {"sha256": "*", "rollback_of": "t"}}), 2),
+            # Another day disappears next to the withheld one.
+            "other_day": (dict(hold_days={"2026-10-03": self.DESK},
+                               deleted=["sbringkas_2026-10-03_2026-10-03.md", "sbringkas_2026-10-02_2026-10-02.md"]), 2),
+            # A week that does not contain the withheld day.
+            "other_week": (dict(hold_days={"2026-10-03": self.DESK}, deleted=["sbpekan_2026-10-05_2026-10-11.md"]), 2),
+            # Working tree says withheld, but the staged hold file (what would be committed) does not.
+            "staged_hold_differs": (dict(hold_days={"2026-10-03": self.DESK}, staged_days={}), 7),
+        }
+        for label, (kw, expected) in cases.items():
+            with self.subTest(label):
+                runner = self.withheld_runner(**kw)
+                self.assertEqual(self.publish(runner)[0], expected, self.output)
+                self.assertFalse([c for c in runner.calls if c.startswith(("git commit", "git push", "git tag"))])
+                if expected == 2:
+                    self.assertFalse([c for c in runner.calls if "publish_chat" in c or "sync_idx" in c])
+        # The sync itself deleting a non-withheld sb file is caught right after the sync (exit 7, before deploy).
+        dest = "needtobeindexed/idx-signal-desk/"
+        runner = FakeRunner(**{"git status": lambda r, l: r.result(0, f" D {dest}{SB[0]}\0" if any("sync_idx" in c for c in r.calls)
+                                                                  else f" M {dest}stockbit-index.json\0")})
+        self.assertEqual(self.publish(runner)[0], 7)
+        self.assertFalse([c for c in runner.calls if "publish_chat" in c])
+
+    def test_commit_message_mentions_withheld_days(self):
+        msg = pub.commit_message
+        self.assertEqual(msg(["sbringkas_2026-10-03_2026-10-03.md", "sbdetail_2026-10-03_2026-10-03.md"],
+                             ["sbringkas_2026-10-03_2026-10-03.md", "sbdetail_2026-10-03_2026-10-03.md"]),
+                         "Stockbit: tahan 2026-10-03 dari web")
+        self.assertEqual(msg(["sbringkas_2026-10-08_2026-10-08.md", "sbringkas_2026-10-03_2026-10-03.md"],
+                             ["sbringkas_2026-10-03_2026-10-03.md"]),
+                         "Stockbit: ringkasan 2026-10-08 · tahan 2026-10-03 dari web")
+        self.assertEqual(msg(["sbpekan_2026-09-28_2026-10-04.md"], ["sbpekan_2026-09-28_2026-10-04.md"]),
+                         "Stockbit: tahan pekan 2026-09-28..2026-10-04 dari web")
+        self.assertEqual(msg(["sbringkas_2026-10-08_2026-10-08.md"]), "Stockbit: ringkasan 2026-10-08")
+        self.assertEqual(pub.desk_withheld_days('{"days": {"2026-10-03": {"withheld_by": "desk"}, "2026-10-04": {"sha256": "*"},'
+                                                ' "2026-13-01": {"withheld_by": "desk"}, "x": {"withheld_by": "desk"}}}'),
+                         {"2026-10-03"})
+        self.assertEqual(pub.desk_withheld_days("not json"), set())
+        self.assertFalse(pub.withheld_deletion("elsewhere/sbringkas_2026-10-03_2026-10-03.md", {"2026-10-03"}))
+
     def test_digest_or_ownership_changes_refused_dot_files_ignored(self):
         for dirty in (" M needtobeindexed/idx-signal-desk/digest_2026-10-01_2026-10-02.md\0",
                       " M needtobeindexed/idx-signal-desk/kepemilikan.json\0"):
@@ -499,6 +600,41 @@ class RollbackTests(unittest.TestCase):
         self.assertFalse([c for c in runner.calls if c.startswith(("git revert", "git push", "git pull"))])
         self.assertTrue([c for c in runner.calls if "rollback v-b" in c])
         self.assertIn("2026-10-05", self.hold())
+
+    def test_rollback_keeps_desk_hold_fields_and_does_not_hold_withdrawn_days(self):
+        hold = self.root / HOLD
+        hold.parent.mkdir(parents=True)
+        hold.write_text(json.dumps({"format": 1, "days": {
+            "2026-10-03": {"sha256": "*", "withheld_by": "desk"},
+            "2026-10-05": {"sha256": "*", "withheld_by": "desk"}}}))
+        # The publish brought 2026-10-05 and removed the files of desk-withheld 2026-10-04.
+        removed = "needtobeindexed/idx-signal-desk/sbringkas_2026-10-04_2026-10-04.md\n"
+        runner = self.runner(**{"--diff-filter=D --name-only b0 b1": lambda r, l: r.result(0, removed),
+                                "git diff --name-only": lambda r, l: r.result(0, f"needtobeindexed/idx-signal-desk/{SB[0]}\n" + removed)})
+        self.assertEqual(self.rollback(runner)[0], 0, self.output)
+        self.assertEqual(self.hold(), {
+            "2026-10-03": {"sha256": "*", "withheld_by": "desk"},
+            "2026-10-05": {"sha256": "shaX", "withheld_by": "desk", "rollback_of": "stockbit-publish-20261007-101500"}})
+        self.assertEqual(self.last()["held"], {"2026-10-05": "shaX"})
+
+    def test_rollback_of_withholding_publish_is_refused_without_changes(self):
+        rows = [json.loads(l) for l in self.log.read_text().splitlines()]
+        rows[-1]["withheld"] = ["2026-10-03"]
+        self.write(rows)
+        for dry_run in (True, False):
+            with self.subTest(dry_run=dry_run):
+                runner = self.runner()
+                code, summary = self.rollback(runner, dry_run=dry_run)
+                self.assertEqual(code, 2, self.output)
+                self.assertIn("ditahan desk", summary["error"])
+                self.assertEqual(runner.calls, [], "nothing reverted, reset, restored or rolled back")
+                self.assertFalse((self.root / HOLD).exists())
+        # Deploy-without-commit variant (restore mode) is refused as well.
+        self.write([{"type": "publish", "status": "deployed_not_committed", "started_at": "s1", "worker_version_before": "v-b",
+                     "worker_version_after": "v-live", "withheld": ["2026-10-03"]}])
+        runner = self.runner()
+        self.assertEqual(self.rollback(runner)[0], 2)
+        self.assertEqual(runner.calls, [])
 
     def test_revert_conflict_aborts(self):
         runner = self.runner(**{"git revert --no-commit": lambda r, l: r.result(1, "conflict")})

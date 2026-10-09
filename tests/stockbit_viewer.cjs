@@ -121,6 +121,20 @@ try {
       assert.deepEqual(refs.slice(0, 2), [
         ['F20261005-0001', '#doc=' + docs['sbdetail_2026-10-05_2026-10-05.md'].path],
         ['F20260920-0003', '#doc=' + docs['sbdetail_2026-09-20_2026-09-20.md'].path]]);
+      // Benang lintas hari: label, teks literal, id dari hari lain ditautkan; id yang tidak dikenal tetap teks biasa.
+      assert.equal(box.querySelector('h3').textContent, 'Benang lintas hari');
+      assert.equal(box.querySelector('.sb-thread').textContent, 'Klaim BBCA 20 September diulang 5 Oktober tanpa sumber baru.' + EVIL);
+      const thread = [...box.querySelectorAll('.sb-refs')].find(p => p.textContent.startsWith('Rujukan: '));
+      assert.ok(thread, 'benang refs line');
+      assert.deepEqual([...thread.querySelectorAll('a')].map(a => [a.textContent, a.getAttribute('href')]), [
+        ['F20260920-0003', '#doc=' + docs['sbdetail_2026-09-20_2026-09-20.md'].path],
+        ['F20261005-0001', '#doc=' + docs['sbdetail_2026-10-05_2026-10-05.md'].path],
+        // The hostile id also sits in the user's 5 Oct row, so it links there, as literal text.
+        [EVIL, '#doc=' + docs['sbdetail_2026-10-05_2026-10-05.md'].path]]);
+      assert.ok(thread.textContent.includes('F20261099-0009'));
+      assert.ok(![...thread.querySelectorAll('a')].some(a => a.textContent === 'F20261099-0009'), 'unknown id stays plain text');
+      assert.ok(box.textContent.includes('Berdasarkan 2 temuan s.d. 5 Oktober 2026'));
+      assert.ok(!box.textContent.includes('Jendela:'), 'based_on replaces the window line');
       const rows = [...s.reader.querySelectorAll('tbody tr')];
       assert.equal(rows.length, 2);
       assert.match(rows[0].cells[0].textContent, /^5 Oktober 2026/);
@@ -136,6 +150,11 @@ try {
     await test('hostile handle key and prototype names render as text or not-found', {}, async s => {
       await s.go('#pengguna=' + encodeURIComponent(EVIL), () => s.reader.querySelector('table'));
       assert.equal(s.reader.querySelector('h1').textContent, '@' + EVIL);
+      const odd = s.reader.querySelector('.sb-judgement');
+      assert.ok(odd.textContent.includes('Penilaian akun aneh.' + EVIL));
+      assert.equal(odd.querySelector('h3'), null, 'malformed benang is not rendered');
+      assert.ok(!odd.textContent.includes('Berdasarkan'), 'malformed based_on is not rendered');
+      assert.ok(odd.textContent.includes('Jendela: 2026-10-05 – 2026-10-05'));
       s.safe();
       for (const name of ['constructor', '__proto__', 'toString']) {
         await s.go('#pengguna=' + name, () => /tidak ada di indeks/.test(s.reader.textContent));

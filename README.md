@@ -724,7 +724,7 @@ python3 -B tools/rollback_stockbit.py --dry-run           # lihat rencana rollba
 python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
 ```
 
-- Sumber: endpoint read-only Signal Desk `GET /api/stockbit/export/days|day/<tgl>?kind=ringkas|detail|week/<senin>|index`
+- Sumber: endpoint read-only Signal Desk `GET /api/stockbit/export/days|day/<tgl>?kind=ringkas|detail|week/<senin>|index|withheld`
   (tanpa `profile_id`, tanpa LLM). Sinkron biasa tidak menyentuh Stockbit kecuali diberi `--with-stockbit`.
 - Berkas: `sbringkas_<tgl>_<tgl>.md` (ringkasan harian, default chat), `sbdetail_<tgl>_<tgl>.md` (semua temuan per emiten),
   `sbpekan_<senin>_<minggu>.md` (hanya pekan yang ketujuh harinya final dan server menjawab selain 404), dan `stockbit-index.json`.
@@ -735,11 +735,25 @@ python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
 - Tahanan rollback `.stockbit-hold.json` (`{"format":1,"days":{tgl:{"sha256":…}}}`, ditulis `rollback_stockbit.py`): hari itu tidak
   diterbitkan lagi selama sha di `export/days` sama (atau `"*"`). Desk harus memperbaiki dan memfinalkan ulang hari itu (sha baru), atau
   hapus entrinya, sebelum hari itu bisa terbit lagi.
+- "Tahan dari web" di desk: `export/withheld` (`{"days":[tgl…],"llm_calls":0}`; jawaban rusak menolak sinkron). HTTP 404 (desk lama
+  atau belum di-restart) berarti "tidak diketahui": tahanan desk yang sudah tercatat tetap berlaku (peringatan dicetak); tanda desk
+  hanya dilepas oleh desk yang punya endpoint ini dan tidak lagi mendaftar hari itu. Hari yang ditahan dan belum terbit tidak diterbitkan. Hari yang sudah terbit dicabut:
+  `sbringkas_`/`sbdetail_` hari itu dan `sbpekan_` yang memuat hari itu dihapus (lewat staging yang sama; sinkron yang ditolak tidak
+  menghapus apa pun), status hari/pekannya dibuang dari `.sync-stockbit.json`, harinya dibuang dari indeks, dan dicatat di
+  `.stockbit-hold.json` sebagai `{"sha256":"*","withheld_by":"desk"}` (digabung dengan tahanan rollback; entri rollback tidak pernah dihapus,
+  paling banter diberi `withheld_by`). Begitu desk melepasnya, hanya tanda desk itu yang dibuang dan hari itu (serta pekannya) diambil ulang
+  karena berkasnya hilang. Hari yang dicabut tidak dihitung sebagai "sudah terbit" oleh penjaga jumlah hari.
+- `user_notes[akun]` boleh membawa `benang` (`{"text", "finding_ids"}`, satu kalimat yang menghubungkan temuan lintas hari) dan
+  `based_on` (`{"findings": n, "last_day": tgl}`); viewer `#pengguna=` menampilkannya di kotak penilaian ("Benang lintas hari",
+  "Berdasarkan n temuan s.d. …" menggantikan baris "Jendela:"). Id `penilaian`/`benang` harus ada di baris `users` yang terbit
+  (selain itu ditolak). Saat hari dibuang dari indeks (sebelum `--stockbit-since`, ditahan rollback/desk), catatan akun yang merujuk
+  temuan hari itu atau yang `based_on.last_day`-nya hari itu dibuang utuh.
 - Ditolak (exit 1, tidak ada berkas yang ditulis) bila: tanggal/nama berkas tidak sesuai pola, `build.categorize()` tidak memberi kategori
   `stockbit-ringkasan|stockbit-detail|stockbit-pekan` yang cocok, `ok` cakupan bukan true, sha256 tidak cocok dengan teks,
   teks/indeks masih memuat stream_id karantina (tautan `stockbit.com/post/<id>` atau angka lepas), indeks menunjuk hari yang tidak terbit,
-  `penilaian` di `user_notes` tanpa teks atau `finding_ids`, atau server mengekspor lebih sedikit hari final daripada `sbringkas_*` yang sudah terbit.
-  `REDACTIONS` diterapkan setelah cek hash. Berkas `sb*` **tidak pernah** dihapus otomatis.
+  `penilaian`/`benang` di `user_notes` tanpa teks atau `finding_ids`, `based_on` tanpa `findings` ≥ 0 dan `last_day` yang valid, atau server
+  mengekspor lebih sedikit hari final daripada `sbringkas_*` yang sudah terbit (di luar hari yang ditahan).
+  `REDACTIONS` diterapkan setelah cek hash. Berkas `sb*` tidak pernah di-prune; yang menghapusnya hanya tahanan desk di atas dan rollback.
 - `publish_stockbit.py` (cwd akar arsip): preflight (git & npx ada, cabang `main`, tidak ada yang di-stage, perubahan hanya berkas Stockbit
   di `needtobeindexed/idx-signal-desk/` (`sb*.md`, `stockbit-index.json`, `.sync-stockbit.json`, `.stockbit-hold.json`; berkas titik lain seperti
   `.sync.json` dibiarkan dan tidak di-commit), `docs/`, `site/`; `digest_*`/`kepemilikan*` yang belum di-commit menolak publish, tidak ada commit
@@ -747,10 +761,11 @@ python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
   deploy tanpa commit, versi sebelum publish itu dicatat sebagai `rollback_to`), sinkron `--stockbit-only --no-build` (tidak ada berkas Stockbit yang
   berubah → selesai "tidak ada perubahan", tanpa build/deploy/commit), `build.py --out <folder sementara>` lalu cek tiap `sb*` masuk kategori dan
   tanggal yang benar (tabelnya dicetak), `tools/publish_chat.py` (gagal setelah deploy → `sync_chat_index.py`/build `docs/` diulang sekali),
-  `git add` hanya berkas Stockbit tadi plus folder hasil build yang masih dilacak Git (`docs/`; `site/` hanya pada checkout lama), berhenti kalau ada `sb*` terhapus, commit `Stockbit: ringkasan <tanggal>`, push (sekali `git pull --rebase` bila ditolak),
+  `git add` hanya berkas Stockbit tadi plus folder hasil build yang masih dilacak Git (`docs/`; `site/` hanya pada checkout lama), berhenti kalau ada `sb*` terhapus (kecuali berkas hari yang ditahan desk menurut `.stockbit-hold.json` yang ikut di-commit, termasuk salinannya di `docs/`/`site/`
+  yang dibangun ulang tanpa hari itu; harinya dicatat sebagai `withheld` di log), commit `Stockbit: ringkasan <tanggal>` (atau `Stockbit: tahan <tanggal> dari web`), push (sekali `git pull --rebase` bila ditolak),
   tag beranotasi `stockbit-publish-YYYYMMDD-HHMMSS`, push tag. `site/` kini diabaikan Git; hanya `docs/` yang di-commit. Kompatibilitas `site/` terlacak dipertahankan untuk checkout lama.
   Exit: 0 ok/tidak ada perubahan, 2 preflight, 3 sinkron, 4 cek build, 5 gagal sebelum deploy, 6 Worker ter-deploy tapi indeks/docs belum,
-  7 ada `sb*` terhapus, 8 push gagal, 1 lain-lain. Baris terakhir keluaran = ringkasan JSON.
+  7 ada `sb*` terhapus tanpa tahanan desk, 8 push gagal, 1 lain-lain. Baris terakhir keluaran = ringkasan JSON.
 - Titik rollback dicatat di `.stockbit-publish/log.jsonl` (diabaikan git): `pre_sha`, `post_sha` (tepat satu commit publish), tag,
   `worker_version_before/after`, `rollback_to`/`supersedes`, `files`, status. `rollback_stockbit.py` memakai entri terakhir (atau `--tag`, ditolak
   selama ada publish lebih baru yang belum di-rollback):
@@ -760,6 +775,10 @@ python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
   - `push_failed` yang commit-nya tidak pernah sampai ke origin: `git reset --keep <pre_sha>` (tanpa push).
   - `deployed_index_pending`/`deployed_not_committed`: tanpa cek pohon bersih; berkas Stockbit yang kotor dikembalikan ke HEAD (yang baru dihapus),
     `docs/`/`site/` dikembalikan. Tahanan di dua cara ini belum di-commit dan ikut publish berikutnya.
+  - Publish yang mencabut hari yang ditahan desk (`withheld` di log) tidak bisa di-rollback (exit 2, tidak ada yang diubah): membatalkannya
+    akan menerbitkan lagi hari itu. Pakai desk: tahan hari lain yang ingin dicabut, atau lepas tahanannya, lalu publish.
+  - Tahanan rollback digabung ke entri yang ada (tanda `withheld_by=desk` tetap). Hari yang berkasnya justru dihapus publish itu
+    (tahanan desk) tidak ditahan rollback; sinkron berikutnya mengikuti daftar tahanan desk lagi.
   - Worker: `npx wrangler@4.135.0 rollback <rollback_to atau versi sebelum> --config worker/wrangler.jsonc --message … --yes` hanya kalau versi live
     masih `worker_version_after`; kalau ada deploy lebih baru, versi tidak tercatat, atau tidak terbaca: Worker tidak disentuh, instruksi manual, exit 5.
   - Lalu `tools/sync_chat_index.py`. Rollback `partial` boleh dijalankan ulang (langkah git dilewati). Exit: 0 ok, 2 ditolak, 3 revert/reset gagal,

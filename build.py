@@ -787,6 +787,7 @@ a.chip:hover{outline:1px solid var(--c)}
 .sb-judgement{display:grid;gap:6px;margin:0 0 22px;padding:12px 14px;border:1px solid var(--line-strong);border-radius:4px;background:var(--surface)}
 .sb-judgement h2{margin:0;font:600 15px/1.4 var(--sans);color:var(--muted)}
 .sb-judgement p{margin:0}
+.sb-judgement h3{margin:6px 0 0;font:600 13px/1.4 var(--sans);color:var(--muted)}
 .sb-refs{font:13px/1.6 var(--mono);color:var(--faint)}
 .prose .sb-hist{font:500 13px var(--mono)}
 
@@ -2819,17 +2820,37 @@ APP_JS = r"""
     var view = sbEl('div', {'class': 'sb-view'}, sbHead('Pengguna', name,
       [fmtNum(rows.length) + ' hari', fmtNum(posts) + ' posting', fmtNum(ids) + ' temuan']));
     var body = sbEl('div', {'class': 'sb-body'});
-    var note = key && hasKey(d.user_notes, key) ? d.user_notes[key] : null, pen = note && typeof note === 'object' ? note.penilaian : null;
-    if (pen && typeof pen === 'object' && typeof pen.text === 'string' && pen.text.trim()){
-      var refs = sbIds(pen.finding_ids), box = sbEl('section', {'class': 'sb-judgement', 'aria-label': SB_JUDGEMENT}, [
-        sbEl('h2', null, SB_JUDGEMENT), sbEl('p', null, sbText(pen.text, 1200))]);
-      if (refs.length){
-        var line = sbEl('p', {'class': 'sb-refs'}, 'Rujukan temuan: ');
-        refs.forEach(function(id, i){ if (i) line.append(', '); line.append(dayOf[id] ? sbFindingLink(dayOf[id], id) : id); });
-        box.append(line);
+    var note = key && hasKey(d.user_notes, key) ? d.user_notes[key] : null;
+    if (!note || typeof note !== 'object' || Array.isArray(note)) note = null;
+    function noteText(v){ return v && typeof v === 'object' && !Array.isArray(v) && typeof v.text === 'string' && v.text.trim() ? v : null; }
+    // Id temuan ditautkan ke berkas harinya kalau id itu ada di baris pengguna ini; selain itu teks biasa.
+    function refLine(label, list){
+      var line = sbEl('p', {'class': 'sb-refs'}, label);
+      list.forEach(function(id, i){ if (i) line.append(', '); line.append(dayOf[id] ? sbFindingLink(dayOf[id], id) : id); });
+      return line;
+    }
+    var pen = note ? noteText(note.penilaian) : null, benang = note ? noteText(note.benang) : null;
+    if (pen || benang){
+      var box = sbEl('section', {'class': 'sb-judgement', 'aria-label': SB_JUDGEMENT}, sbEl('h2', null, SB_JUDGEMENT));
+      if (pen){
+        var refs = sbIds(pen.finding_ids);
+        box.append(sbEl('p', null, sbText(pen.text, 1200)));
+        if (refs.length) box.append(refLine('Rujukan temuan: ', refs));
       }
-      var win = note.window, winText = typeof win === 'string' ? win : (win && typeof win === 'object' && typeof win.start === 'string' && typeof win.end === 'string' ? win.start + ' – ' + win.end : '');
-      if (winText) box.append(sbEl('p', {'class': 'sb-refs'}, 'Jendela: ' + winText.slice(0, 60)));
+      if (benang){
+        // Benang lintas hari dari desk (<=220 huruf, 2-6 temuan dari >=2 hari); dipotong defensif kalau lebih.
+        var threadRefs = sbIds(benang.finding_ids).slice(0, 12);
+        box.append(sbEl('h3', null, 'Benang lintas hari'), sbEl('p', {'class': 'sb-thread'}, sbText(benang.text, 400)));
+        if (threadRefs.length) box.append(refLine('Rujukan: ', threadRefs));
+      }
+      var based = note.based_on, basedDay = based && typeof based === 'object' && !Array.isArray(based) ? based.last_day : null;
+      if (Number.isSafeInteger(basedDay != null ? based.findings : NaN) && based.findings >= 0 && typeof basedDay === 'string'
+          && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(basedDay)){
+        box.append(sbEl('p', {'class': 'sb-refs'}, 'Berdasarkan ' + fmtNum(based.findings) + ' temuan s.d. ' + sbDayText(basedDay)));
+      } else {
+        var win = note.window, winText = typeof win === 'string' ? win : (win && typeof win === 'object' && typeof win.start === 'string' && typeof win.end === 'string' ? win.start + ' – ' + win.end : '');
+        if (winText) box.append(sbEl('p', {'class': 'sb-refs'}, 'Jendela: ' + winText.slice(0, 60)));
+      }
       body.append(box);
     }
     if (!rows.length){
