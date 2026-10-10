@@ -1168,6 +1168,9 @@ def sync_stockbit(server, state, force=False, allow_provisional=False, since=STO
     new_entries = desk_hold_entries(entries, withheld, withdrawn)
     hold = {day: hold_sha(entry) for day, entry in new_entries.items()}
 
+    # Hari yang sudah terbit tidak pernah "terlalu awal": publish dengan --stockbit-since lebih awal (tanggal 'Dari' di
+    # desk) tetap diperbarui dan dihitung oleh putaran berikutnya yang memakai batas bawaan.
+    already = {m[2] for p in DEST.glob("sbringkas_*.md") if (m := STOCKBIT_FILE.fullmatch(p.name))}
     eligible, held, early = {}, set(), set()
     for row in days:
         if not isinstance(row, dict):
@@ -1175,7 +1178,7 @@ def sync_stockbit(server, state, force=False, allow_provisional=False, since=STO
         day = iso_day(row.get("date"), "tanggal export/days")
         if row["date"] in withheld:
             continue  # desk seharusnya sudah tidak mendaftarnya; tetap tidak diterbitkan
-        if day < since_day:
+        if day < since_day and row["date"] not in already:
             early.add(row["date"])
             continue
         if row.get("state") not in allowed:

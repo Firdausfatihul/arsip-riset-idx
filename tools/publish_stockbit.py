@@ -504,7 +504,9 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
                 record["rollback_to"] = first["rollback_to"] if "rollback_to" in first else first.get("worker_version_before")
                 say(f"  publish sebelumnya sudah deploy tanpa commit; rollback Worker nanti ke {record['rollback_to'] or '(tidak tercatat)'}")
         say("2/6 sinkron Stockbit")
-        result = runner([sys.executable, "-B", "tools/sync_idx.py", "--stockbit-only", "--no-build"], timeout=T_SYNC)
+        since = getattr(args, "stockbit_since", None)
+        result = runner([sys.executable, "-B", "tools/sync_idx.py", "--stockbit-only", "--no-build"]
+                        + (["--stockbit-since", since] if since else []), timeout=T_SYNC)
         say(output(result).rstrip())
         if result.returncode:
             raise Failure(3, f"sync_idx.py --stockbit-only keluar dengan kode {result.returncode}")
@@ -603,9 +605,21 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         summary["finished_at"] = now_iso()
 
 
+def since_day(value):
+    try:
+        if len(value) == 10 and date.fromisoformat(value).isoformat() == value:
+            return value
+    except ValueError:
+        pass
+    raise argparse.ArgumentTypeError(f"tanggal tidak valid: {value!r} (pakai YYYY-MM-DD)")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true", help="preflight + sinkron + cek build saja")
+    ap.add_argument("--stockbit-since", type=since_day, metavar="YYYY-MM-DD",
+                    help="terbitkan hari final Stockbit mulai tanggal ini (tanggal 'Dari' di desk), bukan batas bawah "
+                         "bawaan sync_idx.py; hari yang sudah terbit tetap dipertahankan")
     args = ap.parse_args(argv)
     try:
         code, summary = publish(args)

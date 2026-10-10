@@ -439,6 +439,22 @@ class StockbitSyncTests(unittest.TestCase):
         index = json.loads((self.dest / "stockbit-index.json").read_text())
         self.assertEqual([d["d"] for d in index["days"]], ["2026-10-05", "2026-10-06"])
 
+    def test_earlier_since_publishes_and_later_default_keeps_those_days(self):
+        # The desk's 'Dari' date (2026-09-29) publishes September; the next run with the default floor must neither
+        # refuse (shrink guard) nor drop them from the index, and keeps updating them.
+        desk = FakeDesk(["2026-09-29", "2026-09-30", "2026-10-05"])
+        self.sync(desk, stockbit_since="2026-09-29")
+        names = set(self.snapshot())
+        self.assertIn("sbringkas_2026-09-29_2026-09-29.md", names)
+        self.assertIn("sbringkas_2026-09-30_2026-09-30.md", names)
+        self.sync(desk)
+        index = json.loads((self.dest / "stockbit-index.json").read_text())
+        self.assertEqual([d["d"] for d in index["days"]], ["2026-09-29", "2026-09-30", "2026-10-05"])
+        desk.listing[0]["sha256"] = "h-new"
+        desk.overrides[("2026-09-29", "ringkas")] = {"text": "baru", "sha256": sha("baru")}
+        self.sync(desk)
+        self.assertEqual((self.dest / "sbringkas_2026-09-29_2026-09-29.md").read_text(), "baru")
+
     def test_index_day_outside_since_and_held_still_refused_if_unknown(self):
         desk = FakeDesk(["2026-10-05"])
         desk.overrides["index"] = {"days": [{"d": "2026-10-05", "f": "sbringkas_2026-10-05_2026-10-05.md"},

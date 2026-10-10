@@ -1,7 +1,7 @@
 """publish_stockbit.py / rollback_stockbit.py with an injected command runner: no git, npx, network or deploy."""
 import io
 import json
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime
 from pathlib import Path
 import subprocess
@@ -98,9 +98,9 @@ class PublishTests(unittest.TestCase):
         self.log = self.root / ".stockbit-publish/log.jsonl"
         p = patch.object(pub, "ROOT", self.root); p.start(); self.addCleanup(p.stop)
 
-    def publish(self, runner, dry_run=False, free=10e9):
+    def publish(self, runner, dry_run=False, free=10e9, **extra):
         with redirect_stdout(io.StringIO()) as out:
-            code, summary = pub.publish(SimpleNamespace(dry_run=dry_run), runner=runner, which=lambda t: "/bin/" + t,
+            code, summary = pub.publish(SimpleNamespace(dry_run=dry_run, **extra), runner=runner, which=lambda t: "/bin/" + t,
                                         disk_usage=lambda p: SimpleNamespace(free=free), log=self.log,
                                         clock=lambda: datetime(2026, 10, 7, 10, 15, 0))
         self.output = out.getvalue()
@@ -116,6 +116,20 @@ class PublishTests(unittest.TestCase):
         add = next(c for c in runner.calls if c.startswith("git add --"))
         self.assertTrue(add.endswith(" docs"), add)
         self.assertNotIn(" site", add)
+
+    def test_range_start_is_forwarded_to_sync(self):
+        runner = FakeRunner()
+        code, _ = self.publish(runner, stockbit_since="2026-09-01")
+        self.assertEqual(code, 0, self.output)
+        self.assertIn("sync_idx.py --stockbit-only --no-build --stockbit-since 2026-09-01",
+                      runner.calls[runner.index("sync_idx.py")])
+        runner = FakeRunner()
+        self.publish(runner)
+        self.assertNotIn("--stockbit-since", runner.calls[runner.index("sync_idx.py")])
+
+    def test_cli_rejects_bad_range_start(self):
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            pub.main(["--stockbit-since", "2026-9-1"])
 
     def test_happy_path_order_commit_tag_and_log(self):
         runner = FakeRunner()
