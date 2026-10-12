@@ -357,6 +357,36 @@ class BeiRollbackTests(unittest.TestCase):
         self.assertLess(ok.index("git checkout -- docs site"), ok.index(VPS_PUSH))
         self.assertEqual(self.last()["status"], "rolled_back")
 
+    def test_first_revert_or_reset_refuses_untracked_unpublished_files_but_allows_hold_files(self):
+        """A later publish synced a new sb*/bei* day, then failed its build check (or the VPS push): the file is left
+        untracked. `vps.mjs push` sends untracked files, so a first-run revert/reset must refuse before git or the VPS."""
+        reset = {"is-ancestor b1 origin/main": lambda r, l: r.result(1),
+                 "git rev-parse HEAD": lambda r, l: r.result(0, "b1\n") if l == "git rev-parse HEAD" else r.default(l)}
+        cases = [(name, mode) for name in ("beiringkas_2026-10-11_2026-10-11.md", "beidetail_2026-10-11_2026-10-11.md",
+                                           "sbringkas_2026-10-11_2026-10-11.md", "sbpekan_2026-10-05_2026-10-11.md")
+                 for mode in ("revert", "reset")]
+        for name, mode in cases:
+            with self.subTest(name=name, mode=mode):
+                self.setUp()
+                if mode == "reset":
+                    self.write([{"type": "publish", "status": "push_failed", "target": "vps", "vps": True, "started_at": "s1",
+                                 "pre_sha": "b0", "post_sha": "b1", "files": [SB[0], BEI[0]]}])
+                runner = self.runner(**{"git status": lambda r, l: r.result(0, status(f"{DEST}{name}", f"{DEST}.sync-abc123")),
+                                        **(reset if mode == "reset" else {})})
+                code, summary = self.rollback(runner)
+                self.assertEqual(code, 2, self.output)
+                self.assertIn(name, summary["error"])
+                self.assertIn("belum terbit", summary["error"])
+                self.assertFalse([c for c in runner.calls
+                                  if c == VPS_PUSH or c.startswith(("git push", "git revert", "git reset", "git checkout"))])
+                self.assertFalse((self.root / HOLD_BEI).exists())
+                self.assertEqual(self.last()["status"], "gagal")
+        # Untracked hold files (written by an earlier reset/restore rollback, committed with the next publish) are fine.
+        self.setUp()
+        runner = self.runner(**{"git status": lambda r, l: r.result(0, status(f"{DEST}.sync-abc123", HOLD_SB, HOLD_BEI))})
+        self.assertEqual(self.rollback(runner)[0], 0, self.output)
+        self.assertEqual(runner.state["vps"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

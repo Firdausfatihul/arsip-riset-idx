@@ -947,6 +947,16 @@ class RollbackTests(unittest.TestCase):
         self.assertEqual(self.rollback(runner)[0], 2)
         self.assertFalse([c for c in runner.calls if "revert" in c or c == VPS_PUSH])
 
+    def test_first_revert_refuses_untracked_unpublished_stockbit_day(self):
+        """A later publish synced a new day and failed its build check (untracked file): the first revert must not push it."""
+        later = "sbringkas_2026-10-11_2026-10-11.md"
+        runner = self.runner(**{"git status": lambda r, l: r.result(0, f"?? needtobeindexed/idx-signal-desk/{later}\0")})
+        code, summary = self.rollback(runner)
+        self.assertEqual(code, 2, self.output)
+        self.assertIn(later, summary["error"])
+        self.assertFalse([c for c in runner.calls if "revert" in c or c == VPS_PUSH or c.startswith("git push")])
+        self.assertFalse((self.root / HOLD).exists())
+
     def test_partial_rerun_checks_branch_and_tree_before_vps(self):
         self.assertEqual(self.rollback(self.runner(**{VPS_PUSH: lambda r, l: r.result(1, "Gagal")}))[0], 5)
         for label, override in (("branch", {"--abbrev-ref": lambda r, l: r.result(0, "other\n")}),

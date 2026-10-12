@@ -31,7 +31,8 @@ git sedang di tengah revert (REVERT_HEAD/sequencer: `git revert --abort` dulu), 
 needtobeindexed/idx-signal-desk/: `node local/vps.mjs push` mengirim pohon kerja apa adanya, jadi kode atau dokumen yang
 belum di-commit akan ikut live. Putaran ulang juga ditolak kalau berkas Stockbit/BEI selain .stockbit-hold.json dan
 .bei-hold.json kotor (sinkron
-atau publish sesudahnya yang belum terbit; tanpa ini berkas yang belum lolos cek build ikut live); docs/ dan site/ dikembalikan
+atau publish sesudahnya yang belum terbit; tanpa ini berkas yang belum lolos cek build ikut live); putaran pertama revert/reset
+juga menolak berkas Stockbit/BEI baru yang belum dilacak selain kedua berkas tahanan (alasan yang sama); docs/ dan site/ dikembalikan
 ke HEAD sebelum push VPS. Batas waktu di tengah `git revert`/`git commit` menjalankan `git revert --abort`.
 Setelah itu (semua cara):
   - `node local/vps.mjs push` supaya situs di VPS mengikuti pohon yang sudah dikembalikan (juga setelah push git revert
@@ -196,10 +197,21 @@ def preflight(runner, target, plan):
     check_vps_tree(runner)
     if plan["mode"] == "restore":
         return "restore"  # berkas Stockbit kotor memang sisa publish ini
-    blocked = [path for status, path in pub.changed_paths(runner)
+    changes = pub.changed_paths(runner)
+    blocked = [path for status, path in changes
                if status != "??" and pub.dirty_kind(path) not in ("derived", "ignored")]
     if blocked:
         raise pub.Failure(2, "pohon kerja tidak bersih: " + ", ".join(blocked[:15]))
+    # Berkas Stockbit/BEI baru yang belum dilacak: commit publish yang dibatalkan memuat semua berkasnya (dilacak), jadi berkas
+    # baru selain tahanan berasal dari sinkron/publish sesudahnya yang belum lolos cek build atau belum terbit. `vps.mjs push`
+    # mengirim berkas baru dari disk: tanpa ini berkas itu ikut live lewat rollback. Tidak dihapus otomatis (cara restore
+    # menghapusnya karena memang sisa publish yang dibatalkan).
+    unpublished = [path for status, path in changes
+                   if status == "??" and pub.publish_owned(path) and path not in (pub.HOLD_REL, pub.BEI_HOLD_REL)]
+    if unpublished:
+        raise pub.Failure(2, "ada berkas Stockbit/BEI baru yang belum terbit (sinkron/publish sesudahnya yang belum lolos cek "
+                             "build); push VPS akan menerbitkannya tanpa cek build. Hapus dulu lalu ulangi rollback: "
+                             + ", ".join(unpublished[:15]))
     pre, post = target["pre_sha"], target["post_sha"]
     pub.git_ok(runner, "fetch", "origin", "main", timeout=pub.T_NET)
     mode = "revert"
