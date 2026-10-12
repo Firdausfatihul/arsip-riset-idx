@@ -1,44 +1,62 @@
 #!/usr/bin/env python3
 """Terbitkan ringkasan Stockbit dan keterbukaan BEI sekali klik (dijalankan desk dengan cwd = akar arsip), dan bisa di-rollback.
 
-    python3 -B tools/publish_stockbit.py             # preflight, sinkron, cek build, deploy chat, commit+tag, push
-    python3 -B tools/publish_stockbit.py --dry-run   # preflight + sinkron + cek build saja (tanpa deploy/commit/push)
+    python3 -B tools/publish_stockbit.py             # preflight, sinkron, cek build, docs/, push VPS, commit+tag, push git
+    python3 -B tools/publish_stockbit.py --dry-run   # preflight + sinkron + cek build saja (tanpa VPS/commit/push)
+
+Situs live = VPS Jakarta (`node local/vps.mjs push`); GitHub hanya riwayat (docs/ ikut di-commit). Worker Cloudflare
+tidak dipakai lagi dan tidak pernah disentuh skrip ini.
 
 Urutan:
-  1. Preflight: git dan npx ada, cabang main, tidak ada yang di-stage, tidak ada perubahan selain berkas Stockbit/BEI di
-     needtobeindexed/idx-signal-desk/ (sb*.md, stockbit-index.json, .sync-stockbit.json, .stockbit-hold.json, bei*.md,
-     bei-index.json, .sync-bei.json, .bei-hold.json; berkas titik lain seperti .sync.json dibiarkan karena tidak ikut
-     build), docs/, dan site/ (hasil build yang ikut dilacak git).
-     digest_*/kepemilikan* yang belum di-commit menolak publish: publish_chat akan men-deploy-nya dan rollback Stockbit
-     akan ikut membatalkannya. Lalu tidak ada commit lokal yang belum dipush, `git fetch` + `git pull --ff-only` kalau
-     tertinggal origin/main, ruang disk >= 1,5 GB.
-  2. Catat titik rollback SEBELUM mengubah apa pun: HEAD dan versi Worker yang sedang live. Kalau publish sebelumnya
-     sudah deploy tanpa commit (exit 6/7/batas waktu), versi Worker sebelum publish itu yang dipakai (`rollback_to`).
-  3. `tools/sync_idx.py --stockbit-only --no-build --with-bei`: Stockbit dan BEI dalam SATU staging; BEI yang ditolak
-     (atau HTTP error BEI) dikembalikan utuh dan dilewati (`bei_skipped`), Stockbit tetap terbit; desk tanpa /api/bei (404) = BEI dilewati. Kalau tidak ada
-     berkas Stockbit/BEI yang berubah: selesai, "tidak ada perubahan" (tanpa build, deploy, commit, atau tag).
+  1. Preflight: git dan node ada, .local/vps.json ada, cabang main, tidak ada yang di-stage, tidak ada perubahan selain
+     berkas Stockbit/BEI di needtobeindexed/idx-signal-desk/ (sb*.md, stockbit-index.json, .sync-stockbit.json,
+     .stockbit-hold.json, bei*.md, bei-index.json, .sync-bei.json, .bei-hold.json; berkas titik lain seperti .sync.json
+     dibiarkan karena tidak ikut build), docs/, dan site/ (hasil build yang ikut dilacak git). digest_*/kepemilikan* yang belum di-commit menolak publish: push VPS akan ikut
+     mengirimnya dan rollback Stockbit akan ikut membatalkannya. Lalu tidak ada commit lokal yang belum dipush,
+     `git fetch` + `git pull --ff-only` kalau tertinggal origin/main, ruang disk >= 1,5 GB.
+  2. Catat HEAD. Kalau publish sebelumnya sudah memperbarui VPS tanpa commit (vps_not_committed, belum di-rollback),
+     berkasnya ikut di-commit publish ini (`supersedes`; rollback publish ini ikut menutupnya).
+  3. `tools/sync_idx.py --stockbit-only --no-build --with-bei` (+ `--stockbit-since <tgl>` kalau diberikan): Stockbit dan
+     BEI dalam SATU staging; BEI yang ditolak (atau HTTP error BEI, ekspor dari profil desk lain, desk tanpa /api/bei)
+     dikembalikan utuh dan dilewati ("BEI dilewati" -> `bei_skipped` di ringkasan), Stockbit tetap terbit. Kalau tidak ada
+     berkas Stockbit/BEI yang berubah terhadap HEAD: selesai, "tidak ada perubahan" (tanpa build, VPS, commit, atau tag).
+     Berkas dari putaran yang gagal sebelumnya masih berubah terhadap HEAD, jadi putaran ulang tetap menerbitkannya.
   4. `build.py --out <folder sementara>`: setiap sb*.md/bei*.md harus masuk kategori stockbit-*/bei-* yang benar dengan
-     tanggal yang benar.
-  5. `tools/publish_chat.py` (build site/, Worker, deploy, indeks chat, docs/). Kalau gagal setelah deploy,
-     `tools/sync_chat_index.py` (dan build docs/) diulang sekali.
+     tanggal yang benar. Lalu `build.py --out docs` (tanpa CHAT_API_URL, BASE_URL=https://arsip.seekingomega.capital) untuk
+     riwayat git, dan penjaga sb*/bei* terhapus diulang pada docs/ hasil build (gagal: docs/ dikembalikan, VPS tidak
+     disentuh, exit 7).
+  5. `node local/vps.mjs push` SEBELUM commit: build di VPS selagi versi lama melayani, tukar, restart. Kalau gagal,
+     vps.mjs sendiri memulihkan versi sebelumnya; tidak ada commit, dan putaran ulang mengulang dari awal.
   6. `git add` hanya berkas Stockbit/BEI di atas plus hasil build yang masih dilacak Git; berhenti kalau ada berkas sb*/bei*
-     terhapus, kecuali berkas hari yang ditahan desk dari web (entri withheld_by=desk di .stockbit-hold.json / .bei-hold.json
-     yang ikut di-commit); commit "Stockbit: ringkasan <tanggal>" (atau "Stockbit: tahan <tanggal> dari web"; bagian
-     "BEI: ringkasan <tanggal>" ditambahkan kalau ada berkas BEI), push (sekali `git pull --rebase` kalau ditolak), lalu tag
-     beranotasi stockbit-publish-YYYYMMDD-HHMMSS dan push tag.
-  7. Catatan ke .stockbit-publish/log.jsonl (dipakai tools/rollback_stockbit.py) dan satu baris JSON ringkasan di akhir.
+     terhapus, kecuali berkas hari yang ditahan desk dari web (entri withheld_by=desk di .stockbit-hold.json /
+     .bei-hold.json yang ikut di-commit); commit "Stockbit: ringkasan <tanggal>" (atau "Stockbit: tahan <tanggal> dari
+     web"; bagian "BEI: ringkasan <tanggal>" ditambahkan kalau ada berkas BEI), push (sekali `git pull --rebase` kalau
+     ditolak), lalu tag beranotasi stockbit-publish-YYYYMMDD-HHMMSS dan push tag. Langkah commit yang gagal sebelum
+     commit terjadi melepas kembali berkas yang sudah di-stage (`git reset -q -- <berkas>`), jadi putaran ulang dan rollback
+     tidak tertahan oleh index.
+  7. Catatan ke .stockbit-publish/log.jsonl ("target": "vps"; dipakai tools/rollback_stockbit.py; "day_shas" = {tgl: sha256
+     ekspor} hari harian Stockbit yang dikirim putaran ini, "day_shas_bei" sama untuk BEI, keduanya dibaca sebelum push VPS;
+     "withheld"/"withheld_bei" = hari yang ditahan desk yang dicabut putaran ini) dan satu baris JSON ringkasan di akhir
+     ("vps": true kalau VPS sudah diperbarui; "supports": ["stockbit", "bei"]; "bei_skipped" kalau BEI dilewati).
 
 Exit code:
   0 berhasil, tidak ada perubahan, atau dry-run lolos
-  1 kesalahan tak terduga
+  1 kesalahan tak terduga (termasuk batas waktu sebelum push VPS; VPS tidak berubah)
   2 preflight gagal (tidak ada yang diubah)
-  3 sinkron Stockbit/BEI gagal/ditolak (tidak ada yang ditulis atau di-deploy)
-  4 cek build gagal: berkas sb*/bei* salah kategori/tanggal (tidak ada yang di-deploy)
-  5 publish_chat.py gagal sebelum deploy (Worker tidak berubah, tidak ada commit)
-  6 Worker sudah ter-deploy tetapi indeks chat/docs gagal setelah diulang (belum commit/push; bisa di-rollback)
-  7 penjaga commit: ada berkas sb*/bei* yang akan terhapus tanpa tahanan desk (tidak di-commit)
-  8 push gagal (commit lokal ada, Worker live; jalankan ulang atau push manual)
-Semua perintah memakai daftar argumen, tanpa shell, dengan batas waktu.
+  3 sinkron Stockbit/BEI gagal/ditolak (VPS tidak berubah; BEI yang ditolak sendiri tidak menggagalkan, lihat langkah 3)
+  4 cek build atau build docs/ gagal, mis. berkas sb*/bei* salah kategori/tanggal (VPS tidak berubah)
+  5 push VPS gagal atau sisa waktu tidak cukup: situs tetap versi sebelumnya (kecuali batas waktu di tengah push: periksa
+    `node local/vps.mjs status`), tidak ada commit (jalankan ulang)
+  6 VPS sudah diperbarui tetapi commit gagal (tidak ada commit, berkas di-unstage): situs mendahului git (vps_not_committed;
+    jalankan ulang atau rollback)
+  7 penjaga sb*/bei*: ada berkas sb*/bei* yang akan terhapus tanpa tahanan desk (ditemukan sebelum push VPS: VPS tidak berubah, status
+    gagal; ditemukan di index setelahnya: VPS sudah diperbarui, vps_not_committed). Tidak di-commit.
+  8 commit lokal ada tetapi push git gagal (push_failed; VPS sudah live). Publish ulang ditolak preflight selama commit itu belum
+    dipush: push manual `git push origin HEAD:main` (boleh setelah `git pull --rebase`: rollback mengenali salinannya lewat
+    subjek + patch-id), atau batalkan dengan tools/rollback_stockbit.py. Juga: push sudah berhasil
+    tetapi tag gagal dibuat (status published; buat tag manual atau biarkan, rollback tanpa --tag tetap memilihnya).
+Semua perintah memakai daftar argumen, tanpa shell, dengan batas waktu per langkah dan batas waktu total (BUDGET di bawah
+batas desk, supaya penanganan batas waktu skrip ini sendiri yang berjalan, bukan SIGKILL dari desk).
 """
 import argparse
 from datetime import date, datetime, timedelta
@@ -47,16 +65,19 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 DEST_REL = "needtobeindexed/idx-signal-desk"
 LOG = ROOT / ".stockbit-publish" / "log.jsonl"
-WRANGLER = ["npx", "--yes", "wrangler@4.135.0"]
-WRANGLER_CONFIG = ["--config", "worker/wrangler.jsonc"]
+VPS_PUSH = ["node", "local/vps.mjs", "push"]
+VPS_CONFIG_REL = ".local/vps.json"
+TARGET = "vps"
 # Folder hasil build yang diizinkan; hanya folder yang masih dilacak Git boleh di-stage.
 # main terbaru mengabaikan site/, sedangkan publikasi lama mungkin masih melacaknya.
 DERIVED_PATHS = ("docs", "site")
@@ -79,12 +100,21 @@ WEEK_PREFIXES = ("sbpekan", "beipekan")
 # Keluarga per awalan berkas, dan berkas tahanan/status tiap keluarga.
 FAMILY = {prefix: "stockbit" for prefix in SB_CATEGORY} | {prefix: "bei" for prefix in BEI_CATEGORY}
 HOLDS = {"stockbit": HOLD_REL, "bei": BEI_HOLD_REL}
+STATES = {"stockbit": STATE_REL, "bei": BEI_STATE_REL}
+FAMILY_FILE = {"stockbit": SB_FILE, "bei": BEI_FILE}
 BUILD_LINE = re.compile(r" -> files/([^/\s]+)/(\d{4}-\d{2}-\d{2})/(\S+)\s*$")
-FAILED_COMMAND = re.compile(r"Command '(\[.*?\])' returned non-zero exit status")
-DEPLOYED_ONLY = ("deployed_index_pending", "deployed_not_committed")
-ROLLBACKABLE = ("published", "push_failed") + DEPLOYED_ONLY
+# Situs sudah diperbarui tetapi belum ada commit: vps_not_committed (VPS), dua status lama dari masa Worker Cloudflare.
+LEGACY_DEPLOYED = ("deployed_index_pending", "deployed_not_committed")
+UNCOMMITTED = ("vps_not_committed",) + LEGACY_DEPLOYED
+DEPLOYED_ONLY = UNCOMMITTED  # nama lama, dipakai rollback_stockbit.py
+ROLLBACKABLE = ("published", "push_failed") + UNCOMMITTED
 
-T_GIT, T_NET, T_SYNC, T_BUILD, T_PUBLISH, T_INDEX = 60, 180, 900, 900, 3600, 1800
+T_GIT, T_NET, T_SYNC, T_BUILD, T_VPS = 60, 180, 900, 900, 1800
+# Desk (idx_digest/stockbit_jobs.py) membunuh skrip setelah PUBLISH_TIMEOUT_SECONDS = 3600 / ROLLBACK_TIMEOUT_SECONDS = 1800.
+# Anggaran total di bawahnya; sisanya untuk membersihkan (unstage), mencatat log, dan menulis ringkasan JSON.
+PUBLISH_BUDGET, ROLLBACK_BUDGET = 3600 - 180, 1800 - 120
+POST_VPS_RESERVE = 600  # publish: commit + push (+ pull --rebase + push) + tag setelah push VPS
+MIN_VPS_SECONDS = 300   # push VPS tidak dimulai kalau sisa waktunya kurang dari ini
 
 
 class Failure(Exception):
@@ -93,18 +123,30 @@ class Failure(Exception):
         self.code = code
 
 
+def kill_group(proc):
+    """SIGKILL ke seluruh grup proses (node vps.mjs beserta ssh/tar anaknya), bukan hanya proses pertama."""
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
+
+
 def run_command(argv, timeout, env=None, tee=False):
     """Runner bawaan: argv tanpa shell, cwd = akar arsip, stdin kosong. Tidak melempar error untuk exit code bukan 0."""
     if not tee:
         return subprocess.run(argv, cwd=ROOT, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout)
-    # Perintah panjang (publish_chat) ditampilkan sambil berjalan, dan keluarannya tetap disimpan untuk dianalisis.
+    # Perintah panjang (push VPS) ditampilkan sambil berjalan, dan keluarannya tetap disimpan untuk dianalisis.
+    # Grup proses sendiri: saat batas waktu (atau skrip ini berhenti di tengah), node dan ssh di bawahnya ikut dimatikan.
     proc = subprocess.Popen(argv, cwd=ROOT, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT, text=True, bufsize=1)
+                            stderr=subprocess.STDOUT, text=True, bufsize=1, start_new_session=True)
     expired = threading.Event()
 
     def kill():
         expired.set()
-        proc.kill()
+        kill_group(proc)
     timer = threading.Timer(timeout, kill)
     timer.start()
     lines = []
@@ -115,9 +157,30 @@ def run_command(argv, timeout, env=None, tee=False):
         code = proc.wait()
     finally:
         timer.cancel()
+        if proc.poll() is None:  # pengecualian/sinyal di skrip ini selagi perintah masih jalan
+            kill_group(proc)
+            proc.wait()
     if expired.is_set():
         raise subprocess.TimeoutExpired(argv, timeout, output="".join(lines))
     return subprocess.CompletedProcess(argv, code, "".join(lines), "")
+
+
+class Budget:
+    """Batas waktu total: setiap perintah mendapat min(batas langkahnya, sisa anggaran); habis = TimeoutExpired tanpa menjalankan."""
+
+    def __init__(self, seconds, clock=time.monotonic):
+        self.clock, self.end = clock, clock() + seconds
+
+    def left(self):
+        return self.end - self.clock()
+
+    def wrap(self, runner):
+        def run(argv, timeout, **kwargs):
+            left = self.left()
+            if left < 1:
+                raise subprocess.TimeoutExpired(argv, 0)
+            return runner(argv, timeout=min(timeout, left), **kwargs)
+        return run
 
 
 def say(message):
@@ -208,6 +271,37 @@ def stockbit_changes(runner):
     return sorted(path for _, path in changed_paths(runner) if publish_owned(path))
 
 
+def state_day_shas(names, state_text, family="stockbit"):
+    """{tgl: sha256 ekspor desk} untuk berkas harian keluarga itu (sb*: .sync-stockbit.json, bei*: .sync-bei.json) di
+    `names` menurut isi berkas status sinkronnya; "*" kalau tidak diketahui.
+
+    Rekap pekan (sbpekan/beipekan) tidak dihitung: ikut tertahan karena salah satu harinya tidak lagi eligible.
+    """
+    try:
+        days = json.loads(state_text or "").get("days") or {}
+    except (ValueError, AttributeError):
+        days = {}
+    out = {}
+    for name in names:
+        match = FAMILY_FILE[family].search(name)
+        if not match or match[1] in WEEK_PREFIXES:
+            continue
+        entry = days.get(match[2]) if isinstance(days, dict) else None
+        fp = entry.get("fp") if isinstance(entry, dict) else None
+        sha = str(fp).split("|", 1)[0] if fp else ""
+        out[match[2]] = sha if sha and sha != "None" else "*"
+    return out
+
+
+def worktree_day_shas(names, family="stockbit"):
+    """state_day_shas dari berkas status sinkron keluarga itu di pohon kerja (yang dibangun dan dikirim ke VPS putaran ini)."""
+    try:
+        text = (ROOT / STATES[family]).read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    return state_day_shas(names, text, family)
+
+
 def record_key(record):
     return record.get("tag") or record.get("started_at")
 
@@ -237,22 +331,22 @@ def rolled_back_keys(records):
     return done
 
 
-def unrolled_deploys(records):
-    """Rantai publish terakhir yang sudah deploy tanpa commit dan belum di-rollback (paling lama dulu).
+def unrolled_uncommitted(records):
+    """Rantai publish terakhir yang sudah memperbarui situs tanpa commit dan belum di-rollback (paling lama dulu).
 
-    Putaran berikutnya men-deploy ulang dan meng-commit sisa berkasnya, jadi rollback-nya harus kembali ke versi
-    Worker sebelum rantai ini, bukan ke versi yang sudah memuat isi itu.
+    Berkasnya masih berubah terhadap HEAD, jadi putaran berikutnya meng-commit-nya; rollback putaran itu ikut menutup
+    rantai ini (`supersedes`). Status lama dari masa Worker (deployed_*) diperlakukan sama.
     """
     done, chain = rolled_back_keys(records), []
     for r in reversed(records):
         if r.get("type") != "publish":
             continue
         status = r.get("status")
-        if status in DEPLOYED_ONLY:
+        if status in UNCOMMITTED:
             if record_key(r) in done:
                 break
             chain.insert(0, r)
-        elif status not in ("gagal", "tidak ada perubahan"):  # dua status ini tidak mengubah Worker
+        elif status not in ("gagal", "tidak ada perubahan", "vps_failed"):  # tiga status ini tidak mengubah situs
             break
     return chain
 
@@ -298,9 +392,11 @@ def file_family(path):
 def withheld_deletion(path, withheld):
     """True kalau path berkas sb*/bei* yang mencakup hari yang ditahan desk (pekan: salah satu harinya).
 
-    `withheld`: {"stockbit": hari, "bei": hari}; himpunan biasa = hari Stockbit (bentuk lama).
-    Berlaku untuk sumbernya di DEST_REL dan untuk salinannya di hasil build (docs/, site/): publish_chat.py membangun ulang
-    docs/ tanpa hari itu, jadi salinan files/stockbit-*/<tgl>/sb*.md (atau files/bei-*/…) ikut terhapus dan harus boleh di-commit.
+    `withheld`: {"stockbit": hari, "bei": hari}; himpunan biasa = hari Stockbit (bentuk lama). Tahanan satu keluarga tidak
+    pernah mengizinkan penghapusan berkas keluarga lain.
+    Berlaku untuk sumbernya di DEST_REL dan untuk salinannya di hasil build (docs/, site/): `build.py --out docs` membangun ulang
+    docs/ tanpa hari itu, jadi salinan files/stockbit-*/<tgl>/sb*.md (atau files/bei-*/…/bei*.md) ikut terhapus dan harus
+    boleh di-commit.
     """
     if not (publish_owned(path) or inside(path, DERIVED_PATHS)):
         return False
@@ -311,7 +407,7 @@ def withheld_deletion(path, withheld):
 
 def withheld_removed(runner, withheld, family="stockbit"):
     """Hari yang ditahan desk yang berkas keluarga itu terhapus di pohon kerja (dicatat untuk rollback)."""
-    days = withheld.get(family, set()) if isinstance(withheld, dict) else withheld
+    days = withheld.get(family, set()) if isinstance(withheld, dict) else (withheld if family == "stockbit" else set())
     return sorted({day for status, path in changed_paths(runner)
                    if "D" in status and file_family(path) == family and withheld_deletion(path, withheld)
                    for day in sb_file_days(path) & days})
@@ -337,10 +433,25 @@ def check_no_deleted_sb(runner, code):
         raise Failure(code, "berkas Stockbit/BEI akan terhapus, publish dihentikan: " + ", ".join(deleted[:10]))
 
 
-def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_usage):
-    for tool in ("git", "npx"):
+def discard_derived(runner, code):
+    """docs/ dan site/ hanya hasil build (build.py menghapus dan membangun ulang folder itu): kembalikan yang dilacak ke HEAD."""
+    paths = tracked_derived_paths(runner)
+    if paths:
+        git_ok(runner, "checkout", "--", *paths, code=code, what="git checkout hasil build terlacak")
+        git_ok(runner, "clean", "-fdq", "--", *paths, code=code, what="git clean hasil build terlacak")
+
+
+def check_tools(which=shutil.which):
+    """git dan node di PATH, dan konfigurasi VPS (.local/vps.json dari `node local/vps.mjs setup`)."""
+    for tool in ("git", "node"):
         if not which(tool):
             raise Failure(2, f"'{tool}' tidak ditemukan di PATH; jalankan desk dari terminal (nvm) supaya {tool} terbaca.")
+    if not (ROOT / VPS_CONFIG_REL).is_file():
+        raise Failure(2, f"{VPS_CONFIG_REL} tidak ada; VPS belum di-setup di Mac ini (node local/vps.mjs setup …).")
+
+
+def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_usage):
+    check_tools(which)
     branch = git_ok(runner, "rev-parse", "--abbrev-ref", "HEAD")
     if branch != "main":
         raise Failure(2, f"cabang aktif '{branch}', bukan main.")
@@ -366,46 +477,6 @@ def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_
     if free < MIN_FREE_BYTES:
         raise Failure(2, f"ruang disk tinggal {free / 1e9:.2f} GB; perlu minimal {MIN_FREE_BYTES / 1e9:.1f} GB.")
     return {"branch": branch, "behind": behind}
-
-
-def parse_worker_version(text):
-    """ID versi Worker yang live dari JSON `deployments list` / `deployments status` / `versions list`; None kalau tidak jelas."""
-    start = min([i for i in (text.find("["), text.find("{")) if i >= 0], default=-1)
-    if start < 0:
-        return None
-    try:
-        data, _ = json.JSONDecoder().raw_decode(text[start:])
-    except ValueError:
-        return None
-    rows = data if isinstance(data, list) else [data]
-    rows = [r for r in rows if isinstance(r, dict)]
-    if not rows:
-        return None
-
-    def created(row):
-        return str(row.get("created_on") or (row.get("metadata") or {}).get("created_on") or "")
-    latest = max(rows, key=created) if any(created(r) for r in rows) else rows[-1]
-    versions = latest.get("versions")
-    if isinstance(versions, list):
-        live = [v for v in versions if isinstance(v, dict) and v.get("version_id")]
-        if not live:
-            return None
-        return str(max(live, key=lambda v: v.get("percentage") or 0)["version_id"])
-    value = latest.get("id")  # versions list: versi terbaru = yang di-deploy `wrangler deploy`
-    return str(value) if value else None
-
-
-def worker_version(runner):
-    for sub in (["deployments", "list"], ["versions", "list"]):
-        try:
-            result = runner(WRANGLER + sub + WRANGLER_CONFIG + ["--json"], timeout=T_NET)
-        except (OSError, subprocess.TimeoutExpired):
-            continue
-        if result.returncode == 0:
-            version = parse_worker_version(result.stdout or "")
-            if version:
-                return version
-    return None
 
 
 def check_build(stdout, sb_names):
@@ -453,44 +524,40 @@ def build_check(runner, dest=None):
 
 
 def publish_env():
-    """Lingkungan yang sama dengan tools/publish_chat.py untuk mengulang langkah setelah deploy."""
+    """Lingkungan build docs/ yang sama dengan tools/publish_chat.py dulu: tanpa CHAT_API_URL lokal, BASE_URL domain situs."""
     env = dict(os.environ)
     env.pop("CHAT_API_URL", None)
     env["BASE_URL"] = "https://arsip.seekingomega.capital"
     return env
 
 
-def failed_step(text):
-    match = None
-    for match in FAILED_COMMAND.finditer(text or ""):
-        pass
-    command = match[1] if match else ""
-    if "sync_chat_index.py" in command:
-        return "index"
-    if "'--out', 'docs'" in command:
-        return "docs"
-    if "wrangler" in command:
-        return "deploy"
-    return "before-deploy" if command else "unknown"
-
-
-def publish_chat(runner, worker_before):
-    """Jalankan publish_chat.py. Kembalikan (deployed, ok). Gagal setelah deploy → ulangi indeks chat (dan docs/) sekali."""
-    result = runner([sys.executable, "-B", "tools/publish_chat.py"], timeout=T_PUBLISH, tee=True)
-    if result.returncode == 0:
-        return True, True
-    step = failed_step(output(result))
-    now = worker_version(runner)
-    deployed = step in ("index", "docs") or (bool(now and worker_before) and now != worker_before)
-    if not deployed:
-        return False, False
+def build_docs(runner):
+    """Bangun ulang docs/ (dan site/ pada checkout lama yang masih melacaknya) untuk riwayat git."""
     env = publish_env()
-    say("  publish_chat.py gagal setelah deploy; mengulang langkah setelahnya sekali")
-    if step != "docs":
-        if runner([sys.executable, "-B", "tools/sync_chat_index.py"], timeout=T_INDEX, env=env, tee=True).returncode:
-            return True, False
-    retry = runner([sys.executable, "-B", "build.py", "--out", "docs"], timeout=T_BUILD, env=env)
-    return True, retry.returncode == 0
+    for folder in ["docs", *[f for f in tracked_derived_paths(runner) if f != "docs"]]:
+        result = runner([sys.executable, "-B", "build.py", "--out", folder], timeout=T_BUILD, env=env)
+        if result.returncode:
+            raise Failure(4, f"build.py --out {folder} gagal: {output(result).strip()[-600:]}")
+
+
+def vps_push(runner, timeout=T_VPS):
+    """`node local/vps.mjs push` (keluaran ditampilkan). True kalau versi baru live.
+
+    vps.mjs memulihkan versi sebelumnya sendiri kalau build/tukar/restart gagal. Kalau server baru sudah jalan dan hanya
+    pembersihan app.old yang gagal, situs sudah versi baru: dihitung berhasil (dengan peringatan).
+    """
+    try:
+        result = runner(VPS_PUSH, timeout=timeout, tee=True)
+    except subprocess.TimeoutExpired:
+        raise Failure(5, f"push VPS melewati batas {int(timeout) // 60} menit dan dihentikan; status situs tidak pasti "
+                         "(periksa: node local/vps.mjs status). Tidak ada commit.")
+    if result.returncode == 0:
+        return True
+    text = output(result)
+    if "Server berjalan." in text and "Mengembalikan versi sebelumnya" not in text:
+        say("  peringatan: server baru di VPS sudah berjalan, tetapi langkah akhir vps.mjs gagal (pembersihan)")
+        return True
+    return False
 
 
 def _family_message(source, pattern, day_prefix, week_prefix, kept, removed):
@@ -512,10 +579,11 @@ def commit_message(names, removed=()):
     """`removed` = berkas sb*/bei* yang dihapus commit ini (hari yang ditahan desk dari web).
 
     Bagian "BEI: …" hanya ditulis kalau commit menyentuh berkas BEI; bagian Stockbit selalu ada kecuali commit hanya BEI.
+    Subjek ini juga dipakai rollback_stockbit.py untuk mengenali salinan hasil rebase (subjek + patch-id).
     """
     removed = set(removed)
     kept = [n for n in names if n not in removed]
-    base = lambda n: n.rsplit("/", 1)[-1]
+    base = lambda n: n.rsplit("/", 1)[-1]  # noqa: E731
     touches_sb = any(SB_FILE.search(n) or base(n) in STOCKBIT_NAMES for n in names)
     touches_bei = any(BEI_FILE.search(n) or base(n) in BEI_NAMES for n in names)
     parts = []
@@ -526,14 +594,30 @@ def commit_message(names, removed=()):
     return " · ".join(parts)
 
 
+def git_within(runner, *args, timeout=T_NET):
+    """Exit code, atau None kalau batas waktu habis (dihitung gagal)."""
+    try:
+        return git(runner, *args, timeout=timeout).returncode
+    except subprocess.TimeoutExpired:
+        return None
+
+
 def push(runner, refspec):
-    if git(runner, "push", "origin", refspec, timeout=T_NET).returncode == 0:
+    """True kalau push berhasil. Penolakan, galat, dan batas waktu = False (push yang terputus mungkin tetap sampai;
+    rollback memeriksa origin/main sebelum memilih reset atau revert)."""
+    if git_within(runner, "push", "origin", refspec) == 0:
         return True
-    say("  push ditolak; git pull --rebase sekali lalu coba lagi")
-    if git(runner, "pull", "--rebase", "origin", "main", timeout=T_NET).returncode:
-        git(runner, "rebase", "--abort")
+    say("  push ditolak/gagal; git pull --rebase sekali lalu coba lagi")
+    if git_within(runner, "pull", "--rebase", "origin", "main") != 0:
+        git_within(runner, "rebase", "--abort", timeout=T_GIT)
         return False
-    return git(runner, "push", "origin", refspec, timeout=T_NET).returncode == 0
+    return git_within(runner, "push", "origin", refspec) == 0
+
+
+def unstage(runner, paths):
+    """Lepas berkas yang sudah di-stage kalau commit tidak terjadi; pohon kerja tetap (putaran ulang/rollback memakainya)."""
+    if git_within(runner, "reset", "-q", "--", *paths, timeout=T_GIT) != 0:
+        say("  peringatan: berkas yang di-stage tidak bisa dilepas; jalankan `git restore --staged .` sebelum publish/rollback")
 
 
 def append_log(record, log=None):
@@ -547,40 +631,43 @@ def now_iso():
     return datetime.now().astimezone().isoformat(timespec="seconds")
 
 
-def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk_usage, log=None, clock=datetime.now):
+def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk_usage, log=None, clock=datetime.now,
+            budget=None):
+    budget = budget or Budget(PUBLISH_BUDGET)
+    raw, runner = runner, budget.wrap(runner)  # raw: hanya untuk membersihkan setelah anggaran habis (di dalam sisa batas desk)
     stamp = clock().strftime("%Y%m%d-%H%M%S")
     # "supports": penanda kemampuan untuk desk (skrip lama tanpa BEI tidak menyebut "bei").
-    summary = {"status": "dimulai", "dry_run": bool(args.dry_run), "started_at": now_iso(), "supports": ["stockbit", "bei"]}
-    record = {"type": "publish", "tag": None, "start_sha": None, "pre_sha": None, "post_sha": None,
-              "worker_version_before": None, "worker_version_after": None, "files": [], "started_at": summary["started_at"]}
-    deployed = False
+    summary = {"status": "dimulai", "dry_run": bool(args.dry_run), "started_at": now_iso(), "vps": False,
+               "supports": ["stockbit", "bei"]}
+    record = {"type": "publish", "target": TARGET, "tag": None, "start_sha": None, "pre_sha": None, "post_sha": None,
+              "vps": False, "files": [], "started_at": summary["started_at"]}
+    staged = None  # berkas yang sudah (mungkin) di-stage dan belum ter-commit
     try:
         say("1/6 preflight")
         preflight(runner, args.dry_run, which, disk_usage)
         record["start_sha"] = git_ok(runner, "rev-parse", "HEAD")
         if not args.dry_run:
-            record["worker_version_before"] = worker_version(runner)
-            if not record["worker_version_before"]:
-                say("  peringatan: versi Worker live tidak terbaca; rollback Worker nanti harus manual")
-            chain = unrolled_deploys(load_records(log or LOG))
+            chain = unrolled_uncommitted(load_records(log or LOG))
             if chain:
-                first = chain[0]
                 record["supersedes"] = [record_key(r) for r in chain]
-                record["rollback_to"] = first["rollback_to"] if "rollback_to" in first else first.get("worker_version_before")
-                say(f"  publish sebelumnya sudah deploy tanpa commit; rollback Worker nanti ke {record['rollback_to'] or '(tidak tercatat)'}")
+                say(f"  publish sebelumnya sudah memperbarui situs tanpa commit ({', '.join(map(str, record['supersedes']))}); "
+                    "berkasnya ikut di-commit sekarang")
         say("2/6 sinkron Stockbit + BEI")
+        since = getattr(args, "stockbit_since", None)
         # Satu staging untuk keduanya; BEI yang ditolak dikembalikan utuh dan dilewati, Stockbit tetap terbit.
-        result = runner([sys.executable, "-B", "tools/sync_idx.py", "--stockbit-only", "--no-build", "--with-bei"], timeout=T_SYNC)
+        # --stockbit-since hanya batas bawah Stockbit (tanggal 'Dari' desk); BEI memakai batas bawaannya sendiri.
+        result = runner([sys.executable, "-B", "tools/sync_idx.py", "--stockbit-only", "--no-build"]
+                        + (["--stockbit-since", since] if since else []) + ["--with-bei"], timeout=T_SYNC)
         say(output(result).rstrip())
         if result.returncode:
             raise Failure(3, f"sync_idx.py --stockbit-only --with-bei keluar dengan kode {result.returncode}")
-        # BEI dilewati (desk tanpa /api/bei, ekspor dari profil desk lain, atau ekspor BEI ditolak) tidak menggagalkan Stockbit, tetapi
-        # dilaporkan supaya job BEI di desk tidak menganggap BEI sudah terbit.
+        # BEI dilewati (desk tanpa /api/bei, ekspor dari profil desk lain, atau ekspor BEI ditolak) tidak menggagalkan
+        # Stockbit, tetapi dilaporkan supaya job BEI di desk tidak menganggap BEI sudah terbit.
         skipped = [line.strip() for line in output(result).splitlines() if "BEI dilewati" in line]
         if skipped:
             summary["bei_skipped"] = skipped[0][:500]
         check_no_deleted_sb(runner, 7)
-        # Dicatat sebelum deploy: rollback_stockbit.py menolak membatalkan publish yang mencabut hari yang ditahan desk.
+        # Dicatat sebelum push VPS: rollback_stockbit.py menolak membatalkan publish yang mencabut hari yang ditahan desk.
         holds = worktree_withheld()
         withheld = withheld_removed(runner, holds, "stockbit")
         if withheld:
@@ -588,87 +675,114 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         withheld_bei = withheld_removed(runner, holds, "bei")
         if withheld_bei:
             record["withheld_bei"] = summary["withheld_bei"] = withheld_bei
+        # Dibanding HEAD, bukan keluaran sinkron: berkas dari putaran yang gagal sebelumnya (VPS gagal, commit gagal)
+        # masih kotor dan ikut diterbitkan putaran ini.
         changes = stockbit_changes(runner)
         record["files"] = sorted(p.rsplit("/", 1)[-1] for p in changes)
         if not changes:
-            # Tanpa ini setiap klik men-deploy ulang Worker dan meng-commit docs/ dan site/ dengan BUILD_ID baru.
+            # Tanpa ini setiap klik membangun dan mengirim ulang situs ke VPS dan meng-commit docs/ dengan BUILD_ID baru.
             record["status"] = summary["status"] = "tidak ada perubahan"
-            say("tidak ada perubahan Stockbit/BEI; tidak ada build, deploy, atau commit")
+            say("tidak ada perubahan Stockbit/BEI; tidak ada build, push VPS, atau commit")
             return 0, summary
+        # sha per hari dari state yang dikirim putaran ini, dicatat sebelum push VPS: rollback cara restore menahan sha yang
+        # benar-benar live, bukan sha yang ditulis sinkron sesudahnya (desk memfinalkan ulang, publish berikutnya gagal).
+        record["day_shas"] = worktree_day_shas(record["files"])
+        day_shas_bei = worktree_day_shas(record["files"], "bei")
+        if day_shas_bei:
+            record["day_shas_bei"] = day_shas_bei
         say("3/6 cek build (folder sementara)")
         summary["checked"] = len(build_check(runner))
         if args.dry_run:
             summary["status"] = "dry-run"
             return 0, summary
-        say("4/6 publish_chat.py")
-        deployed, ok = publish_chat(runner, record["worker_version_before"])
-        if not deployed:
-            raise Failure(5, "publish_chat.py gagal sebelum deploy; Worker tidak berubah")
-        if not ok:
-            record["status"] = "deployed_index_pending"
-            raise Failure(6, "Worker sudah ter-deploy tetapi indeks chat/docs belum selesai; belum di-commit")
+        say("  build docs/ (riwayat git)")
+        build_docs(runner)
+        # build.py --out docs bisa menghapus salinan sb*/bei* yang tidak dihasilkan lagi; periksa sebelum VPS, bukan baru di index.
+        try:
+            check_no_deleted_sb(runner, 7)
+        except Failure as e:
+            try:
+                discard_derived(raw, 7)  # docs/ dikembalikan supaya preflight berikutnya tidak tertahan
+            except (Failure, subprocess.TimeoutExpired) as cleanup:
+                say(f"  peringatan: docs/ tidak bisa dikembalikan: {cleanup}")
+            raise Failure(7, f"{e} (salinan hasil build docs/; VPS tidak disentuh)")
+        vps_time = min(T_VPS, budget.left() - POST_VPS_RESERVE)
+        if vps_time < MIN_VPS_SECONDS:
+            raise Failure(5, "sisa waktu tidak cukup untuk push VPS dan commit; VPS tidak disentuh, tidak ada commit (jalankan ulang publish)")
+        say("4/6 push VPS (node local/vps.mjs push)")
+        record["status"] = "vps_failed"  # sampai vps.mjs berhasil (gagal atau batas waktu)
+        if not vps_push(runner, timeout=vps_time):
+            raise Failure(5, "VPS gagal; situs tetap versi sebelumnya; tidak ada commit (jalankan ulang publish)")
+        record["vps"] = summary["vps"] = True
+        del record["status"]
         say("5/6 commit")
         paths = [*stockbit_changes(runner), *tracked_derived_paths(runner)]
-        git_ok(runner, "add", "--", *paths, code=7)
-        removed = [n for n in git_ok(runner, "diff", "--cached", "--diff-filter=D", "--name-only", code=7).splitlines() if PUB_FILE.search(n)]
-        # Penghapusan sb*/bei* hanya untuk hari yang ditahan desk menurut berkas tahanan yang di-stage (yang ikut di-commit).
+        staged = paths  # sebelum add: add yang terputus pun bisa meninggalkan entri di index
+        git_ok(runner, "add", "--", *paths, code=6, what="git add")
+        removed = [n for n in git_ok(runner, "diff", "--cached", "--diff-filter=D", "--name-only", code=6).splitlines() if PUB_FILE.search(n)]
+        # Penghapusan sb*/bei* hanya untuk hari yang ditahan desk menurut berkas tahanan keluarganya yang di-stage (yang ikut
+        # di-commit).
         withheld = {}
         for family, rel in HOLDS.items():
             staged_hold = git(runner, "show", f":{rel}") if any(file_family(n) == family for n in removed) else None
             withheld[family] = desk_withheld_days(staged_hold.stdout if staged_hold and staged_hold.returncode == 0 else "")
         deleted = [n for n in removed if not withheld_deletion(n, withheld)]
         if deleted:
-            git(runner, "reset", "-q", "--", *paths)
-            raise Failure(7, "berkas Stockbit/BEI akan terhapus, tidak di-commit: " + ", ".join(deleted[:10]))
+            raise Failure(7, "berkas Stockbit/BEI akan terhapus, tidak di-commit (VPS sudah memuat versi ini): " + ", ".join(deleted[:10]))
         if git(runner, "diff", "--cached", "--quiet").returncode == 0:
+            staged = None
             record["status"] = summary["status"] = "tidak ada perubahan"
-            record["worker_version_after"] = worker_version(runner)
             say("tidak ada perubahan")
             return 0, summary
-        names = git_ok(runner, "diff", "--cached", "--name-only", code=7).splitlines()
+        names = git_ok(runner, "diff", "--cached", "--name-only", code=6).splitlines()
         record["files"] = sorted(n.rsplit("/", 1)[-1] for n in names
                                  if PUB_FILE.search(n) or n.endswith(("stockbit-index.json", "bei-index.json")))
         message = commit_message(names, removed)
-        git_ok(runner, "commit", "-q", "-m", message, "--", *paths, code=7, what="git commit")
-        record["post_sha"] = git_ok(runner, "rev-parse", "HEAD")
-        say("6/6 push")
-        if not push(runner, "HEAD:main"):
-            record["status"] = "push_failed"
-            record["pre_sha"] = git_ok(runner, "rev-parse", "HEAD^", code=8)
-            raise Failure(8, "push gagal; commit ada di lokal dan Worker sudah live")
-        # Setelah `pull --rebase` commit bisa berganti: rentang rollback = tepat satu commit publish ini.
+        git_ok(runner, "commit", "-q", "-m", message, "--", *paths, code=6, what="git commit")
+        staged = None
+        # Sejak commit ada: push_failed (commit hanya di lokal) sampai push berhasil, lalu published. Tidak pernah lagi
+        # vps_not_committed: rollback harus membuang/me-revert commit ini, bukan memulihkan pohon kerja.
+        record["status"] = "push_failed"
         record["post_sha"] = git_ok(runner, "rev-parse", "HEAD", code=8)
         record["pre_sha"] = git_ok(runner, "rev-parse", "HEAD^", code=8)
+        say("6/6 push git")
+        pushed = push(runner, "HEAD:main")
+        if pushed:
+            record["status"] = "published"
+        # Setelah `pull --rebase` (berhasil, termasuk bila push kedua gagal) commit berganti: rentang rollback = tepat satu
+        # commit publish di HEAD.
+        record["post_sha"] = git_ok(runner, "rev-parse", "HEAD", code=8)
+        record["pre_sha"] = git_ok(runner, "rev-parse", "HEAD^", code=8)
+        if not pushed:
+            raise Failure(8, "push git gagal; commit ada di lokal dan VPS sudah live. Publish ulang ditolak selama commit itu belum "
+                             "dipush: push manual `git push origin HEAD:main`, atau batalkan dengan tools/rollback_stockbit.py")
         tag = f"stockbit-publish-{stamp}"
-        git_ok(runner, "tag", "-a", tag, "-m", message, record["post_sha"], code=8, what="git tag")
+        git_ok(runner, "tag", "-a", tag, "-m", message, record["post_sha"], code=8,
+               what="commit sudah dipush, tetapi git tag")
         record["tag"] = tag
-        if git(runner, "push", "origin", f"refs/tags/{tag}", timeout=T_NET).returncode:
+        if git_within(runner, "push", "origin", f"refs/tags/{tag}") != 0:
             say(f"  peringatan: tag {tag} gagal dipush; commit sudah live (push tag manual: git push origin {tag})")
             summary["tag_pushed"] = False
-        record["worker_version_after"] = worker_version(runner)
-        record["status"] = summary["status"] = "published"
+        summary["status"] = "published"
         summary.update(tag=tag, commit=record["post_sha"], message=message)
         return 0, summary
     except Failure as e:
         summary.update(status="gagal", error=str(e))
+        if staged:
+            unstage(raw, staged)
         if "status" not in record:
-            record["status"] = "deployed_not_committed" if deployed else "gagal"
-        if deployed and not record["worker_version_after"]:
-            record["worker_version_after"] = worker_version(runner)  # rollback memeriksa versi live = versi ini
+            record["status"] = "vps_not_committed" if record["vps"] else "gagal"
         say(f"GAGAL: {e}")
         return e.code, summary
     except subprocess.TimeoutExpired as e:
         summary.update(status="gagal", error=f"batas waktu habis: {' '.join(map(str, e.cmd))[:200]}")
-        before = record["worker_version_before"]
-        if not args.dry_run and (deployed or before):
-            now = worker_version(runner)
-            deployed = deployed or (bool(before) and now not in (None, before))
-            if deployed:
-                record["worker_version_after"] = now
+        if staged:
+            unstage(raw, staged)
         if "status" not in record:
-            record["status"] = "deployed_not_committed" if deployed else "gagal"
+            record["status"] = "vps_not_committed" if record["vps"] else "gagal"
         say(f"GAGAL: {summary['error']}")
-        return (6 if deployed else 1), summary
+        committed = record["status"] in ("push_failed", "published")
+        return (8 if committed else 6 if record["vps"] else 1), summary
     finally:
         if not args.dry_run and record.get("start_sha"):
             record.setdefault("status", "gagal")
@@ -681,9 +795,21 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         summary["finished_at"] = now_iso()
 
 
+def since_day(value):
+    try:
+        if len(value) == 10 and date.fromisoformat(value).isoformat() == value:
+            return value
+    except ValueError:
+        pass
+    raise argparse.ArgumentTypeError(f"tanggal tidak valid: {value!r} (pakai YYYY-MM-DD)")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dry-run", action="store_true", help="preflight + sinkron + cek build saja")
+    ap.add_argument("--stockbit-since", type=since_day, metavar="YYYY-MM-DD",
+                    help="terbitkan hari final Stockbit mulai tanggal ini (tanggal 'Dari' di desk), bukan batas bawah "
+                         "bawaan sync_idx.py; hari yang sudah terbit tetap dipertahankan")
     args = ap.parse_args(argv)
     try:
         code, summary = publish(args)

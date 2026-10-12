@@ -132,7 +132,7 @@
     var agentic = !modeBox.hidden && agenticInput.checked;
     message('user', question);
     var nextContext = null;
-    var reply = message('assistant', '', agentic), text = '', sources = [], summary = null, done = false, usage = null, cacheHit = false, clarification = false;
+    var reply = message('assistant', '', agentic), text = '', sources = [], summary = null, done = false, usage = null, cacheHit = false, clarification = false, modelName = '';
     reply.block.insertBefore(progress, reply.content);
     reply.block.scrollIntoView?.({block: 'nearest'});
     status.textContent = 'Menghubungkan…';
@@ -182,6 +182,7 @@
           if (!/^[a-f0-9]{64}$/.test(event.context || '')) throw new Error('Konteks jawaban tidak valid. Muat ulang halaman.');
           nextContext = event.context; done = true;
           usage = event.usage; cacheHit = !!event.cache_hit; clarification = !!event.clarification;
+          modelName = typeof event.model === 'string' ? event.model.slice(0, 80) : '';
           if (summary) summary.textContent = sources.length + ' sumber dirujuk';
           if (typeof event.agentic_left === 'number') showLeft(event.agentic_left);
         }
@@ -197,13 +198,24 @@
       if (!done || !text.trim()) throw new Error('Jawaban terputus. Coba lagi.');
       renderAnswer(reply.content, text, sources);
       if (usage && typeof usage.known_cost_usd === 'number' && Number.isFinite(usage.known_cost_usd)){
-        var cost = document.createElement('details'), costTitle = document.createElement('summary'), detail = document.createElement('p');
-        costTitle.textContent = cacheHit ? 'Dari cache' : 'Biaya AI';
-        detail.textContent = 'Biaya: US$' + usage.known_cost_usd.toFixed(6) +
-          ' · Input: ' + Number(usage.prompt_tokens || 0).toLocaleString('id-ID') +
-          ' token · Output: ' + Number(usage.completion_tokens || 0).toLocaleString('id-ID') +
-          ' token · Input cache: ' + Number(usage.cached_tokens || 0).toLocaleString('id-ID') +
-          ' token.' + (usage.missing_usage_calls ? ' Sebagian biaya belum dilaporkan; total belum lengkap.' : '');
+        var cost = document.createElement('details'), costTitle = document.createElement('summary'), detail = document.createElement('ul');
+        var count = function(value){ return Number(value || 0).toLocaleString('id-ID'); };
+        var usd = function(value){ return value ? 'US$' + Number(value).toFixed(value < 0.01 ? 6 : 4) : 'US$0'; };
+        var prompt = Number(usage.prompt_tokens || 0), cached = Number(usage.cached_tokens || 0), written = Number(usage.cache_write_tokens || 0);
+        // Subscription bridge: nothing billed per token, but the CLI reports what the same tokens cost at API list price.
+        var estimated = Number(usage.estimated_calls || 0) > 0;
+        costTitle.textContent = cacheHit && !usage.calls ? 'Dari cache · tanpa panggilan model' : 'Biaya & token';
+        var rows = [];
+        if (modelName) rows.push('Model: ' + modelName);
+        rows.push('Panggilan model: ' + count(usage.calls));
+        rows.push('Token input: ' + count(prompt) + (prompt ? ' (baru ' + count(Math.max(0, prompt - cached - written)) + ', dibaca dari cache ' +
+          count(cached) + ' = ' + Math.round(cached / prompt * 100) + '%, ditulis ke cache ' + count(written) + ')' : ''));
+        rows.push('Token output: ' + count(usage.completion_tokens));
+        rows.push(estimated && !usage.known_cost_usd ? 'Ditagih: US$0 (kuota langganan Claude)' : 'Biaya: ' + usd(usage.known_cost_usd));
+        if (estimated) rows.push('Estimasi bila memakai API Anthropic (harga daftar): ' + usd(usage.estimated_cost_usd) +
+          (usage.estimated_calls < usage.calls ? ' (belum lengkap: ' + (usage.calls - usage.estimated_calls) + ' panggilan tanpa angka)' : ''));
+        if (usage.missing_usage_calls) rows.push('Sebagian biaya belum dilaporkan; total belum lengkap.');
+        rows.forEach(function(row){ var item = document.createElement('li'); item.textContent = row; detail.appendChild(item); });
         cost.className = 'chat-sources'; cost.appendChild(costTitle); cost.appendChild(detail); reply.block.appendChild(cost);
       }
       context = nextContext; turns++;
