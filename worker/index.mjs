@@ -59,6 +59,7 @@ export class ArchiveChat extends DurableObject {
     sql.exec('CREATE TABLE IF NOT EXISTS agentic_requests (stamp INTEGER)');
     this.cache = new CacheStore(sql);
   }
+  modelLabel() { return typeof this.env.MODEL_LABEL === 'string' && this.env.MODEL_LABEL ? this.env.MODEL_LABEL : MODEL; }
   admit(client) {
     const now = Math.floor(Date.now() / 1000), sql = this.ctx.storage.sql;
     this.ctx.storage.transactionSync(() => {
@@ -108,7 +109,7 @@ export class ArchiveChat extends DurableObject {
     this.ctx.storage.transactionSync(() => {
       sql.exec('DELETE FROM budget WHERE day < ?', day);
       const used = sql.exec('SELECT bytes, tokens FROM budget WHERE day = ?', day).toArray()[0] || {bytes:0, tokens:0};
-      if (used.bytes + bytes > 80000000 || used.tokens + tokens > 500000)
+      if (used.bytes + bytes > limit(this.env, 'CHAT_DAILY_BYTES', 80000000) || used.tokens + tokens > limit(this.env, 'CHAT_DAILY_OUTPUT_TOKENS', 500000))
         throw new ChatError('Anggaran AI hari ini sudah tercapai. Silakan kembali besok.');
       sql.exec('INSERT OR REPLACE INTO budget VALUES (?, ?, ?)', day, used.bytes + bytes, used.tokens + tokens);
     });
@@ -134,7 +135,7 @@ export class ArchiveChat extends DurableObject {
   }
   async fetch(request) {
     if (new URL(request.url).pathname === '/api/chat/config')
-      return json(request, {ready:!!this.env.OPENROUTER_API_KEY, model:MODEL,
+      return json(request, {ready:!!this.env.OPENROUTER_API_KEY, model:this.modelLabel(),
         agentic:{enabled:!!(this.env.OPENROUTER_API_KEY && this.env.DATACAT_API_KEY), limit:limit(this.env, 'CHAT_AGENTIC_DAILY', 10), left:this.agenticLeft()}});
     if (new URL(request.url).pathname === '/api/chat/index') {
       if (!this.env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + this.env.CHAT_METRICS_TOKEN)
@@ -204,7 +205,10 @@ export class ArchiveChat extends DurableObject {
     const emit = value => { controller.signal.throwIfAborted(); return write(value); };
     const timer = setTimeout(() => controller.abort(), 8 * 60 * 1000);
     writer.closed.catch(() => controller.abort());
-    const model = new OpenRouter(this.env.OPENROUTER_API_KEY, controller.signal, undefined, (bytes,tokens) => this.spend(bytes,tokens));
+    // MODEL_FETCHER exists only in the local server (local/server.mjs): the Claude Code CLI bridge. Cloudflare
+    // vars are strings, so a deployed Worker always uses fetch() to OpenRouter.
+    const fetcher = typeof this.env.MODEL_FETCHER === 'function' ? this.env.MODEL_FETCHER : undefined;
+    const model = new OpenRouter(this.env.OPENROUTER_API_KEY, controller.signal, fetcher, (bytes,tokens) => this.spend(bytes,tokens));
     const retrieval = {};
     let agenticStamp = null;
     const run = async () => {
@@ -219,7 +223,7 @@ export class ArchiveChat extends DurableObject {
         // An answer cut at the length limit does not become history; the previous context stays valid.
         const context = result.incomplete && body.context ? body.context
           : this.remember(client, conversation, body.question, result.incomplete ? {...result, answer:'(jawaban terpotong)'} : result);
-        await emit({type:'done', documents:result.documents, batches:result.batches, model:MODEL, context,
+        await emit({type:'done', documents:result.documents, batches:result.batches, model:this.modelLabel(), context,
           usage:model.usage(),cache_hit:!!result.cache_hit,clarification:!!result.clarification,
           ...(body.mode === 'agentic' ? {agentic_left:this.agenticLeft()} : {})});
         outcome = result.clarification ? 'clarification' : 'complete';

@@ -15,3 +15,9 @@ reports/private/
 # Hasil build lokal (GitHub Pages memakai docs/)
 site/
 .stockbit-publish/
+
+# Server lokal (local/server.mjs): hasil build, SQLite chat, kunci mesin
+.local/
+
+# Kata sandi akses jarak jauh (lokal saja, jangan di-commit)
+IMPORTANT.TXT

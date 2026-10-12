@@ -249,8 +249,11 @@ export class OpenRouter {
       a.known_cost_usd += r.cost || 0; a.prompt_tokens += r.prompt_tokens || 0;
       a.completion_tokens += r.completion_tokens || 0; a.cached_tokens += r.cached_tokens || 0;
       a.cache_write_tokens += r.cache_write_tokens || 0;
+      // Provider list-price estimate when the bill itself is not per token (local Claude subscription bridge).
+      if (typeof r.estimated_cost === 'number') { a.estimated_cost_usd += r.estimated_cost; a.estimated_calls++; }
       return a;
-    }, {calls:0,input_bytes:0,output_token_budget:0,known_cost_usd:0,prompt_tokens:0,completion_tokens:0,cached_tokens:0,cache_write_tokens:0,missing_usage_calls:0});
+    }, {calls:0,input_bytes:0,output_token_budget:0,known_cost_usd:0,prompt_tokens:0,completion_tokens:0,cached_tokens:0,cache_write_tokens:0,missing_usage_calls:0,
+      estimated_cost_usd:0,estimated_calls:0});
   }
   account(response, event) {
     const record = this.responses.get(response), usage = event.usage;
@@ -263,6 +266,7 @@ export class OpenRouter {
     record.cost = number(usage.cost);
     record.cached_tokens = number(usage.prompt_tokens_details?.cached_tokens);
     record.cache_write_tokens = number(usage.prompt_tokens_details?.cache_write_tokens);
+    record.estimated_cost = number(usage.estimated_cost);
   }
   cancel() { this.controller.abort(); }
   canSpend({input = 0, output = 0, calls = 0} = {}) {
@@ -280,7 +284,7 @@ export class OpenRouter {
     // Reserve before network I/O; retries and parallel calls consume the same hard budget.
     this.reserve(bytes, maxTokens);
     this.input += bytes; this.output += maxTokens; this.calls++;
-    const receipt = {input_bytes:bytes, output_token_budget:maxTokens, cost:null, prompt_tokens:null, completion_tokens:null, cached_tokens:null, cache_write_tokens:null};
+    const receipt = {input_bytes:bytes, output_token_budget:maxTokens, cost:null, prompt_tokens:null, completion_tokens:null, cached_tokens:null, cache_write_tokens:null, estimated_cost:null};
     this.receipts.push(receipt);
     const payload = {model:MODEL, messages, stream, max_tokens:maxTokens, temperature:0.2,
       reasoning:reasoning ? {max_tokens:reasoning === 2048 ? 2048 : 512, exclude:true} : {enabled:false}};
@@ -313,6 +317,7 @@ export class OpenRouter {
     if (!response.ok) {
       response.body?.cancel().catch(() => {});
       const errors = {401:'Koneksi layanan AI perlu diperbarui pengelola.', 402:'Saldo layanan AI belum mencukupi.',
+        413:'Bahan terlalu panjang untuk model. Persempit topik, kode saham, atau rentang tanggal.',
         429:'Layanan AI sedang membatasi permintaan. Coba beberapa saat lagi.'};
       throw new ChatError(errors[response.status] || 'Layanan AI belum berhasil menjawab. Silakan coba lagi.');
     }

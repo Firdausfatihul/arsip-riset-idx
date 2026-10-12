@@ -18,6 +18,8 @@ python3 -m http.server -d site 8000   # cek di http://localhost:8000
 ```
 
 Lalu upload **isi** folder `site/` ke host statis mana pun (lihat [Cara host ulang](#cara-host-ulang)).
+Untuk pemakaian sendiri dengan akun Claude, situs + chat di Mac ini: `node local/server.mjs` (lihat [Host lokal dengan akun Claude](#host-lokal-dengan-akun-claude-localservermjs)).
+Semua di VPS Jakarta (Mac boleh mati), setelah ada dokumen baru: `node local/vps.mjs push` (lihat [Semua di VPS Jakarta](#semua-di-vps-jakarta-localvpsmjs)).
 Sumber build: `needtobeindexed/`, `build.py`, `chat.js`, dan `chat.config.json` (alamat API publik).
 
 ---
@@ -39,12 +41,13 @@ archivescrapingweb/
 ├── chat.js               # antarmuka percakapan; digabung ke index.html saat build
 ├── chat.config.json      # alamat API publik; bukan secret
 ├── worker/               # API Cloudflare Worker + Durable Object
+├── local/                # host lokal: Worker yang sama di Node + jembatan Claude Code CLI (akun Claude)
 ├── tools/build_worker.py # indeks pencarian, bagian sumber, dan indeks emiten untuk Worker
 ├── tools/evidence_index.py # pemisahan sumber tanpa AI, dengan lokasi dan hash isi
 ├── tools/event_index.py  # tabel aksi korporasi per emiten tanpa AI (events.json) untuk pertanyaan screening
 ├── tools/compare_chat_costs.mjs # pembanding alur lama/baru, simulasi atau API nyata
 ├── tools/chat_metrics.py # laporan biaya aktual melalui endpoint privat
-├── tools/publish_chat.py # build dan perbarui backend + docs/ (tidak git push)
+├── tools/publish_chat.py # LAMA, manual: deploy Worker Cloudflare + docs/ (tidak dipakai desk/publish_stockbit)
 ├── tools/chat_archive.py # pembaca arsip dan pemisah teks untuk build Worker (Python 3.9+, stdlib)
 ├── tools/sync_idx.py     # salin data dari IDX Signal Desk lokal (http://127.0.0.1:8787) lalu build
 ├── tools/sync_prices.py  # harga penutupan per tanggal snapshot KSEI dari dataset broker summary riset → needtobeindexed/harga/harga.json
@@ -563,6 +566,10 @@ cakupan, bukti, dan batas audit.
 
 ### Memasang di situs publik
 
+> Sekarang `arsip.seekingomega.capital` dilayani VPS Jakarta (`node local/vps.mjs push`, lihat [Semua di VPS Jakarta](#semua-di-vps-jakarta-localvpsmjs)).
+> GitHub Pages dimatikan (repo hanya riwayat, `docs/` tetap di-commit) dan Worker Cloudflare tidak dipakai situs lagi.
+> Bagian ini dan `tools/publish_chat.py` adalah dokumentasi/alat lama untuk deploy manual ke Cloudflare.
+
 Frontend tetap **GitHub Pages**, domain `arsip.seekingomega.capital`, folder `docs/`.
 API publik memakai **Cloudflare Workers Free + SQLite Durable Object** di akun yang
 ditentukan `worker/wrangler.jsonc`. Model tetap OpenRouter `qwen/qwen3.7-flash`.
@@ -598,7 +605,7 @@ pertanyaan baru; jawaban cache tidak membuat panggilan model baru.
 Alamat API tersimpan di `chat.config.json`, sehingga build/sinkron berikutnya tidak
 kembali ke `/api/chat` di GitHub Pages. `CHAT_API_URL` bisa mengalahkannya untuk uji lokal.
 
-**Memperbarui arsip dan chat setelah menambah dokumen:**
+**Memperbarui arsip dan chat setelah menambah dokumen (lama, Cloudflare; situs kini: `node local/vps.mjs push`):**
 
 ```bash
 python3 tools/publish_chat.py
@@ -654,6 +661,135 @@ chat_test_deps=$(mktemp -d)
 npm install --prefix "$chat_test_deps" jsdom@26.1.0 marked@15.0.7 dompurify@3.4.15
 NODE_PATH="$chat_test_deps/node_modules" node tests/chat_ui.cjs
 ```
+
+## Host lokal dengan akun Claude (`local/server.mjs`)
+
+Untuk pemakaian sendiri, situs dan chat bisa berjalan seluruhnya di Mac ini, tanpa Cloudflare dan tanpa key OpenRouter.
+Model dijawab oleh Claude Code CLI (`claude -p`) yang sudah login dengan akun Claude (langganan), bukan API berbayar per token.
+
+```bash
+claude                          # sekali: login akun Claude (/login), lalu keluar
+node local/server.mjs --pin     # pertama kali di mesin ini: build + kunci mesin + jalan
+node local/server.mjs           # berikutnya; tambah --build setelah ada dokumen baru
+# buka http://127.0.0.1:8017
+```
+
+- Kode Worker yang sama (`worker/index.mjs`, Durable Object `ArchiveChat`) dijalankan di Node 22. Penyimpanan Durable Object
+  diganti SQLite lokal `.local/chat.sqlite`; aset Worker di `.local/assets`, situs di `.local/site` (dibangun dengan
+  `CHAT_API_URL=/api/chat`, jadi chat satu origin dengan situs). Semua di `.local/` diabaikan Git. `docs/` dan Worker publik tidak diubah.
+- Saat start, indeks sumber SQLite diisi langsung tanpa AI (pengganti `tools/sync_chat_index.py`).
+- `local/claude-bridge.mjs` menggantikan `fetch` ke OpenRouter (hook `env.MODEL_FETCHER`, hanya ada di server lokal):
+  tiap panggilan model = satu proses `claude -p` tanpa alat (`--tools ""`), tanpa setting/hook/MCP pengguna, tanpa sesi tersimpan,
+  dari folder kosong. Pesan sistem lewat berkas sementara (izin 600), bahan lewat stdin. CLI dijalankan dengan lingkungan
+  seperti terminal baru (`cliEnv`: HOME, PATH, bahasa, proxy, `CLAUDE_CONFIG_DIR`), jadi kredensialnya hanya login
+  `claude auth login` milik akun itu. `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, Bedrock/Vertex, secret server, dan variabel
+  sesi Claude Code yang menjalankan server tidak diteruskan, supaya CLI tidak pindah ke tagihan API atau akun lain. Saat start,
+  `claude auth status` harus menunjukkan login langganan (`authMethod` `claude.ai`, provider `firstParty`); selain itu server
+  berhenti dengan kode 78. Streaming, mode JSON (`--json-schema`), dan langkah mode agen
+  (pemanggilan alat ditiru lewat skema `{content, tool_calls}`) diterjemahkan ke format yang dibaca `worker/core.mjs`.
+  Penalaran (thinking) tidak dibatasi: banyaknya ditentukan `--effort` (VPS: `max`), tanpa `MAX_THINKING_TOKENS`.
+  `CLAUDE_CODE_MAX_OUTPUT_TOKENS` = anggaran teks Worker + 64.000 ruang thinking, supaya thinking tidak menghabiskan jawaban;
+  teks jawaban tetap dihentikan sebagai "length" di ±8 karakter per token anggaran. Uji Haiku effort max: satu pertanyaan
+  pendek atas ±34 ribu token bahan memakai ±15.800 token thinking (estimasi API US$0,015 vs US$0,007 tanpa thinking).
+  Pesan dikirim sebagai `--input-format stream-json`: tiap giliran satu blok teks, giliran pertama (bahan arsip) diberi
+  breakpoint cache 1 jam, dan penanda giliran tetap sama untuk bahan yang sama (HMAC dengan kunci acak per proses server).
+  Uji nyata: pertanyaan kedua atas bahan yang sama membaca ±99% input dari cache (estimasi API ±15× lebih murah).
+  Sebelumnya penanda acak per panggilan membuat cache tidak pernah terbaca.
+  Di bawah jawaban, "Biaya & token" menampilkan model, panggilan, token input (baru/dibaca/ditulis cache), output,
+  biaya ditagih (US$0, langganan) dan estimasi harga daftar API menurut Claude Code (`total_cost_usd`).
+  Batas pemakaian langganan dipetakan ke 429 (pesan "sedang membatasi"), bahan terlalu panjang ke 413.
+- Biaya per panggilan dicatat 0 (langganan); jumlah token tetap dicatat. Batas langganan Claude (jendela 5 jam) tetap berlaku.
+- Pilihan: `--model sonnet|opus|haiku` (bawaan `sonnet`), `--effort low|medium|high` (bawaan `low`), `--concurrency 3`
+  (proses `claude` bersamaan), `--port 8017`. Env: `ARSIP_CLAUDE_MODEL`, `ARSIP_CLAUDE_EFFORT`, `ARSIP_CLAUDE_CONCURRENCY`,
+  `ARSIP_CLAUDE_BIN`, `ARSIP_PORT`, `CHAT_AGENTIC_DAILY` (bawaan lokal 100).
+- Mode agen aktif bila `DATACAT_API_KEY` ada di `.env.chat`. Hanya ini yang keluar ke layanan lain selain Claude:
+  datacat (`quant.renr.ai`). Tanpa key, mode agen disembunyikan.
+- Hanya mendengar `127.0.0.1`. `--host <ip> --allow-lan` membuka ke jaringan lokal **tanpa login**. Origin yang diizinkan hanya
+  alamat server sendiri, sehingga situs lain yang dibuka di browser tidak bisa memakai chat. IP klien diambil dari socket, bukan header.
+
+**Kunci mesin (fail-closed).** Server menolak start, sehingga tidak ada pertanyaan yang sampai ke Claude, bila:
+berjalan di container (`/.dockerenv`, `/run/.containerenv`, Kubernetes), zona waktu bukan Indonesia
+(`Asia/Jakarta`, `Asia/Pontianak`, `Asia/Makassar`, `Asia/Jayapura`), ID perangkat keras tidak terbaca, atau hash ID
+berbeda dari `.local/machine-lock.json` yang dibuat `--pin`. Salinan yang dibuka di host/region lain tetap mati sampai
+pemiliknya sengaja menjalankan `--pin` di sana. Zona waktu hanya pengaman tambahan karena bisa diatur; yang mengikat adalah ID mesin.
+Container dan Cloudflare Workers tidak cocok untuk cara ini: container dibuat ulang (login hilang, mesin berganti) dan Worker
+tidak bisa menjalankan CLI. Untuk selalu menyala tanpa Mac, pakai VPS Jakarta yang tetap: lihat
+[Semua di VPS Jakarta](#semua-di-vps-jakarta-localvpsmjs). Token di variabel lingkungan sengaja tidak dipakai.
+
+### Semua di VPS Jakarta (`local/vps.mjs`)
+
+```
+perangkat --HTTPS--> VPS Jakarta: Caddy --> 127.0.0.1:8018 local/server.mjs (wajib kata sandi) --> claude -p (login akun Claude)
+```
+
+Mac boleh mati. Saat ini: Tencent Cloud Lighthouse `ap-jakarta` (2 vCPU, 2 GB, Ubuntu 24.04), domain `arsip.seekingomega.capital`
+(A record di ClouDNS). Semua perintah dijalankan dari Mac lewat SSH ke akun admin (`ubuntu`, sudo).
+
+```bash
+# 1. Sidik jari host dibaca di konsol web penyedia (bukan lewat SSH dari Mac): ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+node local/vps.mjs setup --host <ip> --domain arsip.seekingomega.capital --host-key SHA256:…   # .local/vps.json, kata sandi
+node local/vps.mjs bootstrap   # root: zona Asia/Jakarta, Node 22.17.1 (checksum), Caddy, swap, user arsip, Claude Code, systemd
+node local/vps.mjs login       # interaktif di Terminal: claude auth login --claudeai sebagai user arsip (buka URL, tempel kode)
+node local/vps.mjs push        # salin kode + arsip + key, build, kunci mesin (pertama kali), jalankan; ulangi setelah ada dokumen baru
+node local/vps.mjs setup --model haiku --effort max && node local/vps.mjs apply   # ganti model/effort tanpa build ulang
+node local/vps.mjs status | logs [--follow] | password
+```
+
+- **Kredensial seperti pemakai CLI.** Claude Code dipasang dengan installer resmi Anthropic untuk user `arsip`, versi sama dengan Mac,
+  dan login dengan `claude auth login` (langganan Claude). Login tersimpan dan diperbarui oleh CLI sendiri di `/home/arsip`; tidak ada
+  API key atau token yang disalin. `login`, `push`, dan `status` menampilkan akun VPS dan Mac berdampingan dan memberi peringatan bila berbeda.
+- **Kunci mesin di VPS** (`ARSIP_ALLOW_VPS=1` dari unit systemd): selain zona waktu Indonesia dan `/etc/machine-id`, server membaca
+  metadata Tencent (`placement/region` harus `ap-jakarta`, `instance-id` ikut di-hash ke kunci). Disk yang disalin ke instance atau
+  region lain tidak pernah start. Metadata tidak terbaca = tidak start. Penyedia lain belum didukung.
+- Gagal kunci mesin atau login bukan langganan: exit 78, systemd tidak mengulang (`RestartPreventExitStatus=78`). Status login yang tidak
+  terbaca sementara (timeout, update CLI): exit 1, diulang tiap 10 detik.
+- Di VPS hanya listener bersandi (`127.0.0.1:8018` di belakang Caddy) yang dibuka; tidak ada listener tanpa sandi.
+  Endpoint statistik/impor tidak tersedia di VPS.
+- `push` mengirim berkas Git (tercatat dan baru yang tidak diabaikan) kecuali `docs/`, `reports/`, `tests/`, `.env*`, `.local/`.
+  Dari `.env.chat` hanya `DATACAT_API_KEY` dan `CHAT_METRICS_TOKEN` yang dikirim (key OpenRouter tetap di Mac). Build berjalan di salinan
+  baru selagi server lama tetap melayani; database chat dan kunci dipindah, lalu server baru dijalankan. Bila gagal, versi lama dipulihkan.
+- Host key SSH dicocokkan dengan `--host-key` (StrictHostKeyChecking=yes, `.local/known_hosts`), supaya kode login Claude, arsip, dan key
+  hanya sampai ke server itu.
+- Kata sandi perangkat: `.local/vps.json` (hash scrypt, izin 600); `password` membuat yang baru dan mengeluarkan semua perangkat.
+- Bootstrap root tidak menyentuh jalur di dalam folder milik `arsip` (symlink). Unit: `ProtectSystem=strict`, `PrivateTmp`,
+  `NoNewPrivileges`, tulis hanya `/srv/arsip` dan `/home/arsip`. Bawaan `--concurrency 4` (2 analisis) dengan swap; ±1,3 GB terpakai saat penuh.
+- Yang dapat dilihat penyedia VPS (root/agen Tencent `tat_agent`, `YDService`, `barad_agent`): login Claude, arsip, key datacat, isi
+  percakapan. Itu harga menjalankan Claude tanpa Mac; mode tunnel di bawah menyimpan semuanya di Mac.
+
+### Akses dari perangkat lain lewat VPS Jakarta, Claude tetap di Mac (`local/remote.mjs`)
+
+```
+perangkat (ponsel/laptop/tablet) --HTTPS--> VPS Jakarta (Caddy) --127.0.0.1:18017--> tunnel SSH dari Mac --> Mac 127.0.0.1:8018 (wajib kata sandi)
+```
+
+Claude tetap hanya dipanggil dari Mac. VPS tidak menyimpan login Claude maupun arsip; ia hanya membuka HTTPS dan
+meneruskan ke tunnel yang dibuka Mac. Kunci tunnel hanya boleh membuka satu forward itu (tanpa shell). Mac tidak membuka port publik.
+
+```bash
+node local/remote.mjs setup --vps <ip-vps> --domain arsip.seekingomega.capital   # kunci SSH, kata sandi, .local/vps-setup.sh
+# DNS: A record domain -> IP VPS. Lalu di VPS (Debian 12 / Ubuntu 24.04, root):
+scp .local/vps-setup.sh root@<ip-vps>:/root/ && ssh root@<ip-vps> bash /root/vps-setup.sh
+node local/remote.mjs install     # server + tunnel jalan sekarang dan otomatis saat login (launchd)
+# perangkat mana pun: buka https://<domain>, masukkan kata sandi sekali (sesi 30 hari per perangkat)
+```
+
+- Kata sandi dibuat acak (±100 bit), ditampilkan sekali, disimpan sebagai hash scrypt di `.local/remote.json` (izin 600).
+  `node local/remote.mjs password` membuat sandi baru dan mengeluarkan semua sesi di semua perangkat (cara memutus perangkat yang hilang).
+- Banyak perangkat boleh masuk bersamaan. Analisis yang berjalan serentak dibatasi `--concurrency`/2 untuk seluruh perangkat
+  (bawaan 2); perangkat berikutnya mendapat pesan slot penuh. Naikkan dengan `--concurrency 8` (maks 4 analisis), dengan risiko batas langganan Claude lebih cepat tercapai.
+- Pemeriksaan sandi berjalan di Mac, bukan di VPS. Tanpa sesi, semua halaman, berkas, dan `/api/` ditolak. Cookie
+  `__Host-…; Secure; HttpOnly; SameSite=Strict`, ditandatangani HMAC. Masuk hanya dari origin domain itu; 5 kali gagal per
+  alamat per 15 menit, 30 kali gagal total per jam (lalu semua percobaan menunggu). Endpoint statistik/impor hanya lokal.
+- Listener lokal `127.0.0.1:8017` tetap tanpa sandi untuk Mac sendiri. Kunci mesin dan pemeriksaan zona tetap berlaku.
+- `install` memasang dua LaunchAgent (`capital.seekingomega.arsip.server` dengan `caffeinate -s`, dan `…tunnel`), log di
+  `~/Library/Logs/arsip-*.log`. Mac harus menyala dan tersambung; dengan daya listrik Mac tidak tidur, tetapi menutup
+  layar MacBook tetap membuatnya tidur. `status` dan `uninstall` tersedia. Hentikan server manual sebelum `install`.
+- Tunnel memakai kunci `~/.ssh/arsip_tunnel` dan host key VPS dicatat saat koneksi pertama (`.local/known_hosts`);
+  cocokkan dengan sidik jari yang dicetak skrip VPS.
+- Jika VPS mati atau tunnel putus, akses dari perangkat lain ikut mati; tidak ada jalur cadangan ke luar Indonesia.
+- Yang terlihat oleh VPS: isi lalu lintas setelah HTTPS dibuka (pertanyaan, jawaban, halaman arsip). Pilih VPS milik sendiri.
+
+Uji tanpa jaringan (CLI tiruan, tidak memakai langganan): `node --test tests/local_server.mjs`.
 
 ## Harga penutupan (`tools/sync_prices.py`)
 
@@ -718,7 +854,7 @@ python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # 
 ```bash
 python3 -B tools/sync_idx.py --stockbit-only --no-build   # hanya Stockbit; tanpa profil, digest, kepemilikan
 python3 -B tools/sync_idx.py --with-stockbit              # sinkron biasa, lalu Stockbit (staging terpisah)
-python3 -B tools/publish_stockbit.py --dry-run            # preflight + sinkron + cek build, tanpa deploy/commit
+python3 -B tools/publish_stockbit.py --dry-run            # preflight + sinkron + cek build, tanpa VPS/commit
 python3 -B tools/publish_stockbit.py                      # publish live (dipanggil desk saat "Publikasikan live" dicentang)
 python3 -B tools/rollback_stockbit.py --dry-run           # lihat rencana rollback publish terakhir
 python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
@@ -754,35 +890,65 @@ python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
   `penilaian`/`benang` di `user_notes` tanpa teks atau `finding_ids`, `based_on` tanpa `findings` ≥ 0 dan `last_day` yang valid, atau server
   mengekspor lebih sedikit hari final daripada `sbringkas_*` yang sudah terbit (di luar hari yang ditahan).
   `REDACTIONS` diterapkan setelah cek hash. Berkas `sb*` tidak pernah di-prune; yang menghapusnya hanya tahanan desk di atas dan rollback.
-- `publish_stockbit.py` (cwd akar arsip): preflight (git & npx ada, cabang `main`, tidak ada yang di-stage, perubahan hanya berkas Stockbit
+- `publish_stockbit.py` (cwd akar arsip): situs live = VPS (`node local/vps.mjs push`), GitHub = riwayat; Worker Cloudflare tidak disentuh.
+  Preflight (git & node ada di PATH, `.local/vps.json` ada, cabang `main`, tidak ada yang di-stage, perubahan hanya berkas Stockbit
   di `needtobeindexed/idx-signal-desk/` (`sb*.md`, `stockbit-index.json`, `.sync-stockbit.json`, `.stockbit-hold.json`; berkas titik lain seperti
   `.sync.json` dibiarkan dan tidak di-commit), `docs/`, `site/`; `digest_*`/`kepemilikan*` yang belum di-commit menolak publish, tidak ada commit
-  lokal yang belum dipush, `git fetch` + `git pull --ff-only`, disk ≥ 1,5 GB), catat HEAD dan versi Worker live (kalau publish sebelumnya sudah
-  deploy tanpa commit, versi sebelum publish itu dicatat sebagai `rollback_to`), sinkron `--stockbit-only --no-build` (tidak ada berkas Stockbit yang
-  berubah → selesai "tidak ada perubahan", tanpa build/deploy/commit), `build.py --out <folder sementara>` lalu cek tiap `sb*` masuk kategori dan
-  tanggal yang benar (tabelnya dicetak), `tools/publish_chat.py` (gagal setelah deploy → `sync_chat_index.py`/build `docs/` diulang sekali),
-  `git add` hanya berkas Stockbit tadi plus folder hasil build yang masih dilacak Git (`docs/`; `site/` hanya pada checkout lama), berhenti kalau ada `sb*` terhapus (kecuali berkas hari yang ditahan desk menurut `.stockbit-hold.json` yang ikut di-commit, termasuk salinannya di `docs/`/`site/`
+  lokal yang belum dipush, `git fetch` + `git pull --ff-only`, disk ≥ 1,5 GB), catat HEAD, sinkron `--stockbit-only --no-build` (tidak ada berkas
+  Stockbit yang berubah terhadap HEAD → selesai "tidak ada perubahan", tanpa build/VPS/commit; berkas dari putaran gagal sebelumnya tetap
+  terhitung berubah), `build.py --out <folder sementara>` lalu cek tiap `sb*` masuk kategori dan tanggal yang benar (tabelnya dicetak),
+  `build.py --out docs` (tanpa `CHAT_API_URL`, `BASE_URL=https://arsip.seekingomega.capital`), lalu `node local/vps.mjs push` **sebelum commit**
+  (gagal → vps.mjs memulihkan versi lama, exit 5, tidak ada commit; jalankan ulang; sebelumnya penjaga `sb*` terhapus diulang pada `docs/`
+  hasil build: salinan `sb*` yang hilang tanpa tahanan desk → `docs/` dikembalikan, exit 7, VPS tidak disentuh), `git add` hanya berkas Stockbit tadi plus folder hasil build
+  yang masih dilacak Git (`docs/`; `site/` hanya pada checkout lama), berhenti kalau ada `sb*` terhapus (kecuali berkas hari yang ditahan desk menurut `.stockbit-hold.json` yang ikut di-commit, termasuk salinannya di `docs/`/`site/`
   yang dibangun ulang tanpa hari itu; harinya dicatat sebagai `withheld` di log), commit `Stockbit: ringkasan <tanggal>` (atau `Stockbit: tahan <tanggal> dari web`), push (sekali `git pull --rebase` bila ditolak),
   tag beranotasi `stockbit-publish-YYYYMMDD-HHMMSS`, push tag. `site/` kini diabaikan Git; hanya `docs/` yang di-commit. Kompatibilitas `site/` terlacak dipertahankan untuk checkout lama.
-  Exit: 0 ok/tidak ada perubahan, 2 preflight, 3 sinkron, 4 cek build, 5 gagal sebelum deploy, 6 Worker ter-deploy tapi indeks/docs belum,
-  7 ada `sb*` terhapus tanpa tahanan desk, 8 push gagal, 1 lain-lain. Baris terakhir keluaran = ringkasan JSON.
-- Titik rollback dicatat di `.stockbit-publish/log.jsonl` (diabaikan git): `pre_sha`, `post_sha` (tepat satu commit publish), tag,
-  `worker_version_before/after`, `rollback_to`/`supersedes`, `files`, status. `rollback_stockbit.py` memakai entri terakhir (atau `--tag`, ditolak
-  selama ada publish lebih baru yang belum di-rollback):
+  Exit: 0 ok/tidak ada perubahan, 2 preflight, 3 sinkron, 4 cek build/build `docs/`, 5 push VPS gagal atau sisa waktu tidak cukup
+  (situs versi lama, tanpa commit), 6 VPS sudah diperbarui tapi commit gagal (situs mendahului git; berkas yang sudah di-stage dilepas
+  lagi, jadi publish ulang atau rollback bisa langsung jalan), 7 ada `sb*` terhapus tanpa tahanan desk, 8 commit lokal ada tetapi push git
+  gagal atau terputus (`push_failed`, VPS sudah live; publish ulang ditolak preflight selama commit itu belum dipush: push manual
+  `git push origin HEAD:main` (boleh setelah `git pull --rebase`; rollback mengenali salinannya) atau `rollback_stockbit.py`; juga bila
+  push berhasil tetapi tag gagal dibuat, status tetap `published`),
+  1 lain-lain. Baris terakhir keluaran = ringkasan JSON (`"vps": true` bila VPS sudah diperbarui).
+  Batas waktu: per langkah, ditambah anggaran total di bawah batas desk (`PUBLISH_BUDGET` 3.420 dari 3.600 detik; `ROLLBACK_BUDGET`
+  1.680 dari 1.800 detik) supaya penanganan batas waktu skrip sendiri yang berjalan, bukan SIGKILL dari desk. Push VPS mendapat sisa
+  anggaran (publish menyisakan 10 menit untuk commit/push) dan tidak dimulai kalau sisanya < 5 menit. `node local/vps.mjs push` berjalan
+  di grup proses sendiri; saat batas waktu, node beserta ssh/tar di bawahnya dimatikan bersama.
+- Titik rollback dicatat di `.stockbit-publish/log.jsonl` (diabaikan git): `target: "vps"`, `vps`, `pre_sha`, `post_sha` (tepat satu commit publish),
+  tag, `supersedes`, `files`, `day_shas` (`{tgl: sha256 ekspor}` hari harian yang dikirim putaran itu, dibaca sebelum push VPS), `withheld`, status (`published`, `vps_failed`, `vps_not_committed`, `push_failed`, `gagal`, `tidak ada perubahan`).
+  Publish berikutnya setelah `vps_not_committed` yang belum di-rollback meng-commit berkasnya dan mencatatnya di `supersedes`.
+  Catatan lama dengan `worker_version_*`/`rollback_to` dan status `deployed_*` tetap terbaca. `rollback_stockbit.py` memakai entri terakhir
+  (atau `--tag`, ditolak selama ada publish lebih baru yang belum di-rollback):
   - `published`: `git revert --no-commit <pre_sha>..<post_sha>` + tahanan + satu commit + push (tanpa force push, riwayat tetap ada). `docs/`/`site/`
     yang kotor dibuang dulu (hasil build), berkas titik non-Stockbit seperti `.sync.json` dibiarkan, berkas dilacak lain yang kotor menolak;
     rentang yang menyentuh selain berkas Stockbit/`docs/`/`site/` ditolak.
-  - `push_failed` yang commit-nya tidak pernah sampai ke origin: `git reset --keep <pre_sha>` (tanpa push).
-  - `deployed_index_pending`/`deployed_not_committed`: tanpa cek pohon bersih; berkas Stockbit yang kotor dikembalikan ke HEAD (yang baru dihapus),
-    `docs/`/`site/` dikembalikan. Tahanan di dua cara ini belum di-commit dan ikut publish berikutnya.
+  - `push_failed` yang commit-nya tidak pernah sampai ke origin: `git reset --keep <pre_sha>` (tanpa push). Kalau HEAD bukan commit itu karena
+    pemilik sudah `git pull --rebase` + push manual, salinannya di origin/main dicari (subjek sama dan `git cherry`/patch-id setara, harus tepat
+    satu); yang di-revert hanya salinan itu (`<induk>..<salinan>`, commit orang lain di antaranya tidak ikut) dan dicatat sebagai `rebased_from`.
+    Tidak ketemu: ditolak (exit 2), rollback manual. Commit revert rollback yang dipush manual setelah rebase dikenali dengan cara yang sama.
+  - `vps_not_committed` (dan status lama `deployed_index_pending`/`deployed_not_committed`): berkas Stockbit yang kotor
+    dikembalikan ke HEAD (yang baru dihapus), `docs/`/`site/` dikembalikan; yang ditahan hanya hari dari berkas yang tercatat di publish itu
+    (`files`), bukan berkas kotor dari sinkron sesudahnya, dengan sha dari `day_shas` publish itu (bukan `.sync-stockbit.json` pohon kerja
+    yang mungkin sudah ditulis ulang sinkron sesudahnya; catatan lama tanpa `day_shas`: `"*"`, ditahan sampai entrinya dihapus).
+    Tahanan di dua cara ini belum di-commit dan ikut publish berikutnya.
+  - Semua cara, termasuk putaran ulang, ditolak (exit 2) sebelum ada yang diubah bila cabang bukan `main`, ada yang di-stage, atau ada perubahan
+    (dilacak atau berkas baru) di luar berkas Stockbit/`docs/`/`site/`/berkas titik non-Stockbit: `vps.mjs push` mengirim pohon kerja apa adanya,
+    jadi kode atau dokumen yang belum di-commit akan ikut live. Commit atau kembalikan dulu. Juga ditolak bila git masih di tengah revert
+    (REVERT_HEAD/sequencer; jalankan `git revert --abort`). Batas waktu di tengah `git revert`/`git commit` rollback langsung menjalankan
+    `git revert --abort` (di luar anggaran total). Putaran ulang `partial`/`push_failed` juga ditolak bila berkas Stockbit selain
+    `.stockbit-hold.json` kotor (sisa sinkron/publish sesudahnya yang belum lolos cek build; kembalikan dulu), dan `docs/`/`site/` dikembalikan
+    ke HEAD sebelum push VPS.
   - Publish yang mencabut hari yang ditahan desk (`withheld` di log) tidak bisa di-rollback (exit 2, tidak ada yang diubah): membatalkannya
     akan menerbitkan lagi hari itu. Pakai desk: tahan hari lain yang ingin dicabut, atau lepas tahanannya, lalu publish.
   - Tahanan rollback digabung ke entri yang ada (tanda `withheld_by=desk` tetap). Hari yang berkasnya justru dihapus publish itu
     (tahanan desk) tidak ditahan rollback; sinkron berikutnya mengikuti daftar tahanan desk lagi.
-  - Worker: `npx wrangler@4.135.0 rollback <rollback_to atau versi sebelum> --config worker/wrangler.jsonc --message … --yes` hanya kalau versi live
-    masih `worker_version_after`; kalau ada deploy lebih baru, versi tidak tercatat, atau tidak terbaca: Worker tidak disentuh, instruksi manual, exit 5.
-  - Lalu `tools/sync_chat_index.py`. Rollback `partial` boleh dijalankan ulang (langkah git dilewati). Exit: 0 ok, 2 ditolak, 3 revert/reset gagal,
-    4 push gagal, 5 Worker manual, 6 indeks chat gagal.
+  - Lalu `node local/vps.mjs push` dari pohon yang sudah dikembalikan (juga bila push git revert gagal). Worker Cloudflare tidak pernah disentuh;
+    catatan lama dengan `worker_version_*` hanya diberi keterangan. Catatan `partial` ditulis sebelum push VPS dengan `"interim": true`
+    (desk menyembunyikannya bila catatan akhir dengan `started_at` yang sama ada); rollback `partial` (push VPS
+    gagal, atau skrip dihentikan di tengah push VPS) boleh dijalankan ulang: langkah git dilewati, push VPS diulang. Rollback `push_failed`
+    (exit 4) juga: commit revert yang sudah dipush manual langsung lanjut ke push VPS, yang masih di lokal (HEAD = commit revert) dipush dulu;
+    revert tidak diulang. Exit: 0 ok, 2 ditolak (termasuk node/`.local/vps.json` tidak ada), 3 revert/reset gagal, 4 push git gagal
+    (commit revert di lokal; jalankan skrip ini lagi), 5 push VPS gagal atau sisa waktu tidak cukup setelah git dikembalikan (jalankan skrip ini lagi).
   Riwayat GitHub publik tetap menyimpan versi lama; penghapusan isi butuh langkah terpisah.
 
 ---
@@ -861,8 +1027,8 @@ Membuka `site/index.html` langsung dengan dobel klik (`file://`) juga bisa, tapi
 
 | Gejala | Penyebab / solusi |
 |---|---|
-| `publish_chat.py` macet/timeout di `sync_chat_index.py` setelah deploy | DNS ISP (mis. XL) mengarahkan `*.workers.dev` ke halaman blokir. Skrip otomatis memakai IP dari DNS-over-HTTPS; pengunjung di jaringan itu tetap tidak bisa memakai chat sampai API dipindah ke domain sendiri. |
-| Chat tidak menemukan dokumen baru, padahal tampil di situs | Worker belum diperbarui: `build.py --out docs` hanya memperbarui situs. Jalankan `python3 tools/publish_chat.py`. |
+| (Lama, hanya Worker Cloudflare) `publish_chat.py` macet/timeout di `sync_chat_index.py` setelah deploy | DNS ISP (mis. XL) mengarahkan `*.workers.dev` ke halaman blokir. Skrip otomatis memakai IP dari DNS-over-HTTPS; pengunjung di jaringan itu tetap tidak bisa memakai chat sampai API dipindah ke domain sendiri. |
+| Chat tidak menemukan dokumen baru, padahal tampil di situs | VPS belum diperbarui: `build.py --out docs` hanya memperbarui riwayat GitHub. Jalankan `node local/vps.mjs push` (atau publish dari desk). `tools/publish_chat.py` hanya untuk Worker Cloudflare lama yang tidak di-deploy lagi. |
 | Dokumen masuk "Lainnya" | Nama file tidak cocok `prefixes`/`keywords`. Ganti nama file atau tambah kata kunci di `CATEGORIES`. |
 | Tanggal salah / hari ini | Tidak ada pola tanggal di nama file, jadi dipakai mtime. Tambahkan `YYYYMMDD` ke nama. |
 | Dokumen tampil sebagai teks mentah | CDN `cdnjs.cloudflare.com` diblokir / offline. Tunggu koneksi, atau ganti URL `LIBS` di `build.py`. |
