@@ -122,7 +122,8 @@ test('question changes reuse expensive source notes; document hash and client hi
  db.close();
 });
 test('missing evidence index falls back to full original for that source',async()=>{
- const index=await archive.manifest();const one=index.docs.find(d=>d.source_id==='D47');
+ // D47 was a Digest Emiten window; digests are retired from chat, so any indexed document with an evidence index serves.
+ const index=await archive.manifest();const one=index.docs.find(d=>d.source_id==='D47')||index.docs.find(d=>d.cat==='keterbukaan-informasi');
  const missing={manifest:async()=>index,search:async()=>[one],read:async path=>{if(path.endsWith('.evidence.json'))throw Error('missing');return archive.read(path);}};
  const stats={};await converse(missing,new Fake(),'SOCI',[],()=>{},null,{metrics:stats});assert.equal(stats.fallback_documents,1);
 });

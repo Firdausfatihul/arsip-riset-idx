@@ -2,11 +2,14 @@
 // from the archive; the model only summarises. Nothing here calls a model directly.
 
 const STOCKBIT_SUMMARY_LABEL = 'ringkasan diskusi Stockbit (bukan keterbukaan resmi)';
-const KIND_LABEL = {digest:'digest keterbukaan', ki:'analisis keterbukaan', stockbit:'diskusi Stockbit', other:'arsip lain',
+const BEI_SUMMARY_LABEL = 'ringkasan otomatis pengumuman resmi BEI (bukan rekomendasi; angka belum diaudit ulang)';
+const KIND_LABEL = {digest:'digest keterbukaan', ki:'analisis keterbukaan', bei:'ringkasan keterbukaan resmi BEI', stockbit:'diskusi Stockbit', other:'arsip lain',
   'stockbit-ringkasan':STOCKBIT_SUMMARY_LABEL, 'stockbit-detail':STOCKBIT_SUMMARY_LABEL, 'stockbit-pekan':STOCKBIT_SUMMARY_LABEL};
-// Label sent with each source unit of the new Stockbit categories, so the model never reads them as disclosures.
-export const sourceLabel = cat => cat?.startsWith('stockbit-') ? KIND_LABEL[cat] || STOCKBIT_SUMMARY_LABEL : null;
-const OFFICIAL = new Set(['digest', 'ki']);
+// Label sent with each source unit of the new Stockbit categories, so the model never reads them as disclosures;
+// BEI summaries are labelled as automatic summaries of official announcements.
+export const sourceLabel = cat => cat?.startsWith('stockbit-') ? KIND_LABEL[cat] || STOCKBIT_SUMMARY_LABEL
+  : cat?.startsWith('bei-') ? BEI_SUMMARY_LABEL : null;
+const OFFICIAL = new Set(['digest', 'ki', 'bei']);
 const TABLE_ROWS = 80, ITEMS = 4, EXCERPT = 170;
 const monthNames = 'Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember';
 
@@ -36,7 +39,8 @@ export function screeningGroups(events, typeIds, scope) {
   const rank = e => (OFFICIAL.has(e.kind) ? 0 : 1);
   const groups = [...byTicker.values()];
   for (const g of groups) g.items.sort((a, b) => rank(a) - rank(b) || b.end.localeCompare(a.end));
-  groups.sort((a, b) => (a.kinds.has('digest') || a.kinds.has('ki') ? 0 : 1) - (b.kinds.has('digest') || b.kinds.has('ki') ? 0 : 1)
+  const official = g => [...g.kinds].some(k => OFFICIAL.has(k)) ? 0 : 1;
+  groups.sort((a, b) => official(a) - official(b)
     || b.last.localeCompare(a.last) || a.ticker.localeCompare(b.ticker));
   return groups;
 }

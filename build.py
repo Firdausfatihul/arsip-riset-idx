@@ -76,10 +76,37 @@ CATEGORIES = {
         "prefixes": ("sbpekan",),
         "keywords": (),
     },
-    "keterbukaan-informasi": {
-        "name": "Keterbukaan Informasi",
+    # Diisi tools/sync_idx.py --bei-only dari ekspor IDX Signal Desk (beiringkas_/beidetail_/beipekan_). Awalan ini
+    # dicocokkan sebelum kata kunci KI di bawah, jadi "beiringkas_..." tidak pernah jatuh ke Analisis KI (legacy).
+    "bei-ringkasan": {
+        "name": "Ringkasan keterbukaan BEI",
         "nav": "Indonesia (BEI)",
-        "blurb": "Pemeriksaan pengumuman keterbukaan informasi emiten Bursa Efek Indonesia.",
+        "blurb": ("Ringkasan harian otomatis dari pengumuman resmi di idx.co.id: apa yang baru hari ini dibanding progres "
+                  "pengumuman emiten itu sebelumnya. Bukan rekomendasi; angka dikutip dari dokumen emiten dan belum diaudit ulang."),
+        "prefixes": ("beiringkas",),
+        "keywords": (),
+    },
+    "bei-detail": {
+        "name": "Detail BEI",
+        "blurb": ("Semua pengumuman harian per emiten, lengkap dengan fakta, angka, riwayat, dan jadwal. "
+                  "Ringkasan otomatis dari pengumuman resmi di idx.co.id; bukan rekomendasi."),
+        "prefixes": ("beidetail",),
+        "keywords": (),
+    },
+    "bei-pekan": {
+        "name": "BEI mingguan",
+        "blurb": ("Rekap Senin–Minggu dari ringkasan keterbukaan BEI harian, disusun tanpa LLM. "
+                  "Bukan rekomendasi; angka dikutip dari dokumen emiten dan belum diaudit ulang."),
+        "prefixes": ("beipekan",),
+        "keywords": (),
+    },
+    # Analisis KI buatan tangan (ki_*.md) dipensiunkan: tanpa tombol sumber (nav None), tetap dibangun dan bisa dicari
+    # supaya tautan #doc= lama tetap jalan. Selama belum ada ringkasan BEI, tombol "Indonesia (BEI)" tetap menunjuk ke sini.
+    "keterbukaan-informasi": {
+        "name": "Analisis KI (legacy)",
+        "nav": None,
+        "blurb": ("Arsip lama: pemeriksaan pengumuman keterbukaan informasi emiten BEI yang disusun manual sampai Oktober 2026. "
+                  "Tidak diperbarui lagi; ringkasan harian baru ada di Indonesia (BEI)."),
         "prefixes": ("ki", "idx"),
         "keywords": ("keterbukaan", "pemeriksaan", "emiten", "digest", "disclosure"),
     },
@@ -98,9 +125,13 @@ CATEGORIES = {
         "keywords": (),
     },
     # Diisi otomatis oleh tools/sync_idx.py dari IDX Signal Desk (kepemilikan saham punya tab sendiri, bukan kategori).
+    # Dipensiunkan: tanpa tombol sumber dan tidak tampil di daftar utama ("unlisted"), tetapi berkasnya tetap dibangun
+    # sehingga tautan #doc= lama tetap jalan. Sinkronnya mati kecuali tools/sync_idx.py --with-digests.
     "digest-emiten": {
         "name": "Digest Emiten",
-        "blurb": "Ringkasan per emiten dari IDX Signal Desk, satu berkas per jendela tanggal yang tersimpan.",
+        "nav": None,
+        "unlisted": True,
+        "blurb": "Arsip lama: ringkasan per emiten dari IDX Signal Desk, satu berkas per jendela tanggal yang tersimpan.",
         "prefixes": ("digest",),
         "keywords": (),
     },
@@ -148,7 +179,10 @@ PRICES_PATH = "files/kepemilikan/harga.json"
 # Indeks lintas hari ringkasan Stockbit (tools/sync_idx.py --stockbit-only); viewer mengambilnya untuk #emiten= / #pengguna=.
 SB_INDEX_SRC = SRC / "idx-signal-desk" / "stockbit-index.json"
 SB_INDEX_PATH = "files/stockbit-index/stockbit-index.json"
-# Ringkasan Stockbit yang lebih tua dari ini (dihitung dari hari ringkasan terbaru) diambil saat dibuka, tidak di-embed.
+# Indeks lintas hari ringkasan keterbukaan BEI (tools/sync_idx.py --bei-only); bagian BEI di halaman #emiten=.
+BEI_INDEX_SRC = SRC / "idx-signal-desk" / "bei-index.json"
+BEI_INDEX_PATH = "files/bei-index/bei-index.json"
+# Ringkasan Stockbit/BEI yang lebih tua dari ini (dihitung dari hari ringkasan terbaru sumbernya) diambil saat dibuka, tidak di-embed.
 SB_EMBED_DAYS = 7
 # Peringatan build kalau index.html melewati ukuran ini (konten di-embed bisa membengkak tanpa terasa).
 PAGE_WARN_BYTES = 15 * 1024 * 1024
@@ -540,6 +574,7 @@ mark{background:var(--mark);color:var(--mark-ink);border-radius:2px;padding:0 1p
 [data-cat="stockbit"]{--c:var(--sb);--c-soft:var(--sb-soft)}
 [data-cat="stockbit-ringkasan"],[data-cat="stockbit-detail"],[data-cat="stockbit-pekan"]{--c:var(--sb);--c-soft:var(--sb-soft)}
 [data-cat="keterbukaan-informasi"]{--c:var(--kip);--c-soft:var(--kip-soft)}
+[data-cat="bei-ringkasan"],[data-cat="bei-detail"],[data-cat="bei-pekan"]{--c:var(--kip);--c-soft:var(--kip-soft)}
 [data-cat="digest-emiten"]{--c:var(--dg);--c-soft:var(--dg-soft)}
 [data-cat="keterbukaan-australia"]{--c:var(--asx);--c-soft:var(--asx-soft)}
 [data-cat="keterbukaan-singapura"]{--c:var(--sgx);--c-soft:var(--sgx-soft)}
@@ -790,6 +825,13 @@ a.chip:hover{outline:1px solid var(--c)}
 .sb-judgement h3{margin:6px 0 0;font:600 13px/1.4 var(--sans);color:var(--muted)}
 .sb-refs{font:13px/1.6 var(--mono);color:var(--faint)}
 .prose .sb-hist{font:500 13px var(--mono)}
+.em-sec{display:grid;gap:10px;min-width:0}
+.em-sec+.em-sec{padding-top:8px;border-top:1px solid var(--line)}
+.em-title{display:flex;align-items:center;gap:10px;margin:0;font:600 24px/1.25 var(--cond)}
+.em-sec .meta{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font:13px var(--mono);color:var(--faint)}
+.em-name{margin:4px 0 0;color:var(--muted)}
+.cat-legacy{margin:-8px 0 16px;font-size:15px}
+.cat-legacy a{color:var(--muted)}
 
 /* kepemilikan saham */
 .own-flag{display:block;margin-top:4px;font:500 13px/1.4 var(--sans);color:var(--down)}
@@ -961,6 +1003,9 @@ APP_JS = r"""
   var lazyDocs = docs.filter(function(d){ return d.lazy; }), bulk = null;
   // Detail Stockbit (semua temuan per hari) tidak ikut diambil massal saat mencari; kodenya tetap tercari lewat d.tickers.
   var searchLazy = lazyDocs.filter(function(d){ return d.cat !== 'stockbit-detail'; });
+  // Sama untuk detail BEI, dan dokumen yang dipensiunkan dari daftar (Digest Emiten): tetap bisa dibuka lewat #doc=, tidak ikut dicari.
+  searchLazy = searchLazy.filter(function(d){ return d.cat !== 'bei-detail' && !d.unlisted; });
+  var listedCount = docs.filter(function(d){ return !d.unlisted; }).length;
   function loadDoc(d){
     if (d.content != null) return Promise.resolve(d);
     if (!d.loading){
@@ -1319,6 +1364,7 @@ APP_JS = r"""
       prose.innerHTML = html;
       var info = enhance(prose, doc);
       sbDecorate(prose, doc);
+      beiDecorate(prose, doc);
       doc.codeMap = Object.create(null);
       info.emiten.forEach(function(e){ doc.codeMap[e[1].toLowerCase()] = e[0]; });
       prose.insertAdjacentHTML('beforebegin', tocHtml(info, doc));
@@ -1333,7 +1379,8 @@ APP_JS = r"""
     // .doc-loading masih tampil = dokumen besar belum/tidak jadi dirender (mis. ditinggal saat memuat): render ulang.
     if (fresh || (doc.kind !== 'html' && (renderedQuery !== q || reader.querySelector('.doc-loading')))) renderDoc(doc, q);
     overview.hidden = true; reader.hidden = false;
-    selectedCategory = doc.cat;
+    // Dokumen unlisted (Digest Emiten lama lewat #doc=) tidak punya daftar sendiri: '← Daftar' kembali ke sumber yang ada.
+    selectedCategory = doc.unlisted ? (listedCategory(selectedCategory) ? selectedCategory : homeCategory()) : doc.cat;
     markSource();
     track(doc.key);
     document.title = doc.title + ' · ' + siteTitle;
@@ -1349,8 +1396,18 @@ APP_JS = r"""
     return !!target;
   }
 
+  function listedCategory(cat){
+    var el = cat && document.getElementById(cat);
+    return !!(el && el.classList.contains('cat'));
+  }
+  function homeCategory(){
+    if (listedCategory('bei-ringkasan')) return 'bei-ringkasan';
+    var first = firstSource ? firstSource.getAttribute('data-cat') : '', cat = document.querySelector('#overview .cat');
+    return listedCategory(first) ? first : cat ? cat.id : '';
+  }
   function showOverview(){
     reader.hidden = true; overview.hidden = false;
+    if (!listedCategory(selectedCategory)) selectedCategory = homeCategory();
     document.title = siteTitle;
     filter();
     track('home');
@@ -2782,15 +2839,12 @@ APP_JS = r"""
       return fmtNum(v[k]) + ' ' + (hasKey(SB_EP, k) ? SB_EP[k] : k.slice(0, 20));
     }).join(' · ');
   }
-  function sbEmitenView(d, code){
+  // Bagian "Diskusi Stockbit" di halaman #emiten= (disclaimer Stockbit hanya di bagian ini).
+  function sbEmitenSection(d, code){
     var rows = sbRows(d, hasKey(d.tickers, code) ? d.tickers[code] : null), posts = 0, found = 0;
     rows.forEach(function(r){ posts += sbNum(r[1]); found += sbNum(r[3]); });
-    var view = sbEl('div', {'class': 'sb-view'}, sbHead('Emiten', code,
-      [fmtNum(rows.length) + ' hari', fmtNum(posts) + ' posting', fmtNum(found) + ' temuan']));
-    var links = [];
-    if (own && own.tickers.indexOf(code) !== -1) links.push(sbEl('a', {href: '#kepemilikan=' + encodeURIComponent(code)}, 'Kepemilikan saham ' + code + ' →'));
-    var body = sbEl('div', {'class': 'sb-body'});
-    if (links.length) body.append(sbEl('p', null, links));
+    var body = emSection('stockbit-ringkasan', 'em-stockbit', 'Diskusi Stockbit', SB_NOTE,
+      rows.length ? [fmtNum(rows.length) + ' hari', fmtNum(posts) + ' posting', fmtNum(found) + ' temuan'] : null);
     if (!rows.length){
       body.append(sbEl('p', {'class': 'doc-loading'}, code + ' belum muncul di ringkasan Stockbit yang terindeks.'));
     } else {
@@ -2804,8 +2858,7 @@ APP_JS = r"""
           sbEl('td', {'class': 'n'}, fmtNum(found)), sbEl('td', null, sbText(inti)), sbEl('td', null, sbEp(r[5]))]);
       })));
     }
-    view.append(body);
-    return view;
+    return body;
   }
   function sbUserKey(d, handle){
     if (hasKey(d.users, handle)) return handle;
@@ -2878,6 +2931,7 @@ APP_JS = r"""
     var routeKey = kind + '=' + key, fresh = routeKey !== sbRoute || reader.hidden || current;
     sbRoute = routeKey; current = null; renderedQuery = null;
     overview.hidden = true; reader.hidden = false;
+    if (kind === 'emiten'){ showEmiten(key, routeKey, fresh); return; }
     reader.setAttribute('data-cat', 'stockbit-ringkasan');
     selectedCategory = 'stockbit-ringkasan'; markSource();
     document.title = (kind === 'emiten' ? key : '@' + key) + ' · Ringkasan Stockbit · ' + siteTitle;
@@ -2888,7 +2942,7 @@ APP_JS = r"""
     }
     function paint(){
       if (sbRoute !== routeKey || reader.hidden || current) return;
-      reader.replaceChildren(kind === 'emiten' ? sbEmitenView(sbData, key) : sbPenggunaView(sbData, key));
+      reader.replaceChildren(sbPenggunaView(sbData, key));
     }
     if (!key){ status('Tulis kode emiten atau @pengguna.'); return; }
     if (!sbMeta){ status('Indeks ringkasan Stockbit belum tersedia di arsip ini.'); return; }
@@ -2896,6 +2950,153 @@ APP_JS = r"""
     status('Memuat indeks ringkasan Stockbit…');
     loadSb().then(paint, function(){ if (sbRoute === routeKey && !reader.hidden && !current) status('Indeks ringkasan Stockbit gagal dimuat.', true); });
   }
+  // ---- halaman emiten gabungan: keterbukaan resmi BEI + diskusi Stockbit -------------------------
+  // #emiten=KODE membaca files/bei-index/bei-index.json (tools/sync_idx.py --bei-only) dan stockbit-index.json, masing-masing
+  // diambil sekali. Bagian BEI di atas, Stockbit di bawah; label dan disclaimer terpisah. Kode yang hanya ada di salah satu
+  // indeks tetap punya halaman, dan satu indeks yang gagal dimuat tidak menyembunyikan bagian lainnya.
+  // Semua string dari indeks masuk lewat textContent/atribut DOM, tidak pernah sebagai HTML.
+  var beiMeta = data.bei, beiData = null, beiLoading = null;
+  var BEI_NOTE = 'Ringkasan otomatis dari pengumuman resmi di idx.co.id; bukan rekomendasi. Angka dikutip dari dokumen emiten dan belum diaudit ulang.';
+  function validateBei(d){
+    function require(ok){ if (!ok) throw new Error('Struktur indeks BEI tidak valid.'); }
+    function map(v){ return v != null && typeof v === 'object' && !Array.isArray(v); }
+    require(map(d) && d.format === 1 && Array.isArray(d.days) && d.days.length <= 20000 && map(d.tickers));
+    require(d.names == null || map(d.names));
+    d.days.forEach(function(x){ require(map(x) && typeof x.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.d)); });
+  }
+  function loadBei(){
+    if (beiData) return Promise.resolve(beiData);
+    if (!beiLoading){
+      beiLoading = fetch(beiMeta.path + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function(d){ validateBei(d); beiData = d; beiLoading = null; return d; })
+        .catch(function(e){ beiLoading = null; throw e; });
+    }
+    return beiLoading;
+  }
+  function emSection(cat, cls, title, note, meta){
+    var sec = sbEl('section', {'class': 'em-sec ' + cls, 'data-cat': cat, 'aria-label': title}, [
+      sbEl('h2', {'class': 'em-title'}, [sbEl('span', {'class': 'swatch'}), title]),
+      meta ? sbEl('p', {'class': 'meta'}, meta.map(function(m){ return sbEl('span', null, m); })) : null,
+      sbEl('p', {'class': 'sb-note'}, note)
+    ]);
+    return sec;
+  }
+  function beiCats(v){
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return '';
+    return Object.keys(v).filter(function(k){ return sbNum(v[k]) > 0; }).slice(0, 12).map(function(k){
+      return k.slice(0, 40) + ' ' + fmtNum(v[k]);
+    }).join(' · ');
+  }
+  function beiDayText(day){ return /^\d{4}-\d{2}-\d{2}$/.test(day.d) ? sbDayText(day.d) : ''; }
+  // Bagian ringkasan untuk emiten non-rutin, dari petunjuk desk di baris[8]: id bagian ('bbca', 'emiten-lain', ...),
+  // true (punya blok ### KODE) / false (hanya satu baris di "Emiten lain"), atau objek {s|section|anchor}. Tanpa petunjuk: null.
+  function beiAnchor(hint, code){
+    if (hint && typeof hint === 'object' && !Array.isArray(hint))
+      hint = hasKey(hint, 's') ? hint.s : hasKey(hint, 'section') ? hint.section : hasKey(hint, 'anchor') ? hint.anchor : null;
+    if (hint === true) return code.toLowerCase();
+    if (hint === false) return 'emiten-lain';
+    return typeof hint === 'string' && /^[a-z0-9][a-z0-9-]{0,80}$/i.test(hint) ? hint.toLowerCase() : null;
+  }
+  // Bagian "Keterbukaan resmi BEI": Tanggal | Pengumuman | Status/Tahap | Yang berubah | Kategori, terbaru dulu.
+  function beiEmitenSection(d, code){
+    var rows = sbRows(d, hasKey(d.tickers, code) ? d.tickers[code] : null), anns = 0;
+    rows.forEach(function(r){ anns += sbNum(r[1]); });
+    var sec = emSection('bei-ringkasan', 'em-bei', 'Keterbukaan resmi BEI', BEI_NOTE,
+      rows.length ? [fmtNum(rows.length) + ' hari', fmtNum(anns) + ' pengumuman'] : null);
+    if (!rows.length){
+      sec.append(sbEl('p', {'class': 'doc-loading'}, code + ' belum muncul di ringkasan keterbukaan BEI yang terindeks.'));
+      return sec;
+    }
+    sec.append(sbTable(['Tanggal', 'Pengumuman', 'Status/Tahap', 'Yang berubah', 'Kategori'], rows.map(function(r){
+      var day = d.days[r[0]], ring = sbDoc(day.f), det = sbDoc(day.detail), label = beiDayText(day);
+      var n = sbNum(r[1]), nonroutine = sbNum(r[2]), lower = code.toLowerCase();
+      // Emiten yang hari itu hanya punya laporan rutin muncul di bagian "Laporan rutin" ringkasan, bukan di bloknya sendiri.
+      // Emiten non-rutin tanpa blok sendiri di ringkasan hanya satu baris di "Emiten lain"; tanpa petunjuk desk tanggalnya
+      // menuju detail, yang selalu punya ## KODE, dan ringkasan jadi tautan kedua.
+      var section = nonroutine ? beiAnchor(r[8], code) : 'laporan-rutin';
+      var toDetail = !!(nonroutine && !section && det), main = toDetail ? det : ring;
+      var date = sbEl('td', {'class': 'd'}, main ? sbEl('a', {href: docRoute(main.path, toDetail ? lower : section || lower)}, label)
+        : sbEl('span', null, label));
+      if (day.k && day.k !== 'final') date.append(' · ' + sbText(day.k, 20));
+      if (toDetail && ring) date.append(sbEl('br'), sbEl('a', {href: docRoute(ring.path)}, 'ringkasan'));
+      else if (det && nonroutine) date.append(sbEl('br'), sbEl('a', {href: docRoute(det.path, lower)}, 'detail'));
+      var ids = sbIds(r[7]).slice(0, 40);
+      var count = sbEl('td', {'class': 'n', title: ids.length ? 'Id pengumuman: ' + ids.join(', ') : null},
+        fmtNum(n) + (nonroutine !== n ? ' · ' + fmtNum(nonroutine) + ' non-rutin' : ''));
+      var stage = [sbText(r[3], 60), sbText(r[4], 80)].filter(function(t){ return t; }).join(' · ');
+      return sbEl('tr', null, [date, count, sbEl('td', null, stage), sbEl('td', null, sbText(r[5], 300)), sbEl('td', null, beiCats(r[6]))]);
+    })));
+    return sec;
+  }
+  function emName(code){
+    var n = beiData && beiData.names && hasKey(beiData.names, code) ? beiData.names[code] : null;
+    return typeof n === 'string' ? n.slice(0, 120) : '';
+  }
+  function emHead(code){
+    var back = document.getElementById('bei-ringkasan') ? '#bei-ringkasan' : document.getElementById('stockbit-ringkasan') ? '#stockbit-ringkasan' : '#';
+    var name = emName(code);
+    return [
+      sbEl('nav', {'class': 'crumbs', 'aria-label': 'Lokasi'}, [sbEl('a', {href: back}, '← Daftar'), sbEl('span', null, '/'), sbEl('span', null, 'Emiten')]),
+      sbEl('header', {'class': 'doc-head'}, [
+        sbEl('p', {'class': 'kicker'}, [sbEl('span', {'class': 'swatch'}), 'Emiten']),
+        sbEl('h1', null, code),
+        name ? sbEl('p', {'class': 'meta em-name'}, sbEl('span', null, name)) : null
+      ])
+    ];
+  }
+  function emFailed(cat, cls, title, note, what){
+    var sec = emSection(cat, cls, title, note, null);
+    sec.append(sbEl('div', {'class': 'doc-loading', role: 'status'}, [sbEl('p', null, what + ' gagal dimuat.'),
+      sbEl('button', {type: 'button', 'class': 'sb-retry', 'data-sb-retry': ''}, 'Coba lagi')]));
+    return sec;
+  }
+  function emitenView(code, bei, sb){
+    var view = sbEl('div', {'class': 'sb-view em-view'}, emHead(code));
+    var body = sbEl('div', {'class': 'sb-body'});
+    if (own && own.tickers.indexOf(code) !== -1)
+      body.append(sbEl('p', null, sbEl('a', {href: '#kepemilikan=' + encodeURIComponent(code)}, 'Kepemilikan saham ' + code + ' →')));
+    if (beiMeta) body.append(bei ? beiEmitenSection(bei, code) : emFailed('bei-ringkasan', 'em-bei', 'Keterbukaan resmi BEI', BEI_NOTE, 'Indeks keterbukaan BEI'));
+    if (sbMeta) body.append(sb ? sbEmitenSection(sb, code) : emFailed('stockbit-ringkasan', 'em-stockbit', 'Diskusi Stockbit', SB_NOTE, 'Indeks ringkasan Stockbit'));
+    view.append(body);
+    return view;
+  }
+  function showEmiten(code, routeKey, fresh){
+    var cat = beiMeta ? 'bei-ringkasan' : 'stockbit-ringkasan';
+    reader.setAttribute('data-cat', cat);
+    selectedCategory = document.getElementById(cat) ? cat : selectedCategory; markSource();
+    document.title = (code || 'Emiten') + ' · Emiten · ' + siteTitle;
+    if (fresh) window.scrollTo(0, 0);
+    function status(text){
+      reader.replaceChildren(sbEl('div', {'class': 'sb-view em-view'}, emHead(code).concat(
+        sbEl('div', {'class': 'doc-loading', role: 'status'}, sbEl('p', null, text)))));
+    }
+    function live(){ return sbRoute === routeKey && !reader.hidden && !current; }
+    if (!code){ status('Tulis kode emiten.'); return; }
+    if (!beiMeta && !sbMeta){ status('Indeks ringkasan BEI dan Stockbit belum tersedia di arsip ini.'); return; }
+    if ((!beiMeta || beiData) && (!sbMeta || sbData)){ reader.replaceChildren(emitenView(code, beiData, sbData)); return; }
+    status('Memuat indeks emiten…');
+    function settle(on, loader){ return on ? loader().then(function(d){ return d; }, function(){ return null; }) : Promise.resolve(null); }
+    Promise.all([settle(beiMeta, loadBei), settle(sbMeta, loadSb)]).then(function(res){
+      if (live()) reader.replaceChildren(emitenView(code, res[0], res[1]));
+    });
+  }
+  // "riwayat lintas hari" di dokumen BEI (judul emiten), dibuat dengan DOM.
+  function beiDecorate(root, doc){
+    if (!beiMeta || !/^bei-/.test(doc.cat)) return;
+    root.querySelectorAll('.emiten-top, .emiten > h3').forEach(function(hd){
+      var t = hd.querySelector('.ticker');
+      if (t && TICK.test(t.textContent)) hd.append(sbEl('a', {'class': 'sb-hist', href: '#emiten=' + t.textContent}, 'riwayat lintas hari →'));
+    });
+  }
+  document.querySelectorAll('[data-bei-find]').forEach(function(form){
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var v = form.querySelector('input').value.trim().toUpperCase();
+      if (/^[A-Z][A-Z0-9]{1,7}$/.test(v)) location.hash = '#emiten=' + v;
+    });
+  });
   // Tautan "@nama" dan "riwayat lintas hari" di dokumen Stockbit baru, dibuat dengan DOM (teks tetap teks).
   function sbDecorate(root, doc){
     if (!sbMeta || !/^stockbit-/.test(doc.cat)) return;
@@ -2937,6 +3138,7 @@ APP_JS = r"""
   function filter(){
     var raw = input.value.trim().slice(0,128), q = raw.toLowerCase(), shown = 0;
     docs.forEach(function(d){
+      if (d.unlisted) return;  // dipensiunkan: tidak ada di daftar, tetap bisa dibuka lewat #doc=
       var hits = q ? count(d.body, q) : 0;
       var hit = q ? hits > 0 || d.hay.indexOf(q) !== -1 : d.cat === selectedCategory;
       if (hit) shown++;
@@ -2957,10 +3159,13 @@ APP_JS = r"""
     var code = raw.toUpperCase(), ownHint = own && own.tickers.indexOf(code) !== -1 ?
       ' · <a href="#kepemilikan=' + encodeURIComponent(code) + '">Kepemilikan saham ' + esc(code) + ' →</a>' : '';
     var sbHint = '';
+    function inDaily(cat){ return docs.some(function(d){ return d.cat === cat && d.tickers.indexOf(code) !== -1; }); }
+    var inSb = sbMeta && TICK.test(code) && inDaily('stockbit-ringkasan'), inBei = beiMeta && TICK.test(code) && inDaily('bei-ringkasan');
     if (sbMeta && /^@[A-Za-z0-9_.]{2,64}$/.test(raw)) sbHint = ' · <a href="' + esc(sbHref(raw)) + '">' + esc(raw) + ' di ringkasan Stockbit →</a>';
-    else if (sbMeta && TICK.test(code) && docs.some(function(d){ return d.cat === 'stockbit-ringkasan' && d.tickers.indexOf(code) !== -1; }))
-      sbHint = ' · <a href="#emiten=' + encodeURIComponent(code) + '">' + esc(code) + ' di ringkasan Stockbit →</a>';
-    note.innerHTML = q ? esc(shown + ' dari ' + docs.length + ' dokumen (semua sumber) memuat “' + raw + '”' +
+    else if (inSb || inBei)
+      sbHint = ' · <a href="#emiten=' + encodeURIComponent(code) + '">' + esc(code) +
+        (inBei && inSb ? ' di keterbukaan BEI dan ringkasan Stockbit →' : inBei ? ' di keterbukaan BEI →' : ' di ringkasan Stockbit →') + '</a>';
+    note.innerHTML = q ? esc(shown + ' dari ' + listedCount + ' dokumen (semua sumber) memuat “' + raw + '”' +
       (raw.length >= 2 && waiting ? ' · memuat isi ' + waiting + ' dokumen besar…' : '') +
       (raw.length >= 2 && failed ? ' · isi ' + failed + ' dokumen besar belum dicari' : '')) + ownHint + sbHint +
       (!reader.hidden ? ' · <a href="#">Daftar hasil pencarian →</a>' : '') : '';
@@ -3050,21 +3255,47 @@ def groups_by_day(docs):
             for k in sorted(groups, key=lambda k: (k[1], k[0]), reverse=True)]
 
 
+# Detail harian selalu diambil saat dibuka; ringkasan harian lama juga (lihat SB_EMBED_DAYS).
+ALWAYS_LAZY = ("stockbit-detail", "bei-detail")
+DAILY_SUMMARIES = ("stockbit-ringkasan", "bei-ringkasan")
+
+
+def unlisted(cat):
+    """Kategori yang dipensiunkan dari daftar utama (berkas tetap dibangun untuk tautan #doc= lama)."""
+    return bool(CATEGORIES.get(cat, {}).get("unlisted"))
+
+
 def embed_entries(docs):
-    """Rekaman dokumen untuk payload halaman; isi besar dan Stockbit lama/detail diambil saat dibuka (lazy)."""
-    newest_sb = max((d["_end"] for d in docs if d["cat"] == "stockbit-ringkasan"), default=None)
+    """Rekaman dokumen untuk payload halaman; isi besar dan Stockbit/BEI lama/detail diambil saat dibuka (lazy).
+
+    Dokumen kategori unlisted (Digest Emiten) ditandai "unlisted": viewer tidak menghitung atau mengambilnya saat mencari.
+    """
+    newest = {cat: max((d["_end"] for d in docs if d["cat"] == cat), default=None) for cat in DAILY_SUMMARIES}
     entries = []
     for d in docs:
         entry = {k: v for k, v in d.items() if not k.startswith("_") and k != "raw"}
         lazy = d["kind"] != "html" and (
             d["size"] > EMBED_LIMIT
-            or d["cat"] == "stockbit-detail"
-            or (d["cat"] == "stockbit-ringkasan" and d["_end"] < newest_sb - timedelta(days=SB_EMBED_DAYS)))
+            or d["cat"] in ALWAYS_LAZY
+            or (d["cat"] in DAILY_SUMMARIES and d["_end"] < newest[d["cat"]] - timedelta(days=SB_EMBED_DAYS)))
         if lazy:
             del entry["content"]
             entry["lazy"] = True
+        if unlisted(d["cat"]):
+            entry["unlisted"] = True
         entries.append(entry)
     return entries
+
+
+def bei_find_form(key):
+    return (f'<form class="sb-find" data-bei-find role="search"><label for="bei-cari-{key}">Cari emiten di ringkasan keterbukaan BEI</label>'
+            f'<div class="sb-find-row"><input id="bei-cari-{key}" type="search" maxlength="12" autocomplete="off" spellcheck="false" '
+            'placeholder="Mis. BBCA"><button type="submit">Buka</button></div></form>')
+
+
+def legacy_link():
+    return ('<p class="cat-legacy"><a href="#keterbukaan-informasi">'
+            f'{esc(CATEGORIES["keterbukaan-informasi"]["name"])}: analisis manual lama →</a></p>')
 
 
 def sb_find_form(key):
@@ -3073,15 +3304,29 @@ def sb_find_form(key):
             'placeholder="Mis. BBCA atau @nama"><button type="submit">Buka</button></div></form>')
 
 
-def build_page(docs, by_cat, own=None, sb=None):
+def nav_label(key, by_cat):
+    """Label tombol sumber, atau None (tanpa tombol). nav None = kategori dipensiunkan dari navigasi; Analisis KI (legacy)
+    tetap memakai tombol "Indonesia (BEI)" selama arsip belum punya ringkasan BEI, supaya daftarnya tidak hilang dari navigasi."""
+    cat = CATEGORIES[key]
+    if key == "keterbukaan-informasi" and "bei-ringkasan" not in by_cat:
+        return CATEGORIES["bei-ringkasan"]["nav"]
+    return cat.get("nav", cat["name"])
+
+
+def build_page(docs, by_cat, own=None, sb=None, bei=None):
     chat_js = (ROOT / "chat.js").read_text(encoding="utf-8")
-    first = min((d["_start"] for d in docs), default=None)
-    last = max((d["_end"] for d in docs), default=None)
-    span = date_label(first, last) if docs else "belum ada dokumen"
+    listed_docs = [d for d in docs if not unlisted(d["cat"])]
+    first = min((d["_start"] for d in listed_docs), default=None)
+    last = max((d["_end"] for d in listed_docs), default=None)
+    span = date_label(first, last) if listed_docs else "belum ada dokumen"
     sections, category_links = [], []
     for key, cdocs in by_cat.items():
         cat = CATEGORIES[key]
-        category_links.append(f'<a href="#{key}" data-cat="{key}"><span class="swatch" aria-hidden="true"></span>{esc(cat.get("nav", cat["name"]))}</a>')
+        if unlisted(key):
+            continue  # tanpa tombol dan tanpa daftar; dokumennya tetap ada di payload untuk #doc=
+        label = nav_label(key, by_cat)
+        if label:
+            category_links.append(f'<a href="#{key}" data-cat="{key}"><span class="swatch" aria-hidden="true"></span>{esc(label)}</a>')
         days_main = []
         for (start, end, precision), items in groups_by_day(cdocs):
             num, my, wd = day_parts(start, end, precision)
@@ -3094,6 +3339,8 @@ def build_page(docs, by_cat, own=None, sb=None):
                         f'<span class="cat-count">{len(cdocs)} dokumen</span></div>'
                         f'<p class="cat-blurb">{esc(cat["blurb"])}</p>'
                         + (sb_find_form(key) if sb and key in ("stockbit", "stockbit-ringkasan") else "")
+                        + (bei_find_form(key) if bei and key == "bei-ringkasan" else "")
+                        + (legacy_link() if key == "bei-ringkasan" and "keterbukaan-informasi" in by_cat else "")
                         + f'<div class="ledger">{"".join(days_main)}</div></section>')
 
     raw_links = "".join(f'<li><a href="{esc(d["path"])}">{esc(d["title"])}</a> ({esc(d["label"])})</li>' for d in docs)
@@ -3104,6 +3351,7 @@ def build_page(docs, by_cat, own=None, sb=None):
     "docs": entries,
     "own": own and {k: own[k] for k in ("path", "changes", "reports", "prices", "months", "count", "tickers")},
     "stockbit": sb and {k: sb[k] for k in ("path", "days", "tickers", "users")},
+    "bei": bei and {k: bei[k] for k in ("path", "days", "tickers")},
     }
     data_json = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
     desc = ("Arsip riset pasar modal: Stockbit, keterbukaan informasi Indonesia, Australia, Singapura, "
@@ -3117,7 +3365,7 @@ def build_page(docs, by_cat, own=None, sb=None):
             f'<link rel="stylesheet" href="{FONTS}"><style>{CSS}</style>')
     tabs = ('<nav class="tabs" aria-label="Tampilan">'
             f'<a class="wordmark" href="#">{SITE_NAME}</a>'
-            f'<a class="tab" data-tab="docs" href="#" aria-current="page">Dokumen <span class="n">{len(docs)}</span></a>'
+            f'<a class="tab" data-tab="docs" href="#" aria-current="page">Dokumen <span class="n">{len(listed_docs)}</span></a>'
             + (f'<a class="tab" data-tab="own" href="#kepemilikan=">Kepemilikan Saham <span class="n">{angka(own["count"])} emiten</span></a>' if own else "")
             + "</nav>")
     own_view = ""
@@ -3162,7 +3410,7 @@ def build_page(docs, by_cat, own=None, sb=None):
             '<header class="masthead">'
             "<h1>Arsip riset pasar modal</h1>"
             '<p class="lede">Stockbit dan keterbukaan informasi Indonesia, Australia, Singapura.</p>'
-            f'<p class="tally"><span><b>{len(docs)}</b> dokumen</span><span><b>{len(by_cat)}</b> sumber</span>'
+            f'<p class="tally"><span><b>{len(listed_docs)}</b> dokumen</span><span><b>{len(category_links)}</b> sumber</span>'
             f"<span>{esc(span)}</span>"
             + stat_span("home", live_label="di beranda", always_live=True)
             + '<span class="stat stat-online" hidden></span></p></header>'
@@ -3220,6 +3468,24 @@ def stockbit_meta():
             or any(not isinstance(d, dict) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(d.get("d", ""))) for d in days)):
         raise ValueError("Struktur stockbit-index.json tidak valid.")
     return {"path": SB_INDEX_PATH, "days": len(days), "tickers": len(tickers), "users": len(users)}
+
+
+def bei_meta():
+    """Ringkasan bei-index.json untuk payload halaman, atau None kalau belum disinkron.
+
+    Hanya bentuk luar yang diperiksa di sini (format dan tanggal); viewer memvalidasi ulang setiap baris saat dimuat.
+    """
+    if not BEI_INDEX_SRC.is_file():
+        return None
+    check_source(BEI_INDEX_SRC, SRC)
+    raw = json.loads(BEI_INDEX_SRC.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or raw.get("format") != 1:
+        raise ValueError("Format bei-index.json tidak dikenal.")
+    days, tickers, names = raw.get("days") or [], raw.get("tickers") or {}, raw.get("names") or {}
+    if (not isinstance(days, list) or not isinstance(tickers, dict) or not isinstance(names, dict)
+            or any(not isinstance(d, dict) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(d.get("d", ""))) for d in days)):
+        raise ValueError("Struktur bei-index.json tidak valid.")
+    return {"path": BEI_INDEX_PATH, "days": len(days), "tickers": len(tickers)}
 
 
 def robots_txt(base_url=""):
@@ -3297,7 +3563,11 @@ def main():
     if sb:
         (out / SB_INDEX_PATH).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(SB_INDEX_SRC, out / SB_INDEX_PATH)
-    head, body = build_page(docs, by_cat, own, sb)
+    bei = bei_meta()
+    if bei:
+        (out / BEI_INDEX_PATH).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(BEI_INDEX_SRC, out / BEI_INDEX_PATH)
+    head, body = build_page(docs, by_cat, own, sb, bei)
     chat_js = (ROOT / "chat.js").read_text()
     endpoint = urlsplit(CHAT_API_URL)
     if CHAT_API_URL.startswith("/") and not CHAT_API_URL.startswith("//"):
@@ -3336,6 +3606,8 @@ def main():
     if sb:
         print(f"{'Indeks Stockbit':<22} {sb['days']} hari, {sb['tickers']} emiten, {sb['users']} pengguna "
               f"{SB_INDEX_SRC.name} -> {SB_INDEX_PATH}")
+    if bei:
+        print(f"{'Indeks BEI':<22} {bei['days']} hari, {bei['tickers']} emiten {BEI_INDEX_SRC.name} -> {BEI_INDEX_PATH}")
     if own:
         print(f"{'Kepemilikan Saham':<22} {own['months'][0]['p']} s/d {own['months'][-1]['p']:<12} {OWN_SRC.name} -> {OWN_PATH} "
               f"({own['count']} emiten, {len(own['months'])} bulan, {sum(1 for m in own['months'] if m['asOf'])} bulan KSEI)")

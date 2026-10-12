@@ -4,10 +4,13 @@
     python3 tools/sync_idx.py                  # sekali: sinkron, build kalau ada yang berubah
     python3 tools/sync_idx.py --watch 15       # ulangi tiap 15 menit sampai Ctrl+C
     python3 tools/sync_idx.py --fragment-index /tmp/artifact/index.html   # build juga versi Artifact
-    python3 tools/sync_idx.py --stockbit-only --no-build                  # hanya ringkasan Stockbit (dipakai publish_stockbit.py)
+    python3 tools/sync_idx.py --stockbit-only --no-build                  # hanya ringkasan Stockbit
+    python3 tools/sync_idx.py --stockbit-only --with-bei --no-build       # Stockbit + BEI satu staging (dipakai publish_stockbit.py)
+    python3 tools/sync_idx.py --bei-only --no-build                       # hanya ringkasan keterbukaan BEI
 
 Yang disalin, ke needtobeindexed/idx-signal-desk/ (folder ini milik skrip, isinya boleh ditimpa):
-  digest_<awal>_<akhir>[_HHMM-HHMM].md   satu per jendela "Saved Intelligence" (render /api/share/render)
+  digest_<awal>_<akhir>[_HHMM-HHMM].md   satu per jendela "Saved Intelligence" (render /api/share/render); dipensiunkan:
+                                         hanya dengan --with-digests, dan berkas digest yang ada tidak pernah dihapus
   kepemilikan.json                       semua bulan (laporan emiten sejak Mei 2023, KSEI >1% sejak Feb 2026): pemegang >1%,
                                          pemegang >=5%, free float resmi, dan jumlah pemegang per emiten (tab Kepemilikan Saham)
   kepemilikan-laporan.json               daftar pemegang saham, jenis pemilik BAE, dan tautan laporan bulanan emiten,
@@ -17,6 +20,10 @@ Yang disalin, ke needtobeindexed/idx-signal-desk/ (folder ini milik skrip, isiny
   sbringkas_/sbdetail_<tgl>_<tgl>.md,     ringkasan Stockbit Ideas per hari final, rekap pekan lengkap, dan indeksnya
   sbpekan_<senin>_<minggu>.md,           (hanya dengan --stockbit-only atau --with-stockbit; hanya dihapus untuk hari yang
   stockbit-index.json                    ditahan desk dari web, atau oleh rollback_stockbit.py)
+  beiringkas_/beidetail_<tgl>_<tgl>.md,  ringkasan keterbukaan BEI per hari final, rekap pekan lengkap, dan indeksnya
+  beipekan_<senin>_<minggu>.md,          (hanya dengan --bei-only atau --with-bei; aturan hapus sama dengan Stockbit,
+  bei-index.json                         tahanan di .bei-hold.json; dipatok ke satu profil desk lewat profile_id di
+                                         .sync-bei.json: ekspor profil lain = BEI dilewati, pindah dengan --bei-profile)
 Hanya membaca: GET, render tanpa menulis berkas, dan ledger kepemilikan dibuka read-only. Tidak memicu scraping IDX.
 """
 import argparse
@@ -66,6 +73,17 @@ STOCKBIT_CATEGORY = {"sbringkas": "stockbit-ringkasan", "sbdetail": "stockbit-de
 STOCKBIT_KIND = {"ringkas": "sbringkas", "detail": "sbdetail"}
 # Keputusan pemilik: backfill dimulai 1 Oktober 2026; hari sebelumnya tidak diterbitkan.
 STOCKBIT_SINCE = "2026-10-01"
+# Ringkasan keterbukaan BEI (hanya --bei-only / --with-bei): klon aturan Stockbit. beiringkas_/beidetail_/beipekan_ tidak
+# pernah di-prune; yang menghapusnya hanya tahanan desk (export/withheld) dan rollback_stockbit.py.
+BEI_STATE = DEST / ".sync-bei.json"
+BEI_INDEX = DEST / "bei-index.json"
+# Format sama dengan .stockbit-hold.json: {"format":1,"days":{tgl:{"sha256":sha|"*", "rollback_of"?, "withheld_by"?}}}.
+BEI_HOLD = DEST / ".bei-hold.json"
+BEI_FILE = re.compile(r"^(beiringkas|beidetail|beipekan)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.md$")
+BEI_CATEGORY = {"beiringkas": "bei-ringkasan", "beidetail": "bei-detail", "beipekan": "bei-pekan"}
+BEI_KIND = {"ringkas": "beiringkas", "detail": "beidetail"}
+# Kode emiten di bei-index.json (IDX: 4 huruf; sedikit longgar untuk kode lain, tetap tanpa tanda baca).
+BEI_TICKER = re.compile(r"[A-Z][A-Z0-9]{1,7}")
 ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 # Naikkan kalau bentuk kepemilikan.json / kepemilikan-laporan.json berubah, supaya sinkron berikutnya membuatnya ulang.
 OWNERSHIP_FORMAT = 6
@@ -201,10 +219,8 @@ def sync_digests(server, state, force, guard):
             changed.append(name)
         fingerprints[name] = fp
     guard()
-    removed = prune("digest_", seen, allow_empty=bool(windows))
-    for name in removed:
-        fingerprints.pop(name, None)
-    return changed, removed
+    # Digest dipensiunkan: berkas yang tidak lagi dihasilkan server dibiarkan (tautan #doc= lama tetap jalan).
+    return changed, []
 
 
 # ---------------------------------------------------------------- kepemilikan
@@ -1304,15 +1320,487 @@ def _sync_stockbit_once(args):
     print(f"[{datetime.now():%H:%M:%S}] Stockbit: {len(changed)} berkas baru/berubah")
     for name in changed:
         print(f"  {'+' if (DEST / name).exists() else '-'} {name}")
+    if getattr(args, "with_bei", False):
+        # Staging yang sama (sync_once), tetapi BEI yang ditolak tidak membatalkan Stockbit: semua berkas BEI di staging
+        # dikembalikan persis seperti sebelum putaran ini dan BEI dilaporkan "dilewati" (publish_stockbit -> bei_skipped).
+        changed = changed + _run_bei_or_skip(server, args)
     return bool(changed)
+
+
+def _bei_managed(path):
+    return path.name in (".sync-bei.json", "bei-index.json", ".bei-hold.json") or bool(BEI_FILE.fullmatch(path.name))
+
+
+def _run_bei_or_skip(server, args):
+    """_run_bei untuk publish gabungan: penolakan atau HTTP error BEI = BEI dilewati tanpa satu pun berkas BEI berubah."""
+    before = {p.name: p.read_bytes() for p in DEST.iterdir() if _bei_managed(p) and p.is_file() and not p.is_symlink()}
+    try:
+        return _run_bei(server, args)
+    except (BeiRefused, HTTPError) as e:
+        if isinstance(e, HTTPError):
+            e.close()
+            reason = f"Signal Desk menjawab HTTP {e.code} untuk {e.url}"
+        else:
+            reason = str(e)
+        for p in DEST.iterdir():
+            if _bei_managed(p) and p.name not in before:
+                p.unlink()
+        for name, data in before.items():
+            if not (DEST / name).is_file() or (DEST / name).read_bytes() != data:
+                (DEST / name).write_bytes(data)
+        print(f"  peringatan: BEI dilewati, tidak ada berkas BEI yang diubah: {reason}. Stockbit tetap diterbitkan; "
+              f"tinjau BEI di Signal Desk lalu publikasikan lagi.")
+        return []
+
+
+# ---------------------------------------------------------------- ringkasan keterbukaan BEI
+
+class BeiRefused(ValueError):
+    """Ekspor BEI tidak lolos pemeriksaan; sinkron dibatalkan tanpa menulis apa pun."""
+
+
+class BeiProfileSkip(Exception):
+    """Ekspor BEI berasal dari profil desk lain dari yang tercatat di .sync-bei.json: BEI dilewati tanpa menulis apa pun."""
+
+
+def bei_profile_of(response):
+    """profile_id dari respons ekspor BEI, atau None kalau desk tidak menyebutnya (desk lama = tidak diketahui)."""
+    pid = response.get("profile_id") if isinstance(response, dict) else None
+    if pid is None:
+        return None
+    if not isinstance(pid, str) or not pid.strip() or len(pid) > 200:
+        raise BeiRefused(f"profile_id di ekspor BEI tidak valid: {pid!r}")
+    return pid
+
+
+def same_bei_profile(response, expected, what):
+    """Respons ekspor BEI berikutnya harus dari profil yang sama dengan export/days; kalau tidak, BEI dilewati."""
+    pid = bei_profile_of(response)
+    if expected is not None and pid is not None and pid != expected:
+        raise BeiProfileSkip(f"{what} dari profil desk '{pid}', bukan '{expected}' (profil aktif berganti di tengah sinkron)")
+
+
+def bei_day(value, what="tanggal"):
+    try:
+        return iso_day(value, what)
+    except StockbitRefused as e:
+        raise BeiRefused(str(e)) from None
+
+
+def check_bei_file(name, expected, text, sha):
+    """Tolak berkas BEI yang namanya, kategorinya, atau hash-nya tidak sesuai kontrak ekspor."""
+    if name != expected:
+        raise BeiRefused(f"nama berkas dari server {name!r}, seharusnya {expected!r}")
+    match = BEI_FILE.fullmatch(name)
+    if not match:
+        raise BeiRefused(f"nama berkas BEI tidak dikenal: {name!r}")
+    category = categorize(Path(name).stem)
+    if category != BEI_CATEGORY[match[1]]:
+        raise BeiRefused(f"build.py memasukkan {name} ke kategori '{category}', bukan '{BEI_CATEGORY[match[1]]}'; "
+                         f"tambahkan kategorinya di CATEGORIES build.py dulu")
+    if not isinstance(text, str) or not text.strip():
+        raise BeiRefused(f"{name} kosong")
+    if not isinstance(sha, str) or sha.lower() != sha256_text(text):
+        raise BeiRefused(f"sha256 {name} tidak cocok dengan isinya")
+
+
+def _count(value):
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+BEI_ANCHOR = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,80}")
+
+
+def bei_anchor_hint(value):
+    """Petunjuk bagian ringkasan (baris[8]): id bagian (mis. 'bbca', 'emiten-lain', 'laporan-rutin'), true/false
+    (punya blok sendiri / tidak), objek kecil berisi salah satunya, atau null."""
+    if value is None or isinstance(value, bool):
+        return True
+    if isinstance(value, str):
+        return bool(BEI_ANCHOR.fullmatch(value))
+    if isinstance(value, dict):
+        return len(value) <= 5 and all(isinstance(k, str) and len(k) <= 40 and
+                                       (v is None or isinstance(v, bool) or (isinstance(v, str) and BEI_ANCHOR.fullmatch(v)))
+                                       for k, v in value.items())
+    return False
+
+
+def check_bei_row(code, row, n_days):
+    """Baris tickers bei-index.json: [hariIdx, n_pengumuman, n_nonrutin, status, tahap, delta, {kategori: n}, [id2...],
+    petunjuk_bagian?]."""
+    ok = (isinstance(row, list) and 6 <= len(row) <= 9 and isinstance(row[0], int) and not isinstance(row[0], bool)
+          and 0 <= row[0] < n_days and _count(row[1]) and _count(row[2]) and row[2] <= row[1]
+          and all(isinstance(v, str) and len(v) <= 2000 for v in row[3:6]))
+    if ok and len(row) > 6:
+        ok = isinstance(row[6], dict) and len(row[6]) <= 50 and all(isinstance(k, str) and len(k) <= 100 and _count(v)
+                                                                   for k, v in row[6].items())
+    if ok and len(row) > 7:
+        ok = isinstance(row[7], list) and len(row[7]) <= 1000 and all(
+            (isinstance(i, str) and 0 < len(i) <= 100) or (isinstance(i, int) and not isinstance(i, bool)) for i in row[7])
+    if ok and len(row) > 8:
+        ok = bei_anchor_hint(row[8])
+    if not ok:
+        raise BeiRefused(f"baris tickers.{code} di bei-index.json tidak sesuai format 1")
+
+
+def filter_bei_index(index, drop):
+    """Buang hari `drop` (sebelum --bei-since, ditahan rollback, atau ditahan desk) dari indeks desk dan petakan ulang dayIdx.
+
+    Baris tickers yang menunjuk hari yang dibuang ikut dibuang; kode yang jadi kosong (dan namanya) juga.
+    """
+    if not isinstance(index, dict) or index.get("format") != 1 or not isinstance(index.get("days"), list):
+        raise BeiRefused("bei-index.json tidak berformat 1")
+    if not drop:
+        return index
+    remap, days = {}, []
+    for old, row in enumerate(index["days"]):
+        if isinstance(row, dict) and row.get("d") in drop:
+            continue
+        remap[old] = len(days)
+        days.append(row)
+    out = {**index, "days": days}
+    table = index.get("tickers", {})
+    if isinstance(table, dict):  # selain objek: check_bei_index menolaknya
+        kept = {}
+        for code, rows in table.items():
+            if not isinstance(rows, list):
+                raise BeiRefused(f"tickers.{code} di bei-index.json harus daftar")
+            new = []
+            for row in rows:
+                if not isinstance(row, list) or not row or not isinstance(row[0], int) or isinstance(row[0], bool) \
+                        or not 0 <= row[0] < len(index["days"]):
+                    raise BeiRefused(f"baris tickers.{code} di bei-index.json tidak menunjuk hari yang valid")
+                if row[0] in remap:
+                    new.append([remap[row[0]], *row[1:]])
+            if new:
+                kept[code] = new
+        out["tickers"] = kept
+        names = index.get("names")
+        if isinstance(names, dict):
+            out["names"] = {code: name for code, name in names.items() if code in kept}
+    return out
+
+
+def check_bei_index(index, published):
+    """bei-index.json hanya boleh menunjuk hari yang terbit; bentuk baris diperiksa sebelum ada yang ditulis."""
+    if not isinstance(index, dict) or index.get("format") != 1 or not isinstance(index.get("days"), list):
+        raise BeiRefused("bei-index.json tidak berformat 1")
+    seen = set()
+    for row in index["days"]:
+        if not isinstance(row, dict):
+            raise BeiRefused("baris hari di bei-index.json tidak valid")
+        day = row.get("d")
+        bei_day(day, "tanggal di bei-index.json")
+        if day in seen:
+            raise BeiRefused(f"hari {day} muncul dua kali di bei-index.json")
+        seen.add(day)
+        if row.get("f") != f"beiringkas_{day}_{day}.md" or day not in published:
+            raise BeiRefused(f"bei-index.json menunjuk hari {day} yang tidak diterbitkan ({row.get('f')!r})")
+        if row.get("detail") not in (None, f"beidetail_{day}_{day}.md"):
+            raise BeiRefused(f"berkas detail {row.get('detail')!r} di bei-index.json tidak sesuai tanggal {day}")
+    tickers, names = index.get("tickers", {}), index.get("names", {})
+    if not isinstance(tickers, dict):
+        raise BeiRefused("tickers di bei-index.json harus objek")
+    if not isinstance(names, dict):
+        raise BeiRefused("names di bei-index.json harus objek")
+    for code, rows in tickers.items():
+        if not isinstance(code, str) or not BEI_TICKER.fullmatch(code) or not isinstance(rows, list):
+            raise BeiRefused(f"kode {code!r} di bei-index.json tidak valid")
+        for row in rows:
+            check_bei_row(code, row, len(index["days"]))
+    for code, name in names.items():
+        if not BEI_TICKER.fullmatch(code) or not isinstance(name, str) or len(name) > 300:
+            raise BeiRefused(f"nama emiten {code!r} di bei-index.json tidak valid")
+    text = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
+    redacted = redact(text)
+    try:
+        json.loads(redacted)
+    except ValueError:
+        raise BeiRefused("penyamaran merusak bei-index.json") from None
+    return redacted
+
+
+def load_bei_state():
+    try:
+        state = json.loads(BEI_STATE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {"format": 1}
+    return state if isinstance(state, dict) and state.get("format") == 1 else {"format": 1}
+
+
+def read_bei_hold():
+    """Entri mentah .bei-hold.json {tgl: entri}, apa adanya. Berkas tidak ada = tidak ada yang ditahan."""
+    try:
+        data = json.loads(BEI_HOLD.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError):
+        raise BeiRefused(f"{BEI_HOLD.name} tidak bisa dibaca; perbaiki atau hapus dulu") from None
+    days = data.get("days") if isinstance(data, dict) else None
+    if not isinstance(days, dict):
+        raise BeiRefused(f"{BEI_HOLD.name} tidak berisi objek days")
+    for day in days:
+        bei_day(day, f"tanggal di {BEI_HOLD.name}")
+    return dict(days)
+
+
+def bei_withheld(server, profile=None):
+    """Hari BEI yang ditahan desk dari web, atau None kalau desk tidak punya endpoint ini (HTTP 404 = tidak diketahui)."""
+    try:
+        r = server.get("/api/bei/export/withheld")
+    except HTTPError as e:
+        if e.code == 404:
+            e.close()
+            return None
+        raise
+    days = r.get("days") if isinstance(r, dict) else None
+    if not isinstance(days, list):
+        raise BeiRefused("respons bei export/withheld tidak berisi daftar days")
+    if r.get("llm_calls", 0) != 0:
+        raise BeiRefused("bei export/withheld melaporkan panggilan LLM; ekspor harus read-only")
+    same_bei_profile(r, profile, "bei export/withheld")
+    for day in days:
+        bei_day(day, "tanggal bei export/withheld")
+    return set(days)
+
+
+def bei_empty_day(row):
+    """Baris export/days untuk hari tercakup tanpa pengumuman (announcements 0, atau files tanpa nama berkas)."""
+    files = row.get("files")
+    return row.get("announcements") == 0 or (isinstance(files, dict) and not any(files.values()))
+
+
+def bei_fp(row):
+    return f"{row.get('sha256')}|{row.get('detail_sha256')}|{row.get('updated_at')}|{row.get('state')}"
+
+
+def bei_file_days(match):
+    """Hari yang dicakup berkas bei*: satu hari untuk beiringkas/beidetail, tujuh hari untuk beipekan."""
+    try:
+        start, end = date.fromisoformat(match[2]), date.fromisoformat(match[3])
+    except ValueError:
+        return set()
+    if match[1] != "beipekan":
+        return {match[2]}
+    return {(start + timedelta(days=i)).isoformat() for i in range(min((end - start).days, 6) + 1)}
+
+
+def sync_bei(server, state, force=False, allow_provisional=False, since=None, profile=None):
+    """sync_bei_days, tetapi profil desk yang lain dari yang tercatat = BEI dilewati (None) dengan peringatan.
+
+    .sync-bei.json mencatat profile_id dari ekspor desk pada sinkron BEI pertama yang menyebutnya. Ekspor dari profil
+    lain tidak menulis atau menghapus berkas BEI apa pun (Stockbit di staging yang sama tetap jalan). `profile`
+    (--bei-profile) memilih profil yang diharapkan secara sengaja; setelah sinkron berhasil profil itulah yang tercatat.
+    Desk yang tidak menyebut profile_id = tidak diketahui: perilaku lama, catatan profil tidak diubah.
+    """
+    try:
+        return sync_bei_days(server, state, force=force, allow_provisional=allow_provisional, since=since, profile=profile)
+    except BeiProfileSkip as e:
+        print(f"  peringatan: BEI dilewati, tidak ada berkas BEI yang diubah: {e}. Aktifkan profil itu di Signal Desk, "
+              f"atau jalankan dengan --bei-profile <id> kalau memang pindah profil.")
+        return None
+
+
+def sync_bei_days(server, state, force=False, allow_provisional=False, since=None, profile=None):
+    """Salin hari final ringkasan keterbukaan BEI dari ekspor read-only Signal Desk; kembalikan nama berkas yang berubah,
+    atau None kalau desk belum punya /api/bei (HTTP 404 pada export/days): BEI dilewati tanpa menyentuh berkas apa pun.
+
+    Klon sync_stockbit: semua respons diperiksa dulu, satu kegagalan menolak seluruh putaran sebelum ada yang ditulis
+    atau dihapus. Berkas bei* hanya dihapus untuk hari yang ditahan desk dari web (export/withheld); tahanan dicatat di
+    .bei-hold.json dengan withheld_by=desk. HTTP 404 pada export/withheld = tahanan desk yang sudah tercatat tetap berlaku.
+    """
+    since_day = bei_day(since, "--bei-since") if since else None
+    provisional = "include_provisional=1" if allow_provisional else ""
+    try:
+        listing = server.get("/api/bei/export/days" + (f"?{provisional}" if provisional else ""))
+    except HTTPError as e:
+        if e.code == 404:
+            e.close()
+            print("  desk belum punya /api/bei (HTTP 404 pada export/days); BEI dilewati, tidak ada berkas BEI yang diubah")
+            return None
+        raise
+    days = listing.get("days") if isinstance(listing, dict) else None
+    if not isinstance(days, list):
+        raise BeiRefused("respons bei export/days tidak berisi daftar days")
+    source = bei_profile_of(listing)
+    recorded = state.get("profile_id")
+    expected = profile or recorded
+    if source is not None and expected is not None and source != expected:
+        how = "diminta --bei-profile" if profile else "tercatat di .sync-bei.json"
+        raise BeiProfileSkip(f"ekspor dari profil desk '{source}', padahal profil BEI yang {how} '{expected}'")
+    withheld = bei_withheld(server, source)
+    if withheld is None:
+        withheld = {day for day, entry in read_bei_hold().items() if isinstance(entry, dict) and entry.get("withheld_by") == "desk"}
+        if withheld:
+            print(f"  peringatan: desk tidak punya bei export/withheld (HTTP 404); {len(withheld)} hari BEI yang ditahan desk tetap ditahan")
+    allowed = {"final", "sementara"} if allow_provisional else {"final"}
+
+    entries = read_bei_hold()
+    withdraw, withdrawn = [], set()
+    for p in sorted(DEST.glob("bei*.md")):
+        m = BEI_FILE.fullmatch(p.name)
+        hit = bei_file_days(m) & withheld if m else set()
+        if hit:
+            withdraw.append(p.name)
+            withdrawn |= hit
+    new_entries = desk_hold_entries(entries, withheld, withdrawn)
+    hold = {day: hold_sha(entry) for day, entry in new_entries.items()}
+
+    eligible, held, early, empty = {}, set(), set(), {}
+    for row in days:
+        if not isinstance(row, dict):
+            raise BeiRefused("baris bei export/days tidak valid")
+        day = bei_day(row.get("date"), "tanggal bei export/days")
+        if row["date"] in withheld:
+            continue
+        if since_day and day < since_day:
+            early.add(row["date"])
+            continue
+        if row.get("state") not in allowed:
+            continue
+        if bei_empty_day(row):
+            # Hari tercakup tanpa pengumuman: tidak punya berkas, hanya melengkapi pekan (beipekan) menurut desk.
+            if row.get("ok", True) is True and row["date"] not in eligible:
+                empty[row["date"]] = row
+            continue
+        if row["date"] in hold and hold[row["date"]] in ("*", str(row.get("sha256") or "").lower()):
+            held.add(row["date"])
+            continue
+        if row["date"] in eligible:
+            raise BeiRefused(f"tanggal {row['date']} muncul dua kali di bei export/days")
+        if row.get("ok") is not True:
+            raise BeiRefused(f"hari BEI {row['date']} belum klop (ok bukan true); tinjau di Signal Desk dulu")
+        files = row.get("files")
+        expected = {kind: f"{prefix}_{row['date']}_{row['date']}.md" for kind, prefix in BEI_KIND.items()}
+        if files is not None and (not isinstance(files, dict) or any(files.get(k) not in (None, n) for k, n in expected.items())):
+            raise BeiRefused(f"nama berkas di bei export/days {row['date']} tidak sesuai kontrak: {files!r}")
+        eligible[row["date"]] = row
+
+    published = {m[2] for p in DEST.glob("beiringkas_*.md") if (m := BEI_FILE.fullmatch(p.name)) and p.name not in withdraw}
+    for day in sorted(held):
+        print(f"  BEI ditahan rollback: {day} (sha ekspor belum berubah; lihat {BEI_HOLD.name})")
+    for day in sorted(withheld):
+        print(f"  BEI ditahan desk dari web: {day}" + (" (berkas terbit dicabut)" if day in withdrawn else ""))
+    if len(eligible) + len(held & published) < len(published):
+        raise BeiRefused(f"server hanya mengekspor {len(eligible)} hari BEI final, padahal {len(published)} hari sudah terbit; "
+                         f"tidak ada yang ditulis")
+    for day in sorted(published - eligible.keys() - held):
+        print(f"  peringatan: BEI {day} sudah terbit tetapi tidak lagi diekspor sebagai final; berkasnya dibiarkan")
+
+    day_state, week_state = state.setdefault("days", {}), state.setdefault("weeks", {})
+    pending, new_days, new_weeks = {}, {}, {}
+    day_fp = {day: bei_fp(row) for day, row in (empty | eligible).items()}
+    for day, row in sorted(eligible.items()):
+        fp = day_fp[day]
+        names = {kind: f"{prefix}_{day}_{day}.md" for kind, prefix in BEI_KIND.items()}
+        prev = day_state.get(day) or {}
+        if not force and prev.get("fp") == fp and all((DEST / n).is_file() for n in names.values()):
+            continue
+        entry = {"fp": fp, "files": {}}
+        for kind, name in names.items():
+            r = server.get(f"/api/bei/export/day/{day}?kind={kind}" + (f"&{provisional}" if provisional else ""))
+            if not isinstance(r, dict):
+                raise BeiRefused(f"respons bei export/day {day} {kind} tidak valid")
+            same_bei_profile(r, source, f"bei export/day {day}")
+            if r.get("state") != row.get("state"):
+                raise BeiRefused(f"status BEI {day} berubah di tengah sinkron ({row.get('state')} -> {r.get('state')}); ulangi")
+            if r.get("llm_calls", 0) != 0:
+                raise BeiRefused(f"bei export/day {day} melaporkan panggilan LLM; ekspor harus read-only")
+            check_bei_file(r.get("name"), name, r.get("text"), r.get("sha256"))
+            pending[name] = redact(r["text"])
+            entry["files"][name] = r["sha256"].lower()
+        new_days[day] = entry
+
+    mondays = sorted({date.fromisoformat(d) - timedelta(days=date.fromisoformat(d).weekday()) for d in eligible})
+    for monday in mondays:
+        week = [(monday + timedelta(days=i)).isoformat() for i in range(7)]
+        if not all(d in day_fp for d in week):
+            continue
+        name = f"beipekan_{week[0]}_{week[-1]}.md"
+        fp = "|".join(day_fp[d] for d in week)
+        if not force and (week_state.get(week[0]) or {}).get("fp") == fp and (DEST / name).is_file():
+            continue
+        try:
+            r = server.get(f"/api/bei/export/week/{week[0]}")
+        except HTTPError as e:
+            if e.code == 404:  # pekan belum lengkap atau ada hari yang ditahan menurut server
+                e.close()
+                continue
+            raise
+        if not isinstance(r, dict):
+            raise BeiRefused(f"respons bei export/week {week[0]} tidak valid")
+        same_bei_profile(r, source, f"bei export/week {week[0]}")
+        if r.get("llm_calls", 0) != 0:
+            raise BeiRefused(f"bei export/week {week[0]} melaporkan panggilan LLM; ekspor harus read-only")
+        check_bei_file(r.get("name"), name, r.get("text"), r.get("sha256"))
+        pending[name] = redact(r["text"])
+        new_weeks[week[0]] = {"fp": fp, "file": name, "sha256": r["sha256"].lower()}
+
+    index = server.get("/api/bei/export/index" + (f"?{provisional}" if provisional else ""))
+    same_bei_profile(index, source, "bei export/index")
+    if isinstance(index, dict) and "profile_id" in index:
+        index = {k: v for k, v in index.items() if k != "profile_id"}  # urusan desk, tidak ikut ke web
+    index = filter_bei_index(index, (early - published) | held | withheld | (empty.keys() - published))
+    index_text = check_bei_index(index, published | eligible.keys())
+
+    # Semua lolos: baru menulis dan menghapus (di folder staging sync_once).
+    changed = [name for name, text in sorted(pending.items()) if write_if_changed(DEST / name, text)]
+    if write_if_changed(BEI_INDEX, index_text):
+        changed.append(BEI_INDEX.name)
+    for name in withdraw:
+        path = DEST / name
+        if path.is_symlink() or path.parent.resolve() != DEST.resolve():
+            raise ValueError("Berkas BEI yang dicabut bukan berkas biasa dalam folder yang dikelola.")
+        path.unlink()
+        changed.append(name)
+    if new_entries != entries:
+        write_if_changed(BEI_HOLD, json.dumps({"format": 1, "days": dict(sorted(new_entries.items()))},
+                                              ensure_ascii=False, indent=1) + "\n")
+        changed.append(BEI_HOLD.name)
+    day_state.update(new_days)
+    week_state.update(new_weeks)
+    for day in withheld:
+        day_state.pop(day, None)
+    for monday in list(week_state):
+        try:
+            week = {(date.fromisoformat(monday) + timedelta(days=i)).isoformat() for i in range(7)}
+        except (TypeError, ValueError):
+            continue
+        if week & withheld:
+            del week_state[monday]
+    state["format"] = 1
+    if source is not None:
+        state["profile_id"] = source
+    write_if_changed(BEI_STATE, json.dumps(state, ensure_ascii=False, indent=1, sort_keys=True))
+    return changed
+
+
+def _run_bei(server, args):
+    changed = sync_bei(server, load_bei_state(), force=getattr(args, "force", False),
+                       allow_provisional=getattr(args, "allow_provisional", False), since=getattr(args, "bei_since", None),
+                       profile=getattr(args, "bei_profile", None))
+    if changed is None:
+        return []
+    print(f"[{datetime.now():%H:%M:%S}] BEI: {len(changed)} berkas baru/berubah")
+    for name in changed:
+        print(f"  {'+' if (DEST / name).exists() else '-'} {name}")
+    return changed
+
+
+def _sync_bei_once(args):
+    """Mode --bei-only: tanpa /api/profiles, penjaga profil, digest, kepemilikan, atau Stockbit."""
+    server = Server(args.server)
+    server.get("/api/health", timeout=10)
+    DEST.mkdir(parents=True, exist_ok=True)
+    return bool(_run_bei(server, args))
 
 
 # ---------------------------------------------------------------- inti
 
 def prune(prefix, keep, allow_empty):
     """Hapus berkas lama milik skrip ini yang tidak lagi dihasilkan server."""
-    if prefix.startswith("sb") or prefix.startswith("stockbit"):
-        raise ValueError("Berkas Stockbit tidak pernah di-prune; hanya hari yang ditahan desk (atau rollback) yang dicabut.")
+    if prefix.startswith(("sb", "stockbit", "bei")):
+        raise ValueError("Berkas Stockbit/BEI tidak pernah di-prune; hanya hari yang ditahan desk (atau rollback) yang dicabut.")
     stale = [p for p in DEST.glob(prefix + "*.md") if OWNED.match(p.name) and p.name not in keep]
     if stale and not allow_empty:
         print(f"  server tidak mengembalikan data {prefix.rstrip('_')}; {len(stale)} berkas lama dibiarkan")
@@ -1350,7 +1838,9 @@ def _sync_once(args):
     profile = next((p for p in profiles["profiles"] if p["id"] == expected), {"id": expected})
     if state.get("profile_id") != expected:
         state = {"profile_id": expected}
-    d_changed, d_removed = ([], []) if getattr(args, "ownership_only", False) else sync_digests(server, state, args.force, guard)
+    # Digest Emiten dipensiunkan: hanya disinkron dengan --with-digests; berkas yang ada tidak dihapus.
+    with_digests = getattr(args, "with_digests", False) and not getattr(args, "ownership_only", False)
+    d_changed, d_removed = sync_digests(server, state, args.force, guard) if with_digests else ([], [])
     o_changed, o_removed = sync_ownership(server, state, args.force, profile, guard)
     guard()
     state["synced_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
@@ -1366,15 +1856,18 @@ def _sync_once(args):
 
 def sync_once(args):
     global DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON, STOCKBIT_STATE, STOCKBIT_INDEX, STOCKBIT_HOLD
+    global BEI_STATE, BEI_INDEX, BEI_HOLD
     original, old_state, old_ownership, old_filings, old_reports = DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON
     old_sb_state, old_sb_index, old_sb_hold = STOCKBIT_STATE, STOCKBIT_INDEX, STOCKBIT_HOLD
+    old_bei_state, old_bei_index, old_bei_hold = BEI_STATE, BEI_INDEX, BEI_HOLD
     if original.is_symlink() or not original.resolve().is_relative_to((ROOT / "needtobeindexed").resolve()):
         raise ValueError("Folder sinkron menunjuk keluar arsip.")
     original.mkdir(parents=True, exist_ok=True)
     def managed(path):
         return path.name in (".sync.json", "kepemilikan.json", "kepemilikan-perubahan.json", "kepemilikan-laporan.json",
-                             ".sync-stockbit.json", "stockbit-index.json", ".stockbit-hold.json") \
-            or bool(OWNED.fullmatch(path.name)) or bool(STOCKBIT_FILE.fullmatch(path.name))
+                             ".sync-stockbit.json", "stockbit-index.json", ".stockbit-hold.json",
+                             ".sync-bei.json", "bei-index.json", ".bei-hold.json") \
+            or bool(OWNED.fullmatch(path.name)) or bool(STOCKBIT_FILE.fullmatch(path.name)) or bool(BEI_FILE.fullmatch(path.name))
     originals = {}
     for path in original.iterdir():
         if managed(path):
@@ -1390,11 +1883,18 @@ def sync_once(args):
             FILINGS_JSON, REPORTS_JSON = stage / "kepemilikan-perubahan.json", stage / "kepemilikan-laporan.json"
             STOCKBIT_STATE, STOCKBIT_INDEX = stage / ".sync-stockbit.json", stage / "stockbit-index.json"
             STOCKBIT_HOLD = stage / ".stockbit-hold.json"
-            # --stockbit-only diputuskan di sini, sebelum _sync_once: tidak menyentuh /api/profiles, guard(), atau kepemilikan.
-            changed = _sync_stockbit_once(args) if getattr(args, "stockbit_only", False) else _sync_once(args)
+            BEI_STATE, BEI_INDEX, BEI_HOLD = stage / ".sync-bei.json", stage / "bei-index.json", stage / ".bei-hold.json"
+            # --stockbit-only/--bei-only diputuskan di sini, sebelum _sync_once: tidak menyentuh /api/profiles, guard(), atau kepemilikan.
+            if getattr(args, "bei_only", False):
+                changed = _sync_bei_once(args)
+            elif getattr(args, "stockbit_only", False):
+                changed = _sync_stockbit_once(args)
+            else:
+                changed = _sync_once(args)
         finally:
             DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON = original, old_state, old_ownership, old_filings, old_reports
             STOCKBIT_STATE, STOCKBIT_INDEX, STOCKBIT_HOLD = old_sb_state, old_sb_index, old_sb_hold
+            BEI_STATE, BEI_INDEX, BEI_HOLD = old_bei_state, old_bei_index, old_bei_hold
         staged = {p.name: p.read_bytes() for p in stage.iterdir() if managed(p)}
         # Refuse concurrent edits instead of silently overwriting them.
         current = {p.name: p.read_bytes() for p in original.iterdir() if managed(p) and p.is_file() and not p.is_symlink()}
@@ -1430,11 +1930,18 @@ def build(args):
 def run(args):
     try:
         changed = sync_once(args)
-        if getattr(args, "with_stockbit", False) and not getattr(args, "stockbit_only", False):
-            # Putaran terpisah dengan staging sendiri: Stockbit yang ditolak tidak membatalkan digest/kepemilikan.
+        single = getattr(args, "stockbit_only", False) or getattr(args, "bei_only", False)
+        if getattr(args, "with_stockbit", False) and not single:
+            # Putaran terpisah dengan staging sendiri: Stockbit (dan BEI kalau --with-bei, di staging yang sama) yang
+            # ditolak tidak membatalkan digest/kepemilikan.
             changed = sync_once(argparse.Namespace(**{**vars(args), "stockbit_only": True})) or changed
+        elif getattr(args, "with_bei", False) and not single:
+            changed = sync_once(argparse.Namespace(**{**vars(args), "bei_only": True, "with_bei": False})) or changed
     except StockbitRefused as e:
         print(f"Stockbit ditolak, tidak ada berkas yang ditulis: {e}", file=sys.stderr)
+        return 1
+    except BeiRefused as e:
+        print(f"BEI ditolak, tidak ada berkas yang ditulis: {e}", file=sys.stderr)
         return 1
     except HTTPError as e:
         print(f"Signal Desk menjawab HTTP {e.code} untuk {e.url}", file=sys.stderr)
@@ -1476,9 +1983,22 @@ def main():
     ap.add_argument("--allow-provisional", action="store_true", help="Stockbit: ikutkan hari 'sementara' (default hanya final)")
     ap.add_argument("--stockbit-since", default=STOCKBIT_SINCE, metavar="YYYY-MM-DD",
                     help=f"Stockbit: abaikan hari sebelum tanggal ini (default {STOCKBIT_SINCE})")
+    ap.add_argument("--bei-only", action="store_true",
+                    help="hanya ringkasan keterbukaan BEI (bei*.md + bei-index.json); tanpa profil, digest, kepemilikan, Stockbit")
+    ap.add_argument("--with-bei", action="store_true",
+                    help="tambahkan BEI: dengan --stockbit-only di staging yang sama (ditolak = tidak ada yang ditulis), "
+                         "selain itu putaran terpisah setelah sinkron biasa")
+    ap.add_argument("--bei-since", metavar="YYYY-MM-DD", help="BEI: abaikan hari sebelum tanggal ini (default: semua hari final desk)")
+    ap.add_argument("--bei-profile", metavar="ID",
+                    help="BEI: profil desk yang diharapkan (default: yang tercatat di .sync-bei.json); dipakai untuk pindah "
+                         "profil dengan sengaja, setelah berhasil profil ini yang tercatat")
+    ap.add_argument("--with-digests", action="store_true",
+                    help="sinkron biasa: sinkron juga Digest Emiten (dipensiunkan; default mati, berkas lama tidak dihapus)")
     args = ap.parse_args()
     if args.stockbit_only and args.ownership_only:
         ap.error("--stockbit-only dan --ownership-only tidak bisa digabung")
+    if args.bei_only and (args.ownership_only or args.stockbit_only):
+        ap.error("--bei-only tidak bisa digabung dengan --ownership-only atau --stockbit-only (pakai --stockbit-only --with-bei)")
     if not args.watch:
         raise SystemExit(run(args))
     print(f"Sinkron tiap {args.watch:g} menit dari {args.server}. Ctrl+C untuk berhenti.")

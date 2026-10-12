@@ -48,7 +48,7 @@ const DETAILS = {
 };
 
 export const TOOLS = [
-  {type:'function', function:{name:'cari_arsip', description:'Arsip riset internal (Stockbit, analisis KI BEI, digest, keterbukaan Australia/ASX dan Singapura/SGX). Murah, pakai dulu. Hasil kutipan+ref D.',
+  {type:'function', function:{name:'cari_arsip', description:'Arsip riset internal (Stockbit, ringkasan keterbukaan BEI harian, analisis KI lama, keterbukaan Australia/ASX dan Singapura/SGX). Murah, pakai dulu. Hasil kutipan+ref D.',
     parameters:{type:'object', properties:{kata:{type:'array', items:{type:'string'}, maxItems:4, description:'kode saham huruf besar/nama/istilah'}}, required:['kata']}}},
   {type:'function', function:{name:'data_kepemilikan', description:'Data KSEI >1% Feb-Agu 2026 + daftar pemegang laporan emiten, sinyal dihitung kode. '
     + 'ticker: bagian sinyal (pengalihan/pemecahan blok, keluar-masuk, kelompok, ganti nama; wajib:1 = harus dibahas), riwayat (per bulan), kelompok. '

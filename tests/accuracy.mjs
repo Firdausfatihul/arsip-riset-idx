@@ -5,7 +5,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {Archive, OpenRouter, converse, directTickers, nearestWord, rememberTurn} from '../worker/core.mjs';
 import {dateQuery, documentRequest} from '../worker/retrieval.mjs';
 import {SourceStore} from '../worker/source-store.mjs';
-import {latestSourceDocuments} from './helpers/archive-expectations.mjs';
+import {latestSourceDocuments, tickerDocuments} from './helpers/archive-expectations.mjs';
 
 const read = name => readFile(new URL('../worker/.assets/' + name, import.meta.url), 'utf8').then(JSON.parse);
 const manifest = await read('manifest.json');
@@ -216,7 +216,10 @@ test('a name the user wrote is searched even when the model "corrects" it', asyn
   const result = await converse(new Archive(assets), model, 'Tanoko?', [], () => {}, null, {metrics:{}});
   assert.equal(result.terms[0], 'Tanoko');
   const names = result.sources.map(s => manifest.docs.find(d => d.source_id === s.source_id).name);
-  assert.ok(names.includes('digest_2026-08-26_2026-08-27.md') && names.includes('digest_2026-09-07_2026-09-09.md'));
+  // Digest Emiten is retired from chat (BEI plan 2026-10-09): the name is found in the documents still indexed.
+  const indexed = await tickerDocuments(manifest, 'Tanoko');
+  assert.ok(indexed.some(d => names.includes(d.name)), names.join(', '));
+  assert.ok(!names.some(n => n.startsWith('digest_')));
 });
 
 test('issuer names that differ from the archive are reported with the official name', async () => {

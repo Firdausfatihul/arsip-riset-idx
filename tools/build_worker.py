@@ -42,6 +42,11 @@ def covers(doc):
 STOCKBIT_SUMMARY = 'stockbit-ringkasan'
 STOCKBIT_DETAIL = 'stockbit-detail'
 STOCKBIT_RAW = 'stockbit'
+# Per-issuer BEI detail files: read for ticker or "detail" questions, never for date summaries.
+BEI_DETAIL = 'bei-detail'
+LOW_PRIORITY = (STOCKBIT_DETAIL, BEI_DETAIL)
+# Retired sources: still on the static site (old #doc= links), no longer indexed by chat.
+RETIRED = ('digest-emiten',)
 STOCKBIT_INDEX = ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'stockbit-index.json'
 STOCKBIT_RULE = ('Konten Stockbit (ringkasan, detail, rekap pekan, laporan mentah) adalah klaim pengguna yang belum '
                  'diverifikasi, bukan keterbukaan resmi atau rekomendasi; balasan (reply) posting tidak dikumpulkan. '
@@ -58,7 +63,8 @@ def _days(first, last):
 
 
 def worker_docs(docs):
-    """Documents the chat indexes, plus raw Stockbit reports left out because summaries cover them.
+    """Documents the chat indexes, plus documents left out: raw Stockbit reports that summaries cover,
+    and retired sources (Digest Emiten).
 
     A raw 'stockbit' report is excluded only when EVERY day it covers has a stockbit-ringkasan
     document. It stays on the static site as proof; chat reads the bounded summary instead.
@@ -66,7 +72,9 @@ def worker_docs(docs):
     summarized = {day for d in docs if d['cat'] == STOCKBIT_SUMMARY for day in _days(*covers(d))}
     kept, excluded = [], []
     for doc in docs:
-        if doc['cat'] == STOCKBIT_RAW and summarized and set(_days(*covers(doc))) <= summarized:
+        if doc['cat'] in RETIRED:
+            excluded.append(doc)
+        elif doc['cat'] == STOCKBIT_RAW and summarized and set(_days(*covers(doc))) <= summarized:
             excluded.append(doc)
         else:
             kept.append(doc)
@@ -176,7 +184,13 @@ def auxiliary_versions(directory):
 def build(directory, out):
     docs, tickers = read_archive(directory)
     docs, excluded = worker_docs(docs)
+    retired = [doc for doc in excluded if doc['cat'] in RETIRED]
+    if retired:
+        print(f'Worker: {len(retired)} dokumen sumber yang dipensiunkan ({", ".join(sorted({d["cat"] for d in retired}))}) '
+              f'tidak diindeks chat (tetap di situs).')
     for doc in excluded:
+        if doc['cat'] in RETIRED:
+            continue
         print(f'Worker: {doc["name"]} ({doc["cat"]}, {"–".join(covers(doc))}) tidak diindeks chat; '
               f'harinya tercakup ringkasan Stockbit (tetap di situs).')
     out = check_output(out, ROOT, [ROOT / "needtobeindexed", directory], kind="worker")
@@ -204,7 +218,7 @@ def build(directory, out):
                          'document_id': evidence['document_id'], 'document_hash': evidence['document_hash'],
                          'sizes': [len(json.dumps(p, ensure_ascii=False, separators=(',', ':')).encode()) for p in parts],
                          # Per-ticker detail: read for ticker/handle or "detail" questions, never for date summaries.
-                         **({'priority': 'low'} if doc['cat'] == STOCKBIT_DETAIL else {})})
+                         **({'priority': 'low'} if doc['cat'] in LOW_PRIORITY else {})})
         for word in posting_words(doc['title'] + '\n' + doc['search_body']):
             postings.setdefault(word, []).append(source_id)
     manifest = {'version': digest.hexdigest()[:16], 'retrieval_version': VERSION, 'docs': metadata, 'tickers': sorted(tickers),
@@ -226,7 +240,8 @@ def build(directory, out):
         (out / 'stockbit.json').write_text(json.dumps(stockbit, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         manifest['stockbit'] = {'asset': 'stockbit.json', 'tickers': len(stockbit['tickers']),
                                 'users': len(stockbit['users']), 'days': len(stockbit['days'])}
-    events = make_events(docs, tickers, evidences)
+    # Retired documents are not indexed, but their official issuer names ("PT … Tbk (KODE)") still name issuers.
+    events = make_events(docs, tickers, evidences, name_docs=docs + [d for d in excluded if d['cat'] in RETIRED])
     (out / 'events.json').write_text(json.dumps(events, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     manifest.update(auxiliary_versions(out))
     (out / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')

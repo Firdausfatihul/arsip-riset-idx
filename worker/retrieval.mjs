@@ -121,7 +121,14 @@ export function filterRecords(rows, scope) {
 // Category words plus a date (or "terbaru") select whole documents by their catalog date.
 const CATEGORY_WORDS = [
   [/\b(asx|australia)\b/i,'keterbukaan-australia'], [/\b(sgx|singapur[ae]?|singapore)\b/i,'keterbukaan-singapura'],
-  [/\b(keterbukaan|ki)\b/i,'keterbukaan-informasi'], [/\bstockbit\b/i,'stockbit'], [/\bdigest\b/i,'digest-emiten']];
+  [/\b(keterbukaan|ki)\b/i,'keterbukaan-informasi'], [/\bbei\b/i,'bei-ringkasan'], [/\bstockbit\b/i,'stockbit'],
+  // Digest Emiten is retired from chat (build_worker RETIRED); its successor is the BEI daily summary family.
+  [/\bdigest\b/i,'bei-ringkasan']];
+// "keterbukaan", "ki" and "bei" name the Indonesian disclosure family: the daily BEI summaries (bei-ringkasan), weekly
+// recaps (bei-pekan) for ranges of more than two days, and the retired manual KI analyses (keterbukaan-informasi) for
+// the days and snapshots they cover. Per-issuer BEI detail files are read only for "detail"/explicit tickers, like Stockbit.
+export const IDX_CATEGORIES = ['bei-ringkasan','bei-pekan','bei-detail','keterbukaan-informasi'];
+const IDX_FAMILY = new Set(IDX_CATEGORIES);
 // "stockbit" names the Stockbit source family, not one file kind. It reads the daily summaries
 // (stockbit-ringkasan), weekly recaps for ranges of more than two days (stockbit-pekan), and old raw
 // reports only where no summary covers the day. Raw reports are read alone only on request; the per-ticker
@@ -141,7 +148,7 @@ const dayList = (from, to) => {
 function categories(text) {
   // A qualified foreign disclosure label is one source, but "SGX dan KI" names two.
   const domestic = text.replace(/\b(?:keterbukaan(?:\s+informasi)?|ki)\s+(?:sgx|singapur[ae]?|singapore|asx|australia)\b/gi, '');
-  return CATEGORY_WORDS.filter(([re,cat]) => re.test(cat === 'keterbukaan-informasi' ? domestic : text)).map(([,cat]) => cat);
+  return [...new Set(CATEGORY_WORDS.filter(([re,cat]) => re.test(cat === 'keterbukaan-informasi' ? domestic : text)).map(([,cat]) => cat))];
 }
 const span = d => d.covers || [d.start,d.end];
 // Every date the user wrote: "25 september", "22 dan 25 sept", "23-24 sept" (range), "26/9", "2026-09-26".
@@ -215,7 +222,30 @@ function stockbitKind(d, request, cats) {
   if (request.stockbitRaw) return d.cat === 'stockbit';
   return d.cat !== 'stockbit-detail' || !!request.stockbitDetail;
 }
-const family = cat => STOCKBIT_FAMILY.has(cat) ? 'stockbit' : cat;
+const family = cat => STOCKBIT_FAMILY.has(cat) ? 'stockbit' : IDX_FAMILY.has(cat) ? 'idx' : cat;
+// Which Indonesian disclosure kinds a request may read: a family word reads all of them except per-issuer detail.
+function idxKind(d, request, cats) {
+  if (cats.includes(d.cat)) return true;
+  if (cats.length && !cats.some(c => IDX_FAMILY.has(c))) return false;
+  return d.cat !== 'bei-detail' || !!request.stockbitDetail;
+}
+// Weekly BEI recaps answer ranges of more than two days (three asked-for days inside the recap); the newest snapshot
+// is a daily summary, and a retired KI analysis is not the newest Indonesian snapshot once a BEI summary is as new.
+function preferBei(selected, request, {dates, latest}) {
+  if (!selected.some(d => IDX_FAMILY.has(d.cat))) return selected;
+  const paired = (request.pairs || []).filter(p => family(p.category) === 'idx').flatMap(p => p.dates);
+  const ranges = dates ? (paired.length ? paired : request.dates || []) : [];
+  const wanted = new Set(ranges.flatMap(r => dayList(r.from, r.to)));
+  const inRange = d => { const [s,e] = span(d); return dayList(s,e).filter(day => !wanted.size || wanted.has(day)); };
+  const weekly = wanted.size > 2 && !latest ? selected.filter(d => d.cat === 'bei-pekan' && inRange(d).length >= 3) : [];
+  let out = selected.filter(d => d.cat !== 'bei-pekan' || weekly.includes(d));
+  out = out.filter(d => d.cat !== 'bei-ringkasan' || !weekly.some(w => span(w)[0] <= span(d)[0] && span(d)[1] <= span(w)[1]));
+  if (latest) {
+    const newestBei = out.filter(d => d.cat === 'bei-ringkasan').map(d => d.end).sort().at(-1);
+    if (newestBei) out = out.filter(d => d.cat !== 'keterbukaan-informasi' || d.end > newestBei);
+  }
+  return out;
+}
 // Summaries replace what they cover: weekly recaps for ranges of more than two days, daily
 // summaries instead of raw reports. Raw reports stay for days no summary covers.
 function preferSummaries(selected, candidates, request, {dates, latest}) {
@@ -256,21 +286,23 @@ export function scopeDocuments(docs, request, options = {}) {
 
 function scopeOnce(docs, request, {dates = false, latest = false} = {}) {
   const cats = request.categories || [];
-  let selected = docs.filter(d => STOCKBIT_FAMILY.has(d.cat) ? stockbitKind(d, request, cats) : !cats.length || cats.includes(d.cat));
+  let selected = docs.filter(d => STOCKBIT_FAMILY.has(d.cat) ? stockbitKind(d, request, cats)
+    : IDX_FAMILY.has(d.cat) ? idxKind(d, request, cats) : !cats.length || cats.includes(d.cat));
   if (dates && request.dates?.length) selected = selected.filter(d => {
-    const paired = (request.pairs || []).filter(p => p.category === d.cat || p.category === family(d.cat)).flatMap(p => p.dates);
+    const paired = (request.pairs || []).filter(p => p.category === d.cat || family(p.category) === family(d.cat)).flatMap(p => p.dates);
     const ranges = paired.length ? paired : request.dates, [start,end] = span(d);
     return start && ranges.some(r => start <= r.to && r.from <= end);
   });
   if (latest) {
     const newest = {};
     // The newest day is one summary, never a weekly recap of earlier days.
-    selected = selected.filter(d => d.cat !== 'stockbit-pekan');
+    selected = selected.filter(d => d.cat !== 'stockbit-pekan' && d.cat !== 'bei-pekan');
     for (const d of selected) if (!newest[d.cat] || d.end > newest[d.cat]) newest[d.cat] = d.end;
     const last = Object.values(newest).sort().at(-1);
     selected = selected.filter(d => d.end === newest[d.cat] && (cats.length || d.end === last));
   }
-  return preferSummaries(selected, docs, request, {dates:dates && !!request.dates?.length, latest});
+  const options = {dates:dates && !!request.dates?.length, latest};
+  return preferBei(preferSummaries(selected, docs, request, options), request, options);
 }
 
 export function dedupeDocuments(docs) {
@@ -305,7 +337,7 @@ export function documentRequest(question, scope, index, request = requestScope(q
   } else return null;
   docs = dedupeDocuments(docs);
   // Daily summaries (≤60 KB) and weekly recaps are small: a month is about four recaps plus edge days.
-  const cap = docs.every(d => d.cat === 'stockbit-ringkasan' || d.cat === 'stockbit-pekan') ? 10 : 6;
+  const cap = docs.every(d => ['stockbit-ringkasan','stockbit-pekan','bei-ringkasan','bei-pekan'].includes(d.cat)) ? 10 : 6;
   return docs.length && docs.length <= cap ? docs : null;
 }
 const READ_VERBS = /\b(baca|bacakan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|simpulkan|kesimpulan|inti|intinya|isi|isinya|garis besar|highlight|menarik)\b/i;

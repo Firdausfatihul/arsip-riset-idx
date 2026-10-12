@@ -100,8 +100,12 @@ def digest_events(doc, tickers):
 
 
 # Stockbit summaries are user discussion too: screening labels them 'diskusi Stockbit', never official.
+# BEI summaries are automatic summaries of official announcements: kind 'bei', ranked with the official sources.
 KINDS = {'keterbukaan-informasi': 'ki', 'stockbit': 'stockbit', 'stockbit-ringkasan': 'stockbit',
-         'stockbit-detail': 'stockbit', 'stockbit-pekan': 'stockbit'}
+         'stockbit-detail': 'stockbit', 'stockbit-pekan': 'stockbit',
+         'bei-ringkasan': 'bei', 'bei-detail': 'bei', 'bei-pekan': 'bei'}
+# Kinds whose `### KODE`/`## KODE` heading owns the prose under it (a KI or BEI issuer section).
+HEADING_OWNERS = ('ki', 'bei')
 
 
 def text_events(doc, tickers, records):
@@ -113,7 +117,7 @@ def text_events(doc, tickers, records):
         if len(text) > 200000:  # embedded data blobs, not prose
             continue
         heading = re.match(r'\s*#{1,6}\s+(?:\d+(?:\.\d+)*\.?\s+)?([A-Z0-9]{4})\b', record['content'])
-        owner = heading[1] if heading and heading[1] in tickers and kind == 'ki' else None
+        owner = heading[1] if heading and heading[1] in tickers and kind in HEADING_OWNERS else None
         for sentence in re.split(r'(?<=[.!?])\s+|\n+', text):
             if sentence.lstrip().startswith('[^'):  # footnote definitions point to lines, not events
                 continue
@@ -155,8 +159,12 @@ def primary_names(counts):
     return {code: max(found, key=found.get) for code, found in sorted(counts.items())}
 
 
-def make_events(docs, tickers, evidence):
-    """evidence: {source_id: make_evidence(...) result} for the non-digest documents."""
+def make_events(docs, tickers, evidence, name_docs=None):
+    """evidence: {source_id: make_evidence(...) result} for the non-digest documents.
+
+    name_docs: documents read only for official issuer names (default: docs). Retired sources (Digest Emiten) are no
+    longer indexed by chat, but the names they wrote stay: without them the model fills in names from memory.
+    """
     events, seen = [], set()
     for doc in docs:
         found = (digest_events(doc, tickers) if doc['cat'] == 'digest-emiten'
@@ -166,10 +174,11 @@ def make_events(docs, tickers, evidence):
             if key not in seen:
                 seen.add(key)
                 events.append(event)
-    counts = issuer_names(docs, tickers)
+    name_docs = docs if name_docs is None else name_docs
+    counts = issuer_names(name_docs, tickers)
     # Words the archive writes in lowercase often: "(Pergantian Pengurus)" is a description, not a name.
     lower = {}
-    for doc in docs:
+    for doc in name_docs:
         for w in re.findall(r'\b[a-z]{3,}\b', plain(doc['body']) if doc['kind'] == 'html' else doc['body']):
             lower[w] = lower.get(w, 0) + 1
     # A renamed issuer keeps every name the archive used (IPAC: APAC Inti Corpora, Era Graharealty).

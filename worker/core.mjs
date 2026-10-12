@@ -700,7 +700,7 @@ export async function converse(archive, model, question, history, emit, signal, 
   // geography names are search candidates, not a request to exclude Indonesian sources.
   let searchScope = thematic ? {...request,categories:[],pairs:[]} : request;
   const topicTerms = terms => searchScope.categories?.length ? terms.filter(t =>
-    !/^(sgx|singapur[ae]?|singapore|asx|australia|bei|idx|indonesia|ki|keterbukaan(?: informasi)?|stockbit(?:[- ](?:ringkasan|detail|pekan|mentah|harian))?|ringkasan stockbit|stockbit-ringkasan|mentah|digest(?: emiten)?)$/i.test(t)) : terms;
+    !/^(sgx|singapur[ae]?|singapore|asx|australia|bei|idx|indonesia|ki|keterbukaan(?: informasi)?|keterbukaan bei|ringkasan bei|bei-ringkasan|stockbit(?:[- ](?:ringkasan|detail|pekan|mentah|harian))?|ringkasan stockbit|stockbit-ringkasan|mentah|digest(?: emiten)?)$/i.test(t)) : terms;
   const scopedSearch = async terms => {
     const latestIds = searchScope.latest && searchScope.categories?.length
       ? new Set(scopeDocuments(index.docs || [],searchScope,{latest:true}).map(d=>d.document_id || d.path)) : null;
@@ -731,7 +731,8 @@ export async function converse(archive, model, question, history, emit, signal, 
   if (!documents && !thematic && ['summary','discover'].includes(intent)) {
     // Discovery has a bounded, visible default; it is not a claim to screen the market.
     if (!request.categories?.length && !request.dates?.length) {
-      request = {...request,categories:['keterbukaan-informasi','stockbit-ringkasan','stockbit'],latest:true};
+      // BEI daily summaries first; the retired KI analyses stay only while no BEI summary is as new (retrieval.mjs).
+      request = {...request,categories:['bei-ringkasan','keterbukaan-informasi','stockbit-ringkasan','stockbit'],latest:true};
       stats.default_scope = 'latest-idx-stockbit';
     }
     documents = dedupeDocuments(scopeDocuments(index.docs,request,

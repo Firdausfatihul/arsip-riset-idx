@@ -1,38 +1,42 @@
 #!/usr/bin/env python3
-"""Terbitkan ringkasan Stockbit sekali klik (dijalankan desk dengan cwd = akar arsip), dan bisa di-rollback.
+"""Terbitkan ringkasan Stockbit dan keterbukaan BEI sekali klik (dijalankan desk dengan cwd = akar arsip), dan bisa di-rollback.
 
     python3 -B tools/publish_stockbit.py             # preflight, sinkron, cek build, deploy chat, commit+tag, push
     python3 -B tools/publish_stockbit.py --dry-run   # preflight + sinkron + cek build saja (tanpa deploy/commit/push)
 
 Urutan:
-  1. Preflight: git dan npx ada, cabang main, tidak ada yang di-stage, tidak ada perubahan selain berkas Stockbit di
-     needtobeindexed/idx-signal-desk/ (sb*.md, stockbit-index.json, .sync-stockbit.json, .stockbit-hold.json; berkas titik
-     lain seperti .sync.json dibiarkan karena tidak ikut build), docs/, dan site/ (hasil build yang ikut dilacak git).
+  1. Preflight: git dan npx ada, cabang main, tidak ada yang di-stage, tidak ada perubahan selain berkas Stockbit/BEI di
+     needtobeindexed/idx-signal-desk/ (sb*.md, stockbit-index.json, .sync-stockbit.json, .stockbit-hold.json, bei*.md,
+     bei-index.json, .sync-bei.json, .bei-hold.json; berkas titik lain seperti .sync.json dibiarkan karena tidak ikut
+     build), docs/, dan site/ (hasil build yang ikut dilacak git).
      digest_*/kepemilikan* yang belum di-commit menolak publish: publish_chat akan men-deploy-nya dan rollback Stockbit
      akan ikut membatalkannya. Lalu tidak ada commit lokal yang belum dipush, `git fetch` + `git pull --ff-only` kalau
      tertinggal origin/main, ruang disk >= 1,5 GB.
   2. Catat titik rollback SEBELUM mengubah apa pun: HEAD dan versi Worker yang sedang live. Kalau publish sebelumnya
      sudah deploy tanpa commit (exit 6/7/batas waktu), versi Worker sebelum publish itu yang dipakai (`rollback_to`).
-  3. `tools/sync_idx.py --stockbit-only --no-build`. Kalau tidak ada berkas Stockbit yang berubah: selesai,
-     "tidak ada perubahan" (tanpa build, deploy, commit, atau tag).
-  4. `build.py --out <folder sementara>`: setiap sb*.md harus masuk kategori stockbit-* yang benar dengan tanggal yang benar.
+  3. `tools/sync_idx.py --stockbit-only --no-build --with-bei`: Stockbit dan BEI dalam SATU staging; BEI yang ditolak
+     (atau HTTP error BEI) dikembalikan utuh dan dilewati (`bei_skipped`), Stockbit tetap terbit; desk tanpa /api/bei (404) = BEI dilewati. Kalau tidak ada
+     berkas Stockbit/BEI yang berubah: selesai, "tidak ada perubahan" (tanpa build, deploy, commit, atau tag).
+  4. `build.py --out <folder sementara>`: setiap sb*.md/bei*.md harus masuk kategori stockbit-*/bei-* yang benar dengan
+     tanggal yang benar.
   5. `tools/publish_chat.py` (build site/, Worker, deploy, indeks chat, docs/). Kalau gagal setelah deploy,
      `tools/sync_chat_index.py` (dan build docs/) diulang sekali.
-  6. `git add` hanya berkas Stockbit di atas plus hasil build yang masih dilacak Git; berhenti kalau ada berkas sb* terhapus,
-     kecuali berkas hari yang ditahan desk dari web (entri withheld_by=desk di .stockbit-hold.json yang ikut di-commit);
-     commit "Stockbit: ringkasan <tanggal>" (atau "Stockbit: tahan <tanggal> dari web"), push (sekali `git pull --rebase`
-     kalau ditolak), lalu tag beranotasi stockbit-publish-YYYYMMDD-HHMMSS dan push tag.
+  6. `git add` hanya berkas Stockbit/BEI di atas plus hasil build yang masih dilacak Git; berhenti kalau ada berkas sb*/bei*
+     terhapus, kecuali berkas hari yang ditahan desk dari web (entri withheld_by=desk di .stockbit-hold.json / .bei-hold.json
+     yang ikut di-commit); commit "Stockbit: ringkasan <tanggal>" (atau "Stockbit: tahan <tanggal> dari web"; bagian
+     "BEI: ringkasan <tanggal>" ditambahkan kalau ada berkas BEI), push (sekali `git pull --rebase` kalau ditolak), lalu tag
+     beranotasi stockbit-publish-YYYYMMDD-HHMMSS dan push tag.
   7. Catatan ke .stockbit-publish/log.jsonl (dipakai tools/rollback_stockbit.py) dan satu baris JSON ringkasan di akhir.
 
 Exit code:
   0 berhasil, tidak ada perubahan, atau dry-run lolos
   1 kesalahan tak terduga
   2 preflight gagal (tidak ada yang diubah)
-  3 sinkron Stockbit gagal/ditolak (tidak ada yang di-deploy)
-  4 cek build gagal: berkas sb* salah kategori/tanggal (tidak ada yang di-deploy)
+  3 sinkron Stockbit/BEI gagal/ditolak (tidak ada yang ditulis atau di-deploy)
+  4 cek build gagal: berkas sb*/bei* salah kategori/tanggal (tidak ada yang di-deploy)
   5 publish_chat.py gagal sebelum deploy (Worker tidak berubah, tidak ada commit)
   6 Worker sudah ter-deploy tetapi indeks chat/docs gagal setelah diulang (belum commit/push; bisa di-rollback)
-  7 penjaga commit: ada berkas sb* yang akan terhapus tanpa tahanan desk (tidak di-commit)
+  7 penjaga commit: ada berkas sb*/bei* yang akan terhapus tanpa tahanan desk (tidak di-commit)
   8 push gagal (commit lokal ada, Worker live; jalankan ulang atau push manual)
 Semua perintah memakai daftar argumen, tanpa shell, dengan batas waktu.
 """
@@ -56,13 +60,25 @@ WRANGLER_CONFIG = ["--config", "worker/wrangler.jsonc"]
 # Folder hasil build yang diizinkan; hanya folder yang masih dilacak Git boleh di-stage.
 # main terbaru mengabaikan site/, sedangkan publikasi lama mungkin masih melacaknya.
 DERIVED_PATHS = ("docs", "site")
-# Di DEST_REL hanya berkas Stockbit ini (plus SB_FILE) yang boleh kotor dan di-commit; digest/kepemilikan tidak.
+# Di DEST_REL hanya berkas Stockbit/BEI ini (plus SB_FILE/BEI_FILE) yang boleh kotor dan di-commit; digest/kepemilikan tidak.
 STOCKBIT_NAMES = ("stockbit-index.json", ".sync-stockbit.json", ".stockbit-hold.json")
 HOLD_REL = f"{DEST_REL}/.stockbit-hold.json"
 STATE_REL = f"{DEST_REL}/.sync-stockbit.json"
+BEI_NAMES = ("bei-index.json", ".sync-bei.json", ".bei-hold.json")
+BEI_HOLD_REL = f"{DEST_REL}/.bei-hold.json"
+BEI_STATE_REL = f"{DEST_REL}/.sync-bei.json"
 MIN_FREE_BYTES = 1_500_000_000
 SB_FILE = re.compile(r"(?:^|/)(sbringkas|sbdetail|sbpekan)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.md$")
 SB_CATEGORY = {"sbringkas": "stockbit-ringkasan", "sbdetail": "stockbit-detail", "sbpekan": "stockbit-pekan"}
+BEI_FILE = re.compile(r"(?:^|/)(beiringkas|beidetail|beipekan)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.md$")
+BEI_CATEGORY = {"beiringkas": "bei-ringkasan", "beidetail": "bei-detail", "beipekan": "bei-pekan"}
+# Berkas harian/pekan kedua keluarga yang diterbitkan publish ini (sb* atau bei*).
+PUB_FILE = re.compile(r"(?:^|/)(sbringkas|sbdetail|sbpekan|beiringkas|beidetail|beipekan)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.md$")
+PUB_CATEGORY = {**SB_CATEGORY, **BEI_CATEGORY}
+WEEK_PREFIXES = ("sbpekan", "beipekan")
+# Keluarga per awalan berkas, dan berkas tahanan/status tiap keluarga.
+FAMILY = {prefix: "stockbit" for prefix in SB_CATEGORY} | {prefix: "bei" for prefix in BEI_CATEGORY}
+HOLDS = {"stockbit": HOLD_REL, "bei": BEI_HOLD_REL}
 BUILD_LINE = re.compile(r" -> files/([^/\s]+)/(\d{4}-\d{2}-\d{2})/(\S+)\s*$")
 FAILED_COMMAND = re.compile(r"Command '(\[.*?\])' returned non-zero exit status")
 DEPLOYED_ONLY = ("deployed_index_pending", "deployed_not_committed")
@@ -152,12 +168,29 @@ def stockbit_owned(path):
     return folder == DEST_REL and (bool(SB_FILE.search(name)) or name in STOCKBIT_NAMES)
 
 
+def bei_owned(path):
+    """Berkas BEI langsung di DEST_REL: bei*.md, bei-index.json, .sync-bei.json, .bei-hold.json."""
+    folder, _, name = path.rpartition("/")
+    return folder == DEST_REL and (bool(BEI_FILE.search(name)) or name in BEI_NAMES)
+
+
+def publish_owned(path):
+    """Berkas yang boleh diubah dan di-commit publish ini (Stockbit atau BEI)."""
+    return stockbit_owned(path) or bei_owned(path)
+
+
+# Jenis dirty_kind yang dimiliki publish ini (boleh kotor, di-commit, dan di-revert rollback).
+OWNED_KINDS = ("stockbit", "bei")
+
+
 def dirty_kind(path):
-    """derived (docs/, site/), stockbit, ignored (berkas titik lain di DEST_REL: tidak ikut build), atau other."""
+    """derived (docs/, site/), stockbit, bei, ignored (berkas titik lain di DEST_REL: tidak ikut build), atau other."""
     if inside(path, DERIVED_PATHS):
         return "derived"
     if stockbit_owned(path):
         return "stockbit"
+    if bei_owned(path):
+        return "bei"
     folder, _, name = path.rpartition("/")
     if folder == DEST_REL and name.startswith("."):
         return "ignored"
@@ -171,7 +204,8 @@ def tracked_derived_paths(runner):
 
 
 def stockbit_changes(runner):
-    return sorted(path for _, path in changed_paths(runner) if stockbit_owned(path))
+    """Berkas Stockbit dan BEI yang berubah (nama lama dipertahankan untuk rollback_stockbit.py)."""
+    return sorted(path for _, path in changed_paths(runner) if publish_owned(path))
 
 
 def record_key(record):
@@ -241,8 +275,8 @@ def desk_withheld_days(text):
 
 
 def sb_file_days(path):
-    """Hari yang dicakup berkas sb*: satu hari (sbringkas/sbdetail) atau hari-hari pekannya (sbpekan); kosong kalau tidak valid."""
-    match = SB_FILE.search(path)
+    """Hari yang dicakup berkas sb*/bei*: satu hari (ringkas/detail) atau hari-hari pekannya (pekan); kosong kalau tidak valid."""
+    match = PUB_FILE.search(path)
     if not match:
         return set()
     try:
@@ -250,43 +284,57 @@ def sb_file_days(path):
     except ValueError:
         return set()
     span = (end - start).days
-    if match[1] != "sbpekan":
+    if match[1] not in WEEK_PREFIXES:
         return {match[2]} if span == 0 else set()
     return {(start + timedelta(days=i)).isoformat() for i in range(span + 1)} if 0 <= span <= 6 else set()
 
 
+def file_family(path):
+    """'stockbit' (sb*), 'bei' (bei*), atau None."""
+    match = PUB_FILE.search(path)
+    return FAMILY[match[1]] if match else None
+
+
 def withheld_deletion(path, withheld):
-    """True kalau path berkas sb* yang mencakup hari yang ditahan desk (sbpekan: salah satu harinya).
+    """True kalau path berkas sb*/bei* yang mencakup hari yang ditahan desk (pekan: salah satu harinya).
 
+    `withheld`: {"stockbit": hari, "bei": hari}; himpunan biasa = hari Stockbit (bentuk lama).
     Berlaku untuk sumbernya di DEST_REL dan untuk salinannya di hasil build (docs/, site/): publish_chat.py membangun ulang
-    docs/ tanpa hari itu, jadi salinan files/stockbit-*/<tgl>/sb*.md ikut terhapus dan harus boleh di-commit.
+    docs/ tanpa hari itu, jadi salinan files/stockbit-*/<tgl>/sb*.md (atau files/bei-*/…) ikut terhapus dan harus boleh di-commit.
     """
-    if not (stockbit_owned(path) or inside(path, DERIVED_PATHS)):
+    if not (publish_owned(path) or inside(path, DERIVED_PATHS)):
         return False
-    return bool(sb_file_days(path) & withheld)
+    family = file_family(path)
+    days = withheld.get(family, set()) if isinstance(withheld, dict) else (withheld if family == "stockbit" else set())
+    return bool(sb_file_days(path) & days)
 
 
-def withheld_removed(runner, withheld):
-    """Hari yang ditahan desk yang berkas sb*-nya terhapus di pohon kerja (dicatat untuk rollback)."""
-    return sorted({day for status, path in changed_paths(runner) if "D" in status and withheld_deletion(path, withheld)
-                   for day in sb_file_days(path) & withheld})
+def withheld_removed(runner, withheld, family="stockbit"):
+    """Hari yang ditahan desk yang berkas keluarga itu terhapus di pohon kerja (dicatat untuk rollback)."""
+    days = withheld.get(family, set()) if isinstance(withheld, dict) else withheld
+    return sorted({day for status, path in changed_paths(runner)
+                   if "D" in status and file_family(path) == family and withheld_deletion(path, withheld)
+                   for day in sb_file_days(path) & days})
 
 
 def worktree_withheld():
-    """Tahanan desk di .stockbit-hold.json pohon kerja (berkas yang akan ikut di-commit bersama penghapusannya)."""
-    try:
-        return desk_withheld_days((ROOT / HOLD_REL).read_text(encoding="utf-8"))
-    except OSError:
-        return set()
+    """Tahanan desk di .stockbit-hold.json / .bei-hold.json pohon kerja (ikut di-commit bersama penghapusannya)."""
+    out = {}
+    for family, rel in HOLDS.items():
+        try:
+            out[family] = desk_withheld_days((ROOT / rel).read_text(encoding="utf-8"))
+        except OSError:
+            out[family] = set()
+    return out
 
 
 def check_no_deleted_sb(runner, code):
-    """sb* hanya boleh terhapus kalau harinya ditahan desk (withheld_by=desk); penghapusan lain menghentikan publish."""
+    """sb*/bei* hanya boleh terhapus kalau harinya ditahan desk (withheld_by=desk); penghapusan lain menghentikan publish."""
     withheld = worktree_withheld()
     deleted = [path for status, path in changed_paths(runner)
-               if "D" in status and SB_FILE.search(path) and not withheld_deletion(path, withheld)]
+               if "D" in status and PUB_FILE.search(path) and not withheld_deletion(path, withheld)]
     if deleted:
-        raise Failure(code, "berkas Stockbit akan terhapus, publish dihentikan: " + ", ".join(deleted[:10]))
+        raise Failure(code, "berkas Stockbit/BEI akan terhapus, publish dihentikan: " + ", ".join(deleted[:10]))
 
 
 def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_usage):
@@ -301,6 +349,7 @@ def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_
     outside = [path for _, path in changed_paths(runner) if dirty_kind(path) == "other"]
     if outside:
         raise Failure(2, "ada perubahan yang tidak boleh ikut publish Stockbit (hanya sb*.md, " + ", ".join(STOCKBIT_NAMES)
+                      + ", bei*.md, " + ", ".join(BEI_NAMES)
                       + ", docs/, site/; commit atau kembalikan dulu): " + ", ".join(outside[:15]))
     check_no_deleted_sb(runner, 2)
     git_ok(runner, "fetch", "origin", "main", timeout=T_NET)
@@ -360,18 +409,18 @@ def worker_version(runner):
 
 
 def check_build(stdout, sb_names):
-    """Baris build.py → tabel (nama, kategori, tanggal). Gagal kalau ada sb* yang salah kategori/tanggal atau hilang."""
+    """Baris build.py → tabel (nama, kategori, tanggal). Gagal kalau ada sb*/bei* yang salah kategori/tanggal atau hilang."""
     rows, problems, seen = [], [], {}
     for line in stdout.splitlines():
         match = BUILD_LINE.search(line)
         if not match:
             continue
         category, start, name = match.groups()
-        sb = SB_FILE.search(name)
+        sb = PUB_FILE.search(name)
         if not sb:
             continue
         seen[name] = seen.get(name, 0) + 1
-        expected = SB_CATEGORY[sb[1]]
+        expected = PUB_CATEGORY[sb[1]]
         rows.append((name, category, start))
         if category != expected:
             problems.append(f"{name}: kategori '{category}', seharusnya '{expected}'")
@@ -387,7 +436,7 @@ def check_build(stdout, sb_names):
 
 def build_check(runner, dest=None):
     dest = dest or ROOT / DEST_REL
-    names = [p.name for p in dest.glob("sb*.md") if SB_FILE.search(p.name)] if dest.is_dir() else []
+    names = [p.name for p in [*dest.glob("sb*.md"), *dest.glob("bei*.md")] if PUB_FILE.search(p.name)] if dest.is_dir() else []
     folder = tempfile.mkdtemp(prefix="arsip-sbcheck-")
     try:
         result = runner([sys.executable, "-B", "build.py", "--out", str(Path(folder) / "site")], timeout=T_BUILD)
@@ -399,7 +448,7 @@ def build_check(runner, dest=None):
     say(f"  {'berkas':<34} {'kategori':<20} tanggal")
     for name, category, start in sorted(rows):
         say(f"  {name:<34} {category:<20} {start}")
-    say(f"  {len(rows)} berkas Stockbit cocok kategori dan tanggal")
+    say(f"  {len(rows)} berkas Stockbit/BEI cocok kategori dan tanggal")
     return rows
 
 
@@ -444,22 +493,37 @@ def publish_chat(runner, worker_before):
     return True, retry.returncode == 0
 
 
-def commit_message(names, removed=()):
-    """`removed` = berkas sb* yang dihapus commit ini (hari yang ditahan desk dari web)."""
-    removed = set(removed)
-    kept = [n for n in names if n not in removed]
-
+def _family_message(source, pattern, day_prefix, week_prefix, kept, removed):
     def label(days):
         return f"{days[0]} s/d {days[-1]} ({len(days)} hari)" if len(days) > 5 else ", ".join(days)
-    days = sorted({m[2] for n in kept if (m := SB_FILE.search(n)) and m[1] == "sbringkas"})
-    weeks = sorted({f"{m[2]}..{m[3]}" for n in kept if (m := SB_FILE.search(n)) and m[1] == "sbpekan"})
-    held = sorted({m[2] for n in removed if (m := SB_FILE.search(n)) and m[1] != "sbpekan"})
-    held_weeks = sorted({f"{m[2]}..{m[3]}" for n in removed if (m := SB_FILE.search(n)) and m[1] == "sbpekan"})
+    removed = [n for n in removed if pattern.search(n)]
+    days = sorted({m[2] for n in kept if (m := pattern.search(n)) and m[1] == day_prefix})
+    weeks = sorted({f"{m[2]}..{m[3]}" for n in kept if (m := pattern.search(n)) and m[1] == week_prefix})
+    held = sorted({m[2] for n in removed if (m := pattern.search(n)) and m[1] != week_prefix})
+    held_weeks = sorted({f"{m[2]}..{m[3]}" for n in removed if (m := pattern.search(n)) and m[1] == week_prefix})
     withheld = f"tahan {label(held) if held else 'pekan ' + ', '.join(held_weeks)} dari web" if removed else ""
     if withheld and not days and not weeks:
-        return f"Stockbit: {withheld}"
-    return (f"Stockbit: ringkasan {label(days) or 'pembaruan indeks/situs'}" + (f" · pekan {', '.join(weeks)}" if weeks else "")
+        return f"{source}: {withheld}"
+    return (f"{source}: ringkasan {label(days) or 'pembaruan indeks/situs'}" + (f" · pekan {', '.join(weeks)}" if weeks else "")
             + (f" · {withheld}" if withheld else ""))
+
+
+def commit_message(names, removed=()):
+    """`removed` = berkas sb*/bei* yang dihapus commit ini (hari yang ditahan desk dari web).
+
+    Bagian "BEI: …" hanya ditulis kalau commit menyentuh berkas BEI; bagian Stockbit selalu ada kecuali commit hanya BEI.
+    """
+    removed = set(removed)
+    kept = [n for n in names if n not in removed]
+    base = lambda n: n.rsplit("/", 1)[-1]
+    touches_sb = any(SB_FILE.search(n) or base(n) in STOCKBIT_NAMES for n in names)
+    touches_bei = any(BEI_FILE.search(n) or base(n) in BEI_NAMES for n in names)
+    parts = []
+    if touches_sb or not touches_bei:
+        parts.append(_family_message("Stockbit", SB_FILE, "sbringkas", "sbpekan", kept, removed))
+    if touches_bei:
+        parts.append(_family_message("BEI", BEI_FILE, "beiringkas", "beipekan", kept, removed))
+    return " · ".join(parts)
 
 
 def push(runner, refspec):
@@ -485,7 +549,8 @@ def now_iso():
 
 def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk_usage, log=None, clock=datetime.now):
     stamp = clock().strftime("%Y%m%d-%H%M%S")
-    summary = {"status": "dimulai", "dry_run": bool(args.dry_run), "started_at": now_iso()}
+    # "supports": penanda kemampuan untuk desk (skrip lama tanpa BEI tidak menyebut "bei").
+    summary = {"status": "dimulai", "dry_run": bool(args.dry_run), "started_at": now_iso(), "supports": ["stockbit", "bei"]}
     record = {"type": "publish", "tag": None, "start_sha": None, "pre_sha": None, "post_sha": None,
               "worker_version_before": None, "worker_version_after": None, "files": [], "started_at": summary["started_at"]}
     deployed = False
@@ -503,22 +568,32 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
                 record["supersedes"] = [record_key(r) for r in chain]
                 record["rollback_to"] = first["rollback_to"] if "rollback_to" in first else first.get("worker_version_before")
                 say(f"  publish sebelumnya sudah deploy tanpa commit; rollback Worker nanti ke {record['rollback_to'] or '(tidak tercatat)'}")
-        say("2/6 sinkron Stockbit")
-        result = runner([sys.executable, "-B", "tools/sync_idx.py", "--stockbit-only", "--no-build"], timeout=T_SYNC)
+        say("2/6 sinkron Stockbit + BEI")
+        # Satu staging untuk keduanya; BEI yang ditolak dikembalikan utuh dan dilewati, Stockbit tetap terbit.
+        result = runner([sys.executable, "-B", "tools/sync_idx.py", "--stockbit-only", "--no-build", "--with-bei"], timeout=T_SYNC)
         say(output(result).rstrip())
         if result.returncode:
-            raise Failure(3, f"sync_idx.py --stockbit-only keluar dengan kode {result.returncode}")
+            raise Failure(3, f"sync_idx.py --stockbit-only --with-bei keluar dengan kode {result.returncode}")
+        # BEI dilewati (desk tanpa /api/bei, ekspor dari profil desk lain, atau ekspor BEI ditolak) tidak menggagalkan Stockbit, tetapi
+        # dilaporkan supaya job BEI di desk tidak menganggap BEI sudah terbit.
+        skipped = [line.strip() for line in output(result).splitlines() if "BEI dilewati" in line]
+        if skipped:
+            summary["bei_skipped"] = skipped[0][:500]
         check_no_deleted_sb(runner, 7)
         # Dicatat sebelum deploy: rollback_stockbit.py menolak membatalkan publish yang mencabut hari yang ditahan desk.
-        withheld = withheld_removed(runner, worktree_withheld())
+        holds = worktree_withheld()
+        withheld = withheld_removed(runner, holds, "stockbit")
         if withheld:
             record["withheld"] = summary["withheld"] = withheld
+        withheld_bei = withheld_removed(runner, holds, "bei")
+        if withheld_bei:
+            record["withheld_bei"] = summary["withheld_bei"] = withheld_bei
         changes = stockbit_changes(runner)
         record["files"] = sorted(p.rsplit("/", 1)[-1] for p in changes)
         if not changes:
             # Tanpa ini setiap klik men-deploy ulang Worker dan meng-commit docs/ dan site/ dengan BUILD_ID baru.
             record["status"] = summary["status"] = "tidak ada perubahan"
-            say("tidak ada perubahan Stockbit; tidak ada build, deploy, atau commit")
+            say("tidak ada perubahan Stockbit/BEI; tidak ada build, deploy, atau commit")
             return 0, summary
         say("3/6 cek build (folder sementara)")
         summary["checked"] = len(build_check(runner))
@@ -535,21 +610,24 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         say("5/6 commit")
         paths = [*stockbit_changes(runner), *tracked_derived_paths(runner)]
         git_ok(runner, "add", "--", *paths, code=7)
-        removed = [n for n in git_ok(runner, "diff", "--cached", "--diff-filter=D", "--name-only", code=7).splitlines() if SB_FILE.search(n)]
-        # Penghapusan sb* hanya untuk hari yang ditahan desk menurut .stockbit-hold.json yang di-stage (yang ikut di-commit).
-        staged_hold = git(runner, "show", f":{HOLD_REL}") if removed else None
-        withheld = desk_withheld_days(staged_hold.stdout if staged_hold and staged_hold.returncode == 0 else "")
+        removed = [n for n in git_ok(runner, "diff", "--cached", "--diff-filter=D", "--name-only", code=7).splitlines() if PUB_FILE.search(n)]
+        # Penghapusan sb*/bei* hanya untuk hari yang ditahan desk menurut berkas tahanan yang di-stage (yang ikut di-commit).
+        withheld = {}
+        for family, rel in HOLDS.items():
+            staged_hold = git(runner, "show", f":{rel}") if any(file_family(n) == family for n in removed) else None
+            withheld[family] = desk_withheld_days(staged_hold.stdout if staged_hold and staged_hold.returncode == 0 else "")
         deleted = [n for n in removed if not withheld_deletion(n, withheld)]
         if deleted:
             git(runner, "reset", "-q", "--", *paths)
-            raise Failure(7, "berkas Stockbit akan terhapus, tidak di-commit: " + ", ".join(deleted[:10]))
+            raise Failure(7, "berkas Stockbit/BEI akan terhapus, tidak di-commit: " + ", ".join(deleted[:10]))
         if git(runner, "diff", "--cached", "--quiet").returncode == 0:
             record["status"] = summary["status"] = "tidak ada perubahan"
             record["worker_version_after"] = worker_version(runner)
             say("tidak ada perubahan")
             return 0, summary
         names = git_ok(runner, "diff", "--cached", "--name-only", code=7).splitlines()
-        record["files"] = sorted(n.rsplit("/", 1)[-1] for n in names if SB_FILE.search(n) or n.endswith("stockbit-index.json"))
+        record["files"] = sorted(n.rsplit("/", 1)[-1] for n in names
+                                 if PUB_FILE.search(n) or n.endswith(("stockbit-index.json", "bei-index.json")))
         message = commit_message(names, removed)
         git_ok(runner, "commit", "-q", "-m", message, "--", *paths, code=7, what="git commit")
         record["post_sha"] = git_ok(runner, "rev-parse", "HEAD")

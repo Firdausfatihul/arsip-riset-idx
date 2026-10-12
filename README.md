@@ -67,8 +67,9 @@ archivescrapingweb/
 | Pola nama | Kategori |
 |---|---|
 | `stockbit_YYYYMMDD.md` | Stockbit |
-| `ki_YYYYMMDD.md` | Keterbukaan Informasi |
-| `digest_YYYY-MM-DD_YYYY-MM-DD[_HHMM-HHMM].md` | Digest Emiten (dibuat `tools/sync_idx.py`) |
+| `ki_YYYYMMDD.md` | Analisis KI (legacy): arsip lama, tanpa tombol sumber, tetap dibangun dan bisa dicari |
+| `idx-signal-desk/beiringkas_<tgl>_<tgl>.md` / `beidetail_…` / `beipekan_<senin>_<minggu>.md` | Indonesia (BEI): ringkasan, detail, dan rekap pekan keterbukaan BEI (dibuat `tools/sync_idx.py --bei-only`) |
+| `digest_YYYY-MM-DD_YYYY-MM-DD[_HHMM-HHMM].md` | Digest Emiten (dipensiunkan: tidak tampil di daftar/tombol, tidak masuk chat; `#doc=` lama tetap jalan) |
 | `asx_YYYYMMDD.md` | Keterbukaan Informasi Australia (tanggal potret riset) |
 | `sgx_YYYYMMDD.md` / `sgx_january-20september2026.md` | Keterbukaan Informasi Singapura (SGX); file kedua memakai 20 September 2026 sebagai tanggal penyusunan |
 | `keterbukaan_sg_DDMMYYYY_*.md` / `.csv` | Keterbukaan Informasi Singapura (SGX), tanggal dari nama file |
@@ -121,7 +122,11 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
 - Font dari Google Fonts: IBM Plex Sans / Sans Condensed / Mono. Kalau gagal, pakai font sistem.
 - Tab di atas: **Dokumen** (daftar dan pembaca) dan **Kepemilikan Saham** (hanya muncul kalau `kepemilikan.json` ada).
 - Beranda memakai **tombol sumber + satu daftar**. Tombol selalu tersedia di atas daftar maupun pembaca:
-  Stockbit → Indonesia (BEI) → Australia (ASX) → Singapura (SGX) → Digest Emiten.
+  Stockbit → Stockbit harian → Detail Stockbit → Stockbit mingguan → Indonesia (BEI) → Detail BEI → BEI mingguan → Australia (ASX) → Singapura (SGX)
+  (tombol hanya untuk kategori yang punya dokumen). Kategori dengan `"nav": None` tidak punya tombol: **Analisis KI (legacy)**
+  (daftarnya tetap ada lewat `#keterbukaan-informasi`, ditautkan dari daftar Indonesia (BEI); selama arsip belum punya ringkasan
+  BEI, tombol "Indonesia (BEI)" tetap menunjuk ke daftar ini) dan **Digest Emiten** (`"unlisted": True`: tidak tampil di daftar,
+  tidak dihitung atau diambil saat mencari, berkasnya tetap dibangun sehingga tautan `#doc=` lama tetap jalan).
   - Lebar layar ≥768 px: lima tombol satu baris. Di HP: dua kolom, Australia dan Singapura berdampingan di baris kedua; Digest memenuhi baris ketiga.
   - Klik sumber membuka satu daftar sumber itu dan menghapus pencarian. Beranda awal memilih Stockbit. Tautan `#keterbukaan-singapura` langsung membuka SGX.
   - Pencarian tetap **lintas semua sumber**. Saat ada kata pencarian, daftar menampilkan semua sumber yang cocok; tombol sumber tetap terlihat meski tidak ada hasil.
@@ -132,6 +137,13 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
   - Warna mengikuti mode terang/gelap perangkat; pembesaran halaman tetap diizinkan. HTML arsip lama tetap memakai desain aslinya di dalam iframe.
 - Routing lewat hash: `#doc=files/<kategori>/<tanggal>/<file>.md` dan opsional `&s=<id-bagian>`.
   Contoh: `#doc=files/keterbukaan-informasi/2026-09-14/pemeriksaan_55_emiten_14_September_2026.md&s=foru`
+  Halaman emiten: `#emiten=<KODE>` menggabungkan dua bagian dengan label dan disclaimer masing-masing: **Keterbukaan resmi BEI**
+  (`files/bei-index/bei-index.json`; tabel Tanggal | Pengumuman | Status/Tahap | Yang berubah | Kategori, tautan ke seksi emiten di
+  `beiringkas_`/`beidetail_`, atau ke "Laporan rutin" untuk hari yang hanya berisi laporan rutin; emiten non-rutin memakai petunjuk
+  bagian dari desk (baris indeks ke-9: id bagian seperti `emiten-lain`, atau true/false), dan tanpa petunjuk tanggalnya membuka
+  `beidetail_` di `## KODE`) di atas, dan **Diskusi Stockbit**
+  (`stockbit-index.json`) di bawahnya. Kode yang hanya ada di salah satu indeks tetap punya halaman; indeks yang gagal dimuat
+  hanya menampilkan "Coba lagi" di bagiannya. Isi indeks divalidasi saat dimuat dan selalu masuk sebagai teks (DOM), tidak pernah HTML.
   Tab kepemilikan: `#kepemilikan=<KODE>&dari=<YYYY-MM>&sampai=<YYYY-MM>` (kode kosong = daftar semua emiten;
   tanpa `dari` = bulan KSEI pertama, tanpa `sampai` = bulan terakhir). Contoh: `#kepemilikan=BBRI&dari=2026-06`, `#kepemilikan=ADES&dari=2023-05`
 - Rapikan otomatis setelah render Markdown:
@@ -678,9 +690,9 @@ python3 tools/sync_idx.py --watch 15      # tiap 15 menit, biarkan jalan di tab 
 python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # sekalian siapkan publish Artifact
 ```
 
-- `digest_<awal>_<akhir>[_HHMM-HHMM].md`: satu per jendela di *Library → Summary Windows*, isi = `POST /api/share/render`
-  (format md, semua digest per emiten). Baris judul diganti supaya tiap berkas bisa dibedakan.
-  Akhiran jam dipakai kalau jendela tidak 00:00–23:59 (mis. `_0000-1959`).
+- `digest_<awal>_<akhir>[_HHMM-HHMM].md` (**dipensiunkan**; hanya dengan `--with-digests`): satu per jendela di *Library → Summary
+  Windows*, isi = `POST /api/share/render` (format md, semua digest per emiten). Baris judul diganti supaya tiap berkas bisa dibedakan.
+  Akhiran jam dipakai kalau jendela tidak 00:00–23:59 (mis. `_0000-1959`). Berkas digest yang ada tidak pernah dihapus sinkron.
 - `kepemilikan.json`: semua bulan sekaligus (laporan emiten sejak Mei 2023 dan bulan KSEI), dari `GET /api/ownership` dan `/api/ownership/<KODE>?profile_id=…`:
   per emiten per bulan akumulasi >1%, pemegang >1% (baris dengan nama investor sama dijumlahkan), catatan data KSEI, free float resmi,
   jumlah pemegang, pemegang ≥5% gabungan, dan status laporan emiten, masing-masing dengan penanda terverifikasi.
@@ -703,7 +715,7 @@ python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # 
 - Hemat: jendela yang `updated_at`/jumlah emitennya sama tidak dirender ulang; kepemilikan hanya diambil ulang kalau ringkasan `/api/ownership`
   atau file KSEI aktif di ledger berubah.
   Status disimpan di `needtobeindexed/idx-signal-desk/.sync.json`. `--force` merender ulang semuanya.
-- Berkas yang tidak lagi dihasilkan server dihapus dari folder itu (hanya pola `digest_*.md` / `kepemilikan_*.md`, dan tidak pernah kalau server mengembalikan daftar kosong).
+- Berkas lama `kepemilikan_*.md` dihapus saat `kepemilikan.json` ditulis. Berkas `digest_*.md` tidak lagi dihapus (dipensiunkan; tautan lama tetap jalan).
 - Profil: yang pertama kali disinkron dicatat di `.sync.json`. Kalau profil aktif di Signal Desk berbeda, sinkron dilewati (exit 2)
   supaya data profil lain tidak menimpa. Profil aktif dicek lagi sebelum menghapus berkas lama dan sebelum menyimpan status. Ganti sengaja dengan `--profile <id>`.
 - Sinkron menyusun hasil di direktori sementara terlebih dahulu. Penjagaan profil dan keberhasilan seluruh pengambilan diperiksa sebelum menulis tujuan. Perubahan bersamaan pada tujuan membatalkan commit; kegagalan commit biasa dipulihkan dari snapshot. Ini bukan transaksi atomik terhadap mati listrik/SIGKILL di tengah beberapa berkas. Berkas sementara memakai nama acak dan tujuan symlink ditolak.
@@ -784,6 +796,42 @@ python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
   - Lalu `tools/sync_chat_index.py`. Rollback `partial` boleh dijalankan ulang (langkah git dilewati). Exit: 0 ok, 2 ditolak, 3 revert/reset gagal,
     4 push gagal, 5 Worker manual, 6 indeks chat gagal.
   Riwayat GitHub publik tetap menyimpan versi lama; penghapusan isi butuh langkah terpisah.
+
+### Ringkasan keterbukaan BEI (`--bei-only`, ikut publish sekali klik)
+
+```bash
+python3 -B tools/sync_idx.py --bei-only --no-build                   # hanya BEI
+python3 -B tools/sync_idx.py --stockbit-only --with-bei --no-build   # Stockbit + BEI dalam satu staging (dipakai publish_stockbit.py)
+python3 -B tools/sync_idx.py --with-bei                              # sinkron biasa, lalu BEI (staging terpisah)
+```
+
+- Kontrak: `docs/BEI_PIPELINE_PLAN.md` di repo IDX Signal Desk. Sumber: endpoint read-only `GET /api/bei/export/days|day/<tgl>?kind=ringkas|detail|
+  week/<senin>|index|withheld` (tanpa profil, tanpa LLM; `llm_calls` bukan 0 ditolak). Klon aturan Stockbit di atas:
+  `beiringkas_<tgl>_<tgl>.md`, `beidetail_<tgl>_<tgl>.md`, `beipekan_<senin>_<minggu>.md` (hanya pekan yang ketujuh harinya final dan server
+  tidak menjawab 404; hari tercakup tanpa pengumuman di `export/days` (`announcements: 0`, tanpa berkas) ikut melengkapi pekan),
+  `bei-index.json` (format 1: `days`, `tickers{KODE:[[hariIdx, n, nonrutin, status, tahap, delta, {kategori:n}, [id…], petunjuk_bagian?]]}`,
+  `names`), status `.sync-bei.json`, tahanan `.bei-hold.json` (bentuk sama dengan `.stockbit-hold.json`).
+- Desk tanpa `/api/bei` (HTTP 404 pada `export/days`): BEI dilewati dengan pesan, tidak ada berkas BEI yang diubah, Stockbit tetap jalan.
+- Profil: `profile_id` dari ekspor desk dicatat di `.sync-bei.json` pada sinkron BEI pertama. Ekspor dari profil lain (profil aktif desk
+  berganti, juga di tengah sinkron) = BEI dilewati dengan peringatan, tidak ada berkas BEI yang ditulis atau dihapus, Stockbit tetap jalan;
+  `publish_stockbit.py` melaporkannya sebagai `bei_skipped`. Pindah profil dengan sengaja: `--bei-profile <id>`. Desk yang tidak menyebut
+  `profile_id` = tidak diketahui (perilaku lama).
+- Hanya hari `final` (atau `sementara` dengan `--allow-provisional`); `--bei-since` membuang hari sebelum tanggal itu (default: semua hari
+  final desk). Tahanan rollback berlaku selama `sha256` ekspor sama. "Tahan dari web" di desk (`export/withheld`) mencabut berkas hari itu
+  dan pekannya, ditandai `withheld_by=desk`; 404 = tahanan desk yang tercatat tetap berlaku.
+- Ditolak (exit 1, tidak ada yang ditulis; dengan `--stockbit-only --with-bei` BEI dikembalikan utuh dan dilewati, Stockbit tetap ditulis) bila: nama/tanggal tidak sesuai pola atau tidak
+  sesuai `files` di `export/days`, `build.categorize()` tidak memberi `bei-ringkasan|bei-detail|bei-pekan`, `ok` bukan true, sha256 tidak
+  cocok, indeks menunjuk hari yang tidak terbit, kode/baris/nama di indeks tidak sesuai format 1, atau server mengekspor lebih sedikit hari
+  final daripada `beiringkas_*` yang sudah terbit. `REDACTIONS` diterapkan setelah cek hash (juga ke indeks). Berkas `bei*` tidak pernah di-prune.
+- `publish_stockbit.py` menjalankan `sync_idx.py --stockbit-only --no-build --with-bei`: satu publish, satu commit, satu tag, satu log rollback
+  untuk keduanya. Allowlist ditambah `bei*.md`, `bei-index.json`, `.sync-bei.json`, `.bei-hold.json`; penjaga hapus berlaku untuk keduanya
+  (tahanan BEI dibaca dari `.bei-hold.json`); cek build memeriksa kategori/tanggal `bei*`; pesan commit menambahkan `BEI: ringkasan <tgl>`
+  (atau `BEI: tahan <tgl> dari web`) bila ada berkas BEI. Hari BEI yang dicabut dicatat sebagai `withheld_bei` di log (rollback ditolak).
+- `rollback_stockbit.py` membalik rentang yang menyentuh berkas Stockbit/BEI; hari BEI yang dibawa publish ditahan di `.bei-hold.json`.
+- Chat: Digest Emiten tidak lagi diindeks (nama resmi emiten yang ditulisnya tetap dipakai untuk mengecek nama); `bei-ringkasan` dan
+  `bei-pekan` prioritas normal, `bei-detail` `priority: low` dan hanya dibaca untuk pertanyaan ticker/"detail". Kata "bei", "ki",
+  "keterbukaan" membaca keluarga Indonesia (ringkasan BEI, rekap pekan, dan Analisis KI lama untuk hari yang dicakupnya); "terbaru"
+  memilih ringkasan BEI terbaru. Cakupan discovery bawaan: `bei-ringkasan`, `keterbukaan-informasi`, `stockbit-ringkasan`, `stockbit`.
 
 ---
 
