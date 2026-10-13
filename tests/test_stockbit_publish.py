@@ -137,6 +137,15 @@ class PublishTests(unittest.TestCase):
         self.publish(runner)
         self.assertNotIn("--stockbit-since", runner.calls[runner.index("sync_idx.py")])
 
+    def test_provisional_days_are_forwarded_to_sync_only_when_asked(self):
+        runner = FakeRunner()
+        code, _ = self.publish(runner, allow_provisional=True)
+        self.assertEqual(code, 0, self.output)
+        self.assertIn("--allow-provisional --with-bei", runner.calls[runner.index("sync_idx.py")])
+        runner = FakeRunner()
+        self.publish(runner)
+        self.assertNotIn("--allow-provisional", runner.calls[runner.index("sync_idx.py")])
+
     def test_cli_rejects_bad_range_start(self):
         with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             pub.main(["--stockbit-since", "2026-9-1"])

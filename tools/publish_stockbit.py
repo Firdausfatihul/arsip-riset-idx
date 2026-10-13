@@ -16,7 +16,8 @@ Urutan:
      `git fetch` + `git pull --ff-only` kalau tertinggal origin/main, ruang disk >= 1,5 GB.
   2. Catat HEAD. Kalau publish sebelumnya sudah memperbarui VPS tanpa commit (vps_not_committed, belum di-rollback),
      berkasnya ikut di-commit publish ini (`supersedes`; rollback publish ini ikut menutupnya).
-  3. `tools/sync_idx.py --stockbit-only --no-build --with-bei` (+ `--stockbit-since <tgl>` kalau diberikan): Stockbit dan
+  3. `tools/sync_idx.py --stockbit-only --no-build --with-bei` (+ `--stockbit-since <tgl>` dan `--allow-provisional`
+     kalau diberikan; yang kedua ikut menerbitkan hari 'sementara', mis. hari ini yang belum tutup): Stockbit dan
      BEI dalam SATU staging; BEI yang ditolak (atau HTTP error BEI, ekspor dari profil desk lain, desk tanpa /api/bei)
      dikembalikan utuh dan dilewati ("BEI dilewati" -> `bei_skipped` di ringkasan), Stockbit tetap terbit. Kalau tidak ada
      berkas Stockbit/BEI yang berubah terhadap HEAD: selesai, "tidak ada perubahan" (tanpa build, VPS, commit, atau tag).
@@ -656,8 +657,12 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         since = getattr(args, "stockbit_since", None)
         # Satu staging untuk keduanya; BEI yang ditolak dikembalikan utuh dan dilewati, Stockbit tetap terbit.
         # --stockbit-since hanya batas bawah Stockbit (tanggal 'Dari' desk); BEI memakai batas bawaannya sendiri.
+        # --allow-provisional: hari 'sementara' (mis. hari ini) ikut terbit dengan label sementara; hari itu diperbarui
+        # pada publish berikutnya dan menjadi final setelah desk menutupnya.
         result = runner([sys.executable, "-B", "tools/sync_idx.py", "--stockbit-only", "--no-build"]
-                        + (["--stockbit-since", since] if since else []) + ["--with-bei"], timeout=T_SYNC)
+                        + (["--stockbit-since", since] if since else [])
+                        + (["--allow-provisional"] if getattr(args, "allow_provisional", False) else [])
+                        + ["--with-bei"], timeout=T_SYNC)
         say(output(result).rstrip())
         if result.returncode:
             raise Failure(3, f"sync_idx.py --stockbit-only --with-bei keluar dengan kode {result.returncode}")
@@ -810,6 +815,8 @@ def main(argv=None):
     ap.add_argument("--stockbit-since", type=since_day, metavar="YYYY-MM-DD",
                     help="terbitkan hari final Stockbit mulai tanggal ini (tanggal 'Dari' di desk), bukan batas bawah "
                          "bawaan sync_idx.py; hari yang sudah terbit tetap dipertahankan")
+    ap.add_argument("--allow-provisional", action="store_true",
+                    help="ikut terbitkan hari 'sementara' Stockbit/BEI (mis. hari ini yang belum tutup)")
     args = ap.parse_args(argv)
     try:
         code, summary = publish(args)
