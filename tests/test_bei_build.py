@@ -102,7 +102,7 @@ class FixtureBuildTests(unittest.TestCase):
         self.assertTrue(docs["beidetail_2026-10-06_2026-10-06.md"]["lazy"])
         self.assertTrue(docs["beiringkas_2026-09-20_2026-09-20.md"]["lazy"])
         self.assertEqual(docs["beipekan_2026-09-28_2026-10-04.md"]["cat"], "bei-pekan")
-        self.assertEqual(payload["bei"], {"path": "files/bei-index/bei-index.json", "days": 2, "tickers": 5})
+        self.assertEqual(payload["bei"], {"path": "files/bei-index/bei-index.json", "days": 2, "tickers": 6})  # BBCA BREN TOBA MEJA ASII EPAC
         self.assertEqual((self.out / "files/bei-index/bei-index.json").read_bytes(),
                          (self.src / "idx-signal-desk/bei-index.json").read_bytes())
         self.assertNotIn("bei-index.json", docs)

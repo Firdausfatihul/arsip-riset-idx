@@ -39,12 +39,55 @@ def ringkas_md(day_label, extra=""):
         "## Laporan rutin", "", "8 laporan registrasi: TLKM, ASII.", "", extra]) + "\n"
 
 
-def detail_md(day_label):
-    return "\n".join([
+# Full "Yang berubah" sentences as the desk detail writes them (md_inline escapes, other codes in lower case); the
+# index rows below carry their shortened form. Used by the "selengkapnya" checks of tests/bei_viewer.cjs.
+EPAC_FULL = ("Sebelumnya (28/09): rencana PMHMETD I hingga 2.000.000.000 saham dan buyback maksimum Rp20.000.000.000, "
+             "RUPSLB 3 November 2026; hari ini: pemanggilan RUPSLB 3 November 2026 pukul 10.00 WIB \\[agenda 1\\-5\\] "
+             "dan bukti iklan panggilan, mitra bbca disebut.")
+SB_EPAC_FULL = ("Diskusi EPAC berpusat pada rights issue (rasio 1:2, harga Rp100 menurut brief), harga turun ke 4830, dan "
+                "perdebatan dividend trap. Juga dibahas buyback Rp8 triliun serta klaim akumulasi asing.")
+
+
+def detail_md(day_label, epac=False, evil=False):
+    """A beidetail file in the desk's real layout ("## KODE — Nama", status line, "Kesinambungan (…): …")."""
+    lines = [
         f"# Detail keterbukaan BEI · {day_label}", "",
+        "Cakupan: 12 pengumuman · 5 emiten · 4 non-rutin · 8 rutin · 0 koreksi · terakhir 17:59 · final", "",
         "Ringkasan otomatis dari pengumuman resmi di idx.co.id; bukan rekomendasi.", "",
-        "## BBCA — Bank Central Asia Tbk", "", "Status: lanjutan", "", "### Hari ini", "", "- 09:12 · Panggilan RUPS", "",
-        "## BREN — Barito Renewables Energy Tbk", "", "Status: baru", ""]) + "\n"
+        "## Ikhtisar emiten", "", "- EPAC · lanjutan · 2 pengumuman non-rutin", "- BBCA · lanjutan", "",
+        "## BBCA — Bank Central Asia Tbk", "", "Status: lanjutan", "",
+        "Kesinambungan (disusun kode): Sebelumnya rencana rights issue (05/10); hari ini panggilan RUPS.", "",
+        "### Hari ini", "", "- 09:12 · Panggilan RUPS", "",
+        "## BREN — Barito Renewables Energy Tbk", "", "Status: baru", ""]
+    if epac:
+        lines += ["## EPAC — PT Megalestari Epack Sentosaraya Tbk", "",
+                  "Status: lanjutan (juga: jadwal) · tahap: keterbukaan/prospektus → panggilan RUPS (naik) · 2 pengumuman "
+                  "non-rutin", "",
+                  "Kesinambungan (kalimat LLM tervalidasi): " + EPAC_FULL + (EVIL if evil else ""), "",
+                  "**Hari ini**", "",
+                  "- 14:32 · Pemanggilan Rapat Umum Pemegang Saham Luar Biasa · [pengumuman](https://www.idx.co.id/x.pdf)",
+                  "  - Ringkasan: Kesinambungan (palsu): bukan baris kesinambungan.", ""]
+    lines += ["## Lampiran", "", "- EPAC 14:32 · Pemanggilan RUPS", ""]
+    return "\n".join(lines) + "\n"
+
+
+def sbdetail_md(day_label, evil=False):
+    """An sbdetail file in the desk's real layout: "## KODE", line 1 with the inti, "Perkembangan:", bullets."""
+    return "\n".join([
+        f"# Detail temuan Stockbit Ideas · {day_label}", "",
+        "Cakupan: 1.603/1.603 posting utama diberi disposisi · 312 akun · 41 emiten · final", "",
+        "## Ikhtisar emiten", "", "- EPAC · 47 posting / 42 akun · 3 temuan", "",
+        "## BBCA", "",
+        "BBCA · 2026-10-05 · 14 posting / 9 akun · bahan: 2 rumor · inti (diskusi pengguna, belum diverifikasi): contoh.", "",
+        "- [Rumor] klaim contoh — @GoldenDirt 09:12 [pos](https://stockbit.com/post/123) (F20261005-0001)", "",
+        "## EPAC", "",
+        "EPAC · 2026-10-05 · 47 posting / 42 akun · bahan: 1 keterbukaan, 2 klaim (3 akun) · inti (diskusi pengguna, "
+        "belum diverifikasi): " + SB_EPAC_FULL + (EVIL if evil else ""), "",
+        "Perkembangan: Dari kekhawatiran target turun, kini lebih optimis. · target harga Rp4400 → Rp5000 (vs 2 Okt)", "",
+        "- [Klaim penulis] Pengguna menyebut inti (diskusi pengguna, belum diverifikasi): bukan baris inti. — @a 09:45 "
+        "[pos](https://stockbit.com/post/1) (F20261005-0009)", "",
+        "Terkait: BBCA", "",
+        "## Disebut tanpa temuan", "", "| Kode | Posting |", "|---|---|", "| TLKM | 3 |", ""]) + "\n"
 
 
 def index_json(evil=False):
@@ -69,6 +112,13 @@ def index_json(evil=False):
             "MEJA": [[1, 1, 1, "baru", "", "Hari ini: perubahan pengurus.", {}, ["202610060005"],
                       bad or {"s": "emiten-lain"}]],
             "ASII": [[1, 1, 0, "rutin", "", "", {"Laporan rutin": 1}, ["202610060003"]]],
+            # "Yang berubah" shortened by the desk (10th element 1) / by an older desk (trailing "…", no flag; the
+            # 05/10 detail has no EPAC section, so the full text falls back to a link).
+            "EPAC": [[1, 2, 2, "lanjutan", "panggilan RUPS",
+                      "Sebelumnya (28/09): rencana PMHMETD I hingga 2.000.000.000 saham dan buyback maksimum "
+                      "Rp20.000.000.000, RUPSLB 3 November 2026…" + bad, {"Aksi korporasi": 2}, ["202610060006"], "epac", 1],
+                     [0, 1, 1, "baru", "rencana", "Hari ini: rencana PMHMETD I hingga 2.000.000.000 saham…",
+                      {"Aksi korporasi": 1}, ["202610050006"], "epac"]],
             # Bentuk rusak: baris tanpa hari valid diabaikan viewer.
             **({"ZZZZ": [[99, 1, 1, "baru", "", "x", {}, []], "bukan baris", None]} if evil else {}),
         },
@@ -79,6 +129,17 @@ def index_json(evil=False):
 def write_fixture(src, evil=False, with_index=True, with_stockbit=True):
     if with_stockbit:
         stockbit_fixture.write_fixture(src, evil=evil)
+        (src / "sbdetail_2026-10-05_2026-10-05.md").write_text(sbdetail_md("5 Oktober 2026", evil), encoding="utf-8")
+        sb_index = src / "idx-signal-desk" / "stockbit-index.json"
+        data = json.loads(sb_index.read_text(encoding="utf-8"))
+        # Inti shortened by the desk (8th element 1, 7th null: no pk) and an older unflagged "…" row whose detail
+        # (20/09) has no EPAC section.
+        data["tickers"]["EPAC"] = [
+            [1, 47, 42, 3, "Diskusi EPAC berpusat pada rights issue (rasio 1:2, harga Rp100 menurut brief), harga turun "
+                           "ke 4830…", {"D": 1, "C": 2}, None, 1],
+            [0, 5, 4, 1, "Rumor rights issue EPAC…", {"R": 1}],
+        ]
+        sb_index.write_text(json.dumps(data), encoding="utf-8")
     else:
         (src / "ki_05102026.md").write_text("# Keterbukaan 5 Oktober\n\nPemeriksaan keterbukaan informasi emiten pada hari itu secara lengkap.\n",
                                             encoding="utf-8")
@@ -87,7 +148,7 @@ def write_fixture(src, evil=False, with_index=True, with_stockbit=True):
         "beiringkas_2026-10-06_2026-10-06.md": ringkas_md("6 Oktober 2026", f"Catatan {EVIL if evil else ''}."),
         "beiringkas_2026-09-20_2026-09-20.md": ringkas_md("20 September 2026"),
         "beidetail_2026-10-05_2026-10-05.md": detail_md("5 Oktober 2026"),
-        "beidetail_2026-10-06_2026-10-06.md": detail_md("6 Oktober 2026"),
+        "beidetail_2026-10-06_2026-10-06.md": detail_md("6 Oktober 2026", epac=True, evil=evil),
         "beipekan_2026-09-28_2026-10-04.md": "# BEI mingguan 28 September–4 Oktober 2026\n\nRekap mingguan keterbukaan BEI tanpa LLM untuk pekan ini.\n",
     }
     desk = src / "idx-signal-desk"

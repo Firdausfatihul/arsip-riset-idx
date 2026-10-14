@@ -238,6 +238,80 @@ const sec = (s, cls) => s.reader.querySelector('.em-sec.' + cls);
     }
   });
 
+  // "selengkapnya": shortened index cells fetch the full text from that day's detail document on demand.
+  const EPAC_BEI = 'Sebelumnya (28/09): rencana PMHMETD I hingga 2.000.000.000 saham dan buyback maksimum Rp20.000.000.000, ' +
+    'RUPSLB 3 November 2026; hari ini: pemanggilan RUPSLB 3 November 2026 pukul 10.00 WIB [agenda 1-5] dan bukti iklan panggilan, mitra bbca disebut.';
+  const EPAC_SB = 'Diskusi EPAC berpusat pada rights issue (rasio 1:2, harga Rp100 menurut brief), harga turun ke 4830, dan ' +
+    'perdebatan dividend trap. Juga dibahas buyback Rp8 triliun serta klaim akumulasi asing.';
+  const more = (row) => row.querySelector('button.sb-more');
+  const settle = async (ready) => { for (let i = 0; i < 200 && !ready(); i++) await delay(5); };
+
+  await test('selengkapnya: flagged and old "…" cells get the button; full text from the detail, fetched once', {}, async s => {
+    await s.go('#emiten=EPAC', () => sec(s, 'em-bei')?.querySelector('table') && sec(s, 'em-stockbit')?.querySelector('table'));
+    const bei = [...sec(s, 'em-bei').querySelectorAll('tbody tr')], sb = [...sec(s, 'em-stockbit').querySelectorAll('tbody tr')];
+    assert.equal(bei.length, 2); assert.equal(sb.length, 2);
+    assert.ok(more(bei[0]) && more(bei[1]) && more(sb[0]) && more(sb[1]), 'flag 1 and an unflagged trailing "…" both offer it');
+    assert.equal(more(bei[0]).textContent, 'selengkapnya');
+    const detailDoc = s.docs['beidetail_2026-10-06_2026-10-06.md'].path, sbDetail = s.docs['sbdetail_2026-10-05_2026-10-05.md'].path;
+    assert.ok(!s.fetched.includes(detailDoc) && !s.fetched.includes(sbDetail), 'nothing fetched before a click');
+    more(bei[0]).click();
+    await settle(() => !more(bei[0]));
+    const cell = bei[0].cells[3];
+    assert.ok(cell.hasAttribute('data-full'));
+    assert.equal(cell.querySelector('span').textContent, EPAC_BEI + '<img src=x onerror="window.pwned=1">', 'markdown escapes removed, HTML stays text');
+    assert.ok(!/…/.test(cell.textContent) && !cell.querySelector('.sb-more-note'));
+    more(sb[0]).click();
+    await settle(() => !more(sb[0]));
+    assert.equal(sb[0].cells[4].querySelector('span').textContent, EPAC_SB + '<img src=x onerror="window.pwned=1">');
+    s.safe();
+    // Re-rendering the page and clicking again reuses the in-memory document.
+    await s.go('#emiten=BBCA', () => s.reader.querySelector('h1')?.textContent === 'BBCA');
+    await s.go('#emiten=EPAC', () => s.reader.querySelector('h1')?.textContent === 'EPAC' && sec(s, 'em-bei')?.querySelector('button.sb-more'));
+    const again = sec(s, 'em-bei').querySelector('tbody tr');
+    more(again).click();
+    await settle(() => !more(again));
+    assert.equal(again.cells[3].querySelector('span').textContent, EPAC_BEI + '<img src=x onerror="window.pwned=1">');
+    assert.equal(s.fetched.filter(p => p === detailDoc).length, 1, 'detail fetched once');
+    assert.equal(s.fetched.filter(p => p === sbDetail).length, 1);
+    s.safe();
+  });
+
+  await test('selengkapnya: section missing in the detail falls back to a detail link; unshortened rows have no button', {}, async s => {
+    await s.go('#emiten=EPAC', () => sec(s, 'em-bei')?.querySelector('table') && sec(s, 'em-stockbit')?.querySelector('table'));
+    const old = sec(s, 'em-bei').querySelectorAll('tbody tr')[1];
+    const shortText = old.cells[3].querySelector('span').textContent;
+    more(old).click();
+    await settle(() => old.querySelector('.sb-more-note'));
+    const note = old.querySelector('.sb-more-note');
+    assert.match(note.textContent, /^teks lengkap ada di halaman detail/);
+    assert.equal(note.querySelector('a').getAttribute('href'), '#doc=' + s.docs['beidetail_2026-10-05_2026-10-05.md'].path + '&s=epac');
+    assert.equal(old.cells[3].querySelector('span').textContent, shortText, 'short text kept');
+    assert.equal(more(old), null);
+    const oldSb = sec(s, 'em-stockbit').querySelectorAll('tbody tr')[1];
+    more(oldSb).click();
+    await settle(() => oldSb.querySelector('.sb-more-note'));
+    assert.equal(oldSb.querySelector('.sb-more-note a').getAttribute('href'), '#doc=' + s.docs['sbdetail_2026-09-20_2026-09-20.md'].path + '&s=epac');
+    s.safe();
+    // Old index rows without the flag and without "…" (BBCA, BREN, routine ASII) render exactly as before.
+    for (const code of ['BBCA', 'BREN', 'ASII']) {
+      await s.go('#emiten=' + code, () => s.reader.querySelector('h1')?.textContent === code && sec(s, 'em-bei')?.querySelector('table'));
+      assert.equal(s.reader.querySelectorAll('button.sb-more').length, 0, code);
+    }
+  });
+
+  await test('selengkapnya: a failed detail fetch shows the link instead of an error', {}, async s => {
+    const failing = s.docs['beidetail_2026-10-06_2026-10-06.md'].path, real = s.w.fetch;
+    s.w.fetch = async url => decodeURIComponent(String(url).split('?')[0]) === failing ? new Response('nope', {status: 500}) : real(url);
+    await s.go('#emiten=EPAC', () => sec(s, 'em-bei')?.querySelector('table'));
+    const row = sec(s, 'em-bei').querySelector('tbody tr');
+    more(row).click();
+    assert.equal(more(row).disabled, true, 'busy while loading');
+    await settle(() => row.querySelector('.sb-more-note'));
+    assert.equal(row.querySelector('.sb-more-note a').getAttribute('href'), '#doc=' + failing + '&s=epac');
+    assert.ok(row.cells[3].querySelector('span').textContent.endsWith('…<img src=x onerror="window.pwned=1">'));
+    s.safe();
+  });
+
   const beiOnly = fixture(['--no-stockbit']);
   await test('archive without Stockbit index still renders BEI-only emiten pages', {}, async s => {
     assert.equal(s.data.stockbit, null);

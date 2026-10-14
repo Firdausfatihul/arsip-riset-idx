@@ -830,6 +830,9 @@ a.chip:hover{outline:1px solid var(--c)}
 .em-title{display:flex;align-items:center;gap:10px;margin:0;font:600 24px/1.25 var(--cond)}
 .em-sec .meta{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font:13px var(--mono);color:var(--faint)}
 .em-name{margin:4px 0 0;color:var(--muted)}
+.sb-more{margin:0 0 0 4px;padding:2px 0;font:500 13px/1.4 var(--sans);color:var(--c);background:none;border:0;text-decoration:underline;cursor:pointer;white-space:nowrap}
+.sb-more[disabled]{color:var(--faint);cursor:default;text-decoration:none}
+.sb-more-note{display:block;margin-top:4px;font:13px/1.5 var(--sans);color:var(--muted)}
 .cat-legacy{margin:-8px 0 16px;font-size:15px}
 .cat-legacy a{color:var(--muted)}
 
@@ -2839,6 +2842,57 @@ APP_JS = r"""
       return fmtNum(v[k]) + ' ' + (hasKey(SB_EP, k) ? SB_EP[k] : k.slice(0, 20));
     }).join(' · ');
   }
+  // ---- "selengkapnya": teks lengkap sel indeks yang dipendekkan ----------------------------------------------
+  // Desk memendekkan sel indeks di batas kalimat/klausa dan memberi tanda: BEI baris[9] === 1 ("Yang berubah"),
+  // Stockbit baris[7] === 1 (inti; baris[6] = pk atau null). Indeks lama tanpa tanda: sel yang berakhir "…".
+  // Klik mengambil dokumen detail hari itu (loadDoc, sekali per dokumen, tersimpan di memori), mencari bagian
+  // "## KODE" / "## KODE — Nama" lalu baris teksnya: "Kesinambungan (…): …" (BEI), "… · inti (diskusi pengguna,
+  // belum diverifikasi): …" (Stockbit). Teks masuk lewat textContent; kalau tidak ketemu/gagal: tautan ke detail.
+  var INTI_MARK = ' · inti (diskusi pengguna, belum diverifikasi): ', emDetailCache = Object.create(null);
+  function mdPlain(t){
+    return String(t).replace(/\[([^\]\n]*)\]\([^)\s]*\)/g, '$1').replace(/\*\*|__/g, '')
+      .replace(/\\([\\`*_{}\[\]()#+\-.!<>|~])/g, '$1').replace(/\s+/g, ' ').trim().slice(0, 4000);
+  }
+  // {KODE: {delta, inti, pk}} dari Markdown detail BEI/Stockbit; hanya baris pertama tiap jenis per bagian.
+  function emitenDetailSections(md){
+    var out = Object.create(null), cur = null;
+    String(md || '').split(/\r?\n/).forEach(function(line){
+      var h = /^##\s+([A-Z][A-Z0-9]{1,7})(?:\s+[—–-]\s+.*)?\s*$/.exec(line), m, i;
+      if (h){ cur = hasKey(out, h[1]) ? null : (out[h[1]] = {}); return; }
+      if (/^#{1,2}\s/.test(line)){ cur = null; return; }
+      if (!cur) return;
+      if (cur.delta == null && (m = /^Kesinambungan \([^)]{0,60}\):\s+(\S.*)$/.exec(line))) cur.delta = mdPlain(m[1]);
+      else if (cur.inti == null && (i = line.indexOf(INTI_MARK)) !== -1) cur.inti = mdPlain(line.slice(i + INTI_MARK.length));
+      else if (cur.pk == null && (m = /^Perkembangan:\s+(\S.*)$/.exec(line))) cur.pk = mdPlain(m[1]);
+    });
+    return out;
+  }
+  function emShortened(flag, text){ return flag === 1 || (flag == null && typeof text === 'string' && /…$/.test(text)); }
+  // Sel tabel: teks indeks + tombol "selengkapnya" bila dipendekkan dan hari itu punya dokumen detail.
+  function emCell(text, shortened, detail, code, field){
+    var span = sbEl('span', null, text), td = sbEl('td', null, span);
+    if (!shortened || !text) return td;
+    var btn = sbEl('button', {type: 'button', 'class': 'sb-more'}, 'selengkapnya');
+    function fallback(){
+      btn.remove();
+      var note = sbEl('span', {'class': 'sb-more-note'}, detail ? 'teks lengkap ada di halaman detail: ' : 'teks lengkap ada di halaman detail');
+      if (detail) note.append(sbEl('a', {href: docRoute(detail.path, code.toLowerCase())}, 'buka detail'));
+      td.append(note);
+    }
+    btn.addEventListener('click', function(){
+      if (btn.disabled) return;
+      if (!detail){ fallback(); return; }
+      btn.disabled = true; btn.textContent = 'memuat…';
+      loadDoc(detail).then(function(doc){
+        var secs = emDetailCache[doc.path] || (emDetailCache[doc.path] = emitenDetailSections(doc.content));
+        var full = hasKey(secs, code) ? secs[code][field] : null;
+        if (typeof full !== 'string' || !full){ fallback(); return; }
+        span.textContent = full; btn.remove(); td.setAttribute('data-full', '');
+      }).catch(fallback);
+    });
+    td.append(' ', btn);
+    return td;
+  }
   // Bagian "Diskusi Stockbit" di halaman #emiten= (disclaimer Stockbit hanya di bagian ini).
   function sbEmitenSection(d, code){
     var rows = sbRows(d, hasKey(d.tickers, code) ? d.tickers[code] : null), posts = 0, found = 0;
@@ -2853,9 +2907,10 @@ APP_JS = r"""
         var det = sbDoc(day.detail);
         if (day.k && day.k !== 'final') date.append(' · ' + sbText(day.k, 20));
         if (det && found) date.append(sbEl('br'), sbEl('a', {href: docRoute(det.path, code.toLowerCase())}, 'detail'));
-        var inti = r[4] && typeof r[4] === 'object' ? r[4].text : r[4];
+        var inti = sbText(r[4] && typeof r[4] === 'object' ? r[4].text : r[4]);
         return sbEl('tr', null, [date, sbEl('td', {'class': 'n'}, fmtNum(sbNum(r[1]))), sbEl('td', {'class': 'n'}, fmtNum(sbNum(r[2]))),
-          sbEl('td', {'class': 'n'}, fmtNum(found)), sbEl('td', null, sbText(inti)), sbEl('td', null, sbEp(r[5]))]);
+          sbEl('td', {'class': 'n'}, fmtNum(found)), emCell(inti, found > 0 && emShortened(r[7], inti), det, code, 'inti'),
+          sbEl('td', null, sbEp(r[5]))]);
       })));
     }
     return body;
@@ -3026,7 +3081,9 @@ APP_JS = r"""
       var count = sbEl('td', {'class': 'n', title: ids.length ? 'Id pengumuman: ' + ids.join(', ') : null},
         fmtNum(n) + (nonroutine !== n ? ' · ' + fmtNum(nonroutine) + ' non-rutin' : ''));
       var stage = [sbText(r[3], 60), sbText(r[4], 80)].filter(function(t){ return t; }).join(' · ');
-      return sbEl('tr', null, [date, count, sbEl('td', null, stage), sbEl('td', null, sbText(r[5], 300)), sbEl('td', null, beiCats(r[6]))]);
+      var delta = sbText(r[5], 300);
+      return sbEl('tr', null, [date, count, sbEl('td', null, stage),
+        emCell(delta, nonroutine > 0 && emShortened(r[9], delta), det, code, 'delta'), sbEl('td', null, beiCats(r[6]))]);
     })));
     return sec;
   }
