@@ -133,7 +133,7 @@ class Server:
             raise ValueError("Respons Signal Desk terlalu besar.")
         return json.loads(raw)
 
-    def get(self, path, timeout=60):
+    def get(self, path, timeout=600):  # the desk renders Stockbit exports with day-to-day comparison (~1.5 min)
         return self.request(path, timeout=timeout)
 
     def post(self, path, body, timeout=300):

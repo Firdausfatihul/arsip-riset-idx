@@ -110,7 +110,7 @@ UNCOMMITTED = ("vps_not_committed",) + LEGACY_DEPLOYED
 DEPLOYED_ONLY = UNCOMMITTED  # nama lama, dipakai rollback_stockbit.py
 ROLLBACKABLE = ("published", "push_failed") + UNCOMMITTED
 
-T_GIT, T_NET, T_SYNC, T_BUILD, T_VPS = 60, 180, 900, 900, 1800
+T_GIT, T_NET, T_SYNC, T_BUILD, T_VPS = 60, 180, 1800, 900, 1800
 # Desk (idx_digest/stockbit_jobs.py) membunuh skrip setelah PUBLISH_TIMEOUT_SECONDS = 3600 / ROLLBACK_TIMEOUT_SECONDS = 1800.
 # Anggaran total di bawahnya; sisanya untuk membersihkan (unstage), mencatat log, dan menulis ringkasan JSON.
 PUBLISH_BUDGET, ROLLBACK_BUDGET = 3600 - 180, 1800 - 120
