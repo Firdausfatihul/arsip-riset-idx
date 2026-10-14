@@ -361,6 +361,19 @@ class BeiSyncTests(unittest.TestCase):
         self.sync(FakeBeiDesk(["2026-09-30", "2026-10-05", "2026-10-06"]))
         self.assertIn("beiringkas_2026-09-30_2026-09-30.md", set(self.snapshot()))
 
+    def test_published_provisional_day_may_age_out_of_the_export(self):
+        # A 'sementara' day that went live stays as published when the desk stops listing it (its provisional window
+        # passed); only a final day that disappears still blocks the sync.
+        desk = FakeBeiDesk(["2026-10-04", "2026-10-05", "2026-10-06"])
+        desk.listing[2]["state"] = "sementara"
+        desk.overrides[("2026-10-06", "ringkas")] = {"state": "sementara"}
+        desk.overrides[("2026-10-06", "detail")] = {"state": "sementara"}
+        self.sync(desk, allow_provisional=True)
+        self.assertIn("beiringkas_2026-10-06_2026-10-06.md", set(self.snapshot()))
+        self.sync(FakeBeiDesk(["2026-10-04", "2026-10-05"]), allow_provisional=True)
+        self.assertIn("beiringkas_2026-10-06_2026-10-06.md", set(self.snapshot()))
+        self.refused(FakeBeiDesk(["2026-10-05"]), "sudah terbit")  # a final day went missing
+
     def test_wrong_build_category_refused_and_redaction_after_hash(self):
         with patch.object(sync, "categorize", return_value="keterbukaan-informasi"):
             self.refused(FakeBeiDesk(["2026-10-05"]), "kategori")

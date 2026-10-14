@@ -1215,11 +1215,15 @@ def sync_stockbit(server, state, force=False, allow_provisional=False, since=STO
         print(f"  ditahan rollback: {day} (sha ekspor belum berubah; lihat {STOCKBIT_HOLD.name})")
     for day in sorted(withheld):
         print(f"  ditahan desk dari web: {day}" + (" (berkas terbit dicabut)" if day in withdrawn else ""))
-    if len(eligible) + len(held & published) < len(published):
+    aged = {d for d in published - eligible.keys() - held if published_provisional(state.get("days"), d)}
+    if len(eligible) + len(held & published) + len(aged) < len(published):
         raise StockbitRefused(f"server hanya mengekspor {len(eligible)} hari final, padahal {len(published)} hari sudah terbit; "
                               f"tidak ada yang ditulis")
     for day in sorted(published - eligible.keys() - held):
-        print(f"  peringatan: {day} sudah terbit tetapi tidak lagi diekspor sebagai final; berkasnya dibiarkan")
+        if day in aged:
+            print(f"  {day} terbit sebagai hari sementara dan tidak lagi diekspor; berkasnya dibiarkan")
+        else:
+            print(f"  peringatan: {day} sudah terbit tetapi tidak lagi diekspor sebagai final; berkasnya dibiarkan")
 
     day_state, week_state = state.setdefault("days", {}), state.setdefault("weeks", {})
     pending, new_days, new_weeks, quarantined = {}, {}, {}, {}
@@ -1573,6 +1577,15 @@ def bei_empty_day(row):
     return row.get("announcements") == 0 or (isinstance(files, dict) and not any(files.values()))
 
 
+def published_provisional(state_days, day):
+    """True when ``day`` was last published as a not-final (e.g. 'sementara') day. Such a day may age out of the desk's
+    export (it only lists recent provisional days); its published files then stay as they are and it does not count as
+    a final day that went missing."""
+    entry = (state_days or {}).get(day)
+    fp = entry.get("fp") if isinstance(entry, dict) else entry
+    return isinstance(fp, str) and "|" in fp and not fp.endswith("|final")
+
+
 def bei_fp(row):
     return f"{row.get('sha256')}|{row.get('detail_sha256')}|{row.get('updated_at')}|{row.get('state')}"
 
@@ -1684,11 +1697,15 @@ def sync_bei_days(server, state, force=False, allow_provisional=False, since=Non
         print(f"  BEI ditahan rollback: {day} (sha ekspor belum berubah; lihat {BEI_HOLD.name})")
     for day in sorted(withheld):
         print(f"  BEI ditahan desk dari web: {day}" + (" (berkas terbit dicabut)" if day in withdrawn else ""))
-    if len(eligible) + len(held & published) < len(published):
+    aged = {d for d in published - eligible.keys() - held if published_provisional(state.get("days"), d)}
+    if len(eligible) + len(held & published) + len(aged) < len(published):
         raise BeiRefused(f"server hanya mengekspor {len(eligible)} hari BEI final, padahal {len(published)} hari sudah terbit; "
                          f"tidak ada yang ditulis")
     for day in sorted(published - eligible.keys() - held):
-        print(f"  peringatan: BEI {day} sudah terbit tetapi tidak lagi diekspor sebagai final; berkasnya dibiarkan")
+        if day in aged:
+            print(f"  BEI {day} terbit sebagai hari sementara dan tidak lagi diekspor; berkasnya dibiarkan")
+        else:
+            print(f"  peringatan: BEI {day} sudah terbit tetapi tidak lagi diekspor sebagai final; berkasnya dibiarkan")
 
     day_state, week_state = state.setdefault("days", {}), state.setdefault("weeks", {})
     pending, new_days, new_weeks = {}, {}, {}
