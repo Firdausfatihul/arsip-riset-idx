@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def copy_code(dest):
     """What sync_idx.py, build.py and publish/rollback need, so they run against `dest` instead of this checkout."""
-    for name in ("build.py", "chat.js", "report-frame.js", "report-shell.js", ".gitignore"):
+    for name in ("build.py", "app.css", "app.js", "chat.js", "report-frame.js", "report-shell.js", ".gitignore"):
         shutil.copy2(ROOT / name, dest / name)
     (dest / "tools").mkdir()
     for path in (ROOT / "tools").glob("*.py"):

@@ -1,3 +1,4 @@
+// Legacy label kept because it is part of every cache key; the VPS/Mac host shows MODEL_LABEL (claude-code:<model>).
 export const MODEL = 'qwen/qwen3.7-flash';
 import {chooseThematic,THEMATIC_RULES,THEMATIC_ANSWER_RULES} from './thematic.mjs';
 import {cacheOnce, hash} from './cache.mjs';
@@ -254,6 +255,8 @@ export function batches(docs, budget = LIMITS.batch) {
   return result;
 }
 
+// Model client in the OpenAI/OpenRouter wire format. Under local/server.mjs, env.MODEL_FETCHER (local/claude-bridge.mjs)
+// answers these requests with `claude -p`; nothing reaches openrouter.ai.
 export class OpenRouter {
   constructor(key, signal, fetcher = (...args) => fetch(...args), reserve = () => {}, options = {}) {
     this.controller = new AbortController();

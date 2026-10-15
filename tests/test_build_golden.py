@@ -1,7 +1,7 @@
 """build.py over the fixed sources of tests/helpers/doc_fixture.py (never the real archive): every naming rule, then
 a golden snapshot of the per-document output lines, the page payload, the files/ list and the index.html hash.
 
-After an intended change to build.py, chat.js or report-*.js, regenerate the snapshot explicitly:
+After an intended change to build.py, app.css, app.js, chat.js or report-*.js, regenerate the snapshot explicitly:
     UPDATE_GOLDEN=1 python3 -B -m unittest discover -s tests -p test_build_golden.py
 and review the diff of tests/golden/build.json.
 """

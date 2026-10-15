@@ -9,7 +9,7 @@
 // Run from this Mac; every command goes over SSH to the admin account (sudo) given at setup.
 //
 //   node local/vps.mjs setup --host <ip> --domain <name> --host-key SHA256:… [--ssh-user ubuntu] [--ssh-port 22] [--new-password]
-//                            [--model sonnet|opus|haiku] [--effort low|medium|high]
+//                            [--model sonnet|opus|haiku] [--effort low|medium|high|xhigh|max]
 //   node local/vps.mjs apply       send settings, keys and password to the VPS and restart (no rebuild)
 //   node local/vps.mjs bootstrap   root setup: Jakarta time zone, Node, Caddy, user arsip, Claude Code, systemd
 //   node local/vps.mjs login       interactive `claude auth login` on the VPS (open the URL on any browser)

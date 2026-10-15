@@ -428,9 +428,9 @@ test('VPS host: Jakarta zone, pinned Node, Claude for user arsip, no restart on 
   const plain = options([], {});
   assert.equal(serverEnv(), `ARSIP_CLAUDE_MODEL=${plain.model}\nARSIP_CLAUDE_EFFORT=${plain.effort}\n`);
   assert.throws(() => serverEnv({effort:'turbo'}), /Effort/);
-  assert.deepEqual(pushable(['build.py', 'docs/index.html', 'reports/a.md', 'tests/x.mjs', '.env.chat', '.env.chat.example', '.local/remote.json',
+  assert.deepEqual(pushable(['build.py', 'app.css', 'app.js', 'docs/index.html', 'reports/a.md', 'tests/x.mjs', '.env.chat', '.env.chat.example', '.local/remote.json',
     'tools/__pycache__/a.pyc', 'needtobeindexed/ki_20260915.md', 'local/server.mjs', 'site/index.html']),
-    ['build.py', 'needtobeindexed/ki_20260915.md', 'local/server.mjs']);
+    ['build.py', 'app.css', 'app.js', 'needtobeindexed/ki_20260915.md', 'local/server.mjs']);
 });
 
 test('local CLI helpers: options, settings file with mode 600, password rotation', async () => {
