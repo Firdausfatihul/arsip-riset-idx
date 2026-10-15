@@ -1,7 +1,32 @@
 const months = {januari:1,january:1,jan:1,februari:2,february:2,feb:2,maret:3,march:3,mar:3,april:4,apr:4,mei:5,may:5,juni:6,june:6,jun:6,juli:7,july:7,jul:7,agustus:8,august:8,agu:8,aug:8,september:9,sep:9,sept:9,oktober:10,october:10,okt:10,oct:10,november:11,nov:11,desember:12,december:12,des:12,dec:12};
 const monthNames = Object.keys(months).join('|');
+// "22 Septembet - 5 Oct": a word next to a day number, one edit away from a full month name with the same first three
+// letters, is that month. Without this the range silently shrank to "5 Oct". Only clear misspellings count: the word
+// and the month both have six or more letters (so "market" ~ maret and "marsh" ~ march stay words), and a few real
+// words one edit away from a month are listed (NOT_MONTHS; a scan of an English word list finds no other).
+const FULL_MONTHS = Object.keys(months).filter(m => m.length >= 6);
+const NOT_MONTHS = new Set(['market', 'markets', 'marah', 'marsh', 'marco', 'marek', 'augusta', 'augusti', 'augustus']);
+function oneEdit(a, b) {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+const monthFix = word => {
+  const w = word.toLowerCase();
+  if (Object.hasOwn(months, w) || NOT_MONTHS.has(w)) return word;
+  return FULL_MONTHS.find(m => m.slice(0,3) === w.slice(0,3) &&
+    Math.min(w.length, m.length) >= 6 && oneEdit(w, m)) || word;
+};
+export const fixMonths = text => String(text)
+  .replace(/(\b\d{1,2}\s+)([A-Za-z]{5,})\b/g, (m, day, word) => day + monthFix(word))
+  .replace(/\b([A-Za-z]{5,})(\s+\d{1,2})(?!\d)/g, (m, word, day) => monthFix(word) + day);
 // A short correction such as "september 22" carries the same date as "22 september".
-const dateOrder = text => text.replace(new RegExp('\\b(' + monthNames + ')\\s+(\\d{1,2})(?!\\d)\\b,?','gi'), '$2 $1');
+const dateOrder = text => fixMonths(text).replace(new RegExp('\\b(' + monthNames + ')\\s+(\\d{1,2})(?!\\d)\\b,?','gi'), '$2 $1');
 function validDate(y,m,d) {
   const date = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   const parsed = new Date(date + 'T00:00:00Z');
@@ -88,6 +113,7 @@ export function affirmed(text, re) {
   }
   return false;
 }
+const LISTISH = /^\s*(?:[-*+]\s|\d{1,3}[.)]\s|\|)/;
 export function selectRecords(data, terms, tickers = new Set(), {keepNegated = false} = {}) {
   const patterns = terms.map(t => [pattern(t,tickers), tickers.has(t)]), selected = new Set(), rows = data.records;
   for (let i=0;i<rows.length;i++) {
@@ -96,9 +122,18 @@ export function selectRecords(data, terms, tickers = new Set(), {keepNegated = f
     if (terms.some(t => tickers.has(t) && row.tickers.includes(t)) ||
         patterns.some(([p, code]) => code || keepNegated ? p.test(row.content) : affirmed(row.content, p))) {
       selected.add(i);
-      // Untitled prose can carry supporting detail into the adjacent paragraph.
-      if (row.kind === 'context' && !row.content.trim().startsWith('|')) {
+      // Untitled prose can carry supporting detail into the adjacent paragraph. A list (a short unsplit list
+      // record or one item of a long split list) keeps only its intro sentence ("Nama yang paling menarik …:"),
+      // which says what the list ranks; the records after it are other bullets, usually about other issuers.
+      // Table rows stand alone.
+      if (row.kind === 'context' && !LISTISH.test(row.content)) {
         for (const j of [i-1,i+1]) if (rows[j]?.kind === 'context' && rows[j].context === row.context) selected.add(j);
+      } else if (row.kind === 'context' || row.kind === 'list_item') {
+        let j = i - 1;
+        while (rows[j]?.kind === 'list_item' && rows[j].context === row.context) j--;
+        const intro = rows[j];
+        if (intro?.kind === 'context' && intro.context === row.context && !LISTISH.test(intro.content) &&
+            !/^\s*#{1,6}\s/.test(intro.content)) selected.add(j);
       }
     }
   }
@@ -108,6 +143,88 @@ export function selectRecords(data, terms, tickers = new Set(), {keepNegated = f
     if ([...rows[i].content.matchAll(/id=["']([^"']+)/g)].some(m=>refs.has(m[1]))) selected.add(i);
   }
   return [...selected].sort((a,b)=>a-b).map(i=>rows[i]);
+}
+
+// ---- Model copy of search material ------------------------------------------------------------
+// Stored sources, the source cache and the number check keep the original text; only the copy sent
+// to the model drops what an answer never needs (it cites [D…], the site links every document).
+// Code of an issuer section heading ("## TOWR — PT …", "### 01. TOWR"), as heading_ticker in tools/evidence_index.py.
+export function headingTicker(content, tickers) {
+  const m = String(content || '').match(/^\s*#{1,6}\s+([^\n]+)/);
+  if (!m) return null;
+  const code = m[1].replace(/[*`]/g, '').replace(/^[\d.()\s]+/, '').match(/^([A-Z0-9]{2,8})(?![A-Za-z0-9_])/)?.[1];
+  return code && (!tickers || tickers.has(code)) ? code : null;
+}
+// [pos](url) -> pos; IDX PDF links, "(juga: 365…)" post ids, "(F20261012-0371)" finding ids and
+// " · 20261013135714-072/CORSEC-SOCI/X/2026_id-id" announcement ids carry no evidence.
+export const modelText = text => String(text)
+  .replace(/\[([^\[\]\n]{1,300})\]\((?:https?:\/\/|www\.)[^\s)]*\)/g, '$1')
+  // A bare URL ends at a quote, angle bracket or comma too: HTML attributes and CSV cells keep their neighbours.
+  .replace(/\s?\(https?:\/\/(?:www\.)?idx\.co\.id\/[^\s)]*\)|https?:\/\/(?:www\.)?idx\.co\.id\/[^\s)\]"'<>,]*/g, '')
+  .replace(/(?: ·)? ?\(juga: \d+(?:, \d+)*(?:, \+\d+ lagi)?\)/g, '')
+  .replace(/\s?\(F20\d{6}-\d+(?:, F20\d{6}-\d+)*\)/g, '')
+  .replace(/ · 20\d{12}-[^\s·]*?_[a-z]{2}-[a-z]{2}(?=[\s·]|$)/g, '');
+// Context headers repeat for every passage: plain text, no table markup.
+export const plainContext = text => String(text || '').replace(/<\/t[hd]>/gi, ' | ').replace(/<[^>]+>/g, ' ')
+  .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'")
+  .split('\n').map(l => l.replace(/\s+/g, ' ').replace(/(?:\s*\|\s*)+$/, '').trim()).filter(Boolean).join('\n');
+const LIST_TRIM = 2000;
+// A long list outside the issuer's own section (sbdetail "Ikhtisar emiten", beidetail "Lampiran") that tags
+// the ticker once: keep its headings and the items naming a searched term (an item is a line plus its
+// indented continuation lines), not the bullets for every other issuer.
+function trimList(content, patterns) {
+  const items = [];
+  for (const line of content.split(/(?<=\n)/)) {
+    if (items.length && /^[ \t]+\S/.test(line)) items.at(-1).push(line); else items.push([line]);
+  }
+  let matched = 0, dropped = 0;
+  const kept = items.filter(item => {
+    const text = item.join('');
+    if (/^\s*#{1,6}\s/.test(text)) return true;
+    if (patterns.some(p => p.test(text))) { matched++; return true; }
+    if (text.trim()) dropped++;
+    return false;
+  });
+  if (!matched || !dropped) return content;
+  const out = kept.map(i => i.join('')).join('');
+  return out + (out.endsWith('\n') ? '' : '\n') + `(${dropped} butir lain dalam daftar ini tidak dikirim)\n`;
+}
+// Another issuer's Stockbit section that names the searched ticker ("## PMUI … [Pertanyaan] PMUI dipertanyakan untung
+// dari penjualan GRPM"): its GRPM findings are copies of the ticker's own section's findings (same text before " — ").
+// Only the finding lines naming the ticker that the own section lacks are sent, with the heading; without any, the
+// section is not sent. A document without an own section keeps the heading, the opening line and every naming finding.
+function comention(text, code, patterns, own) {
+  const lines = text.split('\n'), kept = [];
+  for (const line of lines.slice(1)) {
+    if (!/^- \[/.test(line) || !patterns.some(p => p.test(line))) continue;
+    const key = line.split(' — ')[0];
+    if (own && key.length >= 20 && own.includes(key)) continue;
+    kept.push(line);
+  }
+  if (own && !kept.length) return null;
+  const opening = own ? [] : [lines.slice(1).find(l => l.trim() && !/^- \[/.test(l)) || ''].filter(Boolean);
+  const body = [...opening, ...kept];
+  return lines[0] + '\n\n' + body.join('\n') + (body.length ? '\n' : '') + `(bagian ${code} lain tidak dikirim)\n\n`;
+}
+// Rows as sent to the model; `original` keeps the source text for the post-answer number check. A row the model copy
+// does not need (a co-mention section whose findings the own section already has) is left out.
+export function modelRows(doc, rows, terms, tickers = new Set()) {
+  const codes = terms.filter(t => tickers.has(t)), patterns = terms.map(t => pattern(t, tickers));
+  const desk = /^(bei|stockbit)-/.test(doc?.cat || '');
+  const ownText = /^stockbit-/.test(doc?.cat || '') && codes.length
+    ? rows.filter(r => r.kind === 'issuer_section' && codes.includes(headingTicker(r.content, tickers))).map(r => r.content).join('\n') : null;
+  return rows.flatMap(row => {
+    let text = row.content;
+    const other = ownText !== null && row.kind === 'issuer_section' ? headingTicker(text, tickers) : null;
+    if (other && !codes.includes(other)) {
+      text = comention(text, other, patterns, ownText);
+      if (text === null) return [];
+    }
+    if (desk && codes.length && row.kind === 'context' && text.length > LIST_TRIM && codes.some(c => row.tickers?.includes(c)))
+      text = trimList(text, patterns);
+    text = modelText(text);
+    return [text === row.content ? row : {...row, content:text, original:row.content}];
+  });
 }
 
 export function filterRecords(rows, scope) {
@@ -137,7 +254,10 @@ export const STOCKBIT_CATEGORIES = ['stockbit-ringkasan','stockbit-pekan','stock
 const STOCKBIT_FAMILY = new Set(STOCKBIT_CATEGORIES);
 // Only explicit phrases: "posting asli" is an ordinary request for post links, not for the raw reports.
 const STOCKBIT_RAW = /\b(stockbit\s+mentah|laporan\s+(?:mentah|lama|asli)|raw)\b/i;
-const STOCKBIT_DETAIL = /\bsemua temuan\b|(?<!\b(?:hilang|hilangkan|lewatkan)\s+)\bdetail\b/i;
+// "semua temuan" / "jangan lewatkan detail" ask for completeness (core.mjs EXHAUSTIVE), not for the detail files.
+const STOCKBIT_DETAIL = /(?<!\b(?:hilang|hilangkan|menghilangkan|lewat|lewatkan|melewatkan)\s+)\bdetail\b/i;
+// The retired manual KI analyses are read next to a BEI daily summary of the same day only on request.
+const KI_LEGACY = /\b(?:ki|keterbukaan(?:\s+informasi)?)\s+lama\b|\banalis[ia]s?\s+(?:ki|keterbukaan)\b|\bki_/i;
 const DAY_MS = 86400000;
 const dayList = (from, to) => {
   const out = [];
@@ -211,7 +331,7 @@ export function requestScope(question, index, year, today = todayWIB()) {
   const all = /\b(semua|seluruh|selengkapnya|all)\b/i.test(question);
   // Flags are added only when set, so scopes stored in earlier conversation turns stay comparable.
   const stockbit = {...(cats.includes('stockbit') && STOCKBIT_RAW.test(question) ? {stockbitRaw:true} : {}),
-    ...(STOCKBIT_DETAIL.test(question) ? {stockbitDetail:true} : {})};
+    ...(STOCKBIT_DETAIL.test(question) ? {stockbitDetail:true} : {}), ...(KI_LEGACY.test(question) ? {kiLegacy:true} : {})};
   return {categories:cats, dates, pairs, latest, all, explicit:!!(cats.length || dates.length || latest || all), ...stockbit};
 }
 
@@ -243,6 +363,13 @@ function preferBei(selected, request, {dates, latest}) {
   if (latest) {
     const newestBei = out.filter(d => d.cat === 'bei-ringkasan').map(d => d.end).sort().at(-1);
     if (newestBei) out = out.filter(d => d.cat !== 'keterbukaan-informasi' || d.end > newestBei);
+  } else if (dates && !request.kiLegacy) {
+    // With dates, a retired KI analysis is dropped only when the selected BEI files cover every day it covers. A KI
+    // file is named for the day its digest ran and mostly holds the evening before (ki_07102026 covers 6–7 Oct), so
+    // "KI 7 Oktober" next to BEI 7 Oktober still adds 6 October and its own analysis (core.mjs sends it as a head).
+    // "KI lama"/"analisis KI" keeps it whole. Like raw Stockbit reports under preferSummaries.
+    const covered = new Set(out.filter(d => ['bei-ringkasan','bei-pekan','bei-detail'].includes(d.cat)).flatMap(d => dayList(...span(d))));
+    out = out.filter(d => d.cat !== 'keterbukaan-informasi' || !inRange(d).length || !dayList(...span(d)).every(day => covered.has(day)));
   }
   return out;
 }
@@ -336,10 +463,24 @@ export function documentRequest(question, scope, index, request = requestScope(q
     docs = scopeDocuments(index.docs, request, {latest:request.latest || !request.all});
   } else return null;
   docs = dedupeDocuments(docs);
+  if (!docs.length) return null;
   // Daily summaries (≤60 KB) and weekly recaps are small: a month is about four recaps plus edge days.
   const cap = docs.every(d => ['stockbit-ringkasan','stockbit-pekan','bei-ringkasan','bei-pekan'].includes(d.cat)) ? 10 : 6;
-  return docs.length && docs.length <= cap ? docs : null;
+  if (docs.length <= cap) return docs;
+  // An explicit date range over the cap is still a document request: desk files are read as a code-built digest
+  // (core.mjs), other files whole or as notes. Beyond that, a code-built clarification without any model call
+  // (it used to fall through to term extraction and fail with "Sebutkan saham").
+  if (!request.dates.length) return null;
+  const other = docs.filter(d => !DESK_DOCS.has(d.cat)), otherBytes = other.reduce((n, d) => n + (d.sizes || []).reduce((a, b) => a + b, 0), 0);
+  if (docs.length <= DIGEST_MAX_DOCS && other.length <= 8 && otherBytes <= 1500000) return docs;
+  const kinds = [...new Set(docs.map(d => sourceName(d.cat)))].join(', ');
+  return Object.assign([], {clarification:`Rentang ini mencakup ${docs.length} dokumen (${kinds}), terlalu banyak untuk dibaca dalam satu jawaban. `
+    + 'Persempit rentang tanggal (misalnya satu pekan) atau pilih satu sumber, misalnya “ringkas stockbit 1–7 oktober” atau “ringkas BEI 6–9 oktober”. Belum ada bahan yang dikirim ke layanan AI.'});
 }
+const DESK_DOCS = new Set(['stockbit-ringkasan','stockbit-detail','stockbit-pekan','bei-ringkasan','bei-detail','bei-pekan']);
+const DIGEST_MAX_DOCS = 31;
+const sourceName = cat => /^stockbit/.test(cat) ? 'Stockbit' : /^bei-|keterbukaan-informasi/.test(cat) ? 'keterbukaan BEI/KI'
+  : cat === 'keterbukaan-singapura' ? 'SGX' : cat === 'keterbukaan-australia' ? 'ASX' : cat;
 const READ_VERBS = /\b(baca|bacakan|ringkas|ringkasan|rangkum|rangkuman|summary|summarize|simpulkan|kesimpulan|inti|intinya|isi|isinya|garis besar|highlight|menarik)\b/i;
 // Common action names are topics even without "soal": "ringkas SGX delisting".
 const TOPIC_WORDS = /\b(soal|tentang|mengenai|terkait|perihal|yang menyebut|delisting|go private|rights? issue|hmetd|private placement|tender offer|akuisisi|acquisition|buyback|dividen|dividend|merger|stock split|kepemilikan|pengendali)\b/i;

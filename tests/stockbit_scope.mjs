@@ -24,7 +24,9 @@ test('plain "stockbit" reads the daily summary; raw only on request; detail only
   assert.deepEqual(names(documents('ringkas stockbit 5 Oktober')), ['sbringkas_2026-10-05_2026-10-05.md']);
   assert.deepEqual(names(documents('stockbit mentah 5 Oktober')), ['stockbit_05102026.md']);
   assert.deepEqual(names(documents('baca laporan lama stockbit 5 oktober')), ['stockbit_05102026.md']);
-  assert.deepEqual(names(documents('stockbit 5 oktober semua temuan')),
+  // "semua temuan" asks for a complete answer (EXHAUSTIVE in core.mjs), not for the per-ticker detail files.
+  assert.deepEqual(names(documents('stockbit 5 oktober semua temuan')), ['sbringkas_2026-10-05_2026-10-05.md']);
+  assert.deepEqual(names(documents('stockbit 5 oktober detail')),
     ['sbdetail_2026-10-05_2026-10-05.md', 'sbringkas_2026-10-05_2026-10-05.md']);
   // "jangan hilangkan detail" asks for completeness, not for the per-ticker detail files.
   assert.deepEqual(names(documents('ringkas stockbit 5 oktober, jangan hilangkan detail')), ['sbringkas_2026-10-05_2026-10-05.md']);

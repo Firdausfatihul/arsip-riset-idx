@@ -159,13 +159,27 @@ def primary_names(counts):
     return {code: max(found, key=found.get) for code, found in sorted(counts.items())}
 
 
+def without_csv_twins(docs):
+    """Drop a CSV whose Markdown twin (same category, date and stem) is also present.
+
+    The chat reads only the Markdown of such a pair (dedupeDocuments in worker/retrieval.mjs, same key); the CSV
+    now yields one record per row, so counting both would list every SGX row match twice.
+    """
+    def key(doc):
+        return (doc.get('cat'), doc.get('end'), re.sub(r'\.[^.]+$', '', doc.get('name', '')))
+    markdown = {key(d) for d in docs if re.search(r'\.md$', d.get('name', ''), re.I)}
+    return [d for d in docs if not re.search(r'\.csv$', d.get('name', ''), re.I) or key(d) not in markdown]
+
+
 def make_events(docs, tickers, evidence, name_docs=None):
     """evidence: {source_id: make_evidence(...) result} for the non-digest documents.
 
     name_docs: documents read only for official issuer names (default: docs). Retired sources (Digest Emiten) are no
     longer indexed by chat, but the names they wrote stay: without them the model fills in names from memory.
+    CSV documents with a Markdown twin are skipped for both (without_csv_twins).
     """
     events, seen = [], set()
+    docs = without_csv_twins(docs)
     for doc in docs:
         found = (digest_events(doc, tickers) if doc['cat'] == 'digest-emiten'
                  else text_events(doc, tickers, evidence[doc['source_id']]['records']))
@@ -174,7 +188,7 @@ def make_events(docs, tickers, evidence, name_docs=None):
             if key not in seen:
                 seen.add(key)
                 events.append(event)
-    name_docs = docs if name_docs is None else name_docs
+    name_docs = docs if name_docs is None else without_csv_twins(name_docs)
     counts = issuer_names(name_docs, tickers)
     # Words the archive writes in lowercase often: "(Pergantian Pengurus)" is a description, not a name.
     lower = {}

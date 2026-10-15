@@ -297,6 +297,19 @@ function upload(config, files) {
   });
 }
 
+// State the new copy inherits from the running one before it is built (run in /srv/arsip). The machine lock is copied as
+// before (a missing lock means the first push, which pins). The prompt-cache boundary key (local/claude-bridge.mjs) is
+// copied with mode 600 so a deploy keeps Claude's cached prefixes warm; a symlink, a missing key or one without a valid
+// 64-hex key line is not copied, and
+// the new server then makes its own. Copies, not moves: a failed swap leaves app (later app.old) exactly as it was.
+// The Mac's own .local/ is never uploaded (SKIP), so these only ever come from the VPS.
+export function carryState(from = 'app', to = 'app.new') {
+  return `mkdir -p -m 700 ${to}/.local; if [ -f ${from}/.local/machine-lock.json ]; then cp -p ${from}/.local/machine-lock.json ${to}/.local/; fi; `
+    + `if [ -f ${from}/.local/boundary.key ] && [ ! -L ${from}/.local/boundary.key ] && grep -qxE '[0-9a-f]{64}' ${from}/.local/boundary.key; then `
+    + `(umask 077; cp ${from}/.local/boundary.key ${to}/.local/boundary.key.tmp) && chmod 600 ${to}/.local/boundary.key.tmp `
+    + `&& mv ${to}/.local/boundary.key.tmp ${to}/.local/boundary.key; fi; `;
+}
+
 async function push(opt) {
   const config = read();
   const auth = vpsAuth(config);
@@ -309,8 +322,7 @@ async function push(opt) {
   // Build the new copy while the old server keeps serving. The machine lock is pinned on the first push only; it is
   // bound to this Tencent instance and the Jakarta region, so a copied disk never matches without --repin.
   const arsip = script => `sudo -u arsip -H sh -c ${q('set -e; cd /srv/arsip; ' + script)}`;
-  must(ssh(config, arsip(`mkdir -p -m 700 app.new/.local; if [ -f app/.local/machine-lock.json ]; then cp -p app/.local/machine-lock.json app.new/.local/; fi; `
-    + `cd app.new; if [ ! -f .local/machine-lock.json ]; then PIN=--pin; fi; `
+  must(ssh(config, arsip(carryState() + `cd app.new; if [ ! -f .local/machine-lock.json ]; then PIN=--pin; fi; `
     + `PATH=${PATH_VPS} ARSIP_ALLOW_VPS=1 ${NODE} local/server.mjs --build-only \${PIN:-} ${opt.repin ? '--repin' : ''}`)), 'Build di VPS (server lama tetap jalan)');
   // Swap: the chat database and keys move to the new copy; the old copy stays as app.old until the new server is up.
   const moveDb = to => `for f in app/.local/chat.sqlite*; do if [ -e "$f" ]; then mkdir -p -m 700 ${to}/.local; mv "$f" ${to}/.local/; fi; done; `;

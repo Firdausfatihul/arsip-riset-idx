@@ -5,6 +5,8 @@ import {readFile} from 'node:fs/promises';
 import {SourceStore} from '../worker/source-store.mjs';
 import {Archive,converse,size,OpenRouter,CacheStore} from '../worker/core.mjs';
 import {tickerDocuments} from './helpers/archive-expectations.mjs';
+import {hash} from '../worker/cache.mjs';
+import {storage} from '../local/server.mjs';
 const manifest=JSON.parse(await readFile(new URL('../worker/.assets/manifest.json',import.meta.url),'utf8'));
 function fixture(){
  const db=new DatabaseSync(':memory:');
@@ -64,4 +66,85 @@ test('truncated streams retain trailing usage before reporting incomplete output
  const model=new OpenRouter('offline',null,async()=>new Response(chunks.map(c=>'data: '+JSON.stringify(c)+'\n\n').join('')+'data: [DONE]\n\n'));
  await assert.rejects(model.stream([],{},()=>{}),e=>e.code==='length');
  assert.equal(model.usage().missing_usage_calls,0);assert.equal(model.usage().known_cost_usd,0.001);
+});
+
+// Synthetic manifest: independent of worker/.assets, so the cleanup rules are tested on their own.
+async function synthetic(version,docs){
+ const out={version:'m-'+version,retrieval_version:version,tickers:['SOCI'],docs:[]},data={};
+ for(const [id,texts] of Object.entries(docs)){
+  const records=texts.map((content,i)=>({content,context:'ctx '+i,line:i+1})),document_hash=await hash(texts.join(''));
+  const doc={document_id:id,document_hash,title:'Judul '+id,name:id+'.md',end:'2026-10-01'};
+  out.docs.push(doc);data[id]={version,document_id:id,document_hash,coverage:'full-source-partition',records};
+ }
+ return {index:out,data};
+}
+const counts=db=>Object.fromEntries(['source_documents','source_passages','source_fts'].map(t=>[t,db.prepare(`SELECT COUNT(*) n FROM ${t}`).get().n]));
+async function load(store,{index,data}){for(const doc of index.docs)await store.importDocument(index,doc,data[doc.document_id]);}
+
+test('prune removes documents of an older evidence version or hash, idempotently, and keeps every active key',async()=>{
+ for(const make of [fixture,()=>{const s=storage(':memory:');return {db:s.db,store:new SourceStore({storage:s.storage})};}]){
+  const {db,store}=make();
+  const old=await synthetic('issuer-passages-v2',{a:['SOCI kapal ','tanker'],b:['Rights issue SOCI']});
+  const now=await synthetic('issuer-passages-v3',{a:['SOCI kapal ','tanker'],b:['Rights issue SOCI ','HMETD'],c:['dokumen baru']});
+  await load(store,old);
+  // An empty or version-less manifest (failed load) never removes anything.
+  for(const bad of [{docs:[],retrieval_version:'issuer-passages-v3'},{docs:now.index.docs},null])
+   assert.deepEqual(store.prune(bad),{removed:0,records:0});
+  assert.deepEqual(counts(db),{source_documents:2,source_passages:3,source_fts:3});
+  await load(store,now);
+  // Active a under v2 is unchanged text but a different key (version is part of it): both copies exist until pruned.
+  assert.deepEqual(counts(db),{source_documents:5,source_passages:8,source_fts:8});
+  const before=JSON.stringify(now.index.docs.map(d=>store.read(d,now.index)));
+  assert.deepEqual(store.prune(now.index),{removed:2,records:3});
+  assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
+  assert.equal(JSON.stringify(now.index.docs.map(d=>store.read(d,now.index))),before);
+  assert.equal(store.status(now.index).ready,3);assert.deepEqual(store.status(now.index).pending,[]);
+  for(const d of old.index.docs)assert.equal(store.read(d,old.index),null);
+  // FTS rows of removed passages are gone; active ones are still found.
+  assert.deepEqual(store.search(now.index,['HMETD']).map(d=>d.document_id),['b']);
+  assert.deepEqual(store.search(now.index,['SOCI']).map(d=>d.document_id).sort(),['a','b']);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM source_fts WHERE source_fts MATCH 'tanker'").get().n,1);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM source_fts WHERE rowid NOT IN (SELECT id FROM source_passages)').get().n,0);
+  // Idempotent.
+  assert.deepEqual(store.prune(now.index),{removed:0,records:0});
+  assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
+  // A changed hash for one document removes only that document's previous copy.
+  const next=await synthetic('issuer-passages-v3',{a:['SOCI kapal ','tanker'],b:['Rights issue SOCI ','HMETD'],c:['dokumen baru, revisi']});
+  await load(store,next);
+  assert.deepEqual(store.prune(next.index),{removed:1,records:1});
+  assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
+  assert.equal(store.read(now.index.docs[2],now.index),null);assert.ok(store.read(next.index.docs[2],next.index));
+  db.close();
+ }
+});
+
+test('prune waits until the active version is fully imported (a half-done start keeps both versions)',async()=>{
+ const {db,store}=fixture();
+ const old=await synthetic('issuer-passages-v2',{a:['satu ','dua'],b:['tiga']}),now=await synthetic('issuer-passages-v3',{a:['satu ','dua'],b:['tiga']});
+ await load(store,old);
+ await store.importDocument(now.index,now.index.docs[0],now.data.a);
+ assert.deepEqual(store.prune(now.index),{removed:0,records:0,deferred:true});
+ assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
+ // The rolled-back copy (old manifest, complete) keeps the partial rows of the newer version for the next push.
+ assert.deepEqual(store.prune(old.index),{removed:0,records:0});
+ await load(store,now);
+ assert.equal(store.status(now.index).pending.length,0);
+ assert.deepEqual(store.prune(now.index),{removed:2,records:3});
+ assert.deepEqual(counts(db),{source_documents:2,source_passages:3,source_fts:3});db.close();
+});
+
+test('prune is transactional per document: a failure leaves the document whole and a rerun finishes it',async()=>{
+ const {db,store}=fixture();
+ const old=await synthetic('issuer-passages-v2',{a:['satu ','dua'],b:['tiga']}),now=await synthetic('issuer-passages-v3',{c:['empat']});
+ await load(store,old);await load(store,now);
+ db.exec("CREATE TRIGGER fail_prune BEFORE DELETE ON source_documents WHEN OLD.doc_key LIKE '%:a:%' BEGIN SELECT RAISE(ABORT,'simulated prune failure'); END");
+ assert.throws(()=>store.prune(now.index),/prune failure/);
+ const a=old.index.docs[0];
+ assert.ok(store.read(a,old.index),'failed document still complete');
+ assert.equal(store.read(a,old.index).records.length,2);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM source_fts WHERE rowid NOT IN (SELECT id FROM source_passages)').get().n,0);
+ db.exec('DROP TRIGGER fail_prune');
+ const rest=store.prune(now.index);assert.ok(rest.removed>=1);
+ assert.deepEqual(counts(db),{source_documents:1,source_passages:1,source_fts:1});
+ assert.ok(store.read(now.index.docs[0],now.index));db.close();
 });

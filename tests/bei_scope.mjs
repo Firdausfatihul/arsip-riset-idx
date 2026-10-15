@@ -24,9 +24,12 @@ test('"bei", "ki" and "keterbukaan" read the BEI daily summary; detail only when
   assert.deepEqual(requestScope('ringkas BEI 6 oktober', index).categories, ['bei-ringkasan']);
   assert.deepEqual(names(documents('ringkas BEI 6 oktober')), ['beiringkas_2026-10-06_2026-10-06.md']);
   assert.deepEqual(names(documents('ringkas KI 6 oktober')), ['beiringkas_2026-10-06_2026-10-06.md']);
-  // Days before the BEI summaries keep their retired KI analysis; days with both read both (they differ in kind).
+  // Days before the BEI summaries keep their retired KI analysis; a day a BEI file covers reads the retired
+  // analysis only when asked for it ("KI lama", "analisis KI").
   assert.deepEqual(names(documents('baca KI 2 oktober')), ['ki_02102026.md']);
-  assert.deepEqual(names(documents('ringkas keterbukaan 5 oktober')), ['beiringkas_2026-10-05_2026-10-05.md', 'ki_05102026.md']);
+  assert.deepEqual(names(documents('ringkas keterbukaan 5 oktober')), ['beiringkas_2026-10-05_2026-10-05.md']);
+  assert.deepEqual(names(documents('ringkas KI lama 5 oktober')), ['beiringkas_2026-10-05_2026-10-05.md', 'ki_05102026.md']);
+  assert.deepEqual(names(documents('ringkas analisis KI 5 oktober')), ['beiringkas_2026-10-05_2026-10-05.md', 'ki_05102026.md']);
   assert.deepEqual(names(documents('BEI 6 oktober semua detail')),
     ['beidetail_2026-10-06_2026-10-06.md', 'beiringkas_2026-10-06_2026-10-06.md']);
   // A date without a source never pulls in the low-priority detail file.
@@ -69,9 +72,9 @@ test('paired source dates bind BEI and Stockbit separately', () => {
   const request = requestScope('BEI 5 oktober dan Stockbit 6 oktober', index);
   assert.deepEqual(request.pairs, [{category:'bei-ringkasan', dates:[{from:'2026-10-05', to:'2026-10-05'}]},
     {category:'stockbit', dates:[{from:'2026-10-06', to:'2026-10-06'}]}]);
-  // The Indonesian family includes the retired KI analysis of that day; Stockbit keeps its own date.
+  // The BEI file covers that day, so the retired KI analysis is not read next to it; Stockbit keeps its own date.
   assert.deepEqual(names(scopeDocuments(index.docs, request, {dates:true})),
-    ['beiringkas_2026-10-05_2026-10-05.md', 'ki_05102026.md', 'sbringkas_2026-10-06_2026-10-06.md']);
+    ['beiringkas_2026-10-05_2026-10-05.md', 'sbringkas_2026-10-06_2026-10-06.md']);
 });
 
 test('BEI summaries are labelled official summaries and rank with official screening sources', () => {

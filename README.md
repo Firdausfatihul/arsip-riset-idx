@@ -270,6 +270,8 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   memasangkan tiap tanggal dengan sumbernya; "SGX soal delisting" tetap mencari topik dalam sumber SGX.
   Rentang dua tanggal lengkap ("3 Oktober 2026 sampai tanggal 5 Oktober 2026") mencakup hari di antaranya,
   termasuk lintas bulan/tahun. Tanggal tidak valid atau urutan terbalik meminta koreksi tanpa membaca bahan lewat AI.
+  Nama bulan salah ketik di samping angka hari ("22 Septembet - 5 Oct", "oktber 5") dibaca sebagai bulan bila kata dan
+  bulannya sama-sama ≥6 huruf, tiga huruf awalnya sama dan selisihnya satu huruf; kata biasa ("market", "marsh") tidak.
 - Permintaan kandidat/rumor yang jarang dibahas dapat dijawab tanpa ticker. Tanpa sumber atau tanggal, mode biasa
   mulai dari potret KI Indonesia dan Stockbit terbaru, lalu menyebut cakupannya. Ini penemuan kandidat dari bahan tersebut,
   bukan screening seluruh pasar; jumlah temuan tidak dipaksakan bila bukti kurang.
@@ -277,14 +279,34 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   cakupan sumber/dokumen yang disimpan di server. Koreksi tanggal atau "yang terbaru" memilih ulang dalam sumber itu;
   objek atau sumber baru mengikuti permintaan baru. Riwayat singkat tetap berlaku, bukan memori riset tanpa batas.
 - `tools/evidence_index.py` membagi sumber secara deterministik saat build, tanpa API berbayar.
-  Heading emiten dipertahankan sebagai bagian utuh; baris tabel membawa header, artikel HTML tetap utuh,
+  Heading emiten dipertahankan sebagai bagian utuh; baris tabel Markdown dan baris CSV menjadi bagian sendiri dengan
+  header sebagai konteks (header tabel berakhir di bagian pertama yang bukan baris tabel). Baris CSV dipisah seperti
+  viewer membacanya: tanda kutip hanya membuka sel bila berada di awal sel, `""` di dalam sel kutip adalah kutip,
+  dan baris berakhir di `\n`, `\r` atau `\r\n`. Blok Markdown di atas 1.500 karakter dipecah per butir daftar di kolom 0
+  (`- `, `* `, `+ `, `1. `, `1) `, `[^KODE]:`; butir bertingkat/lanjutan ikut butirnya), masing-masing dengan
+  ticker sendiri; baris di dalam blok kode berpagar (```` ``` ````/`~~~`) tidak dipecah. Artikel HTML tetap utuh,
   dan skrip/data HTML tetap menjadi bagian sumber. Gabungan `content` seluruh bagian harus sama persis
-  dengan sumber asli. Setiap bagian mempunyai lokasi, ticker, tanggal, dan hash dokumen.
+  dengan sumber asli. Setiap bagian mempunyai lokasi, ticker, tanggal, dan hash dokumen (versi `issuer-passages-v3`).
 - Worker mencari dan mengambil bagian terkait dari SQLite FTS5 jika seluruh versi arsip sudah diimpor.
   `source_documents`, `source_passages`, dan `source_fts` menyimpan sumber lengkap serta indeksnya.
   Jika indeks database belum lengkap, pencarian masih memakai Assets.
 - Worker mengambil bagian terkait dari setiap dokumen. Bagian prosa tetangga dan rujukan internal
-  disertakan untuk menjaga konteks. Kalau indeks hilang, versinya salah, atau tidak menemukan bagian
+  disertakan untuk menjaga konteks. Butir daftar dan baris tabel diambil tanpa tetangganya (tetangganya biasanya
+  butir emiten lain); daftar yang cocok tetap membawa kalimat pengantarnya ("Nama yang paling menarik …:").
+  Salinan untuk model membuang tautan, nomor posting "(juga: …)", ID temuan dan ID pengumuman IDX; daftar panjang
+  di berkas desk (Ikhtisar emiten, Lampiran) hanya mengirim butir yang menyebut kode yang dicari. Di berkas Stockbit,
+  bagian emiten lain yang menyebut kode itu hanya mengirim butir temuannya yang belum ada di bagian emiten itu sendiri
+  (bagian PMUI yang mengulang butir GRPM tidak dikirim). Pemeriksa angka tetap memakai teks asli.
+- Pertanyaan ticker membatasi bahan per keluarga: ringkasan Stockbit 90 KB, BEI 70 KB, Stockbit mentah/KI lama 60 KB.
+  Hari terbaru dibaca utuh; hari yang lebih lama tercantum satu baris buatan kode dan tetap menjadi sumber yang
+  dapat dibuka. Bagian emiten di ringkasan harian tidak dikirim bila bagian emiten yang sama di dokumen detail hari
+  itu (≥2× lebih besar) ikut dibaca. Stockbit mentah/KI lama: bagian emiten itu (atau baris yang menyebutnya) dari
+  setiap dokumen dibaca lebih dulu, dokumen dengan bagian sendiri didahulukan, lalu sisa dokumen (prosa tetangga,
+  emiten lain) selama muat; dokumen yang hanya dikirim bagiannya diberi `cakupan_bahan`. Bahan pertanyaan ticker
+  disusun keterbukaan resmi (BEI, KI, bursa lain) dulu, lalu Stockbit mentah, lalu berkas Stockbit harian, dan
+  jawabannya diminta mempertahankan klasifikasi transaksi resmi (afiliasi/material), penjamin/tanggung renteng,
+  tujuan dana dan status proses terakhir, serta satu baris per hari yang membahas emiten itu.
+  Kalau indeks hilang, versinya salah, atau tidak menemukan bagian
   meskipun dokumen cocok, Worker kembali ke dokumen asal tersebut. Pencocokan tetap berbasis teks:
   penyebutan hanya melalui alias/nama tanpa ticker dapat terlewat.
 - Tanggal dokumen dipisahkan dari tanggal kejadian. Hanya tanggal ISO di awal record yang jelas
@@ -293,27 +315,54 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   rentang tanggal, dan bahan dengan tanggal relevan lain tetap dipertahankan. “Tanggal 17” tanpa
   bulan/tahun meminta penjelasan tanpa panggilan model; tanggal lengkap dari pertanyaan sebelumnya
   dapat menjadi konteks. Filter ini konservatif, bukan jaminan seluruh tanggal telah dikenali.
-- Bahan sampai 350 KB (±100 ribu token) dibaca model sebagai teks asli dalam satu panggilan jawaban.
-  Khusus permintaan dokumen utuh, teks asli sampai 900 KB dibaca langsung; batas pesan jalur ini 1 MB
-  termasuk instruksi/metadata. Kapasitas model yang dipakai telah diperiksa melalui katalog OpenRouter
-  (1 juta token konteks); evaluasi ulang batas ini jika model diganti. Batas total analisis dan harian tetap berlaku.
-  Bahan di atas itu memakai catatan sumber bersama untuk unit di atas 24 KB, maksimal dua pembaca bersamaan.
+- Bahan sampai 240 KB (±130 ribu token Claude, ±1,8 byte per token) dibaca model sebagai teks asli dalam satu
+  panggilan jawaban, termasuk permintaan dokumen utuh; batas pesan jalur dokumen utuh 320 KB termasuk
+  instruksi/metadata. Batas ini menyisakan ruang di konteks 200 ribu token untuk instruksi, riwayat dan jawaban;
+  evaluasi ulang jika model diganti. Batas total analisis dan harian tetap berlaku.
+  Berkas desk Stockbit/BEI (`sbringkas_`, `sbdetail_`, `sbpekan_`, `beiringkas_`, `beidetail_`, `beipekan_`) yang tidak
+  muat dibaca sebagai **ringkasan buatan kode** (`worker/document-material.mjs`): bagian pembuka dan sorotan tiap hari
+  (utuh bila semuanya muat dalam 60% anggaran; selain itu dibagi rata dalam 60% itu), lalu bagian emiten berurutan dibagi
+  adil antarhari (paragraf awal dulu, lalu diperluas), bagian emiten tingkat kedua, lalu lampiran; sisanya hanya tercantum
+  satu baris di "DAFTAR BAGIAN YANG TIDAK DIKIRIM" atau dihitung ("dan N bagian lain"). Mulai hari kedua, kode yang
+  sudah masuk 10 teratas hari sebelumnya (FORU, GOTO …) mundur ke akhir tingkat teratas hari itu, dan bagian yang
+  mengutip keterbukaan resmi didahulukan dari bagian rumor saja. Paragraf awal membawa sampai dua butir
+  "[Mengutip keterbukaan]" (≤400 byte). Bagian yang hanya dikirim paragraf awalnya
+  selalu diberi tanda "(… rincian bagian ini tidak dikirim)". Anggaran: 72 KB, 27 KB bila diminta singkat, 165 KB untuk
+  seluruh temuan, 120 KB untuk "semua yang penting" atas beberapa hari dan untuk "detail"/"rinci" atas satu hari.
+  Dua anggaran terakhir memakai **paragraf awal kaya**: semua bagian emiten teratas lebih dulu (paragraf awal plus sampai
+  tiga butir temuan, didahulukan "[Mengutip keterbukaan]" yang memuat angka, lalu temuan lain yang memuat angka;
+  pertanyaan tidak dipilih; dua butir untuk kode yang sudah teratas di hari sebelumnya), lalu bagian tingkat kedua yang
+  memuat angka (Rp, US$, %, juta/miliar/triliun), baru kemudian perluasan. Bagian emiten `beidetail_` dikirim sebagai
+  ringkas: Status, Kesinambungan, lalu per pengumuman hari itu judul, Ringkasan, Mengoreksi dan butir Fakta sampai
+  ±320 byte (diperluas sampai ±1,4 KB bila anggaran sisa); Angka, Aksi korporasi, Tanggal penting, Batasan, Lampiran,
+  Baru vs sebelumnya, Riwayat dan Jadwal tidak dikirim dan ditandai. Cadangan daftar 6% (biasa 15%). Uji offline
+  (pesan jawaban, perkiraan token): Stockbit 1–6 Okt "semua yang penting" ±300 ribu → ±76 ribu (dulu teks utuh); BEI 12 Okt
+  detail ±294 ribu → ±73 ribu. Ringkasan harian yang dibaca bersama dokumen detail tanggal yang sama hanya mengirim pembuka,
+  sorotan dan bagian yang tidak ada di dokumen detail (Baru muncul, Emiten lain, Laporan rutin, Jadwal 30 hari,
+  Cakupan); `cakupan_bahan` per dokumen menyebut apa yang dikirim. Rentang tanggal eksplisit di atas batas jumlah
+  dokumen dibaca sampai 31 dokumen (dokumen non-desk ≤8 dan ≤1,5 MB); lebih dari itu dijawab dengan permintaan
+  mempersempit rentang, tanpa panggilan AI. Hitungan "FAKTA TERHITUNG SISTEM" dan pemeriksa angka tetap memakai
+  dokumen lengkap.
+  Bahan di atas 240 KB memakai catatan sumber bersama untuk unit di atas 24 KB, maksimal dua pembaca bersamaan.
   Catatan membahas bukti emiten tanpa pertanyaan atau riwayat pengguna. Jika model menyatakan catatan belum cukup, satu pemeriksaan tambahan atas
   maksimal dua dokumen lengkap diperbolehkan; seluruh batas biaya/koneksi tetap berlaku.
   Permintaan dokumen utuh mengemas teks asli berurutan, dengan identitas sumber dan lokasi per potongan;
   judul/header tabel tidak diulang pada setiap baris indeks. Seluruh teks dan hash sumber tetap sama.
   Sebelum membaca, sistem menghitung kebutuhan awal seluruh catatan dan menyisihkan 6.500 token untuk jawaban.
-  Jika permintaan seluruh temuan dapat membaca teks asli langsung, jawaban mendapat maksimal 24.000 token,
-  tanpa panggilan catatan perantara. Semua teks sumber masuk ke model, tetapi ringkasan tetap dapat menghilangkan rincian
+  Jika permintaan seluruh temuan dapat membaca teks asli langsung dan bahannya ≤180 KB, jawaban mendapat maksimal
+  24.000 token, tanpa panggilan catatan perantara. Semua teks sumber masuk ke model, tetapi ringkasan tetap dapat menghilangkan rincian
   atau keliru mengaitkan fakta; tersedianya seluruh teks bukan jaminan setiap detail termuat atau setiap klaim benar.
   Jalur dokumen utuh membatasi teks keluaran 160 ribu karakter, aliran provider 6 MB, dan waktu panggilan 6 menit;
   antarmuka menerima sampai 200 ribu karakter termasuk catatan validasi. Jalur biasa mempertahankan batas lamanya.
   Catatan dokumen utuh dibaca sekali, maksimal 5.000 token per unit (dibagi sesuai sisa anggaran, minimal 1.800).
-  Catatan pencarian topik memakai 1.800 token dan boleh diulang sampai 3.600 bila sisa anggaran tetap cukup bagi bagian lain dan jawaban akhir.
-  Jika tidak cukup, catatan yang terpotong ditandai; jawaban dari catatan tersebut juga ditandai parsial dan tidak disimpan sebagai jawaban lengkap.
+  Catatan pencarian topik mendapat 1.800–4.000 token sesuai ukuran unit (±1 token per 30 byte) dan tidak dibaca ulang;
+  bila jumlahnya bersama jawaban melebihi batas keluaran analisis, semua catatan diperkecil (minimal 1.800) alih-alih
+  menolak pertanyaan. Jika teks asli ditambah catatan masih melebihi 240 KB, unit terbesar yang tersisa (>12 KB) juga
+  dijadikan catatan (maksimal 14 catatan). Catatan yang terpotong ditandai; jawaban dari catatan tersebut juga ditandai
+  parsial dan tidak disimpan sebagai jawaban lengkap.
 - Kalimat penyangkalan ("Tidak ada aksi korporasi seperti rights issue…", "belum merencanakan delisting") tidak
   dihitung sebagai kecocokan kata topik. Dokumen yang hanya menyebut topik dalam penyangkalan tidak dibaca.
-- **Topik terlalu luas** (tanpa kode saham, bahan di atas 350 KB):
+- **Topik terlalu luas** (tanpa kode saham, bahan di atas 240 KB):
   - Jika pertanyaan menyebut jenis aksi korporasi (rights issue, private placement, stock split, buyback,
     tender offer, go private/delisting, akuisisi, perubahan pengendali/backdoor, KBLI/kegiatan usaha, merger,
     dividen, saham bonus), jawaban memakai **tabel aksi korporasi** `events.json` dari `tools/event_index.py`.
@@ -337,11 +386,24 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   ada dalam dokumen. Fakta, rumor/pernyataan penulis, angka, tanggal dan ketidakpastian tetap dibedakan.
   Jawaban dimulai dengan kesimpulan, memakai rujukan `[D…]` yang ditautkan ke arsip, dan menyebut batas bukti.
   Jika diminta singkat, targetnya sekitar 150–250 kata kecuali pengguna menentukan panjang lain.
-  Permintaan "semua/seluruh temuan" atau "jangan hilangkan detail" tidak dibatasi ke 3–5 pilihan atau panjang ringkasan umum.
+  Permintaan cakupan eksplisit ("semua/seluruh temuan|detail|isi|rincian", "selengkapnya", "ringkasan/rincian/detail/
+  daftar/versi lengkap", "secara lengkap", "tanpa kecuali", "jangan hilangkan/lewatkan detail|apa pun|satu pun") tidak
+  dibatasi ke 3–5 pilihan atau panjang ringkasan umum. "Lengkap" saja ("tanggal lengkap") dan "semua dokumen …" bukan
+  permintaan cakupan, dan kata singkat ("singkat", "padat", "intinya") selalu menang ("singkat tapi lengkap" = singkat).
+  "Semua temuan" meminta jawaban lengkap, bukan berkas `sbdetail_` (itu hanya dengan kata "detail"). Permintaan dokumen
+  yang bukan cakupan penuh, lebih dari satu dokumen atau meminta peringkat ("paling menarik", "urutkan") dijawab
+  sebagai peringkat maksimal 10 butir (3 per dokumen untuk lebih dari tiga dokumen, paling banyak 20), kecuali pengguna
+  meminta singkat atau menyebut jumlah/panjang sendiri. "Semua/seluruh" tanpa kata peringkat atas beberapa dokumen
+  ("stockbit 1-6 oktober ringkas semua yang penting") memakai anggaran 120 KB dengan paragraf awal kaya; setiap butir
+  Yang berubah/Sorotan/Jarang disebut tiap hari mendapat satu baris, dikelompokkan per jenis, dengan jawaban maksimal
+  12.000 token. Kata "detail"/"rinci" tidak pernah dijawab sebagai peringkat (kecuali ada kata peringkat): jawaban
+  maksimal 12.000 token, mulai dari jumlah di baris Cakupan, satu baris per butir Sorotan/Yang berubah dan satu butir per
+  bagian emiten yang dikirim. Rincian yang tidak dikirim disebut "tidak termasuk bahan yang dibaca", bukan "terpotong".
+  Kalimat cakupan penutup menyebut bagian emiten utuh, sebagian dan yang hanya tercantum/dihitung secara terpisah. Permintaan seluruh temuan atas ringkasan buatan kode juga diminta memasukkan setiap butir bagian pembuka
+  tiap hari; kalimat awal di daftar boleh dikutip sebagai temuan satu baris bertanda "dari daftar".
   Ini tetap ringkasan dengan batas keluaran: model harus menyebut rincian yang belum termuat, bukan mengklaim seluruh detail selesai.
-- Pembacaan gagal/terpotong tidak masuk cache. Retry pemotongan catatan hanya satu kali dan tetap memakai
-  anggaran. Catatan yang masih terpotong setelah retry (mis. katalog 1.535 kode SGX) dipakai apa adanya dengan tanda
-  "Catatan terpotong" dan tidak disimpan di cache, supaya satu unit panjang tidak menggagalkan seluruh jawaban. Jawaban akhir yang mencapai batas panjang tetap ditampilkan dengan tanda terpotong, tidak masuk
+- Pembacaan gagal/terpotong tidak masuk cache. Catatan tidak dibaca ulang dengan batas lebih besar; catatan yang
+  terpotong (mis. katalog 1.535 kode SGX) dipakai apa adanya dengan tanda "Catatan terpotong" dan tidak disimpan di cache, supaya satu unit panjang tidak menggagalkan seluruh jawaban. Jawaban akhir yang mencapai batas panjang tetap ditampilkan dengan tanda terpotong, tidak masuk
   cache jawaban dan tidak menjadi riwayat percakapan. Rujukan `[D…]` di luar sumber yang diperiksa tidak
   menggagalkan jawaban; jawaban diberi catatan agar rujukan itu diabaikan.
 - Tombol Hentikan memutus koneksi. Server menghentikan pekerjaan setelah mendeteksi pemutusan;
@@ -498,6 +560,25 @@ node tools/compare_chat_costs.mjs --live    # perbandingan API nyata, batas cada
 python3 tools/chat_metrics.py --days 7 --out reports/private/chat-metrics.json --html reports/private/chat-statistics.html
 ```
 
+**Bandingkan token dua versi kode (`tools/bench_tokens.mjs`).** Menjalankan pertanyaan yang sama lewat `converse()` dari satu
+salinan kode dengan aset Worker-nya dan mencatat setiap panggilan model (jenis, byte masuk, estimasi token = byte/1,8).
+Mode bawaan offline: model tiruan, tanpa jaringan dan tanpa kuota; panggilan istilah memakai istilah produksi dari dump.
+`--bridge` memakai `claude -p` sungguhan lewat `local/claude-bridge.mjs` salinan itu (langganan Claude, memakai batas pemakaian).
+
+```bash
+node tools/bench_tokens.mjs --impl <salinan-lama> --assets <aset-lama> --questions q.json --out /tmp/a.json --now 2026-10-15T05:00:00Z
+node tools/bench_tokens.mjs --impl . --assets <aset-baru> --questions q.json --out /tmp/b.json --now 2026-10-15T05:00:00Z
+node tools/bench_tokens.mjs --diff /tmp/a.json /tmp/b.json [--out diff.json]   # tabel Markdown + ringkasan JSON
+node tools/bench_tokens.mjs --bridge --model sonnet --effort low --impl . --assets <aset> --questions q.json --out reports/private/live.json --limit 8
+```
+
+`--questions` menerima dump pertanyaan VPS (baris mode agen dilewati, pertanyaan identik sekali) atau larik string/
+`{id, question, terms?, intent?}`. Bangun aset per versi dengan `tools/build_worker.py --out <folder baru>` bila
+`build_worker.py`/`evidence_index.py` berbeda. Pilihan lain: `--only`, `--limit`, `--concurrency`, `--no-store`, `--verbose`.
+Kunci penanda giliran kini disimpan di `.local/boundary.key`: jalankan arm `--bridge` berjarak lebih dari TTL cache, atau
+dari salinan berbeda, supaya arm kedua tidak membaca cache arm pertama. `--out` harus di luar repo atau di folder yang
+diabaikan Git (mis. `reports/private/`).
+
 Hasil pembanding berada di `reports/cache-comparison/`. Alur lama tetap tersedia sebagai
 `converseLegacy` untuk kontrol pengujian, bukan pilihan dari browser publik. Mode nyata memakai
 key khusus `.env.chat`; biaya aktual berasal dari respons provider. Batas US$1 adalah cadangan
@@ -542,9 +623,9 @@ Batas backend tetap berlaku walaupun JavaScript browser diubah:
 | HTTP body | 4.096 byte, JSON saja, unggahan maksimal 5 detik |
 | Riwayat dari browser | Ditolak; hanya token konteks acak 256 bit |
 | Topik | Maksimal 4 ticker/istilah, 4 MB bahan, 14 kelompok |
-| Satu panggilan model | Maksimal 480.000 byte JSON pesan; 1.000.000 khusus teks asli dokumen utuh yang dipilih server; tidak sama dengan jumlah token |
+| Satu panggilan model | Maksimal 480.000 byte JSON pesan; 320.000 khusus teks asli dokumen utuh yang dipilih server; tidak sama dengan jumlah token |
 | Satu analisis | 8 MB total pesan termasuk retry, 20 panggilan, alokasi keluaran 36.000 token |
-| Keluaran per panggilan | Catatan topik 1.800 token, retry sekali 3.600 bila anggaran cukup; catatan dokumen utuh 1.800–5.000 sekali baca; jawaban akhir 6.500, atau 24.000 untuk seluruh temuan dari teks asli dokumen utuh; termasuk penalaran |
+| Keluaran per panggilan | Catatan topik 1.800–4.000 token sesuai ukuran unit, tanpa retry; catatan dokumen utuh 1.800–5.000 sekali baca; jawaban akhir 6.500, atau 24.000 untuk seluruh temuan dari teks asli dokumen utuh ≤180 KB; termasuk penalaran |
 | Anggaran global/hari UTC | 80 MB pesan model dan alokasi keluaran 500.000 token, dicadangkan sebelum setiap panggilan |
 | Permintaan masuk termasuk invalid | 12/IP/menit dan 120 global/menit |
 | Analisis diterima | 120/IP/jam, 3.000 global/hari |
@@ -689,7 +770,11 @@ node local/server.mjs           # berikutnya; tambah --build setelah ada dokumen
 - Kode Worker yang sama (`worker/index.mjs`, Durable Object `ArchiveChat`) dijalankan di Node 22. Penyimpanan Durable Object
   diganti SQLite lokal `.local/chat.sqlite`; aset Worker di `.local/assets`, situs di `.local/site` (dibangun dengan
   `CHAT_API_URL=/api/chat`, jadi chat satu origin dengan situs). Semua di `.local/` diabaikan Git. `docs/` dan Worker publik tidak diubah.
-- Saat start, indeks sumber SQLite diisi langsung tanpa AI (pengganti `tools/sync_chat_index.py`).
+- Saat start, indeks sumber SQLite diisi langsung tanpa AI (pengganti `tools/sync_chat_index.py`). Setelah semua dokumen
+  manifest aktif terimpor, `SourceStore.prune` menghapus dokumen versi lain (versi bukti lama atau hash lama), satu
+  transaksi per dokumen. Selama impor belum lengkap tidak ada yang dihapus, dan baris versi bukti yang lebih baru
+  (`issuer-passages-v3` > `-v2`) selalu disimpan: push yang gagal di tengah lalu kembali ke `app.old` tidak membuang
+  kemajuan impor, sehingga push berikutnya melanjutkan, bukan mengimpor dari nol.
 - `local/claude-bridge.mjs` menggantikan `fetch` ke OpenRouter (hook `env.MODEL_FETCHER`, hanya ada di server lokal):
   tiap panggilan model = satu proses `claude -p` tanpa alat (`--tools ""`), tanpa setting/hook/MCP pengguna, tanpa sesi tersimpan,
   dari folder kosong. Pesan sistem lewat berkas sementara (izin 600), bahan lewat stdin. CLI dijalankan dengan lingkungan
@@ -697,14 +782,29 @@ node local/server.mjs           # berikutnya; tambah --build setelah ada dokumen
   `claude auth login` milik akun itu. `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, Bedrock/Vertex, secret server, dan variabel
   sesi Claude Code yang menjalankan server tidak diteruskan, supaya CLI tidak pindah ke tagihan API atau akun lain. Saat start,
   `claude auth status` harus menunjukkan login langganan (`authMethod` `claude.ai`, provider `firstParty`); selain itu server
-  berhenti dengan kode 78. Streaming, mode JSON (`--json-schema`), dan langkah mode agen
-  (pemanggilan alat ditiru lewat skema `{content, tool_calls}`) diterjemahkan ke format yang dibaca `worker/core.mjs`.
-  Penalaran (thinking) tidak dibatasi: banyaknya ditentukan `--effort` (VPS: `max`), tanpa `MAX_THINKING_TOKENS`.
+  berhenti dengan kode 78. Streaming, mode JSON, dan langkah mode agen diterjemahkan ke format yang dibaca `worker/core.mjs`
+  **tanpa `--json-schema`** (yang menambah putaran alat StructuredOutput): fungsi server dijelaskan di system prompt
+  ("FUNGSI SERVER …") dan model membalas satu objek JSON `{content, tool_calls}` sebagai teks (`parseStep`/`parseJson`).
+  Rencana dibaca bila objek JSON berada di awal balasan (polos, beberapa objek per baris, atau dalam pagar kode; catatan
+  sesudahnya diabaikan) atau setelah satu baris pengantar ("Rencana:") sampai akhir balasan. JSON yang dikutip di
+  tengah kalimat tidak pernah dijalankan, supaya teks dokumen yang dikutip model tidak memicu panggilan. Balasan yang
+  dimulai seperti rencana tetapi tidak terbaca dijawab 502 (Worker mencoba lagi), bukan dianggap "SIAP". Jawaban akhir
+  mode agen ditahan ±64 karakter pertama: bila isinya JSON protokol atau tag transkrip, isinya dibuka bila berupa
+  jawaban biasa, atau aliran diakhiri tanpa "stop" sehingga Worker mencoba sekali lagi dengan `tool_choice` none (system
+  prompt hanya meminta jawaban teks). Penanda giliran rahasia selalu dibuang dari teks yang dialirkan.
+  Penalaran (thinking): jawaban biasa mengikuti `--effort` (VPS: `max`), tanpa `MAX_THINKING_TOKENS`; panggilan dengan
+  `reasoning {enabled:false}` (catatan, mode JSON, langkah dan jawaban mode agen) memakai `--thinking disabled`.
   `CLAUDE_CODE_MAX_OUTPUT_TOKENS` = anggaran teks Worker + 64.000 ruang thinking, supaya thinking tidak menghabiskan jawaban;
   teks jawaban tetap dihentikan sebagai "length" di ±8 karakter per token anggaran. Uji Haiku effort max: satu pertanyaan
   pendek atas ±34 ribu token bahan memakai ±15.800 token thinking (estimasi API US$0,015 vs US$0,007 tanpa thinking).
   Pesan dikirim sebagai `--input-format stream-json`: tiap giliran satu blok teks, giliran pertama (bahan arsip) diberi
-  breakpoint cache 1 jam, dan penanda giliran tetap sama untuk bahan yang sama (HMAC dengan kunci acak per proses server).
+  breakpoint cache 5 menit (`ARSIP_CLAUDE_CACHE_TTL=1h` untuk 1 jam; TTL yang sama dipakai breakpoint CLI sendiri lewat
+  `CLAUDE_CODE_PROMPT_CACHE_TTL`, karena entri 1 jam setelah entri 5 menit ditolak API; tulis cache 5 menit 1,25× harga
+  input, 1 jam 2×), dan penanda giliran tetap sama untuk bahan yang sama (HMAC dengan kunci di `.local/boundary.key`,
+  izin 600, ditulis ke berkas sementara lalu dipindah; berkas kosong/rusak diganti; `node local/vps.mjs push` menyalin
+  kunci yang valid ke salinan baru sehingga cache tetap hangat setelah deploy; symlink atau folder tak tertulis = kunci
+  per proses). Panggilan bersamaan dengan awalan sama (system prompt + giliran pertama) menunggu maksimal 30 detik
+  sampai panggilan pertama mulai dijawab (`message_start`), supaya cache tidak ditulis dua kali.
   Uji nyata: pertanyaan kedua atas bahan yang sama membaca ±99% input dari cache (estimasi API ±15× lebih murah).
   Sebelumnya penanda acak per panggilan membuat cache tidak pernah terbaca.
   Di bawah jawaban, "Biaya & token" menampilkan model, panggilan, token input (baru/dibaca/ditulis cache), output,
@@ -713,7 +813,7 @@ node local/server.mjs           # berikutnya; tambah --build setelah ada dokumen
 - Biaya per panggilan dicatat 0 (langganan); jumlah token tetap dicatat. Batas langganan Claude (jendela 5 jam) tetap berlaku.
 - Pilihan: `--model sonnet|opus|haiku` (bawaan `sonnet`), `--effort low|medium|high` (bawaan `low`), `--concurrency 3`
   (proses `claude` bersamaan), `--port 8017`. Env: `ARSIP_CLAUDE_MODEL`, `ARSIP_CLAUDE_EFFORT`, `ARSIP_CLAUDE_CONCURRENCY`,
-  `ARSIP_CLAUDE_BIN`, `ARSIP_PORT`, `CHAT_AGENTIC_DAILY` (bawaan lokal 100).
+  `ARSIP_CLAUDE_BIN`, `ARSIP_PORT`, `ARSIP_CLAUDE_CACHE_TTL` (`5m` bawaan atau `1h`), `CHAT_AGENTIC_DAILY` (bawaan lokal 100).
 - Mode agen aktif bila `DATACAT_API_KEY` ada di `.env.chat`. Hanya ini yang keluar ke layanan lain selain Claude:
   datacat (`quant.renr.ai`). Tanpa key, mode agen disembunyikan.
 - Hanya mendengar `127.0.0.1`. `--host <ip> --allow-lan` membuka ke jaringan lokal **tanpa login**. Origin yang diizinkan hanya
@@ -1004,8 +1104,10 @@ python3 -B tools/sync_idx.py --with-bei                              # sinkron b
   `"*"`), dicatat sebagai `held_bei`. Putaran ulang ditolak bila berkas Stockbit/BEI selain `.stockbit-hold.json`/`.bei-hold.json` kotor.
 - Chat: Digest Emiten tidak lagi diindeks (nama resmi emiten yang ditulisnya tetap dipakai untuk mengecek nama); `bei-ringkasan` dan
   `bei-pekan` prioritas normal, `bei-detail` `priority: low` dan hanya dibaca untuk pertanyaan ticker/"detail". Kata "bei", "ki",
-  "keterbukaan" membaca keluarga Indonesia (ringkasan BEI, rekap pekan, dan Analisis KI lama untuk hari yang dicakupnya); "terbaru"
-  memilih ringkasan BEI terbaru. Cakupan discovery bawaan: `bei-ringkasan`, `keterbukaan-informasi`, `stockbit-ringkasan`, `stockbit`.
+  "keterbukaan" membaca keluarga Indonesia (ringkasan BEI dan rekap pekan; Analisis KI lama dibuang hanya bila berkas BEI
+  yang dibaca mencakup setiap hari yang dicakupnya: `ki_07102026` mencakup 6–7 Oktober, jadi tetap ikut untuk "7 Oktober").
+  Di samping ringkasan/rekap BEI, KI dikirim sebagai kepala buatan kode (pembuka, tabel update, judul tiap pembahasan;
+  maksimal 14 KB); utuh bila diminta "KI lama"/"analisis KI"/`ki_…` atau seluruh temuan; "terbaru" memilih ringkasan BEI terbaru. Cakupan discovery bawaan: `bei-ringkasan`, `keterbukaan-informasi`, `stockbit-ringkasan`, `stockbit`.
 
 ---
 

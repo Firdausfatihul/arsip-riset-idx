@@ -2,10 +2,10 @@ export const MODEL = 'qwen/qwen3.7-flash';
 import {chooseThematic,THEMATIC_RULES,THEMATIC_ANSWER_RULES} from './thematic.mjs';
 import {hash} from './cache.mjs';
 import {citations} from './citations.mjs';
-import {documentUnits} from './document-material.mjs';
-import {dateQuery, selectRecords, filterRecords, crossMarketQuery, documentRequest, requestScope, scopeDocuments, dedupeDocuments, pattern} from './retrieval.mjs';
+import {documentUnits, deskDigest, digestUnits, kiHead, DESK_CATS, DIGEST_BUDGET} from './document-material.mjs';
+import {dateQuery, selectRecords, filterRecords, crossMarketQuery, documentRequest, requestScope, scopeDocuments, dedupeDocuments, pattern, modelRows, modelText, headingTicker, plainContext} from './retrieval.mjs';
 import {questionTypes, screeningGroups, screeningCounts, screeningMaterial, screeningTable, overviewTable, documentFacts, unverifiedNumbers, wrongNames, nameNotice, sourceLabel} from './screening.mjs';
-import {STOCKBIT_TICKER_BUDGET, stockbitBudget, stockbitListing, stockbitHandles, stockbitHandleBlock, stockbitHandleDocs, stockbitPenilaianTail} from './stockbit.mjs';
+import {STOCKBIT_TICKER_BUDGET, BEI_TICKER_BUDGET, LEGACY_TICKER_BUDGET, familyBudget, docBudget, stockbitListing, beiListing, legacyListing, stockbitHandles, stockbitHandleBlock, stockbitHandleDocs, stockbitPenilaianTail} from './stockbit.mjs';
 export {CacheStore,hash} from './cache.mjs';
 const encoder = new TextEncoder();
 export const size = value => encoder.encode(JSON.stringify(value)).length;
@@ -14,8 +14,12 @@ export class ChatError extends Error {}
 // Final answers include hidden reasoning (up to 2048 tokens) inside this allowance.
 const ANSWER_TOKENS = 6500;
 const DOCUMENT_ANSWER_TOKENS = 24000;
+// Whole-document "ringkas semua yang penting" over several days: every head-section item gets a line (BROAD).
+const BROAD_ANSWER_TOKENS = 12000;
+// documentMessage: whole-document answers read original text only up to RAW_LIMIT (240 KB, ~130k Claude tokens), plus
+// instructions, counted facts, names and history; larger requests use the desk digest or notes (480 KB message cap).
 export const LIMITS = Object.freeze({question:600, body:4096, terms:4, archive:4000000,
-  batch:384000, message:480000, documentMessage:1000000, input:8000000, output:36000, calls:20});
+  batch:384000, message:480000, documentMessage:320000, input:8000000, output:36000, calls:20});
 
 export function validate(body) {
   if (!body || Array.isArray(body) || Object.keys(body).some(k => !['question','context','mode'].includes(k)) ||
@@ -249,11 +253,13 @@ export class OpenRouter {
       a.known_cost_usd += r.cost || 0; a.prompt_tokens += r.prompt_tokens || 0;
       a.completion_tokens += r.completion_tokens || 0; a.cached_tokens += r.cached_tokens || 0;
       a.cache_write_tokens += r.cache_write_tokens || 0;
+      // Local Claude bridge receipts: cache writes by TTL, thinking tokens and CLI API iterations (null elsewhere).
+      for (const k of ['cache_write_1h_tokens','cache_write_5m_tokens','reasoning_tokens','api_iterations']) a[k] += r[k] || 0;
       // Provider list-price estimate when the bill itself is not per token (local Claude subscription bridge).
       if (typeof r.estimated_cost === 'number') { a.estimated_cost_usd += r.estimated_cost; a.estimated_calls++; }
       return a;
     }, {calls:0,input_bytes:0,output_token_budget:0,known_cost_usd:0,prompt_tokens:0,completion_tokens:0,cached_tokens:0,cache_write_tokens:0,missing_usage_calls:0,
-      estimated_cost_usd:0,estimated_calls:0});
+      estimated_cost_usd:0,estimated_calls:0,cache_write_1h_tokens:0,cache_write_5m_tokens:0,reasoning_tokens:0,api_iterations:0});
   }
   account(response, event) {
     const record = this.responses.get(response), usage = event.usage;
@@ -267,6 +273,10 @@ export class OpenRouter {
     record.cached_tokens = number(usage.prompt_tokens_details?.cached_tokens);
     record.cache_write_tokens = number(usage.prompt_tokens_details?.cache_write_tokens);
     record.estimated_cost = number(usage.estimated_cost);
+    record.cache_write_1h_tokens = number(usage.prompt_tokens_details?.cache_write_1h_tokens);
+    record.cache_write_5m_tokens = number(usage.prompt_tokens_details?.cache_write_5m_tokens);
+    record.reasoning_tokens = number(usage.completion_tokens_details?.reasoning_tokens);
+    record.api_iterations = number(usage.api_iterations);
   }
   cancel() { this.controller.abort(); }
   canSpend({input = 0, output = 0, calls = 0} = {}) {
@@ -284,7 +294,8 @@ export class OpenRouter {
     // Reserve before network I/O; retries and parallel calls consume the same hard budget.
     this.reserve(bytes, maxTokens);
     this.input += bytes; this.output += maxTokens; this.calls++;
-    const receipt = {input_bytes:bytes, output_token_budget:maxTokens, cost:null, prompt_tokens:null, completion_tokens:null, cached_tokens:null, cache_write_tokens:null, estimated_cost:null};
+    const receipt = {input_bytes:bytes, output_token_budget:maxTokens, cost:null, prompt_tokens:null, completion_tokens:null, cached_tokens:null, cache_write_tokens:null, estimated_cost:null,
+      cache_write_1h_tokens:null, cache_write_5m_tokens:null, reasoning_tokens:null, api_iterations:null};
     this.receipts.push(receipt);
     const payload = {model:MODEL, messages, stream, max_tokens:maxTokens, temperature:0.2,
       reasoning:reasoning ? {max_tokens:reasoning === 2048 ? 2048 : 512, exclude:true} : {enabled:false}};
@@ -507,7 +518,24 @@ async function readFullDocuments(archive, model, question, history, emit, signal
   return {answer, documents:selected.length, batches:groups.length, model:MODEL};
 }
 
-const PIPELINE = 'issuer-cache-v8';
+const PIPELINE = 'issuer-cache-v12'; // v9: compact search material, family budgets, list trim; v10: desk digest, KI/detail dedupe;
+// v11: broad answers, KI head next to BEI, legacy sections first, co-mention compaction, official sources first;
+// v12: rich digest leads (broad 115 KB, single-day detail 120 KB), no ranking for detail requests
+// "Seluruh temuan" requests: only explicit completeness phrases. "Ringkas semua yang penting" or "semua … paling menarik"
+// ask for a ranking and keep the normal answer allowance.
+// "Lengkap" alone is ordinary wording ("tanggal lengkap", "singkat tapi lengkap"): only "ringkasan/rincian/detail/daftar/
+// versi lengkap" and "secara lengkap" count. An explicit short-answer word wins over every completeness phrase.
+export const EXHAUSTIVE = /\bjangan\s+(?:sampai\s+)?(?:menghilangkan|hilangkan|hilang|lewatkan|melewatkan|lewat)\s+(?:detail\w*|apa\s*pun|satu\s*pun)\b|\b(?:semua|seluruh)\s+(?:temuan|detail|isi|rincian)\b|\bselengkapnya\b|\b(?:ringkasan|rincian|detail|daftar|versi)\s+(?:yang\s+)?lengkap\b|\bsecara\s+lengkap\b|\btanpa\s+(?:ter)?kecuali\b/i;
+const COMPACT = /\b(?:singkat|padat|intinya|sangat\s+ringkas)\b/i;
+// "Ringkas semua yang penting" (no completeness phrase, no ranking word): the normal digest budget, but every item of
+// the head sections gets a line and the answer allowance is BROAD_ANSWER_TOKENS.
+const BROAD = /\b(?:semua|seluruh)\b/i;
+const RANKING = /\b(?:urut\w*|peringkat|ranking|paling menarik|yang menarik|menarik\w*|saring\w*|outstanding\w*)\b/i;
+// "Detail"/"rinci": no top-N ranking; a single day's desk files get the detail digest budget and rich leads.
+const DETAIL = /\b(?:detail\w*|rinci\w*)\b/i;
+// The 24k answer allowance applies only when the material is about 100k tokens or less: a longer answer cannot
+// cover more than that anyway.
+const EXHAUSTIVE_MATERIAL = 180000;
 const NOTE_VERSION = 'source-notes-v1';
 const NOTE_RULES = 'Catat seluruh kejadian berbeda dalam bahan ini: tanggal, angka, satuan, pihak, sumber pernyataan/rumor, pertentangan dan keterbatasan. '
   +'Jangan menyesuaikan dengan pertanyaan pengguna mana pun. Jangan menganggap tanggal laporan sebagai tanggal kejadian. '
@@ -523,7 +551,11 @@ function sourceNoteInstruction(terms, thematic, wholeDocument = false) {
       +'Pertahankan koreksi sumber dan alternatif angka beserta syaratnya; klaim yang dibantah sumber harus ditandai dibantah, bukan menjadi fakta. Jangan menghapus atribusi atau caveat saat memadatkan.' : NOTE_RULES);
 }
 // Up to this size the model reads original passages; only larger material is condensed into notes.
-const RAW_LIMIT = 350000;
+// Claude reads this archive at about 1.7–1.9 bytes per token: 240 KB is about 130k tokens, leaving room
+// in a 200k context for the system prompt, history and the answer (350 KB was about 195k tokens).
+const RAW_LIMIT = 240000;
+// Notes mode: a note is assumed to be about this many bytes when sizing the final answer message.
+const NOTE_BYTES = 8000;
 const ANSWER_RULES = '\nJawab berdasarkan bagian sumber berikut. Tanggal dokumen dan tanggal kejadian dapat berbeda. '
   +'Awali dengan jawaban atau kesimpulan langsung. Jika diminta singkat/padat, maksimal 250 kata kecuali pengguna menentukan panjang lain. '
   +'Untuk ringkasan umum/penemuan kandidat tanpa permintaan cakupan menyeluruh, pilih 3–5 temuan bila didukung bukti: apa temuannya, mengapa material, rujukan, dan batas bukti atau hal berikutnya yang perlu dicek. '
@@ -564,16 +596,34 @@ function textParts(text) {
   }
   return parts;
 }
+// Search material: consecutive records sharing a context become one passage (context sent once, plain text);
+// no per-part counter or event date (a dated row starts with its date). section_id/line locate the first record.
+// `checked` keeps each unit's original text for the number check after the answer.
 function sourceUnits(doc, records) {
-  const units = []; let current = [];
-  for (const row of records) for (const [part,text] of textParts(row.content).entries()) {
-    const value = {source_id:'D1', section_id:row.section_id, source_line:row.line,
-      event_date:row.event_date || null, context:row.context, part:part+1, text};
-    if (current.length && size([...current,value]) > NOTE_LIMIT) { units.push(current); current=[]; }
-    current.push(value);
+  const passages = [], title = String(doc.title || ''); let last = null;
+  // The document title opens every heading chain; the entry already carries it.
+  const local = c => title && (c === title || c.startsWith(title + '\n')) ? c.slice(title.length + 1) : c;
+  for (const row of records) {
+    const context = local(plainContext(row.context)), original = row.original ?? row.content;
+    for (const [part, text] of textParts(row.content).entries()) {
+      if (!part && last && last.value.context === (context || undefined) && last.value.text.length + text.length <= 22000) {
+        last.value.text += (row.start !== undefined && row.start === last.end ? '' : '\n…\n') + text;
+      } else {
+        last = {value:{section_id:row.section_id, line:row.line, ...(context ? {context} : {}), text}, source:[]};
+        passages.push(last);
+      }
+      if (!part) last.source.push(original);
+      last.end = row.end;
+    }
   }
-  if (current.length) units.push(current);
-  return units.map(parts => ({doc, parts}));
+  const units = []; let parts = [], source = [], bytes = 2;
+  for (const {value, source:text} of passages) {
+    const n = size(value) + (parts.length ? 1 : 0);
+    if (parts.length && bytes + n > NOTE_LIMIT) { units.push({doc, parts, checked:source.join('\n')}); parts = []; source = []; bytes = 2; }
+    parts.push(value); source.push(...text); bytes += size(value) + (parts.length > 1 ? 1 : 0);
+  }
+  if (parts.length) units.push({doc, parts, checked:source.join('\n')});
+  return units;
 }
 
 const numberNotice = list => 'Pemeriksaan angka otomatis: ' + list.join(', ')
@@ -720,6 +770,13 @@ export async function converse(archive, model, question, history, emit, signal, 
     {dates:!!request.dates?.length,latest:explicitRequest.latest})) : null;
   if (documents?.length === 0) throw new ChatError('Dokumen percakapan sebelumnya tidak lagi tersedia dalam cakupan ini. Pilih dokumen atau tanggal baru.');
   documents ||= !thematic && !explicitTickers.length ? documentRequest(question,scope,index,request) : null;
+  // A date range with too many documents is answered by code, without a model call.
+  if (documents?.clarification) {
+    stats.document_clarification = true;
+    await emit({type:'sources',sources:[],terms:[],batches:0});
+    await emit({type:'delta',text:documents.clarification});
+    return {answer:documents.clarification,documents:0,batches:0,model:MODEL,clarification:true};
+  }
   let fromModel = !thematic && !documents && !explicitTickers.length;
   const query = thematic || documents ? null : follow && previous?.terms?.length
     ? {intent:follow.intent || 'search',terms:previous.terms} : await searchQuery(question,history,index,model,explicitTickers);
@@ -829,7 +886,7 @@ export async function converse(archive, model, question, history, emit, signal, 
   if (!selected.length && !handleText) throw new ChatError('Belum ditemukan dokumen untuk “' + terms.join(', ') + '”.');
   stats.documents_checked = selected.length;
   stats.baseline_source_bytes = selected.reduce((n,d)=>n+d.sizes.reduce((a,b)=>a+b,0),0);
-  const units=[], thematicGroups=[], docRows=[], docUnits=new Map();
+  const units=[], thematicGroups=[], docRows=[];
   for (const doc of selected) {
     stats.stage='source_index'; stats.current_document=doc.source_id;
     signal?.throwIfAborted();
@@ -840,34 +897,120 @@ export async function converse(archive, model, question, history, emit, signal, 
     if (hit.value.negatedOnly) { stats.negated_only_documents = (stats.negated_only_documents || 0) + 1; continue; }
     const filtered = documents ? {rows:hit.value.rows,excluded:0} : filterRecords(hit.value.rows,scope);
     stats.excluded_dated_records += filtered.excluded;
-    docRows.push({doc,rows:filtered.rows});
+    // rows: original records (counts, names, checks); model: the copy that is sent (search path only).
+    docRows.push({doc,rows:filtered.rows,model:documents || thematic ? filtered.rows : modelRows(doc,filtered.rows,terms,tickers)});
     if(thematic)thematicGroups.push({doc,rows:filtered.rows});
-    else {
-      const own = documents ? documentUnits(doc,filtered.rows) : sourceUnits(doc,filtered.rows);
-      docUnits.set(doc,own); units.push(...own);
-    }
   }
-  // Ticker/handle sections of Stockbit summaries: newest days are read whole up to a byte budget;
-  // older days get one code-built line each from stockbit.json instead of being sent to the model.
-  let listing = null, listedDocs = [];
+  // Budgets count the bytes actually sent. Stockbit summaries (all searches) and, for ticker questions, BEI daily
+  // files and legacy raw Stockbit/KI: newest days are read whole up to a byte budget; older days get one
+  // code-built line each instead of being sent to the model.
+  const listings = [], listedDocs = [];
+  const exhaustive = !!documents && EXHAUSTIVE.test(question) && !COMPACT.test(question), compactWanted = COMPACT.test(question);
+  const broad = !!documents && documents.length > 1 && !exhaustive && !compactWanted && BROAD.test(question) && !RANKING.test(question);
+  const detailWanted = !!documents && !exhaustive && !compactWanted && DETAIL.test(question);
+  let detailDay = false;
   if (!documents && !thematic) {
-    const entries = docRows.filter(r => ['stockbit-ringkasan','stockbit-detail'].includes(r.doc.cat))
-      .map(r => ({doc:r.doc, bytes:(docUnits.get(r.doc) || []).reduce((n,u)=>n+size(u.parts),0)}));
-    const plan = stockbitBudget(entries, STOCKBIT_TICKER_BUDGET);
-    if (entries.length) { stats.stockbit_days_read = plan.read.length; stats.stockbit_days_listed = plan.listed.length; }
-    if (plan.dropped.size) {
-      for (let i = units.length - 1; i >= 0; i--) if (plan.dropped.has(units[i].doc)) units.splice(i,1);
-      for (let i = docRows.length - 1; i >= 0; i--) if (plan.dropped.has(docRows[i].doc)) docRows.splice(i,1);
-      listedDocs = plan.listed.map(l => l.doc);
-      listing = stockbitListing(plan.listed, terms.filter(t => tickers.has(t)), sbHandles, stockbitTable);
+    const sent = r => sourceUnits(r.doc,r.model).reduce((n,u)=>n+size(u.parts),0);
+    const codes = terms.filter(t => tickers.has(t)), rowsOf = new Map(docRows.map(r => [r.doc, r.rows]));
+    const codePatterns = codes.map(c => pattern(c, tickers));
+    const ownCode = row => row.kind === 'issuer_section' ? headingTicker(row.content, tickers) : null;
+    const ownBytes = (rows, code) => rows.filter(row => ownCode(row) === code).reduce((n,row) => n + (row.original ?? row.content).length, 0);
+    // A ticker's own summary section is a subset of the same day's detail section (8.5x larger on average for BEI,
+    // 8.4x for Stockbit): sent once when the detail is read. A detail section not even twice as large is not trusted to contain it.
+    const covers = (r, detailCat) => {
+      const detail = docRows.filter(d => d.doc.cat === detailCat && d.doc.end === r.doc.end).flatMap(d => d.model);
+      return r.model.filter(row => { const code = ownCode(row);
+        return codes.includes(code) && ownBytes(detail, code) >= 2 * ownBytes(r.model, code); });
+    };
+    const drop = (plan) => {
+      for (let i = docRows.length - 1; i >= 0; i--) {
+        const r = docRows[i];
+        if (plan.dropped.has(r.doc)) docRows.splice(i,1);
+        else if (plan.trimmed?.has(r.doc)) {
+          const covered = new Set(r.covered);
+          r.model = r.model.filter(row => !covered.has(row));
+          if (!r.model.length) docRows.splice(i,1);
+        }
+      }
+    };
+    const families = [['stockbit','stockbit-ringkasan','stockbit-detail',STOCKBIT_TICKER_BUDGET,true]];
+    if (codes.length) families.push(['bei','bei-ringkasan','bei-detail',BEI_TICKER_BUDGET,true],
+      ['legacy','stockbit','keterbukaan-informasi',LEGACY_TICKER_BUDGET,false]);
+    for (const [name, a, b, budget, daily] of families) {
+      const members = docRows.filter(r => [a,b].includes(r.doc.cat));
+      if (!members.length) continue;
+      if (daily) for (const r of members) r.covered = r.doc.cat === a && codes.length ? covers(r,b) : [];
+      // Legacy documents: the rows about the ticker (own section, else rows naming it) are the core read first;
+      // `covered` is the rest, dropped when the document is trimmed to its core.
+      const core = new Map();
+      if (!daily) for (const r of members) {
+        const own = r.model.filter(row => codes.includes(ownCode(row)));
+        const named = own.length ? own : r.model.filter(row => row.kind !== 'script' && codePatterns.some(p => p.test(row.content)));
+        core.set(r, {rows:named.length ? named : r.model, own:!!own.length});
+        r.covered = r.model.filter(row => !core.get(r).rows.includes(row));
+      }
+      const entries = members.map(r => ({doc:r.doc, bytes:sent(r), covered:r.covered?.length ? sent({doc:r.doc,model:r.covered}) : 0,
+        ...(core.has(r) ? {core:sent({doc:r.doc, model:core.get(r).rows}), own:core.get(r).own} : {})}));
+      const plan = daily ? familyBudget(entries, budget, b) : docBudget(entries, budget);
+      if (name === 'stockbit') { stats.stockbit_days_read = plan.read.length; stats.stockbit_days_listed = plan.listed.length; }
+      else (stats.family_budgets ||= {})[name] = {read:plan.read.length, listed:plan.listed.length, bytes:plan.used};
+      drop(plan);
+      if (!daily) for (const r of docRows) if (plan.trimmed.has(r.doc)) r.coverage = `Hanya bagian ${codes.join(', ')} dan baris yang menyebutnya dikirim; bagian lain dokumen ini tidak dikirim.`;
+      if (!plan.dropped.size) continue;
+      listedDocs.push(...plan.listed.map(l => l.doc));
+      const listing = name === 'stockbit' ? stockbitListing(plan.listed, codes, sbHandles, stockbitTable)
+        : name === 'bei' ? beiListing(plan.listed, codes, d => rowsOf.get(d)) : legacyListing(plan.listed, codes, d => rowsOf.get(d));
+      if (listing) listings.push(listing);
     }
+    // Ticker questions: official disclosures (BEI, KI, other exchanges) come first, then raw legacy Stockbit reports,
+    // then the Stockbit daily files; selection (date) order within each group. Stockbit user claims are about half
+    // of the bytes and used to open the material, burying the official facts at its end.
+    const rank = r => !codes.length ? 0 : /^stockbit-/.test(r.doc.cat) ? 2 : r.doc.cat === 'stockbit' ? 1 : 0;
+    for (const r of docRows.map((r, i) => [r, i]).sort((x, y) => rank(x[0]) - rank(y[0]) || x[1] - y[1]).map(x => x[0])) {
+      const list = sourceUnits(r.doc,r.model);
+      if (r.coverage && list.length) list[0].coverage = r.coverage;
+      units.push(...list);
+    }
+  } else if (documents) {
+    // Desk files (Stockbit/BEI daily summaries and details) that do not fit the request's budget are read as a
+    // code-built digest: head sections of every day, issuer sections in document order shared across the days, a
+    // listing of the rest (document-material.mjs). Other files are sent whole (model copy) or, above RAW_LIMIT, as notes.
+    // documentFacts and the number check below keep using the full original records (docRows.rows).
+    const desk = docRows.filter(r => DESK_CATS.has(r.doc.cat) && /\.md$/i.test(r.doc.name || ''));
+    detailDay = detailWanted && desk.length > 0 && new Set(desk.map(r => r.doc.start + '/' + r.doc.end)).size === 1;
+    const rich = (broad || detailDay) && !exhaustive;
+    const budget = exhaustive ? DIGEST_BUDGET.exhaustive : compactWanted ? DIGEST_BUDGET.compact
+      : detailDay ? DIGEST_BUDGET.detail : broad ? DIGEST_BUDGET.broad : DIGEST_BUDGET.normal;
+    // A cross-check with a KI/SGX/ASX document reads the desk sections of the issuers that document has its own section for first.
+    const prefer = new Set(docRows.filter(r => !desk.includes(r)).flatMap(r => r.rows.filter(row => row.kind === 'issuer_section')
+      .map(row => headingTicker(row.content, tickers)).filter(Boolean)));
+    if (desk.length) stats.digest_budget = budget;
+    const plan = desk.length ? deskDigest(desk, {budget, exhaustive, tickers, prefer, rich}) : new Map();
+    // A retired KI analysis read next to a BEI daily summary or weekly recap is sent as its head (kiHead); "KI lama"/
+    // "analisis KI" and completeness requests read it whole.
+    const beiNext = docRows.some(x => ['bei-ringkasan','bei-pekan'].includes(x.doc.cat));
+    for (const r of docRows) {
+      if (r.doc.cat === 'keterbukaan-informasi' && beiNext && !exhaustive && !request.kiLegacy && /\.md$/i.test(r.doc.name || '')) {
+        const head = kiHead(r.rows, tickers);
+        stats.ki_head = (stats.ki_head || 0) + 1;
+        units.push(...digestUnits(r.doc, head, r.rows.map(row => row.content).join('')));
+        continue;
+      }
+      const digest = plan.get(r.doc);
+      if (digest) { r.sentCodes = digest.codes; units.push(...digestUnits(r.doc, digest, r.rows.map(row => row.content).join(''))); }
+      else units.push(...documentUnits(r.doc, r.rows, {transform:/\.(md|csv)$/i.test(r.doc.name || '') ? modelText : null}));
+    }
+    const digested = [...plan.values()].filter(d => !d.whole);
+    if (digested.length) stats.document_digest = {budget, documents:digested.length,
+      ...['issuers','full','partial','listed'].reduce((a,k) => ({...a, [k]:digested.reduce((n,d) => n + d.stats[k], 0)}), {})};
   }
+  const listing = listings.length ? {material:listings.map(l => l.material).join('\n\n'), tail:listings.map(l => l.tail).join('\n\n')} : null;
   if(thematic) {
     stats.stage='candidate_selection';
     let groups;
     try {groups=await chooseThematic(thematicGroups,terms,model,cache,stats,emit,MODEL);}
     catch(error){if(error instanceof ChatError)throw error;throw new ChatError('Pemilihan bukti belum berhasil. Persempit jenis hubungan atau coba lagi.');}
-    for(const {doc,rows} of groups)units.push(...sourceUnits(doc,rows));
+    for(const {doc,rows} of groups)units.push(...sourceUnits(doc,modelRows(doc,rows,[],tickers)));
     stats.evidence_documents=groups.length;
   }
   selected = selected.filter(d => docRows.some(r => r.doc === d));
@@ -909,17 +1052,32 @@ export async function converse(archive, model, question, history, emit, signal, 
   // Full-document summaries keep original evidence when it fits the verified
   // model context (1M tokens). This server-only byte cap leaves room for metadata;
   // per-analysis and daily budgets still apply to every request.
-  const documentRaw = !!documents && stats.selected_source_bytes <= 900000;
-  const exhaustive = !!documents && /\b(semua|seluruh|selengkapnya)\b|jangan\s+(?:menghilangkan|hilangkan|hilang|lewatkan)/i.test(question);
-  const answerTokens = documentRaw && exhaustive ? DOCUMENT_ANSWER_TOKENS : ANSWER_TOKENS;
+  // Whole-document requests read original text (model copy, desk digests included) in one call up to RAW_LIMIT
+  // (~130k Claude tokens); above it, non-digest units over 24 KB become notes. The 24k answer allowance applies
+  // only to explicit completeness requests over material of about 100k tokens or less.
+  const documentRaw = !!documents && stats.selected_source_bytes <= RAW_LIMIT;
+  const answerTokens = documentRaw && exhaustive && stats.selected_source_bytes <= EXHAUSTIVE_MATERIAL ? DOCUMENT_ANSWER_TOKENS
+    : documentRaw && (broad || detailWanted) ? BROAD_ANSWER_TOKENS : ANSWER_TOKENS;
   const messageLimit = documentRaw ? LIMITS.documentMessage : LIMITS.message;
   const useNotes = !documentRaw && stats.selected_source_bytes > RAW_LIMIT;
-  stats.evidence_mode=useNotes ? 'source-notes' : 'original-text';
-  if (useNotes && units.filter(u=>size(u.parts)>24000).length > 14) throw new ChatError('Terlalu banyak bahan untuk satu analisis. Persempit topik.');
+  const noteable = (u,i) => size(u.parts)>24000 && !u.digest;
+  if (useNotes && units.filter(noteable).length > 14) throw new ChatError('Terlalu banyak bahan untuk satu analisis. Persempit topik.');
+  // Units over 24 KB become notes, the rest stay original text. When the remaining original text plus the notes would
+  // still exceed RAW_LIMIT (FORU: many 10–24 KB legacy units), the largest remaining search units become notes too.
+  const noted = new Set(useNotes ? units.flatMap((u,i)=>noteable(u,i)?[i]:[]) : []);
+  stats.evidence_mode=noted.size ? 'source-notes' : 'original-text';
+  if (useNotes && !documents) {
+    let raw = units.reduce((n,u,i)=>noted.has(i)?n:n+size(u.parts),0);
+    const order = units.map((u,i)=>[i,size(u.parts)]).filter(([i,n])=>!noted.has(i) && n>NOTE_BYTES*1.5).sort((a,b)=>b[1]-a[1]||a[0]-b[0]);
+    for (const [i,n] of order) {
+      if (raw+noted.size*NOTE_BYTES <= RAW_LIMIT || noted.size >= 14) break;
+      noted.add(i); raw -= n; stats.raw_units_noted = (stats.raw_units_noted || 0) + 1;
+    }
+  }
   const context = new Array(units.length);
   const notePrompts = new Map();
-  const notePlans = await Promise.all(units.map(async ({doc,parts}) => {
-    if (!useNotes || size(parts)<=24000) return null;
+  const notePlans = await Promise.all(units.map(async ({doc,parts},i) => {
+    if (!noted.has(i)) return null;
     const promptId = doc.document_id || doc.path || doc.source_id;
     if (!notePrompts.has(promptId)) {
       const instruction=sourceNoteInstruction(terms,!!thematic,!!documents)
@@ -935,23 +1093,32 @@ export async function converse(archive, model, question, history, emit, signal, 
     // Hold cache hits in this plan: eviction during another request must not turn a
     // planned free read into an unbudgeted model call.
     const saved=cache?.get('notes',key);
-    return {key,messages,bytes:size(messages),saved,pending:!saved};
+    // Topic notes get output room for the unit's size (about 1 token per 30 bytes, 1800–4000) and keep a cut note
+    // instead of re-sending the whole unit at a doubled limit.
+    return {key,messages,bytes:size(messages),saved,pending:!saved,tokens:Math.max(1800,Math.min(4000,Math.ceil(size(parts)/30)))};
   }));
   const uncachedNotes=notePlans.filter(p=>p?.pending);
   // Whole documents are dense: one adequately sized note avoids repeatedly
   // sending the same full source. Divide the available allowance before reading.
   const noteTokens=documents ? Math.max(1800,Math.min(5000,Math.floor(
     (LIMITS.output-(model.output||0)-ANSWER_TOKENS)/Math.max(1,uncachedNotes.length)))) : 1800;
+  if (documents) { for (const p of notePlans) if (p) p.tokens = noteTokens; }
+  else {
+    // Size-based topic notes must still fit the analysis output allowance next to the answer: scale them down
+    // (never below 1800, the former flat size, which always fit 14 notes) instead of rejecting the question.
+    const avail = LIMITS.output-(model.output||0)-answerTokens, want = uncachedNotes.reduce((n,p)=>n+p.tokens,0);
+    if (want > avail) for (const p of uncachedNotes) p.tokens = Math.max(1800, Math.floor(p.tokens*avail/want));
+  }
   const pendingNotes = uncachedNotes.reduce((a,p)=>({input:a.input+p.bytes,
-    output:a.output+noteTokens,calls:a.calls+1}),{input:0,output:0,calls:0});
+    output:a.output+p.tokens,calls:a.calls+1}),{input:0,output:0,calls:0});
   const withAnswer = (extra={}) => ({input:pendingNotes.input+messageLimit+(extra.input||0),
     output:pendingNotes.output+answerTokens+(extra.output||0),calls:pendingNotes.calls+1+(extra.calls||0)});
   model.planReading?.(withAnswer());
   stats.answer_reserved_tokens=answerTokens;
-  stats.note_output_tokens=noteTokens;
+  stats.note_output_tokens=Math.max(noteTokens,...notePlans.map(p=>p?.tokens || 0));
   const releaseNote = plan => {
     if (!plan.pending) return;
-    plan.pending=false; pendingNotes.input-=plan.bytes; pendingNotes.output-=noteTokens; pendingNotes.calls--;
+    plan.pending=false; pendingNotes.input-=plan.bytes; pendingNotes.output-=plan.tokens; pendingNotes.calls--;
   };
   let next=0,completed=0,failure,lastActivity=0;
   const progress = () => emit({type:'progress',completed,total:units.length,
@@ -960,9 +1127,10 @@ export async function converse(archive, model, question, history, emit, signal, 
   const read = async () => {
     while (next < units.length && !failure) {
       const i=next++, {doc,parts}=units[i]; signal?.throwIfAborted();
-      const raw = parts.map(p=>({...p,source_id:doc.source_id}));
-      if (!useNotes || size(parts)<=24000) context[i]={source_id:doc.source_id,title:doc.title,date:doc.label,source_market:doc.path.includes('singapura')?'SGX':doc.path.includes('australia')?'ASX':'IDX/Indonesia',
-        ...(sourceLabel(doc.cat) ? {source_type:sourceLabel(doc.cat)} : {}),raw};
+      // Search passages drop section_id (citations are per document); whole-document parts keep their offsets.
+      const raw = documents ? parts.map(p=>({...p,source_id:doc.source_id})) : parts.map(({section_id,...p})=>p);
+      if (!noted.has(i)) context[i]={source_id:doc.source_id,title:doc.title,date:doc.label,source_market:doc.path.includes('singapura')?'SGX':doc.path.includes('australia')?'ASX':'IDX/Indonesia',
+        ...(sourceLabel(doc.cat) ? {source_type:sourceLabel(doc.cat)} : {}),...(units[i].coverage ? {cakupan_bahan:units[i].coverage} : {}),raw};
       else {
         const plan=notePlans[i];
         const result = plan.saved ? {value:plan.saved,hit:true} : await cacheOnce(cache,'notes',plan.key,async () => {
@@ -970,17 +1138,12 @@ export async function converse(archive, model, question, history, emit, signal, 
           stats.note_reads++;
           let cut = false;
           const notes = await model.complete(plan.messages,
-            {maxTokens:noteTokens,retry:!documents,
+            {maxTokens:plan.tokens,retry:false,
               onActivity:async()=>{if(Date.now()-lastActivity>1000){lastActivity=Date.now();await emit({type:'activity',text:'Mencatat bukti sumber untuk digunakan kembali…'});}},
-              canRetry:maxTokens=>{
-                const allowed=!model.canSpend || model.canSpend(withAnswer({input:plan.bytes,output:maxTokens,calls:1}));
-                if(!allowed)stats.skipped_note_retries=(stats.skipped_note_retries||0)+1;
-                return allowed;
-              },
               onTruncated:()=>{cut=true;}});
           if ([...notes.matchAll(/\[D\d+\]/g)].some(m=>m[0]!=='[D1]')) throw new ChatError('Rujukan catatan tidak sesuai sumber. Silakan coba lagi.');
           // A long catalog (1.535 SGX codes) overflowed the retry and failed the whole answer. The text written so far
-          // is still evidence; it is used once, marked cut, and never cached.
+          // is still evidence; it is used once, marked cut, and never cached (no resend of the unit at a doubled limit).
           if (cut) { stats.truncated_notes = (stats.truncated_notes || 0) + 1;
             return {notes:notes + '\n(Catatan terpotong pada batas panjang; bagian lain unit ini tidak tercatat, bukan berarti tidak ada di dokumen.)', incomplete:true}; }
           return {notes};
@@ -1006,9 +1169,11 @@ export async function converse(archive, model, question, history, emit, signal, 
   // A source reread is optional. Offer it only when both the current answer and
   // the largest permitted reread (two documents, including retries) still fit.
   let canExpand=false;
+  // Only documents read as notes can be re-read whole; digests and original text already reached the model.
+  const notedDocs=new Set(units.filter((u,i)=>noted.has(i)).map(u=>u.doc));
   if(context.some(c=>c.notes)) {
     try {
-      const expansionDocs=[...selected].sort((a,b)=>b.sizes.reduce((n,v)=>n+v,0)-a.sizes.reduce((n,v)=>n+v,0)).slice(0,2);
+      const expansionDocs=[...notedDocs].sort((a,b)=>b.sizes.reduce((n,v)=>n+v,0)-a.sizes.reduce((n,v)=>n+v,0)).slice(0,2);
       const expansionGroups=batches(expansionDocs).length;
       const expansionReads=expansionGroups>1 ? expansionGroups : 0;
       const expansionBytes=expansionDocs.reduce((n,d)=>n+d.sizes.reduce((a,b)=>a+b,0),0);
@@ -1022,28 +1187,53 @@ export async function converse(archive, model, question, history, emit, signal, 
   const instructions = ANSWER_RULES
     +(thematic ? THEMATIC_ANSWER_RULES : '')
     +(canExpand ? 'Jika catatan ringkas tidak cukup untuk pertanyaan, minta pemeriksaan dokumen lengkap dengan menjawab HANYA [[SUMBER:D12]] '
-      +'(ganti D12 dengan ID yang tersedia, maksimal dua ID dipisah koma). Jangan tulis jawaban lain pada permintaan pemeriksaan itu.'
+      +'(ganti D12 dengan ID dokumen bercatatan: '+[...notedDocs].map(d=>d.source_id).join(', ')+'; maksimal dua ID dipisah koma). Jangan tulis jawaban lain pada permintaan pemeriksaan itu.'
       : 'Tulis jawaban dari bahan yang tersedia sekarang. Jika rincian belum tersedia dalam catatan, sebutkan batasnya dan rujuk dokumen asal; jangan meminta pembacaan tambahan.');
   const facts = documents ? documents.map(d=>documentFacts(d,docRows.find(r=>r.doc===d)?.rows||[],tickers)).filter(Boolean).join('\n') : '';
+  // Counts come from the full records; the model copy lists at most 40 codes per count (a daily summary has 400+ sections).
+  const factsText = facts.replace(/\(((?:[A-Z0-9]{2,8}, ){40,}[A-Z0-9]{2,8})\)/g, (m, list) => {
+    const codes = list.split(', ');
+    return '(' + codes.slice(0, 40).join(', ') + `, … dan ${codes.length - 40} kode lain)`;
+  });
   // Official names for the codes in the material; otherwise the model supplies names from memory.
   let names = {}, aliases = {}, plainWords = [];
   try { ({names = {}, aliases = {}, plainWords = []} = (await archive.events?.()) || {}); } catch { /* names are optional */ }
-  const codes = [...new Set(docRows.flatMap(r => r.rows.flatMap(row => row.tickers || [])))].filter(c => names[c]).slice(0, 150);
+  // Only the question's codes and codes with their own issuer section in the sent material, in material order (max 40):
+  // co-mentioned tickers in lists are not worth the tokens, and wrongNames() still checks every name afterwards.
+  const codes = [...new Set([...explicitTickers, ...terms.filter(t => tickers.has(t)),
+    ...docRows.flatMap(r => r.sentCodes || r.model.filter(row => row.kind === 'issuer_section').map(row => headingTicker(row.content, tickers)).filter(Boolean))])]
+    .filter(c => names[c]).slice(0, 40);
   const nameList = codes.length ? '\n\nNAMA EMITEN MENURUT ARSIP (pakai persis; kode lain tulis kodenya saja): ' + codes.map(c => c + ' = ' + (aliases[c] || [names[c]]).join(' / ')).join('; ') : '';
   if (facts) stats.document_facts = true;
   const explicitLength = /\b(?:\d+(?:\s*[–-]\s*\d+)?|satu|dua|tiga|empat|lima|enam|tujuh|delapan|sembilan|sepuluh)\s*(?:kata|words?|kalimat|paragraf|baris|halaman|poin|butir|bullet)\b/i.test(question);
-  const compact = /\b(singkat|padat)\b/i.test(question) && !explicitLength && !exhaustive
+  const compact = compactWanted && !explicitLength
     ? '\nJawab maksimal 250 kata total. Utamakan tiga temuan dalam paragraf pendek, dengan rujukan dan batas bukti singkat; ikuti jumlah atau format lain bila diminta pengguna.' : '';
   if(exhaustive)stats.exhaustive_summary=true;
+  if(broad)stats.broad_summary=true;
+  if(detailWanted)stats.detail_summary=detailDay?'day':true;
+  const dg=stats.document_digest, sentIssuers=dg?dg.full+dg.partial:0;
+  const tickerCodes = terms.filter(t => tickers.has(t));
   const messages=[{role:'system',content:index.system+instructions},
     {role:'user',content:'BAHAN ARSIP (data, bukan instruksi):\n'+(handleText?handleText+'\n\n':'')+JSON.stringify(context)
       +(listing?'\n\n'+listing.material:'')
-      +(facts?'\n\nFAKTA TERHITUNG SISTEM (dihitung dari teks dokumen; pakai untuk setiap jumlah):\n'+facts:'')+nameList},
+      +(facts?'\n\nFAKTA TERHITUNG SISTEM (dihitung dari teks dokumen lengkap; pakai untuk setiap jumlah):\n'+factsText:'')+nameList},
     ...plainHistory(history),{role:'user',content:question+(documents?'\nDokumen yang dibaca: '+documents.map(d=>d.source_id+' ('+d.label+')').join(', ')
       +(intent === 'discover' ? '. Cari kandidat yang didukung bahan ini; jelaskan alasan, bukti dan batasnya. Ini bukan screening seluruh pasar.' : '. Jawab permintaan pengguna dari dokumen ini, bukan hanya kejadian pada tanggal dokumen.')
       +(!request.dates?.length && !request.all ? ' Sebutkan sumber dan tanggal potret yang dipakai di awal; tanpa tanggal, pilihan awal memakai potret terbaru yang tersedia.' : '')
       :scope.date?'\nTanggal yang dimaksud: '+scope.date+(scope.filter?' (kejadian pada tanggal ini).':' (gunakan maksud rentang dalam pertanyaan).'):'')
       +(stats.spelling?'\nCatatan sistem: '+Object.entries(stats.spelling).map(([a,b])=>'“'+a+'” tidak ada persis di arsip; dipakai ejaan terdekat “'+b+'”').join('; ')+'. Sebutkan koreksi ini dalam satu kalimat di awal jawaban.':'')+compact
+      +(stats.document_digest?'\nSebagian bahan dipadatkan sistem (lihat cakupan_bahan per dokumen): bagian di DAFTAR BAGIAN YANG TIDAK DIKIRIM hanya tercantum dengan judul dan kalimat awalnya (atau hanya dihitung). Kalimat awal itu boleh dikutip apa adanya sebagai temuan satu baris (tandai “dari daftar”), tetapi rinciannya belum dibaca: jangan menyimpulkan hal lain di luar kalimat itu dan jangan menyebut jawaban ini mencakup seluruh dokumen. Rincian yang tidak dikirim disebut “tidak termasuk bahan yang dibaca”, bukan “terpotong”, “belum terlihat” atau “tidak ada di sumber”. '
+        +(exhaustive ? 'Masukkan setiap butir Yang berubah, Sorotan dan Jarang disebut tapi material dari setiap hari (gabungkan kejadian yang sama lintas hari). ' : '')
+        +(exhaustive ? 'Setiap bagian emiten yang dikirim dengan aksi korporasi, transaksi pengendali/direksi, kontrak atau kinerja mendapat sekurangnya satu baris; temuan kecil boleh digabung sebagai “Lainnya: KODE fakta [Dn]; …”. ' : '')
+        +'Akhiri dengan satu kalimat cakupan: '
+        +(sentIssuers ? `jawaban memakai bagian pembuka/sorotan tiap hari dan ${sentIssuers} bagian emiten (`
+          +[dg.full ? `${dg.full} utuh` : '', dg.partial ? `${dg.partial} sebagian: bagian awal dan butir utama` : ''].filter(Boolean).join(', ')+')'
+          +(dg.listed ? `; ${dg.listed} bagian emiten lain hanya tercantum di daftar atau dihitung, rinciannya tidak dibaca.` : '.') : 'jawaban hanya memakai bagian pembuka dan sorotan; bagian per emiten tidak dibaca.'):'')
+      +(detailWanted && !explicitLength?'\nPengguna meminta rincian: jangan susun peringkat atau batasi ke beberapa butir teratas. Mulai dengan jumlah pengumuman/emiten/non-rutin/koreksi dari baris Cakupan bila ada. Setiap butir Sorotan dan Yang berubah mendapat satu baris dengan angka/pihaknya (bukan hanya kode). Lalu setiap bagian emiten yang dikirim mendapat satu butir: kejadian, pihak (pembeli/penjual/pelapor), angka, status/persetujuan yang dibutuhkan dan tanggal penting; gabungkan pengumuman rutin atau kecil dalam satu baris “Lainnya”.':'')
+      +(broad && !explicitLength?'\nPengguna meminta semua yang penting dari beberapa hari: kelompokkan menurut jenis (aksi korporasi, dividen/buyback, perubahan kepemilikan/pengendali/pengurus, kebijakan/pasar, rumor material). Setiap butir Sorotan, Yang berubah dan Jarang disebut tapi material tiap hari mendapat satu baris singkat (gabungkan kejadian sama lintas hari), lalu temuan dari bagian emiten yang dikirim. Temuan yang punya angka/pihak di bahan, termasuk kalimat awal di daftar, jangan hanya disebut kodenya.':'')
+      +(documents && !exhaustive && !broad && !compact && !explicitLength && (RANKING.test(question) || documents.length > 1 && !detailWanted)?`\nSusun peringkat temuan paling material lintas dokumen/hari: maksimal ${Math.min(20, Math.max(10, 3 * documents.length))} butir, satu-dua kalimat per butir dengan rujukan dan batas bukti; temuan lain cukup disebut kodenya.`:'')
+      +(!documents && !thematic && tickerCodes.length?'\nUntuk analisis emiten: dahulukan keterbukaan resmi (BEI/KI) sebelum klaim Stockbit. Untuk tiap transaksi resmi yang dibahas pertahankan klasifikasi tertulis (afiliasi/benturan kepentingan/material), penjamin atau tanggung renteng antarperusahaan grup, tujuan dana (mis. pembiayaan kembali) dan angka status proses terakhir (mis. persentase tender per tanggal). Gabungkan klaim Stockbit sejenis dalam satu butir.'
+        +(compact?'':' Bila emiten dibahas lintas hari, sebut setiap hari/dokumen yang membahasnya dalam satu baris (termasuk pertanyaan/rumor kecil; gabungkan yang sama) dan pertentangkan klaim Stockbit dengan status di dokumen resmi/analitik.'):'')
       +(exhaustive?'\nPengguna meminta cakupan seluruh temuan: jangan batasi menjadi 3–5 pilihan. Susun temuan berbeda menurut materialitas dan kekuatan bukti; pertahankan detail angka/tanggal/pihak/status yang tersedia. Gunakan kode saham saja pada judul butir agar tidak menebak nama perusahaan; nama pihak transaksi harus sesuai bahan. Nyatakan bila sebagian rincian belum termuat; jangan menyebut ringkasan ini lengkap tanpa dasar.':'')}];
   if(size(messages)>messageLimit) throw new ChatError('Bahan terlalu panjang. Persempit topik.');
   await emit({type:'status',phase:'answer',text:`Menulis jawaban berdasarkan bukti dari ${selected.length} dokumen…`});
@@ -1061,7 +1251,7 @@ export async function converse(archive, model, question, history, emit, signal, 
   const expansion=answer.trim().match(/^\[\[SUMBER:(D\d+(?:\s*,\s*D\d+)?)\]\]$/);
   if(expansion && canExpand) {
     const ids=new Set(expansion[1].split(',').map(s=>s.trim()));
-    const originals=selected.filter(d=>ids.has(d.source_id));
+    const originals=selected.filter(d=>ids.has(d.source_id) && notedDocs.has(d));
     if(originals.length!==ids.size)throw new ChatError('Permintaan pemeriksaan sumber tidak valid.');
     stats.original_document_reads=originals.length;
     await emit({type:'status',text:'Catatan belum cukup; memeriksa kembali dokumen asal…'});
@@ -1080,7 +1270,8 @@ export async function converse(archive, model, question, history, emit, signal, 
   const invalid=[...cited].filter(id=>!allowed.has(id));
   const notices=[];
   if(invalid.length){stats.invalid_citations=invalid;notices.push('Rujukan '+invalid.join(', ')+' tidak termasuk sumber yang diperiksa untuk jawaban ini; abaikan rujukan tersebut.');}
-  let checked = units.map(u=>u.parts.map(p=>p.text).join('\n')).join('\n')+'\n'+facts+'\n'+handleText+'\n'+(listing?.material || '');
+  // Numbers are checked against the original text, not the model copy (links and ids removed).
+  let checked = units.map(u=>u.checked ?? u.parts.map(p=>p.text).join('\n')).join('\n')+'\n'+facts+'\n'+handleText+'\n'+(listing?.material || '');
   if (stats.original_document_reads) for (const d of selected.filter(d=>cited.has(d.source_id)))
     checked += '\n'+(await archive.read(d.asset)).parts.map(p=>p.text).join('');
   const unchecked = unverifiedNumbers(answer, checked, question);

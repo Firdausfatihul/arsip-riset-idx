@@ -4,6 +4,11 @@ import {pattern} from './retrieval.mjs';
 export const SOURCE_SCHEMA = 'sources-v1';
 const keyOf = (doc, version) => [SOURCE_SCHEMA,version,doc.document_id,doc.document_hash].join(':');
 const quote = text => '"' + text.replaceAll('"','""') + '"';
+// "issuer-passages-v3" is newer than "issuer-passages-v2" (same name, higher number); other names do not compare.
+const newerVersion = (key, active) => {
+  const version = key.split(':')[1] || '', a = version.match(/^(.*-v)(\d+)$/), b = String(active).match(/^(.*-v)(\d+)$/);
+  return !!(a && b && a[1] === b[1] && Number(a[2]) > Number(b[2]));
+};
 export class SourceStore {
   constructor(ctx) {
     this.ctx=ctx;this.sql=ctx.storage.sql;
@@ -16,6 +21,33 @@ export class SourceStore {
     const pending=index.docs.filter(d=>!stored.has(keyOf(d,index.retrieval_version)));
     return {version:index.version,documents:index.docs.length,ready:index.docs.length-pending.length,
       records:index.docs.reduce((n,d)=>n+(stored.get(keyOf(d,index.retrieval_version))||0),0),pending:pending.map(d=>d.document_id)};
+  }
+  // Removes stored documents the active manifest no longer names (an older evidence VERSION or document hash):
+  // without this every version bump keeps the previous copy forever. One transaction per document, so an
+  // interruption leaves only whole documents; running again finishes the rest. Keys of the active manifest are
+  // never touched, and a manifest without documents or a retrieval version removes nothing. Nothing is removed until
+  // every active document is imported, and rows of a newer evidence version are kept: a push that fails half way and
+  // the rollback to the previous copy keep the progress of both versions, so the next push resumes instead of
+  // importing from zero.
+  prune(index) {
+    if(!index?.retrieval_version || !Array.isArray(index.docs) || !index.docs.length)return {removed:0,records:0};
+    if(this.status(index).pending.length)return {removed:0,records:0,deferred:true};
+    const active=new Set(index.docs.map(d=>keyOf(d,index.retrieval_version)));
+    const stale=this.sql.exec('SELECT doc_key FROM source_documents UNION SELECT DISTINCT doc_key FROM source_passages').toArray()
+      .map(r=>r.doc_key).filter(key=>!active.has(key) && !newerVersion(key,index.retrieval_version));
+    let records=0;
+    for(const key of stale) records+=this.ctx.storage.transactionSync(()=>{
+      // source_fts stores its own copy of the text (not external content), so its rows are deleted by rowid.
+      this.sql.exec('DELETE FROM source_fts WHERE rowid IN (SELECT id FROM source_passages WHERE doc_key=?)',key);
+      const n=this.sql.exec('DELETE FROM source_passages WHERE doc_key=? RETURNING id',key).toArray().length;
+      this.sql.exec('DELETE FROM source_documents WHERE doc_key=?',key);
+      return n;
+    });
+    // Deletes leave tombstones in the FTS5 segments. After a version bump (most rows removed) one merge is cheap and
+    // drops them; for a few replaced documents FTS5's own automerge is enough, a full rewrite would stall start-up.
+    const left=this.sql.exec('SELECT COUNT(*) n FROM source_passages').toArray()[0].n;
+    if(records && records>=left)this.sql.exec("INSERT INTO source_fts(source_fts) VALUES('optimize')");
+    return {removed:stale.length,records};
   }
   async importDocument(index, doc, data) {
     const key=keyOf(doc,index.retrieval_version);

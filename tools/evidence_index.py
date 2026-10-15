@@ -1,11 +1,20 @@
 """Lossless source partitions for issuer retrieval; no model, network, or source edits."""
+import csv
 import hashlib
 import html
 from html.parser import HTMLParser
 import re
 
-VERSION = 'issuer-passages-v2'
+VERSION = 'issuer-passages-v3'
 WORD = re.compile(r'\w+', re.UNICODE)
+# Paragraphs split at blank lines; Markdown tables keep one record per row.
+BLOCK = re.compile(r'\n\s*\n|(?<=\n)(?=\|)')
+# A list item starts at column 0 ("- ", "* ", "+ ", "1. ", "1) ", footnote "[^KODE]:"); indented lines (nested items,
+# continuations) stay with it. Blocks up to LIST_SPLIT characters stay whole: a short list is read as one unit,
+# a long one (Ikhtisar emiten, Lampiran pengumuman) would tag one record with hundreds of tickers.
+ITEM_START = re.compile(r'(?:[-*+]|\d{1,3}[.)])[ \t]+\S|\[\^[^\]\s]+\]:')
+ITEM = re.compile(r'(?<=\n)(?=' + ITEM_START.pattern + ')')
+LIST_SPLIT = 1500
 
 
 def digest(text):
@@ -59,7 +68,69 @@ def markdown_ranges(raw, tickers):
     return ranges
 
 
+def csv_delimiter(raw):
+    """The delimiter the viewer uses (build.py): sniffed from the start, else from the header row, else a comma."""
+    text = raw.lstrip('\ufeff')
+    for sample in (text[:65536], text.split('\n', 1)[0]):
+        try:
+            return csv.Sniffer().sniff(sample, delimiters=',;\t').delimiter
+        except csv.Error:
+            pass
+    return ','
+
+
+def csv_rows(raw, delimiter=','):
+    """Row ends outside quoted cells, as the viewer's csvHtml (build.py) parses them: a quote opens a quoted cell
+    only at the start of a cell, "" inside it is an escaped quote, and a row ends at \\n, \\r or \\r\\n."""
+    quoted, ends, cell_start, i, n = False, [], True, 0, len(raw)
+    if raw.startswith('\ufeff'):
+        i = 1
+    while i < n:
+        c = raw[i]
+        if quoted:
+            if c == '"':
+                if raw[i + 1:i + 2] == '"':
+                    i += 1
+                else:
+                    quoted = False
+        elif c == '"' and cell_start:
+            quoted = True
+            cell_start = False
+        elif c == delimiter:
+            cell_start = True
+        elif c in '\r\n':
+            if c == '\r' and raw[i + 1:i + 2] == '\n':
+                i += 1
+            ends.append(i + 1)
+            cell_start = True
+        else:
+            cell_start = False
+        i += 1
+    return ends
+
+
+def fence_spans(text):
+    """[start, end) spans of fenced code blocks (column-0 ``` or ~~~ up to the matching closing fence)."""
+    spans, opened = [], None
+    for m in re.finditer(r'(?m)^(`{3,}|~{3,})[^\n]*$', text):
+        if opened is None:
+            opened = m
+        elif m[1][0] == opened[1][0] and len(m[1]) >= len(opened[1]) and not m.group(0)[len(m[1]):].strip():
+            spans.append((opened.start(), m.end()))
+            opened = None
+    if opened is not None:
+        spans.append((opened.start(), len(text)))
+    return spans
+
+
 def partitions(raw, kind, tickers):
+    if kind == 'csv':
+        # One record per CSV row, like Markdown table rows; the header row is carried as context.
+        bounds = [0] + csv_rows(raw, csv_delimiter(raw)) + [len(raw)]
+        for a, b in zip(bounds, bounds[1:]):
+            if b > a:
+                yield a, b, 'row'
+        return
     if kind == 'html':
         parser = Records(raw)
         parser.feed(raw)
@@ -71,10 +142,17 @@ def partitions(raw, kind, tickers):
         if start > cursor:
             gap = raw[cursor:start]
             # Markdown tables retain individual rows. Context carries their header below.
-            boundaries = [0] + [m.end() for m in re.finditer(r'\n\s*\n|(?<=\n)(?=\|)', gap)] + [len(gap)]
+            boundaries = [0] + [m.end() for m in BLOCK.finditer(gap)] + [len(gap)]
+            fences = fence_spans(gap) if kind == 'md' else []
             for left, right in zip(boundaries, boundaries[1:]):
-                if right > left:
-                    yield cursor + left, cursor + right, 'context'
+                # A "- " line inside a fenced code block is code, not a list item: the fence stays in one record.
+                items = ([m.start() for m in ITEM.finditer(gap, left + 1, right)
+                          if not any(a < m.start() < b for a, b in fences)]
+                         if kind == 'md' and right - left > LIST_SPLIT else [])
+                # Long lists retain individual items, tagged with their own tickers only.
+                for a, b in zip([left] + items, items + [right]):
+                    if b > a:
+                        yield cursor + a, cursor + b, 'list_item' if items and ITEM_START.match(gap, a) else 'context'
         if end > start:
             yield start, end, record_kind
         cursor = end
@@ -82,9 +160,12 @@ def partitions(raw, kind, tickers):
 
 def make_evidence(doc, tickers):
     raw = doc['body']
-    records, headings, table_header = [], [], ''
+    records, headings, table_header, line, previous = [], [], '', 1, 0
     for start, end, kind in partitions(raw, doc['kind'], tickers):
         text = raw[start:end]
+        line, previous = line + raw.count('\n', previous, start), start
+        if kind == 'row' and not records:
+            table_header = text.strip().lstrip('\ufeff')
         heading = (re.match(r'^(#{1,6})\s+([^\n]+)', text) if doc['kind'] == 'md'
                    else re.match(r'<h([1-6])\b[^>]*>(.*?)</h\1>', text, re.S | re.I))
         if heading:
@@ -94,6 +175,10 @@ def make_evidence(doc, tickers):
         if (kind == 'tr' and re.search(r'<th\b', text, re.I)) or (
             doc['kind'] == 'md' and text.lstrip().startswith('|') and not table_header):
             table_header = text.strip()
+        elif doc['kind'] == 'md' and text.strip() and not text.lstrip().startswith('|'):
+            # A table ends at the first non-row record; later paragraphs/items and the next table do not
+            # inherit its header (each list item would repeat it).
+            table_header = ''
         if '</table' in text.lower():
             table_header = ''
         # Tickers are tagged only when written in capitals: NAIK, TRUE, GOLD are also ordinary words.
@@ -104,7 +189,7 @@ def make_evidence(doc, tickers):
         first = re.match(r'^\s*\|?\s*(20\d{2}-\d{2}-\d{2})(?=[ T|\s]|$)', plain)
         event_date = first[1] if first and (kind == 'tr' or text.lstrip().startswith('|')) else None
         records.append({'section_id': digest(text)[:24] + '-' + str(start),
-                        'start': start, 'end': end, 'line': raw[:start].count('\n') + 1,
+                        'start': start, 'end': end, 'line': line,
                         'kind': kind, 'tickers': codes, 'event_date': event_date,
                         'dates_mentioned': sorted(set(re.findall(r'\b20\d{2}-\d{2}-\d{2}\b', plain))),
                         'context': '\n'.join(h for _, h in headings) + ('\n' + table_header if table_header else ''),

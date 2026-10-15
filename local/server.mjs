@@ -289,6 +289,10 @@ async function main() {
     await object.sources.importDocument(index, doc, await object.archive.read(doc.evidence_asset));
     if ((n + 1) % 10 === 0 || n + 1 === status.pending.length) console.log(`Indeks sumber: ${n + 1}/${status.pending.length} dokumen baru.`);
   }
+  // After the import: rows of other versions go only once this version is complete (prune defers itself otherwise),
+  // so a push that fails half way and the rollback to app.old keep both versions' progress.
+  const pruned = object.sources.prune(index);
+  if (pruned.removed) console.log(`Indeks sumber: ${pruned.removed} dokumen versi lama dihapus (${pruned.records} bagian).`);
   console.log(`Indeks sumber siap: ${object.sources.status(index).ready}/${index.docs.length} dokumen.`);
   if (!env.DATACAT_API_KEY) console.log('Mode agen nonaktif: DATACAT_API_KEY tidak ada di .env.chat.');
 
