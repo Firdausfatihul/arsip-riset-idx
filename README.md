@@ -45,6 +45,7 @@ archivescrapingweb/
 ├── tools/build_worker.py # indeks pencarian, bagian sumber, dan indeks emiten untuk Worker
 ├── tools/evidence_index.py # pemisahan sumber tanpa AI, dengan lokasi dan hash isi
 ├── tools/event_index.py  # tabel aksi korporasi per emiten tanpa AI (events.json) untuk pertanyaan screening
+├── tools/archive_tables.py # tabel klaim Stockbit, sebutan lintas emiten, nama, cek rumor, cakupan (tanpa AI) untuk chat
 ├── tools/compare_chat_costs.mjs # pembanding alur lama/baru, simulasi atau API nyata
 ├── tools/chat_metrics.py # laporan biaya aktual melalui endpoint privat
 ├── tools/publish_chat.py # LAMA, manual: deploy Worker Cloudflare + docs/ (tidak dipakai desk/publish_stockbit)
@@ -408,6 +409,32 @@ Percakapan baru. Riwayat model tidak dicatat ke log. Teks pertanyaan pengguna di
   menggagalkan jawaban; jawaban diberi catatan agar rujukan itu diabaikan.
 - Tombol Hentikan memutus koneksi. Server menghentikan pekerjaan setelah mendeteksi pemutusan;
   provider masih dapat mengenakan biaya untuk pekerjaan yang sudah dikirim.
+
+### Tabel arsip: tambahan untuk pertanyaan kode saham, dan rute satu panggilan
+
+`tools/archive_tables.py` (dipanggil `tools/build_worker.py`, tanpa AI) menulis `claims.json` (temuan `sbdetail_*` dengan F-id),
+`subjects.json` (emiten lain yang disebut di bagian emiten BEI/KI: kode huruf kecil tepat di samping "saham/emiten/tbk",
+`(kode)`, nama resmi terpanjang; baris lampiran/PDF dan pengenal `snake_case` dilewati; "transaksi saham" hanya bila kalimatnya
+menyebut "saham", kalimat pinjaman/bank menjadi "kreditur"), `entities.json` (nama persis KSEI/DPS/keterbukaan, alias grup
+tertulis, ejaan mirip, kata nama resmi emiten), `links.json` (cek rumor per kode: didukung/tercatat/tidak dapat dicek/tanpa dasar;
+pemegang KSEI hanya bila namanya disebut, bukan karena persentase mirip, dan hanya bulan KSEI yang lolos validasi; klaim
+bertanggal sesudah bulan KSEI terakhir tidak pernah disebut "bertentangan", hanya "KSEI s.d. <bulan> mencatat …; belum ada data
+KSEI untuk <bulan>", atau "terakhir tercatat >1% <bulan>; tidak lagi >1% s.d. <bulan>"; klaim yang menyebut kode lain lebih dulu
+tidak dicek untuk kode ini) dan `coverage.json`.
+Hash tabel ikut `data_version`, jadi cache jawaban berganti saat tabel berubah. Kode di `worker/tables.mjs`.
+
+- **Pertanyaan kode saham**: alur di atas tidak berubah. Ditambah blok **[A2]**: kode itu disebut di pengumuman emiten lain
+  dalam huruf kecil atau nama resmi (mis. PMUI menulis "grpm"), yang tidak ditemukan pencarian kode peka huruf besar;
+  maks 8 baris per kode, 4 KB; tidak ditambahkan bila pertanyaan menyebut tanggal atau sumber. Untuk 2+ kode dengan kata
+  hubungan ("pengendali yang sama", "hubungan", "afiliasi", "terkait antara", "apakah … terkait"; "berita terkait X" tidak)
+  ditambah **[H]**: nama persis yang tercatat di kedua emiten, bertier kuat/sedang/lemah.
+- **Tanpa kode saham**, satu panggilan jawaban (maks 4.500 token) atas bahan yang disusun kode, berurutan:
+  rumor aksi korporasi yang jarang dibahas ("jarang/sedikit dibahas"); nama pengguna Stockbit (ejaan terdekat hanya untuk
+  pertanyaan tentang pengguna, mis. "ngomongin", "akun", "@", atau satu kata); nama orang/grup/perusahaan yang ada di
+  `entities.json` (kartu nama, kutipan arsip, klaim Stockbit). Nama emiten ("telkom", "adaro"), kode saham sebagai kata
+  ("emas") dan nama yang hanya dikenal sebagian ("Sukanto Tanoto") tetap memakai alur di atas. Di bawah jawaban,
+  kode menambah maks 8 baris "Klaim tercatat lain" yang tidak dibahas. Pertanyaan lanjutan, bertanggal, bersumber
+  tertentu, atau yang tidak cocok rute mana pun tetap memakai alur di atas; lanjutan dari rute nama mencari nama itu.
 
 ### Mode agen (datacat)
 
@@ -792,7 +819,7 @@ node local/server.mjs           # berikutnya; tambah --build setelah ada dokumen
   mode agen ditahan ±64 karakter pertama: bila isinya JSON protokol atau tag transkrip, isinya dibuka bila berupa
   jawaban biasa, atau aliran diakhiri tanpa "stop" sehingga Worker mencoba sekali lagi dengan `tool_choice` none (system
   prompt hanya meminta jawaban teks). Penanda giliran rahasia selalu dibuang dari teks yang dialirkan.
-  Penalaran (thinking): jawaban biasa mengikuti `--effort` (VPS: `max`), tanpa `MAX_THINKING_TOKENS`; panggilan dengan
+  Penalaran (thinking): jawaban biasa mengikuti `--effort` (bawaan `medium`), tanpa `MAX_THINKING_TOKENS`; panggilan dengan
   `reasoning {enabled:false}` (catatan, mode JSON, langkah dan jawaban mode agen) memakai `--thinking disabled`.
   `CLAUDE_CODE_MAX_OUTPUT_TOKENS` = anggaran teks Worker + 64.000 ruang thinking, supaya thinking tidak menghabiskan jawaban;
   teks jawaban tetap dihentikan sebagai "length" di ±8 karakter per token anggaran. Uji Haiku effort max: satu pertanyaan
@@ -811,7 +838,7 @@ node local/server.mjs           # berikutnya; tambah --build setelah ada dokumen
   biaya ditagih (US$0, langganan) dan estimasi harga daftar API menurut Claude Code (`total_cost_usd`).
   Batas pemakaian langganan dipetakan ke 429 (pesan "sedang membatasi"), bahan terlalu panjang ke 413.
 - Biaya per panggilan dicatat 0 (langganan); jumlah token tetap dicatat. Batas langganan Claude (jendela 5 jam) tetap berlaku.
-- Pilihan: `--model sonnet|opus|haiku` (bawaan `sonnet`), `--effort low|medium|high` (bawaan `low`), `--concurrency 3`
+- Pilihan: `--model sonnet|opus|haiku` (bawaan `sonnet`), `--effort low|medium|high` (bawaan `medium`), `--concurrency 3`
   (proses `claude` bersamaan), `--port 8017`. Env: `ARSIP_CLAUDE_MODEL`, `ARSIP_CLAUDE_EFFORT`, `ARSIP_CLAUDE_CONCURRENCY`,
   `ARSIP_CLAUDE_BIN`, `ARSIP_PORT`, `ARSIP_CLAUDE_CACHE_TTL` (`5m` bawaan atau `1h`), `CHAT_AGENTIC_DAILY` (bawaan lokal 100).
 - Mode agen aktif bila `DATACAT_API_KEY` ada di `.env.chat`. Hanya ini yang keluar ke layanan lain selain Claude:
@@ -843,7 +870,7 @@ node local/vps.mjs setup --host <ip> --domain arsip.seekingomega.capital --host-
 node local/vps.mjs bootstrap   # root: zona Asia/Jakarta, Node 22.17.1 (checksum), Caddy, swap, user arsip, Claude Code, systemd
 node local/vps.mjs login       # interaktif di Terminal: claude auth login --claudeai sebagai user arsip (buka URL, tempel kode)
 node local/vps.mjs push        # salin kode + arsip + key, build, kunci mesin (pertama kali), jalankan; ulangi setelah ada dokumen baru
-node local/vps.mjs setup --model haiku --effort max && node local/vps.mjs apply   # ganti model/effort tanpa build ulang
+node local/vps.mjs setup --model sonnet --effort medium && node local/vps.mjs apply   # ganti model/effort tanpa build ulang
 node local/vps.mjs status | logs [--follow] | password
 ```
 

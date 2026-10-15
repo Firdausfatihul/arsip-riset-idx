@@ -228,7 +228,7 @@ function setup(opt) {
   const old = existsSync(CONFIG) ? JSON.parse(readFileSync(CONFIG, 'utf8')) : null;
   const config = {version:1, host:opt.host || old?.host, domain:(opt.domain || old?.domain || '').toLowerCase(),
     ssh_user:opt['ssh-user'] || old?.ssh_user || 'ubuntu', ssh_port:Number(opt['ssh-port'] || old?.ssh_port || 22),
-    host_key:opt['host-key'] || old?.host_key, model:opt.model || old?.model || 'sonnet', effort:opt.effort || old?.effort || 'low',
+    host_key:opt['host-key'] || old?.host_key, model:opt.model || old?.model || 'sonnet', effort:opt.effort || old?.effort || 'medium',
     secret:old?.secret, password:old?.password};
   serverEnv(config);
   validate({vps:config.host, domain:config.domain, sshPort:config.ssh_port, sshUser:config.ssh_user});
@@ -341,7 +341,7 @@ async function push(opt) {
 }
 
 // Server settings for the systemd unit (EnvironmentFile). Validated like local/server.mjs options.
-export function serverEnv({model = 'sonnet', effort = 'low'} = {}) {
+export function serverEnv({model = 'sonnet', effort = 'medium'} = {}) {
   if (!/^[a-z0-9.\[\]-]+$/i.test(model)) throw new Error('--model tidak valid.');
   if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(effort)) throw new Error('--effort harus low, medium, high, xhigh, atau max.');
   return `ARSIP_CLAUDE_MODEL=${model}\nARSIP_CLAUDE_EFFORT=${effort}\n`;
@@ -392,7 +392,7 @@ function password() {
 
 function apply() {
   const config = read();
-  console.log(`Model ${config.model || 'sonnet'}, effort ${config.effort || 'low'}.`);
+  console.log(`Model ${config.model || 'sonnet'}, effort ${config.effort || 'medium'}.`);
   sendSecrets(config);
   restart(config);
 }

@@ -56,7 +56,7 @@ export function options(argv, env = process.env) {
   const opt = {pin:!!(seen['--pin'] || seen['--repin']), repin:!!seen['--repin'], allowLan:!!seen['--allow-lan'],
     build:!!(seen['--build'] || seen['--build-only'] || seen['--pin'] || seen['--repin']), buildOnly:!!seen['--build-only'],
     port:Number(seen['--port'] ?? env.ARSIP_PORT ?? 8017), host:seen['--host'] ?? env.ARSIP_HOST ?? '127.0.0.1',
-    model:seen['--model'] ?? env.ARSIP_CLAUDE_MODEL ?? 'sonnet', effort:seen['--effort'] ?? env.ARSIP_CLAUDE_EFFORT ?? 'low',
+    model:seen['--model'] ?? env.ARSIP_CLAUDE_MODEL ?? 'sonnet', effort:seen['--effort'] ?? env.ARSIP_CLAUDE_EFFORT ?? 'medium',
     concurrency:Number(seen['--concurrency'] ?? env.ARSIP_CLAUDE_CONCURRENCY ?? 4)};
   if (!Number.isSafeInteger(opt.port) || opt.port < 1 || opt.port > 65535) throw new Error('Port tidak valid.');
   if (!Number.isSafeInteger(opt.concurrency) || opt.concurrency < 1 || opt.concurrency > 8) throw new Error('--concurrency harus 1 sampai 8.');

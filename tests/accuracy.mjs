@@ -144,14 +144,34 @@ test('zero-hit model terms get one retry with other wording, never repeating the
 });
 
 test('when model terms and the retry both miss, the user\'s own distinctive words are searched', async () => {
-  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
+  // Without the archive tables, so the search path's last resort is exercised (the entity route would answer first).
+  const assets = {fetch:async r => {
+    const path = new URL(r.url).pathname, raw = await readFile(new URL('../worker/.assets' + path, import.meta.url));
+    if (path !== '/manifest.json') return new Response(raw);
+    const {tables, ...rest} = JSON.parse(raw);
+    return new Response(JSON.stringify(rest));
+  }};
   const replies = ['{"terms":["Tanoto Foundation"]}', '{"terms":[]}'];
   const model = {complete:async () => replies.shift(), answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
   const stats = {};
   // Lowercase, so the capitalised-name guard does not apply and the last-resort path is exercised.
   const result = await converse(new Archive(assets), model, 'tanoko?', [], () => {}, null, {metrics:stats});
+  assert.equal(stats.route, undefined);
   assert.deepEqual(result.terms, ['tanoko']);
   assert.equal(result.documents, 2);
+});
+
+test('a name the model would "correct" (tanoko -> Tanoto) is found by exact name in the archive tables, without a term call', async () => {
+  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
+  const replies = ['{"terms":["Tanoto Foundation"]}', '{"terms":[]}'];
+  const model = {complete:async () => replies.shift(), answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
+  const stats = {};
+  // Lowercase: "tanoko" counts as a name because the archive writes it capitalised (entities.json namelike).
+  const result = await converse(new Archive(assets), model, 'tanoko?', [], () => {}, null, {metrics:stats});
+  assert.equal(stats.route, 'entity');
+  assert.deepEqual(result.terms, ['tanoko']);
+  assert.equal(replies.length, 2, 'no term call');
+  assert.ok(result.documents >= 2);
 });
 
 const events = await read('events.json');
