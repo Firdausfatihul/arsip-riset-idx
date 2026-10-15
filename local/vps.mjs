@@ -290,7 +290,7 @@ export function carryState(from = 'app', to = 'app.new') {
     + `&& mv ${to}/.local/boundary.key.tmp ${to}/.local/boundary.key; fi; `;
 }
 
-// The other push steps, run in /srv/arsip as the arsip user (tests/vps_swap.mjs runs them on a temp folder).
+// The other push steps, run in /srv/arsip as the arsip user (tests/vps_push.mjs runs them on a temp folder).
 // Build the new copy while the old server keeps serving. The machine lock is pinned on the first push only; it is
 // bound to this Tencent instance and the Jakarta region, so a copied disk never matches without --repin.
 export const buildScript = ({repin = false, node = NODE} = {}) => carryState()

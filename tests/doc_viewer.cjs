@@ -1,4 +1,4 @@
-// Offline DOM regressions for the Markdown document viewer (APP_JS in build.py): #doc= routing and &s= jumps,
+// Offline DOM regressions for the Markdown document viewer (app.js): #doc= routing and &s= jumps,
 // contents from H2 or H1, issuer badges and the Emiten grid, "Label: isi" facts, schedules, lazy documents with
 // "Coba lagi", search counts and <mark>, and the source buttons. Builds tests/helpers/doc_fixture.py into a temp
 // folder; never the real archive or network. Run: NODE_PATH=/path/to/test-deps/node_modules node tests/doc_viewer.cjs

@@ -14,7 +14,7 @@ from build_fixture import build, build_site  # noqa: E402
 
 MTIME = datetime(2026, 10, 1, 12).timestamp()  # the date of names without one (fallback; avoid in real names)
 
-# (file name, category, start, end, label): the naming table in README/AGENTS, checked through build.main().
+# (file name, category, start, end, label): the naming table in AGENTS.md §3, checked through build.main().
 RULES = [
     ("sbringkas_2026-10-05_2026-10-05.md", "stockbit-ringkasan", "2026-10-05", "2026-10-05", "5 Oktober 2026"),
     ("sbdetail_2026-10-05_2026-10-05.md", "stockbit-detail", "2026-10-05", "2026-10-05", "5 Oktober 2026"),

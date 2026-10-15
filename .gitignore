@@ -13,7 +13,7 @@ __pycache__/
 reports/
 /output/
 
-# Hasil build lokal (GitHub Pages memakai docs/)
+# Hasil build lokal (docs/ di-commit sebagai riwayat)
 site/
 .stockbit-publish/
 
