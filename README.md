@@ -633,8 +633,7 @@ node --test tests/worker.mjs tests/security.mjs tests/cache.mjs tests/source-sto
 NODE_PATH=/path/to/test-deps/node_modules node tests/chat_ui.cjs
 ```
 
-Jangan menjalankan flood/attack test pada URL publik. Lihat `SECURITY_REVIEW.md` untuk
-cakupan, bukti, dan batas audit.
+Jangan menjalankan flood/attack test pada URL publik. Invarian keamanan yang dijaga tes ada di `AGENTS.md`.
 
 ### Riwayat: Cloudflare Worker
 
@@ -1061,7 +1060,7 @@ Membuka `site/index.html` langsung dengan dobel klik (`file://`) juga bisa, tapi
 
 ## Audit web dan data
 
-Lihat [laporan audit web](reports/security-audit-web-2026-09-20.md). Jalankan hanya di salinan terisolasi tanpa secret:
+Invarian dari audit web 20 September 2026 ada di `AGENTS.md`. Jalankan hanya di salinan terisolasi tanpa secret:
 
 ```bash
 python3 -B -m unittest discover -s tests -p test_sync_security.py

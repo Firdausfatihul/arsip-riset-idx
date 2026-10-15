@@ -9,7 +9,8 @@ worker/.wrangler/
 .wrangler/
 node_modules/
 __pycache__/
-reports/private/
+# Laporan lokal (evaluasi lama ada di riwayat git; reports/private/ berisi statistik privat)
+reports/
 /output/
 
 # Hasil build lokal (GitHub Pages memakai docs/)
