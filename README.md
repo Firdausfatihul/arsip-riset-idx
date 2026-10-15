@@ -100,7 +100,6 @@ Tanggal dibaca dari nama file, dengan urutan percobaan:
 python3 build.py                                   # output ke ./site
 python3 build.py --out docs                        # output ke folder lain (mis. untuk GitHub Pages /docs)
 BASE_URL=https://arsip.contoh.com python3 build.py # + <link rel=canonical> dan sitemap.xml absolut
-python3 build.py --fragment-index /tmp/artifact/index.html   # versi index tanpa <html>/<head>/<body>, khusus Claude Artifact
 ```
 
 Folder `--out` dibuat ulang. Build menolak symlink, akar proyek, folder yang beririsan dengan sumber, dan folder berisi data yang tidak dikenali sebagai hasil build arsip. Pemeriksaan ini membantu mencegah salah tujuan; penanda build bukan bukti bahwa semua file di folder boleh dibuang. Jangan arahkan ke folder yang berisi file lain. File `CNAME` yang sudah ada dipertahankan agar domain GitHub Pages tidak hilang.
@@ -117,7 +116,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
 - `.md`/`.csv` di atas 256 KB (digest besar; digest kecil tetap tertanam) **tidak ditanam**: viewer mengambil `files/…`
   dengan `fetch()` saat dokumen dibuka, dan mengambil semuanya (3 sekaligus) saat kotak cari pertama kali diisi ≥2 huruf.
   Selama itu catatan cari menulis "memuat isi N dokumen besar…". Yang gagal dimuat bisa dicoba lagi lewat tombol **Coba lagi**, saat dibuka ulang, atau saat mencari ≥30 detik kemudian.
-  Ini jalan di server HTTP dan Claude Artifact. Dari `file://` (dobel klik) dokumen besar tidak bisa dibuka atau dicari; dokumen kecil tetap jalan.
+  Ini jalan di server HTTP. Dari `file://` (dobel klik) dokumen besar tidak bisa dibuka atau dicari; dokumen kecil tetap jalan.
 - Library dari CDN (versi dikunci): `marked@15.0.7` (parser Markdown) dan `dompurify@3.4.15` (sanitasi) dari `cdnjs.cloudflare.com`.
   Kalau CDN gagal dimuat, dokumen tetap tampil sebagai teks mentah (`<pre>`).
 - Font dari Google Fonts: IBM Plex Sans / Sans Condensed / Mono. Kalau gagal, pakai font sistem.
@@ -211,18 +210,7 @@ Cek baris ini untuk memastikan kategori dan tanggal terbaca benar.
 - HTML lama ditempatkan utuh dalam `srcdoc` dengan `sandbox="allow-scripts allow-popups"`, tanpa `allow-same-origin`. Pembungkus tepercaya menyediakan navigasi kembali dan pesan pencarian. Laporan tidak mendapat akses DOM/storage halaman utama. Tautan tanggal dan salin nomor postingan tetap tersedia; jika clipboard tidak tersedia, nomor tampil sebagai teks yang dapat dipilih.
 - CSP melalui meta membatasi skrip ke hash hasil build/CDN yang dikunci, koneksi ke situs dan API chat, serta memblokir form/object. Markdown hanya mengizinkan tag baca dan tautan HTTP(S)/anchor; style/form/SVG/media dibuang. Referrer dimatikan. CSP meta tidak menyediakan HSTS atau perlindungan `frame-ancestors`.
 - Data kepemilikan divalidasi sebelum dirender: versi/skema, tipe angka, indeks investor, ticker unik, rentang tanggal, serta batas jumlah baris. Data rusak menampilkan pesan gagal dan tombol coba lagi.
-- **Pengunjung** (hanya jalan di Claude Artifact; di host lain angka tidak tampil, halaman tetap normal):
-  - *Pengunjung lalu*: kemampuan `db`. Satu dokumen per browser di `visitors/<id-acak-localStorage>` dengan
-    `pages.<kunci-halaman> = {count, first, last}`. Angka = jumlah browser unik yang pernah membuka halaman itu,
-    dan tooltip menampilkan total kali dibuka. Kunci halaman = nama file huruf kecil (`[^a-z0-9_-]` → `-`), beranda = `home`.
-    **Jangan ganti nama file**, karena hitungannya akan mulai dari nol. Kapasitas db 5.000 dokumen, artinya ±5.000 browser unik.
-  - *Pengunjung aktif*: kemampuan `room`, presence `{page: <kunci>}`. Dihitung per tab, tidak disimpan.
-  - Saat publish ulang lewat Artifact tool, **tidak perlu** mengirim `capabilities` lagi (deklarasi `db` + `room` tersimpan).
-    Mengirim `capabilities: {}` akan mematikan fitur ini.
-
-Batas yang perlu diingat (per 15 Sep 2026: 41 dokumen + kepemilikan 963 emiten, `index.html` ±2,4 MB, `files/` ±16 MB):
-- Claude Artifact: halaman dan tiap berkas maks 16 MB, maks 255 berkas, **maks 64 MB per versi**. Digest bertambah ±2 MB per minggu,
-  jadi batas 64 MB tercapai dalam beberapa bulan. Saat itu pindah ke host B/C, atau buang digest lama dari sumber.
+Batas yang perlu diingat:
 - Dokumen 2 MB butuh beberapa detik untuk dirender pertama kali (parse Markdown + DOM besar).
 
 ## Percakapan arsip dengan Qwen3.7 Flash
@@ -821,7 +809,6 @@ ke `needtobeindexed/idx-signal-desk/`, lalu menjalankan `build.py` kalau ada yan
 python3 tools/sync_idx.py                 # sekali
 python3 tools/sync_idx.py --ownership-only # perbarui kepemilikan saja, tanpa merender ulang digest
 python3 tools/sync_idx.py --watch 15      # tiap 15 menit, biarkan jalan di tab Terminal
-python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # sekalian siapkan publish Artifact
 ```
 
 - `digest_<awal>_<akhir>[_HHMM-HHMM].md` (**dipensiunkan**; hanya dengan `--with-digests`): satu per jendela di *Library → Summary
@@ -855,9 +842,8 @@ python3 tools/sync_idx.py --fragment-index <scratchpad>/artifact/index.html   # 
 - Sinkron menyusun hasil di direktori sementara terlebih dahulu. Penjagaan profil dan keberhasilan seluruh pengambilan diperiksa sebelum menulis tujuan. Perubahan bersamaan pada tujuan membatalkan commit; kegagalan commit biasa dipulihkan dari snapshot. Ini bukan transaksi atomik terhadap mati listrik/SIGKILL di tengah beberapa berkas. Berkas sementara memakai nama acak dan tujuan symlink ditolak.
 - HTTP hanya diizinkan untuk loopback; server jauh harus HTTPS, tanpa kredensial di URL dan tanpa redirect. Respons maksimal 32 MB. Path ledger lokal hanya dipakai untuk server loopback dan SQLite dibuka read-only.
 - Exit code: 0 ok, 1 server tidak bisa dihubungi / HTTP error / data tak terduga / ekspor Stockbit ditolak, 2 profil beda, 3 build gagal.
-  Mode `--watch` terus jalan walau satu putaran gagal. Dengan `--fragment-index`, build selalu dijalankan supaya fragment Artifact ikut kode terbaru.
-- Publish ke Artifact tetap lewat Claude Code (skrip tidak bisa memanggil tool Artifact): minta "publish" setelah sinkron.
-  Untuk host yang bisa di-deploy dari skrip (Cloudflare Pages dll.), jalankan perintah deploy setelah sinkron.
+  Mode `--watch` terus jalan walau satu putaran gagal.
+- Situs live diperbarui dengan `node local/vps.mjs push` (atau publish dari desk) setelah sinkron.
 
 ### Ringkasan Stockbit Ideas (`--stockbit-only`, publish sekali klik, rollback)
 
@@ -1013,29 +999,6 @@ python3 -B tools/sync_idx.py --with-bei                              # sinkron b
 
 Semua opsi di bawah cukup memakai **isi folder `site/`** (dengan `index.html` di root).
 
-### A. Claude Artifact (host saat ini, privat, butuh login claude.ai)
-
-URL saat ini: https://claude.ai/artifact/6GLPJkECXVVEUdim73AQug
-
-Langkah untuk Claude Code:
-1. **Baca setiap file baru atau berubah di `needtobeindexed/` sebelum publish** (aturan tool Artifact: jangan publish isi yang belum dibaca).
-   Berkas `idx-signal-desk/` besar (±16 MB); bagi ke beberapa subagent pembaca bila perlu.
-2. `python3 build.py --fragment-index <scratchpad>/artifact/index.html`
-3. Panggil tool `Artifact` (publish):
-   - `file_path`: fragment tadi (bukan `site/index.html`, karena Artifact membungkus sendiri dengan `<html><head><body>`)
-   - `url`: URL di atas, supaya link tetap sama. Kalau artifact sudah dihapus, jangan isi `url`, lalu isi `favicon: "🗂️"`.
-   - `files`: satu entri per file di `site/files/`, dengan path publish = path relatif yang sama:
-     ```json
-     {
-       "files/keterbukaan-informasi/2026-09-15/ki_20260915.md": {"from": "site/files/keterbukaan-informasi/2026-09-15/ki_20260915.md", "contentType": "text/plain"},
-       "files/stockbit/2026-09-13/stockbit_review_2026-09-13_14.html": "site/files/stockbit/2026-09-13/stockbit_review_2026-09-13_14.html"
-     }
-     ```
-     `.md` **wajib** `"contentType": "text/plain"` (persis, tanpa `; charset=...`). Selain itu publish ditolak.
-     `files/kepemilikan/*.json` (kepemilikan, kepemilikan-laporan, kepemilikan-perubahan, harga) pakai `"contentType": "application/json"`.
-     File yang sudah dihapus dari sumber harus dikirim sebagai `null` supaya ikut hilang.
-4. Kalau mau diindeks mesin pencari, jangan pakai opsi ini karena artifact privat. Pakai B/C/D.
-
 ### B. GitHub Pages (gratis, publik)
 
 ```bash
@@ -1077,7 +1040,7 @@ Membuka `site/index.html` langsung dengan dobel klik (`file://`) juga bisa, tapi
    Data Signal Desk: jangan disalin manual, jalankan `python3 tools/sync_idx.py`.
 2. `python3 build.py`, lalu cek baris output: kategori dan tanggal benar, bukan "Lainnya" dan bukan tanggal mtime.
 3. Opsional: buka `site/index.html` dan cek dokumen baru tampil dan pencarian menemukannya.
-4. Deploy ulang ke host yang dipakai (A/B/C/D). Untuk Artifact, publish ke `url` yang sama dan sertakan semua file di `site/files/`.
+4. Deploy ulang: `node local/vps.mjs push` (VPS), atau host statis B/C/D.
 
 ## Troubleshooting
 
@@ -1088,7 +1051,6 @@ Membuka `site/index.html` langsung dengan dobel klik (`file://`) juga bisa, tapi
 | Tanggal salah / hari ini | Tidak ada pola tanggal di nama file, jadi dipakai mtime. Tambahkan `YYYYMMDD` ke nama. |
 | Dokumen tampil sebagai teks mentah | CDN `cdnjs.cloudflare.com` diblokir / offline. Tunggu koneksi, atau ganti URL `LIBS` di `build.py`. |
 | Ticker/daftar emiten tidak muncul | Heading harus `### KODE`, `### 1. KODE`, atau `### 01. KODE — Judul` (kode 4 huruf kapital). |
-| Artifact publish error `contentType … not servable` | Untuk `.md` pakai `"text/plain"` persis. |
 | Tab Kepemilikan Saham tidak muncul | `needtobeindexed/idx-signal-desk/kepemilikan.json` belum ada. Jalankan `python3 tools/sync_idx.py`. |
 | "Data kepemilikan tidak bisa dimuat" | Dibuka dari `file://`, atau `files/kepemilikan/kepemilikan.json` tidak ikut di-upload. |
 | Dokumen besar macet di "Memuat dokumen…" | Dibuka dari `file://`, atau `files/…` tidak ikut di-upload. Buka lewat server / sertakan semua `site/files/`. |

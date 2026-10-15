@@ -3,7 +3,6 @@
 
     python3 tools/sync_idx.py                  # sekali: sinkron, build kalau ada yang berubah
     python3 tools/sync_idx.py --watch 15       # ulangi tiap 15 menit sampai Ctrl+C
-    python3 tools/sync_idx.py --fragment-index /tmp/artifact/index.html   # build juga versi Artifact
     python3 tools/sync_idx.py --stockbit-only --no-build                  # hanya ringkasan Stockbit
     python3 tools/sync_idx.py --stockbit-only --with-bei --no-build       # Stockbit + BEI satu staging (dipakai publish_stockbit.py)
     python3 tools/sync_idx.py --bei-only --no-build                       # hanya ringkasan keterbukaan BEI
@@ -1934,11 +1933,8 @@ def sync_once(args):
         return changed
 
 
-def build(args):
-    cmd = [sys.executable, str(ROOT / "build.py")]
-    if args.fragment_index:
-        cmd += ["--fragment-index", str(args.fragment_index)]
-    result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
+def build():
+    result = subprocess.run([sys.executable, str(ROOT / "build.py")], cwd=ROOT, capture_output=True, text=True)
     lines = result.stdout.strip().splitlines()
     if result.returncode:
         print(result.stdout + result.stderr, file=sys.stderr)
@@ -1977,10 +1973,9 @@ def run(args):
         return 1
     if args.no_build:
         return 0
-    # Fragment Artifact selalu ditulis ulang kalau diminta, supaya selalu sesuai build.py terbaru.
-    if changed or args.build or args.fragment_index or not (ROOT / "site" / "index.html").exists():
+    if changed or args.build or not (ROOT / "site" / "index.html").exists():
         try:
-            build(args)
+            build()
         except RuntimeError as e:
             print(e, file=sys.stderr)
             return 3
@@ -1996,7 +1991,6 @@ def main():
     ap.add_argument("--build", action="store_true", help="build walau tidak ada perubahan")
     ap.add_argument("--no-build", action="store_true", help="hanya salin berkas")
     ap.add_argument("--ownership-only", action="store_true", help="hanya sinkron data kepemilikan; digest dan statusnya dipertahankan")
-    ap.add_argument("--fragment-index", type=Path, help="teruskan ke build.py (versi index untuk Claude Artifact)")
     ap.add_argument("--stockbit-only", action="store_true",
                     help="hanya ringkasan Stockbit (sb*.md + stockbit-index.json); tanpa profil, digest, atau kepemilikan")
     ap.add_argument("--with-stockbit", action="store_true", help="setelah sinkron biasa, jalankan juga sinkron Stockbit")

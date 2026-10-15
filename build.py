@@ -453,8 +453,8 @@ def load_doc(path, index):
         title, desc, codes = md_info(text) if kind == "md" else html_info(text)
     doc = {
         "id": f"d{index}",
-        # Kunci stabil untuk statistik pengunjung (tidak berubah walau urutan file berubah).
-        "key": re.sub(r"[^a-z0-9_-]+", "-", path.name.lower()).strip("-"),
+        # Nama di files/ tanpa beda huruf besar-kecil; harus unik (disk macOS tidak membedakannya). Tidak masuk payload.
+        "_key": re.sub(r"[^a-z0-9_-]+", "-", path.name.lower()).strip("-"),
         "path": f"files/{category}/{start.isoformat()}/{path.name}",
         "name": path.name,
         "kind": kind,
@@ -541,7 +541,7 @@ def with_nav_bar(doc):
 CSS = """
 :root{
   --ground:#f2f5f3;--surface:#ffffff;--ink:#15201c;--muted:#56645e;--faint:#617067;
-  --line:#d7dfdb;--line-strong:#b5c1bb;--focus:#1f5fcc;--mark:#ffe27a;--mark-ink:#15201c;--live:#138a52;
+  --line:#d7dfdb;--line-strong:#b5c1bb;--focus:#1f5fcc;--mark:#ffe27a;--mark-ink:#15201c;
   --sb:#08744f;--sb-soft:#e0f0e8;--kip:#a3372a;--kip-soft:#f6e5e1;--etc:#56645e;--etc-soft:#e6ebe8;
   --dg:#1f5a96;--dg-soft:#e1ebf6;--asx:#6849a3;--asx-soft:#eee8f8;--own:#7a4f0d;--own-soft:#f5ead8;--up:#12804c;--down:#b3321f;
   --sgx:#096b7a;--sgx-soft:#e0f0f3;
@@ -553,14 +553,14 @@ CSS = """
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --ground:#0d1311;--surface:#131a17;--ink:#e1e8e4;--muted:#b2beb8;--faint:#9aa9a1;
-  --line:#243029;--line-strong:#3a4842;--focus:#86adff;--mark:#6b5715;--mark-ink:#fff6d6;--live:#46d18a;
+  --line:#243029;--line-strong:#3a4842;--focus:#86adff;--mark:#6b5715;--mark-ink:#fff6d6;
   --sb:#4cc496;--sb-soft:#132a20;--kip:#ee8b7d;--kip-soft:#301b17;--etc:#9eaca6;--etc-soft:#1d2622;
   --dg:#7fb2ec;--dg-soft:#16222f;--asx:#c7a9f5;--asx-soft:#2a2139;--own:#e0b25c;--own-soft:#2c2213;--up:#4fd394;--down:#f08a7a;
   --sgx:#6dcbdc;--sgx-soft:#142b30;
 }}
 :root[data-theme="dark"]{
   --ground:#0d1311;--surface:#131a17;--ink:#e1e8e4;--muted:#b2beb8;--faint:#9aa9a1;
-  --line:#243029;--line-strong:#3a4842;--focus:#86adff;--mark:#6b5715;--mark-ink:#fff6d6;--live:#46d18a;
+  --line:#243029;--line-strong:#3a4842;--focus:#86adff;--mark:#6b5715;--mark-ink:#fff6d6;
   --sb:#4cc496;--sb-soft:#132a20;--kip:#ee8b7d;--kip-soft:#301b17;--etc:#9eaca6;--etc-soft:#1d2622;
   --dg:#7fb2ec;--dg-soft:#16222f;--asx:#c7a9f5;--asx-soft:#2a2139;--own:#e0b25c;--own-soft:#2c2213;--up:#4fd394;--down:#f08a7a;
   --sgx:#6dcbdc;--sgx-soft:#142b30;
@@ -660,10 +660,6 @@ a.chip:hover{outline:1px solid var(--c)}
 @media (max-width:640px){.chat{padding:14px}.chat-form{grid-template-columns:minmax(0,1fr)}.chat-actions button{flex:1}}
 .hits{font:500 14px/1.4 var(--sans);color:var(--c)}
 .hits:empty{display:none}
-.stat{display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:0 6px;font:14px/1.5 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
-.stat .sep{opacity:.6}
-.stat .live{color:var(--live)}
-.stat .live::before{content:"";display:inline-block;width:6px;height:6px;margin:0 5px 1px 0;border-radius:50%;background:var(--live);vertical-align:middle}
 .doc-frame{display:block;width:100%;height:calc(100vh - 230px);min-height:560px;margin-top:24px;border:1px solid var(--line);border-radius:4px;background:#fff}
 .stage{min-width:0;padding-left:max(var(--gutter),env(safe-area-inset-left,0px));padding-right:max(var(--gutter),env(safe-area-inset-right,0px));padding-block:24px 72px}
 .doc-title,.doc-desc,.doc-head,.own-head,.own-sources{overflow-wrap:anywhere}
@@ -1318,7 +1314,6 @@ APP_JS = r"""
     } else {
       (doc.stats || []).forEach(function(s){ meta.push('<span>' + esc(s) + '</span>'); });
     }
-    meta.push('<span class="stat always-live" data-stat-key="' + esc(doc.key) + '" data-live-label="sedang membaca" hidden></span>');
     meta.push('<a href="' + esc(doc.path) + '"' + (doc.kind === 'csv' ? ' download' : '') + '>' +
       (doc.kind === 'csv' ? 'Unduh CSV asli' : doc.kind === 'md' ? 'Buka .md mentah' : 'Buka halaman penuh') + '</a>');
     reader.setAttribute('data-cat', doc.cat);
@@ -1331,12 +1326,12 @@ APP_JS = r"""
       reader.innerHTML = head + '<iframe class="doc-frame" referrerpolicy="no-referrer" src="' + esc(doc.path) + '" title="' + esc(doc.title) + '"></iframe>';
       var frame = reader.querySelector('.doc-frame');
       frame.addEventListener('load', function(){ if (current === doc) markFrame(frame, doc, input.value.trim()); });
-      current = doc; renderedQuery = q; paintStats();
+      current = doc; renderedQuery = q;
       return;
     }
     if (doc.content == null){
       reader.innerHTML = head + '<div class="doc-grid"><div class="prose"><p class="doc-loading">Memuat dokumen…</p></div></div>';
-      current = doc; renderedQuery = q; paintStats();
+      current = doc; renderedQuery = q;
       if (doc.waiting) return;
       doc.waiting = true;
       loadDoc(doc).then(function(){
@@ -1375,7 +1370,7 @@ APP_JS = r"""
       syncContents();
     }
     if (q.length >= 2) hitNote(q, highlight(prose, q));
-    current = doc; renderedQuery = q; paintStats();
+    current = doc; renderedQuery = q;
   }
 
   function show(doc, section){
@@ -1386,7 +1381,6 @@ APP_JS = r"""
     // Dokumen unlisted (Digest Emiten lama lewat #doc=) tidak punya daftar sendiri: '← Daftar' kembali ke sumber yang ada.
     selectedCategory = doc.unlisted ? (listedCategory(selectedCategory) ? selectedCategory : homeCategory()) : doc.cat;
     markSource();
-    track(doc.key);
     document.title = doc.title + ' · ' + siteTitle;
     if (!jumpTo(doc, section) && fresh) window.scrollTo(0, 0);
   }
@@ -1414,7 +1408,6 @@ APP_JS = r"""
     if (!listedCategory(selectedCategory)) selectedCategory = homeCategory();
     document.title = siteTitle;
     filter();
-    track('home');
   }
 
   function setTab(name){
@@ -1442,107 +1435,7 @@ APP_JS = r"""
     if (fromOwn && !p.get('s')) window.scrollTo(0, 0);
   }
 
-  // ---- pengunjung -------------------------------------------------------
-  // Pengunjung lalu: db, satu dokumen per browser di "visitors/<id>" berisi halaman yang pernah dibuka.
-  // Pengunjung aktif: room presence {page: <kunci halaman>}. Keduanya opsional; tanpa itu angka tidak tampil.
-  var stats = {db: null, room: null, key: null, counts: {}, views: {}, active: {}, online: 0, recorded: {}, full: false};
-  var writeChain = Promise.resolve(), tempVisitor = null;
-
-  function visitorId(){
-    try {
-      var v = localStorage.getItem('arsip-visitor');
-      if (!v || !/^[a-z0-9]{8,40}$/.test(v)){
-        v = 'v' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
-        localStorage.setItem('arsip-visitor', v);
-      }
-      return v;
-    } catch (e){
-      tempVisitor = tempVisitor || 't' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36);
-      return tempVisitor;
-    }
-  }
-
   function fmtNum(n){ return Number(n || 0).toLocaleString('id-ID'); }
-
-  function paintStats(){
-    document.querySelectorAll('[data-stat-key]').forEach(function(el){
-      var k = el.getAttribute('data-stat-key'), parts = [];
-      if (stats.db){
-        var c = stats.counts[k] || 0;
-        parts.push('<span class="past" title="' + fmtNum(stats.views[k]) + ' kali dibuka">' + fmtNum(c) + ' pengunjung</span>');
-      }
-      if (stats.room){
-        var a = stats.active[k] || 0;
-        if (a || el.classList.contains('always-live'))
-          parts.push('<span class="live">' + fmtNum(a) + ' ' + esc(el.getAttribute('data-live-label') || 'aktif') + '</span>');
-      }
-      el.innerHTML = parts.join('<span class="sep">·</span>');
-      el.hidden = !parts.length;
-    });
-    var online = document.querySelector('.stat-online');
-    if (online){
-      online.hidden = !stats.room;
-      online.innerHTML = stats.room ? '<span class="live">' + fmtNum(stats.online) + ' online</span>' : '';
-    }
-  }
-
-  function recordVisit(key){
-    if (!stats.db || stats.full || stats.recorded[key]) return;
-    stats.recorded[key] = true;
-    var ref = stats.db.doc('visitors/' + visitorId());
-    writeChain = writeChain.then(function(){ return ref.get(); }).then(function(snap){
-      var now = new Date().toISOString(), entry = {}, data = snap.exists ? (snap.data() || {}) : {};
-      var old = (data.pages && typeof data.pages === 'object' && data.pages[key]) || {};
-      entry[key] = {count: (Number(old.count) || 0) + 1, first: old.first || now, last: now};
-      if (!snap.exists) return ref.set({first: now, last: now, pages: entry});
-      return ref.update({last: now, pages: entry});
-    }).catch(function(e){
-      if (e && e.code === 'quota_exceeded') stats.full = true;
-      else stats.recorded[key] = false;
-    });
-  }
-
-  function track(key){
-    stats.key = key;
-    if (stats.room) stats.room.presence({page: key}).catch(function(){});
-    recordVisit(key);
-  }
-
-  if (window.claude && typeof window.claude.use === 'function'){
-    window.claude.use('db').then(function(db){
-      if (!db) return;
-      stats.db = db;
-      db.collection('visitors').onSnapshot(function(snap){
-        var counts = {}, views = {};
-        snap.docs.forEach(function(d){
-          var pages = (d.data() || {}).pages;
-          if (!pages || typeof pages !== 'object') return;
-          Object.keys(pages).forEach(function(k){
-            counts[k] = (counts[k] || 0) + 1;
-            views[k] = (views[k] || 0) + (Number(pages[k] && pages[k].count) || 0);
-          });
-        });
-        stats.counts = counts; stats.views = views; paintStats();
-      }, function(){ stats.db = null; paintStats(); });
-      if (stats.key) recordVisit(stats.key);
-      paintStats();
-    }).catch(function(){});
-
-    window.claude.use('room').then(function(room){
-      if (!room) return;
-      stats.room = room;
-      room.onPeers(function(change){
-        var active = {};
-        change.peers.forEach(function(p){
-          var page = p.presence && typeof p.presence.page === 'string' ? p.presence.page : null;
-          if (page) active[page] = (active[page] || 0) + 1;
-        });
-        stats.active = active; stats.online = change.peers.length; paintStats();
-      }, function(){ stats.room = null; paintStats(); });
-      if (stats.key) room.presence({page: stats.key}).catch(function(){});
-      paintStats();
-    }).catch(function(){});
-  }
 
   // ---- kepemilikan saham ---------------------------------------------------
   // Tab sendiri. Datanya (files/kepemilikan/kepemilikan.json dari tools/sync_idx.py) diambil saat tab pertama dibuka.
@@ -1871,7 +1764,6 @@ APP_JS = r"""
     app.hidden = true; ownView.hidden = false; setTab('own');
     ownFrom.value = String(st.from); ownTo.value = String(st.to);
     document.title = (st.t ? st.t + ' · ' : '') + 'Kepemilikan saham · ' + siteTitle;
-    track('kepemilikan');
     if (wasHidden || prevT !== st.t) window.scrollTo(0, 0);
     if (ownData){ renderOwn(); return; }
     ownBody.innerHTML = '<p class="doc-loading">Memuat data kepemilikan…</p>';
@@ -3266,14 +3158,8 @@ APP_JS = r"""
 # ---------------------------------------------------------------- page
 
 def doc_href(doc):
-    # Semua dokumen dibuka di dalam viewer supaya pengunjungnya terhitung.
+    # Semua dokumen dibuka di dalam viewer.
     return doc_link(doc["path"])
-
-
-def stat_span(key, cls="stat", live_label="aktif", always_live=False):
-    """Tempat angka pengunjung; diisi JS saat kemampuan db/room tersedia."""
-    extra = " always-live" if always_live else ""
-    return f'<span class="{cls}{extra}" data-stat-key="{esc(key)}" data-live-label="{esc(live_label)}" hidden></span>'
 
 
 def overview_item(doc):
@@ -3286,7 +3172,6 @@ def overview_item(doc):
         meta.append(f'<span>{angka(doc["words"])} kata</span>')
     else:
         meta += [f"<span>{esc(s)}</span>" for s in doc["stats"]]
-    meta.append(stat_span(doc["key"], live_label="sedang membaca"))
     limit, chips = 12, []
     for code, section in doc["codes"][:limit]:
         chips.append(f'<a class="chip" href="{esc(doc_link(doc["path"], section))}">{esc(code)}</a>' if section
@@ -3440,7 +3325,7 @@ def build_page(docs, by_cat, own=None, sb=None, bei=None):
                     '<p class="lede">'
                     "KSEI: pemegang &gt;1%. Laporan bulanan emiten: pemegang ≥5%, free float resmi, jumlah pemegang. Data: IDX Signal Desk.</p>"
                     f'<p class="tally"><span><b>{angka(own["count"])}</b> emiten</span><span><b>{len(ksei_m)}</b> bulan data KSEI</span>'
-                    f"<span>{esc(span_own)}</span>" + (f'<span><b>{len(own["months"])}</b> bulan {esc(report_span)}</span>' if report_span else "") + stat_span("kepemilikan", live_label="melihat", always_live=True) + "</p></header>"
+                    f"<span>{esc(span_own)}</span>" + (f'<span><b>{len(own["months"])}</b> bulan {esc(report_span)}</span>' if report_span else "") + "</p></header>"
                     '<div class="own-bar">'
                     '<label class="own-field own-search">Cari<input id="own-cari" type="search" maxlength="128" placeholder="Kode atau nama, mis. BBCA" autocomplete="off" spellcheck="false"></label>'
                     '<label class="own-field own-pick">Emiten<select id="own-emiten"><option value="">Semua emiten</option></select></label>'
@@ -3470,9 +3355,7 @@ def build_page(docs, by_cat, own=None, sb=None, bei=None):
             "<h1>Arsip riset pasar modal</h1>"
             '<p class="lede">Stockbit dan keterbukaan informasi Indonesia, Australia, Singapura.</p>'
             f'<p class="tally"><span><b>{len(listed_docs)}</b> dokumen</span><span><b>{len(category_links)}</b> sumber</span>'
-            f"<span>{esc(span)}</span>"
-            + stat_span("home", live_label="di beranda", always_live=True)
-            + '<span class="stat stat-online" hidden></span></p></header>'
+            f"<span>{esc(span)}</span></p></header>"
             + f'<div class="cats">{"".join(sections)}</div>'
             + '<p class="empty" id="kosong" hidden>Tidak ada yang cocok. Coba kode 4 huruf, nama, atau bulan.</p>'
             f'<noscript><p class="empty">JavaScript mati. Buka berkas mentahnya:</p><ul>{raw_links}</ul></noscript>'
@@ -3565,8 +3448,6 @@ def sitemap_xml(docs, base_url):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=Path, default=OUT)
-    ap.add_argument("--fragment-index", type=Path,
-                    help="tulis juga versi index tanpa <html>/<head>/<body> (untuk Claude Artifact)")
     args = ap.parse_args()
 
     # Termasuk subfolder (mis. idx-signal-desk/ hasil tools/sync_idx.py); berkas dan folder berawalan titik dilewati.
@@ -3575,20 +3456,16 @@ def main():
                     and not any(part.startswith(".") for part in p.relative_to(SRC).parts)),
                    key=lambda p: p.relative_to(SRC).as_posix())
     docs = [load_doc(p, i) for i, p in enumerate(files)]
-    # Kunci statistik dan nama di files/ harus unik (tanpa beda huruf besar-kecil, karena disk macOS juga begitu).
+    # Nama di files/ harus unik (tanpa beda huruf besar-kecil, karena disk macOS juga begitu).
     seen = {}
     for doc, src in zip(docs, files):
-        if doc["key"] in seen:
-            raise SystemExit(f"Nama berkas ganda di {SRC.name}/: {seen[doc['key']]} dan {src.relative_to(SRC)}")
-        seen[doc["key"]] = src.relative_to(SRC)
+        if doc["_key"] in seen:
+            raise SystemExit(f"Nama berkas ganda di {SRC.name}/: {seen[doc['_key']]} dan {src.relative_to(SRC)}")
+        seen[doc["_key"]] = src.relative_to(SRC)
     by_cat = {k: [d for d in docs if d["cat"] == k] for k in CATEGORIES}
     by_cat = {k: v for k, v in by_cat.items() if v}
 
     out = check_output(args.out, ROOT, [SRC], kind="site")
-    if args.fragment_index:
-        fragment = args.fragment_index.resolve()
-        if fragment.is_relative_to(SRC.resolve()) or (fragment.is_relative_to(ROOT) and not fragment.is_relative_to(out)):
-            raise SystemExit("Lokasi fragment tidak boleh menimpa sumber proyek.")
     # GitHub Pages custom-domain settings live in the generated directory.
     cname = (out / "CNAME").read_text(encoding="utf-8") if (out / "CNAME").is_file() else None
     if out.exists():
@@ -3646,9 +3523,6 @@ def main():
         '<!doctype html>\n<html lang="id"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
         f"{security_meta}{head}</head><body>{body}</body></html>\n", encoding="utf-8")
-    if args.fragment_index:
-        args.fragment_index.parent.mkdir(parents=True, exist_ok=True)
-        args.fragment_index.write_text(head + body, encoding="utf-8")
 
     page_size = (out / "index.html").stat().st_size
     if page_size > PAGE_WARN_BYTES:

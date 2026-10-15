@@ -555,7 +555,7 @@ class CombinedSyncTests(unittest.TestCase):
             calls.append((bool(getattr(args, "stockbit_only", False)), bool(getattr(args, "bei_only", False)),
                           bool(getattr(args, "with_bei", False))))
             return False
-        base = dict(server="http://127.0.0.1:8787", no_build=True, build=False, fragment_index=None, force=False,
+        base = dict(server="http://127.0.0.1:8787", no_build=True, build=False, force=False,
                     stockbit_only=False, bei_only=False, with_stockbit=False, with_bei=False)
         with patch.object(sync, "sync_once", fake_sync_once):
             self.assertEqual(sync.run(argparse.Namespace(**{**base, "with_bei": True})), 0)

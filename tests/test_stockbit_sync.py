@@ -538,7 +538,7 @@ class StockbitSyncTests(unittest.TestCase):
         def fake_sync_once(args):
             calls.append(bool(getattr(args, "stockbit_only", False)))
             return False
-        base = dict(server="http://127.0.0.1:8787", no_build=True, build=False, fragment_index=None, force=False,
+        base = dict(server="http://127.0.0.1:8787", no_build=True, build=False, force=False,
                     stockbit_only=False, with_stockbit=False)
         with patch.object(sync, "sync_once", fake_sync_once):
             self.assertEqual(sync.run(argparse.Namespace(**base)), 0)
