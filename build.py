@@ -16,7 +16,6 @@ Tambah berkas ke needtobeindexed/, jalankan ulang, lalu upload folder site/.
 """
 import argparse
 import base64
-import csv
 import hashlib
 import html
 import json
@@ -30,6 +29,8 @@ from html.parser import HTMLParser
 from urllib.parse import quote, urlsplit
 
 from tools.build_safety import check_output, check_source
+from tools.evidence_index import csv_delimiter
+from tools.ksei_signals import CUSTODIANS, NOMINEE
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "needtobeindexed"
@@ -473,15 +474,7 @@ def load_doc(path, index):
         doc["words"] = len(re.findall(r"\S+", text))
         doc["content"] = text
     elif kind == "csv":
-        doc["content"], doc["stats"] = text, []
-        try:
-            doc["delimiter"] = csv.Sniffer().sniff(text[:65536].lstrip("\ufeff"), delimiters=",;\t").delimiter
-        except csv.Error:
-            # Jumlah kolom yang tidak rata: coba judul kolom saja.
-            try:
-                doc["delimiter"] = csv.Sniffer().sniff(text.lstrip("\ufeff").split("\n", 1)[0], delimiters=",;\t").delimiter
-            except csv.Error:
-                doc["delimiter"] = ","
+        doc["content"], doc["stats"], doc["delimiter"] = text, [], csv_delimiter(text)
     else:
         cards = re.findall(r'<div class="card"><strong>([^<]+)</strong><span>([^<]+)</span>', text)
         doc["stats"] = [f"{squash(n)} {squash(lbl)}" for n, lbl in cards[:3]]
@@ -1849,8 +1842,8 @@ APP_JS = r"""
 
   // Struktur pemegang: indikator turunan dari KSEI >1% dan laporan emiten. Deskriptif; belum diuji terhadap harga.
   // Rekening kustodian/nominee (dari tools/ksei_signals.py) menampung banyak pemilik, jadi tidak dihitung sebagai blok.
-  var NOMINEE_RE = /\b(A\/C|S\/A|PLEDGED?|CLIENTS?|NOMINEES?|CUSTOD(?:Y|IAN)|FOR THE ACCOUNT|OMNIBUS)\b|\bQQ\b/;
-  var CUSTODIAN_RE = /\b(PANIN|DBS|LGT|UBS|CITIBANK|HSBC|STANDARD CHARTERED|DEUTSCHE|BNY|STATE STREET|JPMORGAN|JP MORGAN|BANK OF NEW YORK|NORTHERN TRUST|BNP PARIBAS|SOCIETE GENERALE|CREDIT SUISSE|MORGAN STANLEY|GOLDMAN|CGS|KGI|MAYBANK|UOB|OCBC|NOMURA|CLEARSTREAM|EUROCLEAR|BANK OF SINGAPORE)\b/;
+  var NOMINEE_RE = __NOMINEE_RE__;
+  var CUSTODIAN_RE = __CUSTODIAN_RE__;
   function pooled(name){ var u = String(name || '').toUpperCase(); return NOMINEE_RE.test(u) || CUSTODIAN_RE.test(u); }
   // Jumlah pemegang terverifikasi terakhir sampai bulan i (maks. 2 bulan ke belakang); hitungan 0 dianggap tidak ada, null bila tidak ditemukan.
   function holderCount(c, i){
@@ -3153,6 +3146,9 @@ APP_JS = r"""
   route();
 })();
 """
+# The ownership tab pools the same custodian/nominee accounts as the chat signals (tools/ksei_signals.py).
+APP_JS = (APP_JS.replace("__NOMINEE_RE__", "/" + NOMINEE.pattern.replace("/", "\\/") + "/")
+          .replace("__CUSTODIAN_RE__", "/\\b(" + "|".join(CUSTODIANS + ("BANK OF SINGAPORE",)) + ")\\b/"))
 
 
 # ---------------------------------------------------------------- page
@@ -3397,37 +3393,22 @@ def ownership_meta():
             "tickers": [c["t"] for c in companies]}
 
 
-def stockbit_meta():
-    """Ringkasan stockbit-index.json untuk payload halaman, atau None kalau belum disinkron."""
-    if not (SRC / SB_INDEX_SRC).is_file():
+def index_meta(src, path, counted, other=()):
+    """Ringkasan indeks harian Signal Desk (stockbit-index.json, bei-index.json) untuk payload halaman, atau None kalau
+    belum disinkron. Hanya bentuk luar yang diperiksa (format 1, tanggal, map `counted` dan `other`); viewer memvalidasi
+    ulang setiap baris saat dimuat. Jumlah entri tiap map `counted` ikut ringkasan."""
+    file = SRC / src
+    if not file.is_file():
         return None
-    check_source(SRC / SB_INDEX_SRC, SRC)
-    raw = json.loads((SRC / SB_INDEX_SRC).read_text(encoding="utf-8"))
+    check_source(file, SRC)
+    raw = json.loads(file.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or raw.get("format") != 1:
-        raise ValueError("Format stockbit-index.json tidak dikenal.")
-    days, tickers, users = raw.get("days") or [], raw.get("tickers") or {}, raw.get("users") or {}
-    if (not isinstance(days, list) or not isinstance(tickers, dict) or not isinstance(users, dict)
+        raise ValueError(f"Format {file.name} tidak dikenal.")
+    days = raw.get("days") or []
+    if (not isinstance(days, list) or any(not isinstance(raw.get(k) or {}, dict) for k in counted + other)
             or any(not isinstance(d, dict) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(d.get("d", ""))) for d in days)):
-        raise ValueError("Struktur stockbit-index.json tidak valid.")
-    return {"path": SB_INDEX_PATH, "days": len(days), "tickers": len(tickers), "users": len(users)}
-
-
-def bei_meta():
-    """Ringkasan bei-index.json untuk payload halaman, atau None kalau belum disinkron.
-
-    Hanya bentuk luar yang diperiksa di sini (format dan tanggal); viewer memvalidasi ulang setiap baris saat dimuat.
-    """
-    if not (SRC / BEI_INDEX_SRC).is_file():
-        return None
-    check_source(SRC / BEI_INDEX_SRC, SRC)
-    raw = json.loads((SRC / BEI_INDEX_SRC).read_text(encoding="utf-8"))
-    if not isinstance(raw, dict) or raw.get("format") != 1:
-        raise ValueError("Format bei-index.json tidak dikenal.")
-    days, tickers, names = raw.get("days") or [], raw.get("tickers") or {}, raw.get("names") or {}
-    if (not isinstance(days, list) or not isinstance(tickers, dict) or not isinstance(names, dict)
-            or any(not isinstance(d, dict) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(d.get("d", ""))) for d in days)):
-        raise ValueError("Struktur bei-index.json tidak valid.")
-    return {"path": BEI_INDEX_PATH, "days": len(days), "tickers": len(tickers)}
+        raise ValueError(f"Struktur {file.name} tidak valid.")
+    return {"path": path, "days": len(days), **{k: len(raw.get(k) or {}) for k in counted}}
 
 
 def robots_txt(base_url=""):
@@ -3495,14 +3476,12 @@ def main():
             shutil.copy2(SRC / REPORTS_SRC, out / REPORTS_PATH)
         if own["prices"]:
             shutil.copy2(SRC / PRICES_SRC, out / PRICES_PATH)
-    sb = stockbit_meta()
-    if sb:
-        (out / SB_INDEX_PATH).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(SRC / SB_INDEX_SRC, out / SB_INDEX_PATH)
-    bei = bei_meta()
-    if bei:
-        (out / BEI_INDEX_PATH).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(SRC / BEI_INDEX_SRC, out / BEI_INDEX_PATH)
+    sb = index_meta(SB_INDEX_SRC, SB_INDEX_PATH, ("tickers", "users"))
+    bei = index_meta(BEI_INDEX_SRC, BEI_INDEX_PATH, ("tickers",), ("names",))
+    for meta, src in ((sb, SB_INDEX_SRC), (bei, BEI_INDEX_SRC)):
+        if meta:
+            (out / meta["path"]).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(SRC / src, out / meta["path"])
     head, body = build_page(docs, by_cat, own, sb, bei)
     chat_js = (ROOT / "chat.js").read_text()
     endpoint = urlsplit(CHAT_API_URL)

@@ -20,9 +20,11 @@ INSTITUTION = {'Mutual Funds', 'Insurance', 'Bank', 'Securities Company', 'Inves
                'Financial Institutional', 'Private Bank', 'Pension Fund', 'State Owned Enterprises', 'Hedge Fund', 'Investment Advisors'}
 # Custodian and nominee accounts move shares between clients; their "renames" and exits are not ownership events.
 NOMINEE = re.compile(r'\b(A/C|S/A|PLEDGED?|CLIENTS?|NOMINEES?|CUSTOD(?:Y|IAN)|FOR THE ACCOUNT|OMNIBUS)\b|\bQQ\b')
-CUSTODIAN = re.compile(r'\b(PANIN|DBS|LGT|UBS|CITIBANK|HSBC|STANDARD CHARTERED|DEUTSCHE|BNY|STATE STREET|JPMORGAN|JP MORGAN|'
-                       r'BANK OF NEW YORK|NORTHERN TRUST|BNP PARIBAS|SOCIETE GENERALE|CREDIT SUISSE|MORGAN STANLEY|GOLDMAN|'
-                       r'CGS|KGI|MAYBANK|UOB|OCBC|NOMURA|CLEARSTREAM|EUROCLEAR)\b')
+# build.py sends NOMINEE and these names to the ownership tab (pooled()), which also pools BANK OF SINGAPORE.
+CUSTODIANS = ('PANIN', 'DBS', 'LGT', 'UBS', 'CITIBANK', 'HSBC', 'STANDARD CHARTERED', 'DEUTSCHE', 'BNY', 'STATE STREET', 'JPMORGAN',
+              'JP MORGAN', 'BANK OF NEW YORK', 'NORTHERN TRUST', 'BNP PARIBAS', 'SOCIETE GENERALE', 'CREDIT SUISSE', 'MORGAN STANLEY',
+              'GOLDMAN', 'CGS', 'KGI', 'MAYBANK', 'UOB', 'OCBC', 'NOMURA', 'CLEARSTREAM', 'EUROCLEAR')
+CUSTODIAN = re.compile(r'\b(' + '|'.join(CUSTODIANS) + r')\b')
 LEGAL = r'\b(PT|TBK|PERSEROAN TERBATAS|THE|LTD|LIMITED|INC|CORP|CORPORATION|PTE|CO|LLC|SA|AG|BV|NV|PERSERO)\b'
 
 

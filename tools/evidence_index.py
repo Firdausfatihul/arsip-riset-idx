@@ -69,7 +69,8 @@ def markdown_ranges(raw, tickers):
 
 
 def csv_delimiter(raw):
-    """The delimiter the viewer uses (build.py): sniffed from the start, else from the header row, else a comma."""
+    """CSV delimiter for the viewer (build.py) and the partitions: sniffed from the start, else from the header row
+    (uneven column counts), else a comma."""
     text = raw.lstrip('\ufeff')
     for sample in (text[:65536], text.split('\n', 1)[0]):
         try:
