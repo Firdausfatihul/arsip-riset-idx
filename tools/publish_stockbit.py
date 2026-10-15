@@ -393,33 +393,45 @@ def check_tools(which=shutil.which):
         raise Failure(2, f"{VPS_CONFIG_REL} tidak ada; VPS belum di-setup di Mac ini (node local/vps.mjs setup …).")
 
 
-def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_usage):
-    check_tools(which)
+def require_clean_main(runner, outside_message):
+    """Cabang main, tidak ada yang di-stage, dan tidak ada perubahan di luar berkas Stockbit/BEI, docs/ dan berkas titik lain
+    di folder sinkron; selain itu Failure(2) tanpa mengubah apa pun. Kembalikan perubahan pohon kerja (changed_paths)."""
     branch = git_ok(runner, "rev-parse", "--abbrev-ref", "HEAD")
     if branch != "main":
         raise Failure(2, f"cabang aktif '{branch}', bukan main.")
     if git(runner, "diff", "--cached", "--quiet").returncode:
-        raise Failure(2, "ada perubahan yang sudah di-stage; selesaikan atau `git restore --staged` dulu.")
-    outside = [path for _, path in changed_paths(runner) if dirty_kind(path) == "other"]
+        raise Failure(2, "ada perubahan yang sudah di-stage; `git restore --staged .` dulu.")
+    changes = changed_paths(runner)
+    outside = [path for _, path in changes if dirty_kind(path) == "other"]
     if outside:
-        allowed = ", ".join(f"{fam.prefix}*.md, " + ", ".join(fam.names) for fam in desk.FAMILIES)
-        raise Failure(2, f"ada perubahan yang tidak boleh ikut publish Stockbit (hanya {allowed}, docs/; commit atau kembalikan "
-                         "dulu): " + ", ".join(outside[:15]))
-    check_no_deleted_sb(runner, 2)
-    git_ok(runner, "fetch", "origin", "main", timeout=T_NET)
+        raise Failure(2, f"{outside_message}: " + ", ".join(outside[:15]))
+    return changes
+
+
+def sync_origin(runner, dry_run=False):
+    """Setelah `git fetch origin main`: commit lokal yang belum dipush menolak (skrip ini tidak boleh ikut mendorongnya), dan
+    kalau tertinggal origin/main `git pull --ff-only` (dry-run: hanya dilaporkan)."""
     ahead = int(git_ok(runner, "rev-list", "--count", "origin/main..HEAD") or 0)
     if ahead:
-        raise Failure(2, f"ada {ahead} commit lokal yang belum dipush; publish tidak boleh ikut mendorongnya.")
+        raise Failure(2, f"ada {ahead} commit lokal yang belum dipush; publish/rollback tidak boleh ikut mendorongnya.")
     behind = int(git_ok(runner, "rev-list", "--count", "HEAD..origin/main") or 0)
-    if behind:
-        if dry_run:
-            say(f"  tertinggal {behind} commit dari origin/main (dry-run: tidak di-pull)")
-        else:
-            git_ok(runner, "pull", "--ff-only", "origin", "main", timeout=T_NET, what="git pull --ff-only")
+    if behind and dry_run:
+        say(f"  tertinggal {behind} commit dari origin/main (dry-run: tidak di-pull)")
+    elif behind:
+        git_ok(runner, "pull", "--ff-only", "origin", "main", timeout=T_NET, what="git pull --ff-only")
+
+
+def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_usage):
+    check_tools(which)
+    allowed = ", ".join(f"{fam.prefix}*.md, " + ", ".join(fam.names) for fam in desk.FAMILIES)
+    require_clean_main(runner, f"ada perubahan yang tidak boleh ikut publish Stockbit (hanya {allowed}, docs/; commit atau "
+                               "kembalikan dulu)")
+    check_no_deleted_sb(runner, 2)
+    git_ok(runner, "fetch", "origin", "main", timeout=T_NET)
+    sync_origin(runner, dry_run)
     free = disk_usage(ROOT).free
     if free < MIN_FREE_BYTES:
         raise Failure(2, f"ruang disk tinggal {free / 1e9:.2f} GB; perlu minimal {MIN_FREE_BYTES / 1e9:.1f} GB.")
-    return {"branch": branch, "behind": behind}
 
 
 def check_build(stdout, sb_names):

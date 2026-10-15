@@ -148,27 +148,20 @@ def check_vps_tree(runner, rerun=False):
     berkas Stockbit, docs/, dan berkas titik non-Stockbit di DEST_REL: kode atau dokumen yang belum di-commit tidak
     boleh ikut live lewat rollback. Putaran ulang (`rerun`, langkah git sudah selesai) juga menolak berkas Stockbit yang kotor
     selain berkas tahanan: pohon kerja setelah langkah git hanya mengubah berkas tahanan, jadi berkas Stockbit kotor lainnya
-    berasal dari sinkron/publish sesudahnya yang belum lolos cek build atau belum terbit.
+    berasal dari sinkron/publish sesudahnya yang belum lolos cek build atau belum terbit. Kembalikan changed_paths.
     """
-    branch = pub.git_ok(runner, "rev-parse", "--abbrev-ref", "HEAD")
-    if branch != "main":
-        raise pub.Failure(2, f"cabang aktif '{branch}', bukan main.")
     if revert_in_progress(runner):
         raise pub.Failure(2, "git sedang di tengah revert (sisa rollback yang terhenti); jalankan `git revert --abort` lalu "
                              "ulangi rollback.")
-    if pub.git(runner, "diff", "--cached", "--quiet").returncode:
-        raise pub.Failure(2, "ada perubahan yang sudah di-stage; `git restore --staged .` dulu.")
-    changes = pub.changed_paths(runner)
-    outside = [path for _, path in changes if pub.dirty_kind(path) == "other"]
-    if outside:
-        raise pub.Failure(2, "push VPS akan ikut mengirim perubahan di luar berkas Stockbit/BEI/docs (commit atau kembalikan "
-                             "dulu): " + ", ".join(outside[:15]))
+    changes = pub.require_clean_main(runner, "push VPS akan ikut mengirim perubahan di luar berkas Stockbit/BEI/docs (commit "
+                                             "atau kembalikan dulu)")
     stale = [path for _, path in changes
              if rerun and pub.publish_owned(path) and path not in pub.HOLDS]
     if stale:
         raise pub.Failure(2, "berkas Stockbit/BEI berubah sesudah langkah git rollback ini (sinkron/publish berikutnya yang belum "
                              "terbit); push VPS akan menerbitkannya tanpa cek build. Kembalikan dulu (`git checkout HEAD -- "
                              "<berkas>`, hapus berkas baru) lalu ulangi rollback: " + ", ".join(stale[:15]))
+    return changes
 
 
 def rebased_copy(runner, sha, base):
@@ -194,10 +187,9 @@ def rebased_copy(runner, sha, base):
 
 def preflight(runner, target, plan):
     """Kembalikan cara yang dipakai: 'revert', 'reset', atau 'restore'. Alat (git, node, .local/vps.json) dicek sebelumnya."""
-    check_vps_tree(runner)
+    changes = check_vps_tree(runner)
     if plan["mode"] == "restore":
         return "restore"  # berkas Stockbit kotor memang sisa publish ini
-    changes = pub.changed_paths(runner)
     blocked = [path for status, path in changes
                if status != "??" and pub.dirty_kind(path) not in ("derived", "ignored")]
     if blocked:
@@ -233,11 +225,7 @@ def preflight(runner, target, plan):
             target.update(pre_sha=pre, post_sha=copy)  # held_days dan git_step membaca rentang baru ini
             post = copy
     if mode == "revert":
-        ahead = int(pub.git_ok(runner, "rev-list", "--count", "origin/main..HEAD") or 0)
-        if ahead:
-            raise pub.Failure(2, f"ada {ahead} commit lokal yang belum dipush.")
-        if int(pub.git_ok(runner, "rev-list", "--count", "HEAD..origin/main") or 0):
-            pub.git_ok(runner, "pull", "--ff-only", "origin", "main", timeout=pub.T_NET, what="git pull --ff-only")
+        pub.sync_origin(runner)
     for older, newer in ((pre, post), (post, "HEAD")):
         if pub.git(runner, "merge-base", "--is-ancestor", older, newer).returncode:
             raise pub.Failure(2, f"{older[:12]} bukan leluhur {newer[:12]}; riwayat berubah, rollback manual.")
