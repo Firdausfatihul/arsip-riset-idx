@@ -87,8 +87,8 @@ if args.html:
     cohort_table=table(['Asal input pada halaman ini','Input unik','Proses selesai','Proses error','Biaya diketahui USD'],
       [('Tes teridentifikasi' if c['origin']=='test' else 'Belum diketahui',c['inputs'],c['completed'],c['errors'],f"{c['known_cost_usd']:.6f}") for c in cohorts])
     modes={m['mode']:m for m in data.get('by_mode',[])}
-    # Daily agentic cap of the server that wrote the data; older snapshots lack it (the worker default then).
-    agentic_cap=data.get('agentic_daily', 10)
+    # The VPS server's daily agentic cap (local/vps.mjs metrics); older snapshots lack it, so no ceiling is computed.
+    agentic_cap=data.get('agentic_daily')
     names={'archive':'Biasa','agentic':'Agen'}
     def per(m,key): return m[key]/m['inputs'] if m.get('inputs') else 0
     mode_rows=[(names.get(m['mode'],m['mode']),m['inputs'],m['completed'],m['failed'],f"{m['known_cost_usd']:.6f}",f"{per(m,'known_cost_usd'):.6f}",
@@ -97,17 +97,20 @@ if args.html:
     mode_table=table(['Mode','Pertanyaan','Selesai','Gagal/ditolak','Biaya USD','Rata-rata/pertanyaan','Termahal','Panggilan AI','Panggilan alat (datacat/arsip)','Input token','Output token','Jawaban dari cache','Datacat dari cache','Biaya belum tercatat'],mode_rows)
     days_seen=sorted({d['day'] for d in data.get('daily_by_mode',[])})
     cell={(d['day'],d['mode']):d for d in data.get('daily_by_mode',[])}
-    daily_mode=table(['Tanggal UTC','Biasa: input','Biasa: USD',f'Agen: input (kuota {agentic_cap}/hari)','Agen: USD'],
+    daily_mode=table(['Tanggal UTC','Biasa: input','Biasa: USD',f'Agen: input (kuota {agentic_cap}/hari)' if agentic_cap else 'Agen: input (kuota tidak tercatat)','Agen: USD'],
       [(day,cell.get((day,'archive'),{}).get('inputs',0),f"{cell.get((day,'archive'),{}).get('known_cost_usd',0):.6f}",
         cell.get((day,'agentic'),{}).get('inputs',0),f"{cell.get((day,'agentic'),{}).get('known_cost_usd',0):.6f}") for day in days_seen])
     agent=modes.get('agentic')
     if agent and agent['inputs']:
         agent_days=len({d['day'] for d in data.get('daily_by_mode',[]) if d['mode']=='agentic'}) or 1
-        ceiling=agentic_cap*agent['max_cost_usd']
         verdict=(f"Mode agen: {agent['inputs']} pertanyaan, US${agent['known_cost_usd']:.4f} dalam {agent_days} hari aktif "
-                 f"(rata-rata US${agent['known_cost_usd']/agent_days:.4f}/hari, US${per(agent,'known_cost_usd'):.4f}/pertanyaan). "
-                 f"Batas atas harian dengan kuota {agentic_cap} × pertanyaan termahal: US${ceiling:.4f}. "
-                 + ("Terkendali: biaya dibatasi kuota harian." if ceiling < 1 else "Perlu dicek: batas atas harian di atas US$1."))
+                 f"(rata-rata US${agent['known_cost_usd']/agent_days:.4f}/hari, US${per(agent,'known_cost_usd'):.4f}/pertanyaan). ")
+        if agentic_cap:
+            ceiling=agentic_cap*agent['max_cost_usd']
+            verdict+=(f"Batas atas harian dengan kuota {agentic_cap} × pertanyaan termahal: US${ceiling:.4f}. "
+                      + ("Terkendali: biaya dibatasi kuota harian." if ceiling < 1 else "Perlu dicek: batas atas harian di atas US$1."))
+        else:
+            verdict+="Kuota harian tidak tercatat di snapshot ini, jadi batas atas harian tidak dihitung."
     else:
         verdict='Mode agen belum dipakai dalam periode ini.'
     mode_section=f"<h2>Mode biasa vs mode agen</h2><p>{esc(verdict)}</p><div class=\"scroll\">{mode_table}</div><h3>Per hari</h3><div class=\"scroll\">{daily_mode}</div>"

@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync} from 'node:fs';
+import {mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -14,10 +14,10 @@ import {metricsScript} from '../local/vps.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('metrics script reports the VPS chat database read-only', () => {
+test('metrics script reports the VPS chat database read-only, with the server\'s agentic cap', () => {
   const app = mkdtempSync(path.join(tmpdir(), 'arsip-metrics-'));
   try {
-    symlinkSync(path.join(ROOT, 'worker'), path.join(app, 'worker'));
+    for (const dir of ['worker', 'local']) symlinkSync(path.join(ROOT, dir), path.join(app, dir));
     mkdirSync(path.join(app, '.local'));
     const {db, storage:store} = storage(path.join(app, '.local/chat.sqlite'));
     const cache = new CacheStore(store.sql);
@@ -38,6 +38,10 @@ test('metrics script reports the VPS chat database read-only', () => {
     assert.deepEqual(report.top_terms, [{term:'SOCI', count:1}]);
     assert.equal(report.questions.length, 1);
     assert.deepEqual(report.pagination, {limit:1, offset:0, total:2});
+    // The daily agentic cap as the VPS server sees it: its EnvironmentFile, else the worker default.
+    assert.equal(report.agentic_daily, 100);
+    writeFileSync(path.join(app, '.local/server.env'), 'ARSIP_CLAUDE_MODEL=sonnet\nCHAT_AGENTIC_DAILY=7\n');
+    assert.equal(run({}).agentic_daily, 7);
     // Out-of-range or non-numeric options are clamped into range, never passed to SQL as text.
     const clamped = run({days:'9999', limit:'x', offset:'-5'});
     assert.deepEqual([clamped.days, clamped.pagination], [365, {limit:1, offset:0, total:2}]);

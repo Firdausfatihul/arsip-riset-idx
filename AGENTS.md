@@ -138,7 +138,7 @@ maks 8 klaim yang tidak dibahas (`claimTail`). Hitungan ("FAKTA TERHITUNG SISTEM
 
 Mode agen: alat baca-saja `cari_arsip`, `data_kepemilikan`, `datacat_cari`, `datacat_daftar`, `datacat_detail`, `cari_teks`,
 `tulis_jawaban` (host `quant.renr.ai`, path tetap). Batas `AGENT`: 4 langkah, 18 alat, 6 KB/hasil, 70 KB total, jawaban 2.000
-token, 44 koneksi keluar. Kuota `CHAT_AGENTIC_DAILY` (VPS/Mac 100/hari UTC). Permintaan isi dokumen dialihkan ke alur biasa.
+token, 44 koneksi keluar. Kuota `agenticDaily` (`worker/index.mjs`: `CHAT_AGENTIC_DAILY`, bawaan 100/hari UTC). Permintaan isi dokumen dialihkan ke alur biasa.
 
 ## 6. Penyimpanan dan cache (`.local/chat.sqlite`)
 
@@ -186,7 +186,7 @@ masuk setiap kunci; jangan diubah tanpa alasan (semua cache akan hilang). Pekerj
 | Serentak | `CHAT_CONCURRENT_REQUESTS` = `CHAT_CONCURRENT_PER_IP` = concurrency/2 (bawaan 2) |
 | Satu analisis | `LIMITS`: 8 MB pesan, 20 panggilan, alokasi keluaran 36.000 token, maks 4 istilah, bahan ≤4 MB |
 | Harian | `CHAT_DAILY_BYTES` 300 MB, `CHAT_DAILY_OUTPUT_TOKENS` 3.000.000 (dicadangkan sebelum panggilan) |
-| Mode agen | `CHAT_AGENTIC_DAILY` 100/hari untuk seluruh situs |
+| Mode agen | `CHAT_AGENTIC_DAILY` 100/hari untuk seluruh situs (`agenticDaily`; di VPS lewat `.local/server.env`) |
 | Sandi jarak jauh | 5 gagal/alamat/15 menit, 30 gagal total/jam; sesi 30 hari (`local/remote-auth.mjs`) |
 
 ## 9. Deploy, publish, rollback
@@ -249,7 +249,8 @@ desk tidak bisa di-rollback (exit 2). Rincian lengkap: docstring kedua skrip dan
   dibuang); SRI untuk CDN; CSP meta dengan hash skrip hasil build; JSON tertanam meng-escape `<`, `>`, `&`; iframe laporan
   tanpa `allow-same-origin`; `Referrer-Policy: no-referrer`.
 - Server: hanya loopback; listener jarak jauh wajib sesi bertanda HMAC (`__Host-` cookie, `SameSite=Strict`); origin chat hanya
-  alamat server sendiri; IP klien dari socket (Mac) atau entri terakhir `X-Forwarded-For` dari Caddy.
+  alamat server sendiri; IP klien dari socket (Mac) atau entri terakhir `X-Forwarded-For` dari Caddy, diberikan sebagai
+  argumen `ArchiveChat.fetch(request, address)`, tidak pernah dari header klien. Chat aktif hanya bila `env.MODEL_FETCHER` ada.
 - Statistik: teks pertanyaan + hash klien, tanpa IP mentah, riwayat model, atau key; laporan HTML meng-escape teks.
 - Build/sinkron: sumber atau tujuan symlink ditolak (`tools/build_safety.py`), tujuan build harus folder hasil build; sinkron
   menulis lewat staging (nama acak, `os.replace`) dan memeriksa profil/perubahan bersamaan sebelum commit.

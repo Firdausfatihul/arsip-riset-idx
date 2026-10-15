@@ -93,7 +93,14 @@ class ChatMetricsReportTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(args, [str(ROOT / 'local/vps.mjs'), 'metrics', '--days', '3', '--limit', '9', '--offset', '5'])
         self.assertIn('kuota 100/hari', html)
+        self.assertIn('Batas atas harian dengan kuota 100', html)
         self.assertEqual(json.loads(result.stdout)['inputs'], 1)
+        # A snapshot without the server's cap (written before it was recorded): no guessed cap, no ceiling.
+        del snapshot['agentic_daily']
+        result, _, html = self.vps(f"echo '{json.dumps(snapshot)}'\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('kuota tidak tercatat', html)
+        self.assertNotIn('Batas atas', html)
 
     def test_vps_failure_stops_with_its_message(self):
         result, _, html = self.vps('echo "Gagal: Belum di-setup." >&2\nexit 1\n')

@@ -22,7 +22,8 @@ DEST = "needtobeindexed/idx-signal-desk/"
 BEI = ["beiringkas_2026-10-05_2026-10-05.md", "beidetail_2026-10-05_2026-10-05.md"]
 BOTH_BUILD = build_stdout([(SB[0], "stockbit-ringkasan", "2026-10-05"), (SB[1], "stockbit-detail", "2026-10-05"),
                            (BEI[0], "bei-ringkasan", "2026-10-05"), (BEI[1], "bei-detail", "2026-10-05")])
-CLOUDFLARE = ("wrangler", "npx", "build_worker")
+# The retired Worker deploy tools: publish never runs them.
+NEVER_RUN = ("wrangler", "npx", "build_worker")
 
 
 def status(*paths, code="??"):
@@ -56,8 +57,8 @@ class BeiPublishTests(unittest.TestCase):
     def records(self):
         return [json.loads(l) for l in self.log.read_text().splitlines()] if self.log.exists() else []
 
-    def no_cloudflare(self, runner):
-        return not [c for c in runner.calls if any(n in c for n in CLOUDFLARE)]
+    def no_worker_deploy(self, runner):
+        return not [c for c in runner.calls if any(n in c for n in NEVER_RUN)]
 
     def runner(self, files, **extra):
         paths = [DEST + n for n in files]
@@ -80,7 +81,7 @@ class BeiPublishTests(unittest.TestCase):
         positions = [runner.index(n) for n in order]
         self.assertEqual(positions, sorted(positions), runner.calls)
         self.assertEqual(runner.state["vps"], 1)
-        self.assertTrue(self.no_cloudflare(runner), runner.calls)
+        self.assertTrue(self.no_worker_deploy(runner), runner.calls)
         add = runner.calls[runner.index("git add --")]
         for name in (SB[0], BEI[0], "bei-index.json", ".sync-bei.json"):
             self.assertIn(DEST + name, add)
@@ -125,7 +126,7 @@ class BeiPublishTests(unittest.TestCase):
         self.assertEqual(code, 0, self.output)
         self.assertEqual(summary["message"], "BEI: ringkasan 2026-10-05")
         self.assertEqual(runner.state["vps"], 1)
-        self.assertTrue(self.no_cloudflare(runner))
+        self.assertTrue(self.no_worker_deploy(runner))
         rec = self.records()[-1]
         self.assertEqual(rec["day_shas"], {})  # no Stockbit day in this publish
         self.assertEqual(rec["day_shas_bei"], {"2026-10-05": "*"})  # no .sync-bei.json in the tree: unknown sha
@@ -279,7 +280,7 @@ class BeiRollbackTests(unittest.TestCase):
         positions = [runner.index(n) for n in order]
         self.assertEqual(positions, sorted(positions), runner.calls)
         self.assertEqual(runner.state["vps"], 1)
-        self.assertFalse([c for c in runner.calls if any(n in c for n in CLOUDFLARE)])
+        self.assertFalse([c for c in runner.calls if any(n in c for n in NEVER_RUN)])
         bei_hold = json.loads((self.root / HOLD_BEI).read_text())["days"]
         self.assertEqual(bei_hold, {"2026-10-05": {"sha256": "beiR", "rollback_of": "stockbit-publish-20261009-100000"}})
         sb_hold = json.loads((self.root / HOLD_SB).read_text())["days"]

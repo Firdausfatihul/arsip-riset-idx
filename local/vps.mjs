@@ -22,7 +22,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {cli, parseEnv, readConfig, rotatePassword, shellQuote as q, writeConfig} from './cli.mjs';
 import {validate} from './remote.mjs';
-import {AGENTIC_DAILY, EFFORT_DEFAULT, MODEL_DEFAULT, checkModel} from './server.mjs';
+import {EFFORT_DEFAULT, MODEL_DEFAULT, checkModel} from './server.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = path.join(ROOT, '.local');
@@ -369,14 +369,20 @@ function logs(opt) {
 }
 
 // CacheStore.report() over the VPS chat database, opened read-only: no table is created and nothing is written.
-// Piped to node on the VPS as the server user.
+// Piped to node on the VPS as the server user. agentic_daily is the server's cap, from the unit's EnvironmentFile.
 export function metricsScript({days = 7, limit = 100, offset = 0} = {}, app = APP) {
   const n = (value, low, high) => Math.max(low, Math.min(high, Math.trunc(Number(value)) || low));
+  const url = file => JSON.stringify(pathToFileURL(app + '/' + file).href);
   return `import {DatabaseSync} from 'node:sqlite';
-import {CacheStore} from ${JSON.stringify(pathToFileURL(app + '/worker/cache.mjs').href)};
+import {existsSync, readFileSync} from 'node:fs';
+import {CacheStore} from ${url('worker/cache.mjs')};
+import {agenticDaily} from ${url('worker/index.mjs')};
+import {parseEnv} from ${url('local/cli.mjs')};
 const db = new DatabaseSync(${JSON.stringify(app + '/.local/chat.sqlite')}, {readOnly:true});
 const sql = {exec:(query, ...args) => ({toArray:() => db.prepare(query).all(...args)})};
-console.log(JSON.stringify(CacheStore.prototype.report.call({sql}, ${n(days, 1, 365)}, ${n(limit, 1, 500)}, ${n(offset, 0, 100000)})));
+const env = ${JSON.stringify(app + '/.local/server.env')};
+console.log(JSON.stringify({...CacheStore.prototype.report.call({sql}, ${n(days, 1, 365)}, ${n(limit, 1, 500)}, ${n(offset, 0, 100000)}),
+  agentic_daily:agenticDaily(existsSync(env) ? parseEnv(readFileSync(env, 'utf8')) : {})}));
 `;
 }
 
@@ -384,7 +390,7 @@ function metrics(opt) {
   const r = must(ssh(read(), asArsip(`${NODE} --input-type=module`), {input:metricsScript(opt), capture:true}), 'Membaca statistik');
   const data = jsonIn(r.stdout || '');
   if (!data) throw new Error('Statistik VPS tidak terbaca.');
-  console.log(JSON.stringify({...data, agentic_daily:AGENTIC_DAILY}));
+  console.log(JSON.stringify(data));
 }
 
 function password() {

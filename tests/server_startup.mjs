@@ -1,6 +1,6 @@
 // local/server.mjs start-up end to end: a fake `claude` CLI and ARSIP_STATE in a temp folder holding a tiny built
-// archive. Checks the exit codes the VPS systemd unit relies on (78 = stay down, 1 = retry), the source index import
-// and that the loopback listener serves the site. No model call, no network.
+// archive. Checks the exit codes the VPS systemd unit relies on (78 = stay down, 1 = retry), the source index import,
+// that the loopback listener serves the site and that the chat is wired in. No model call, no network.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn, execFileSync} from 'node:child_process';
@@ -34,7 +34,7 @@ const freePort = () => new Promise(ok => { const s = createServer().listen(0, '1
 
 // Starts the server; resolves on exit or once `until` appears in stdout.
 function start(state, claude, {until = null, args = []} = {}) {
-  const {TZ, ARSIP_ALLOW_VPS, ...env} = process.env;
+  const {TZ, ARSIP_ALLOW_VPS, CHAT_AGENTIC_DAILY, ...env} = process.env;
   const child = spawn(process.execPath, ['--no-warnings', 'local/server.mjs', ...args],
     {cwd:ROOT, env:{...env, ARSIP_STATE:state, ARSIP_CLAUDE_BIN:claude}});
   let out = '', err = '';
@@ -75,6 +75,13 @@ test('start-up: lock and login checks, source index import, site on the loopback
     assert.equal(page.status, 200);
     assert.match(await page.text(), /id="arsip-data"/);
     assert.equal((await fetch(`http://127.0.0.1:${port}/%2e%2e/machine-lock.json`)).status, 404);
+    // The chat is on (the Claude bridge is wired in); a question answered without a model call streams to "done".
+    const config = await (await fetch(`http://127.0.0.1:${port}/api/chat/config`)).json();
+    assert.deepEqual([config.ready, config.agentic.limit], [true, 100]);
+    const chat = await fetch(`http://127.0.0.1:${port}/api/chat`, {method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:'SOCI tanggal 17'})});
+    assert.equal(chat.status, 200);
+    assert.match(await chat.text(), /"type":"done"/);
   } finally { await stop(run.child); }
   // A second start imports nothing new.
   run = await start(state, SUBSCRIPTION, {args:['--port', String(port)], until:/Arsip berjalan di/});

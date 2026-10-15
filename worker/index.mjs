@@ -7,6 +7,8 @@ const limit = (env, key, fallback) => {
   const value = Number(env[key]);
   return Number.isSafeInteger(value) && value > 0 ? value : fallback;
 };
+// Agentic questions per UTC day for the whole site: CHAT_AGENTIC_DAILY, else 100. Also read by local/vps.mjs metrics.
+export const agenticDaily = env => limit(env, 'CHAT_AGENTIC_DAILY', 100);
 
 const allowed = (request, env) => !request.headers.get('Origin') ||
   (env.CHAT_ALLOWED_ORIGINS || '').split(',').includes(request.headers.get('Origin'));
@@ -17,25 +19,6 @@ function headers(request, type) {
 }
 const json = (request, value, status = 200) => new Response(JSON.stringify(value),
   {status, headers:headers(request, 'application/json; charset=utf-8')});
-
-// Router in front of the single ArchiveChat object (local/server.mjs runs both on Node, storage in SQLite).
-export default {
-  async fetch(request, env) {
-    if (!allowed(request, env)) return new Response('Origin tidak diizinkan', {status:403});
-    const path = new URL(request.url).pathname;
-    if (!['/api/chat', '/api/chat/config'].includes(path)) return new Response('Not found', {status:404});
-    if (request.method === 'OPTIONS') return new Response(null, {status:204, headers:{
-      ...headers(request, 'text/plain'), 'Access-Control-Allow-Methods':'POST, GET, OPTIONS',
-      'Access-Control-Allow-Headers':'Content-Type', 'Access-Control-Max-Age':'600'}});
-    // The agentic quota lives in ArchiveChat, so configuration is answered there.
-    if (request.method === 'GET' && path === '/api/chat/config')
-      return env.CHAT.get(env.CHAT.idFromName('archive-global-v1')).fetch(request);
-    if (request.method !== 'POST' || path !== '/api/chat') return new Response('Method not allowed', {status:405});
-    if (!env.OPENROUTER_API_KEY) return json(request, {error:'Percakapan belum diaktifkan pengelola.'}, 503);
-    // A single named object makes limits and concurrent slots consistent across locations.
-    return env.CHAT.get(env.CHAT.idFromName('archive-global-v1')).fetch(request);
-  }
-};
 
 export class ArchiveChat {
   constructor(ctx, env) {
@@ -75,12 +58,11 @@ export class ArchiveChat {
       sql.exec('INSERT INTO requests VALUES (?, ?)', now, client);
     });
   }
-  // Agentic mode is a site-wide trial: CHAT_AGENTIC_DAILY questions per UTC day (default 10).
-  // Answers served from cache do not use the quota.
+  // Agentic mode is a site-wide quota (agenticDaily). Answers served from cache do not use it.
   agenticLeft() {
     const day = Math.floor(Date.now() / 86400000) * 86400;
     const used = this.ctx.storage.sql.exec('SELECT COUNT(*) AS n FROM agentic_requests WHERE stamp >= ?', day).one().n;
-    return Math.max(0, limit(this.env, 'CHAT_AGENTIC_DAILY', 10) - used);
+    return Math.max(0, agenticDaily(this.env) - used);
   }
   reserveAgentic() {
     const now = Math.floor(Date.now() / 1000), day = Math.floor(now / 86400) * 86400;
@@ -88,7 +70,7 @@ export class ArchiveChat {
       const sql = this.ctx.storage.sql;
       sql.exec('DELETE FROM agentic_requests WHERE stamp < ?', day);
       if (this.agenticLeft() <= 0)
-        throw new ChatError('Kuota mode agen hari ini (' + limit(this.env, 'CHAT_AGENTIC_DAILY', 10) + ' pertanyaan untuk seluruh situs) sudah habis. Mode biasa tetap bisa dipakai.');
+        throw new ChatError('Kuota mode agen hari ini (' + agenticDaily(this.env) + ' pertanyaan untuk seluruh situs) sudah habis. Mode biasa tetap bisa dipakai.');
       sql.exec('INSERT INTO agentic_requests VALUES (?)', now);
     });
     return now;
@@ -126,17 +108,29 @@ export class ArchiveChat {
     });
     return token;
   }
-  async fetch(request) {
-    if (new URL(request.url).pathname === '/api/chat/config')
-      return json(request, {ready:!!this.env.OPENROUTER_API_KEY, model:this.modelLabel(),
-        agentic:{enabled:!!(this.env.OPENROUTER_API_KEY && this.env.DATACAT_API_KEY), limit:limit(this.env, 'CHAT_AGENTIC_DAILY', 10), left:this.agenticLeft()}});
+  // The HTTP entry, called by local/server.mjs. `address` is the caller's address from the socket or the VPS proxy,
+  // never a request header, so a client cannot pick its own rate-limit identity.
+  async fetch(request, address = 'local') {
+    if (!allowed(request, this.env)) return new Response('Origin tidak diizinkan', {status:403});
+    const path = new URL(request.url).pathname;
+    if (!['/api/chat', '/api/chat/config'].includes(path)) return new Response('Not found', {status:404});
+    if (request.method === 'OPTIONS') return new Response(null, {status:204, headers:{
+      ...headers(request, 'text/plain'), 'Access-Control-Allow-Methods':'POST, GET, OPTIONS',
+      'Access-Control-Allow-Headers':'Content-Type', 'Access-Control-Max-Age':'600'}});
+    // MODEL_FETCHER is the Claude Code CLI bridge (local/claude-bridge.mjs); without it the chat is off.
+    const fetcher = typeof this.env.MODEL_FETCHER === 'function' ? this.env.MODEL_FETCHER : null;
+    if (request.method === 'GET' && path === '/api/chat/config')
+      return json(request, {ready:!!fetcher, model:this.modelLabel(),
+        agentic:{enabled:!!(fetcher && this.env.DATACAT_API_KEY), limit:agenticDaily(this.env), left:this.agenticLeft()}});
+    if (request.method !== 'POST' || path !== '/api/chat') return new Response('Method not allowed', {status:405});
+    if (!fetcher) return json(request, {error:'Percakapan belum diaktifkan pengelola.'}, 503);
     // Keep body uploads bounded before expensive decoding, parsing, or document retrieval.
     if (this.receiving >= 4) return json(request, {error:'Server sedang sibuk. Coba sebentar lagi.'}, 429);
     this.receiving++;
     const analysisId=crypto.randomUUID(),started=Date.now();
     let body, client, conversation;
     try {
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(request.headers.get('CF-Connecting-IP') || 'local'));
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(address));
       client = Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
       try { this.admit(client); } catch (error) { return json(request, {error:error.message}, 429); }
       if ((request.headers.get('Content-Type') || '').split(';')[0].trim().toLowerCase() !== 'application/json' ||
@@ -176,9 +170,7 @@ export class ArchiveChat {
     const emit = value => { controller.signal.throwIfAborted(); return write(value); };
     const timer = setTimeout(() => controller.abort(), 8 * 60 * 1000);
     writer.closed.catch(() => controller.abort());
-    // MODEL_FETCHER is the Claude Code CLI bridge (local/server.mjs); without one (tests) the client uses fetch().
-    const fetcher = typeof this.env.MODEL_FETCHER === 'function' ? this.env.MODEL_FETCHER : undefined;
-    const model = new OpenRouter(this.env.OPENROUTER_API_KEY, controller.signal, fetcher, (bytes,tokens) => this.spend(bytes,tokens));
+    const model = new OpenRouter(null, controller.signal, fetcher, (bytes,tokens) => this.spend(bytes,tokens));
     const retrieval = {};
     let agenticStamp = null;
     const run = async () => {

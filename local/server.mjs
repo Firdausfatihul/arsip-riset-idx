@@ -36,8 +36,6 @@ const INDONESIA = ['Asia/Jakarta', 'Asia/Pontianak', 'Asia/Makassar', 'Asia/Jaya
 // Exit status for a failed machine lock or a missing Claude login; the VPS systemd unit does not restart on it
 // (RestartPreventExitStatus), so a server that must not run stays down instead of retrying.
 export const LOCK_FAILED = 78;
-// Agentic questions per UTC day for the whole site (CHAT_AGENTIC_DAILY overrides it); also shown by tools/chat_metrics.py.
-export const AGENTIC_DAILY = Number(process.env.CHAT_AGENTIC_DAILY) || 100;
 // A Linux VPS (ARSIP_ALLOW_VPS=1) must prove where it runs: Tencent Cloud instance metadata, which the hypervisor
 // answers per instance. A disk image copied to another instance or region keeps /etc/machine-id, the lock file and
 // the Claude login, but not the instance ID or the region, so it never starts.
@@ -229,8 +227,6 @@ async function main() {
     catch (error) { setImmediate(() => stop('Pemeriksaan mesin gagal: ' + error.message + ' Server dimatikan.', LOCK_FAILED)); throw error; }
   };
   const env = {
-    // Placeholder that marks the chat as enabled; the bridge never sends it anywhere.
-    OPENROUTER_API_KEY:'local-claude-code',
     MODEL_FETCHER:claudeFetcher({bin:claude, model:opt.model, effort:opt.effort, concurrency:opt.concurrency, guard,
       keyFile:path.join(STATE, 'boundary.key'),
       log:entry => console.log('[claude]', JSON.stringify(entry))}),
@@ -239,7 +235,9 @@ async function main() {
     // Each analysis runs at most two model calls at once, so the analyses admitted never outnumber CLI slots.
     CHAT_DAILY_REQUESTS:'3000', CHAT_HOURLY_PER_IP:'300',
     CHAT_CONCURRENT_REQUESTS:String(Math.max(1, Math.floor(opt.concurrency / 2))), CHAT_CONCURRENT_PER_IP:String(Math.max(1, Math.floor(opt.concurrency / 2))),
-    CHAT_AGENTIC_DAILY:String(AGENTIC_DAILY), CHAT_DAILY_OUTPUT_TOKENS:'3000000', CHAT_DAILY_BYTES:'300000000',
+    CHAT_DAILY_OUTPUT_TOKENS:'3000000', CHAT_DAILY_BYTES:'300000000',
+    // Agentic questions per UTC day (worker/index.mjs agenticDaily: 100 unless set).
+    ...(process.env.CHAT_AGENTIC_DAILY ? {CHAT_AGENTIC_DAILY:process.env.CHAT_AGENTIC_DAILY} : {}),
     ...(secrets.DATACAT_API_KEY ? {DATACAT_API_KEY:secrets.DATACAT_API_KEY} : {}),
     ...(secrets.CHAT_METRICS_TOKEN ? {CHAT_METRICS_TOKEN:secrets.CHAT_METRICS_TOKEN} : {}),
     ASSETS:{async fetch(request) {
@@ -248,10 +246,9 @@ async function main() {
       try { return new Response(await readFile(file)); } catch { return new Response('Not found', {status:404}); }
     }},
   };
-  const {default: worker, ArchiveChat} = await import('../worker/index.mjs');
+  const {ArchiveChat} = await import('../worker/index.mjs');
   const pending = new Set();
   const object = new ArchiveChat({storage:store, waitUntil:promise => { pending.add(promise); promise.finally(() => pending.delete(promise)).catch(() => {}); }}, env);
-  env.CHAT = {idFromName:name => name, get:() => ({fetch:request => object.fetch(request)})};
 
   // Persistent source index, filled in-process and without AI.
   const index = await object.archive.manifest();
@@ -266,14 +263,14 @@ async function main() {
   if (!env.DATACAT_API_KEY) console.log('Mode agen nonaktif: DATACAT_API_KEY tidak ada di .env.chat.');
 
   if (!vps) {
-    server = createServer(handler({worker, env, hosts, client:req => req.socket.remoteAddress || 'local'}));
+    server = createServer(handler({chat:object, hosts, client:req => req.socket.remoteAddress || 'local'}));
     server.listen(opt.port, opt.host, () => console.log(`\nArsip berjalan di http://${opt.host === '::1' ? '[::1]' : opt.host}:${opt.port}  (Ctrl+C untuk berhenti)`));
   }
   if (remote) {
     // Reached only through Caddy: on the VPS itself (local/vps.mjs), or through the SSH tunnel from the VPS
     // (local/remote.mjs). Caddy appends the device's address to X-Forwarded-For, so the last entry is the client.
     const forwarded = req => String(req.headers['x-forwarded-for'] || '').split(',').pop().trim() || 'remote';
-    remoteServer = createServer(handler({worker, env, hosts:new Set([remote.domain]), client:forwarded, auth:gate(remote, forwarded)}));
+    remoteServer = createServer(handler({chat:object, hosts:new Set([remote.domain]), client:forwarded, auth:gate(remote, forwarded)}));
     remoteServer.listen(remote.local_port, '127.0.0.1', () => console.log(`Akses jarak jauh: https://${remote.domain} (${remote.vps_host ? 'lewat VPS ' + remote.vps_host : 'Caddy di mesin ini'}, sandi wajib)`));
   }
   process.on('SIGINT', () => stop()); process.on('SIGTERM', () => stop());
@@ -322,7 +319,7 @@ export function gate(remote, client, limiter = new LoginLimiter()) {
   };
 }
 
-function handler({worker, env, hosts, client, auth = null}) {
+function handler({chat, hosts, client, auth = null}) {
   return async (req, res) => {
     const url = new URL(req.url, 'http://local');
     const security = SECURITY;
@@ -334,13 +331,12 @@ function handler({worker, env, hosts, client, auth = null}) {
         res.on('close', () => { if (!res.writableFinished) controller.abort(); });
         const headers = new Headers();
         for (const [key, value] of Object.entries(req.headers))
-          if (!/^(cf-connecting-ip|x-forwarded-for|host|connection|transfer-encoding|cookie)$/i.test(key)) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
-        // The client address comes from the socket (or the VPS proxy); a client cannot pick its own rate-limit identity.
-        headers.set('CF-Connecting-IP', client(req));
+          if (!/^(x-forwarded-for|host|connection|transfer-encoding|cookie)$/i.test(key)) headers.set(key, Array.isArray(value) ? value.join(', ') : value);
         const hasBody = !['GET', 'HEAD'].includes(req.method);
         const request = new Request('http://' + req.headers.host + url.pathname + url.search, {method:req.method, headers,
           signal:controller.signal, ...(hasBody ? {body:Readable.toWeb(req), duplex:'half'} : {})});
-        const response = await worker.fetch(request, env);
+        // The client address comes from the socket (or the VPS proxy), never from a header the client sends.
+        const response = await chat.fetch(request, client(req));
         res.writeHead(response.status, {...Object.fromEntries(response.headers), ...security});
         if (!response.body) return res.end();
         const reader = response.body.getReader();

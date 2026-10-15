@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {storage} from '../local/sqlite-storage.mjs';
 import {Archive, OpenRouter, ChatError, LIMITS, validate, readLimited, converse, readFullDocuments} from '../worker/core.mjs';
-import router, {ArchiveChat} from '../worker/index.mjs';
+import {ArchiveChat} from '../worker/index.mjs';
 
 const realFetch = globalThis.fetch;
 globalThis.fetch = () => { throw new Error('Network forbidden in attack harness'); };
@@ -11,14 +11,14 @@ test.after(() => { globalThis.fetch = realFetch; });
 function fixture() {
   const {db, storage:store} = storage();
   const ctx = {storage:store, waitUntil(p) { p.catch(() => {}); }};
-  const env = {OPENROUTER_API_KEY:'OFFLINE-CANARY-KEY', CHAT_ALLOWED_ORIGINS:'https://archive.test', ASSETS:{fetch:async () => Response.json({docs:[],tickers:['SOCI'],commonWords:[],postings:{}})}};
+  const env = {MODEL_FETCHER:() => { throw new Error('Network forbidden in attack harness'); }, CHAT_ALLOWED_ORIGINS:'https://archive.test', ASSETS:{fetch:async () => Response.json({docs:[],tickers:['SOCI'],commonWords:[],postings:{}})}};
   const object = new ArchiveChat(ctx, env);
-  env.CHAT = {idFromName:x=>x, get:()=>object};
   return {object, env, ctx, db};
 }
-function request(body, ip='192.0.2.1', extra={}) {
-  return new Request('https://archive.test/api/chat', {method:'POST',headers:{'Content-Type':'application/json','CF-Connecting-IP':ip,...extra},body:JSON.stringify(body)});
-}
+const request = (body, extra={}) =>
+  new Request('https://archive.test/api/chat', {method:'POST',headers:{'Content-Type':'application/json',...extra},body:JSON.stringify(body)});
+// ArchiveChat.fetch takes the caller's address from local/server.mjs, never from a header.
+const post = (object, body, ip='192.0.2.1') => object.fetch(request(body), ip);
 const delay = ms => new Promise(resolve => setTimeout(resolve,ms));
 
 for (const [name,body] of Object.entries({
@@ -51,7 +51,7 @@ test('chunked oversize uploads and slow bodies terminate', async () => {
 test('HTTP rejects malformed JSON, MIME confusion, excessive body, arbitrary session without model calls', async () => {
   const {object,db}=fixture();
   for (const req of [
-    request({question:'SOCI'},undefined,{'Content-Type':'application/jsonp'}),
+    request({question:'SOCI'},{'Content-Type':'application/jsonp'}),
     request({question:'x'.repeat(5000)}),
     request({question:'SOCI',context:'a'.repeat(64)}),
     new Request('https://archive.test/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:'{broken'})
@@ -59,17 +59,21 @@ test('HTTP rejects malformed JSON, MIME confusion, excessive body, arbitrary ses
   assert.equal(db.prepare('SELECT COUNT(*) n FROM requests').get().n,0);db.close();
 });
 test('public routes block foreign origin, file paths and unused methods', async () => {
-  const {env,db}=fixture();
-  assert.equal((await router.fetch(request({question:'SOCI'},undefined,{Origin:'https://evil.example'}),env)).status,403);
-  for (const path of ['/manifest.json','/.env.chat','/D0.json']) assert.equal((await router.fetch(new Request('https://archive.test'+path),env)).status,404);
-  assert.equal((await router.fetch(new Request('https://archive.test/api/chat',{method:'PUT'}),env)).status,405);
-  assert.equal((await router.fetch(new Request('https://archive.test/api/chat',{method:'OPTIONS',headers:{Origin:'https://archive.test'}}),env)).status,204);
+  const {object,db}=fixture();
+  assert.equal((await object.fetch(request({question:'SOCI'},{Origin:'https://evil.example'}))).status,403);
+  for (const path of ['/manifest.json','/.env.chat','/D0.json']) assert.equal((await object.fetch(new Request('https://archive.test'+path))).status,404);
+  assert.equal((await object.fetch(new Request('https://archive.test/api/chat',{method:'PUT'}))).status,405);
+  assert.equal((await object.fetch(new Request('https://archive.test/api/chat',{method:'OPTIONS',headers:{Origin:'https://archive.test'}}))).status,204);
+  // Without the model bridge the chat is off; the configuration says so.
+  delete object.env.MODEL_FETCHER;
+  assert.equal((await post(object,{question:'SOCI'})).status,503);
+  assert.equal((await (await object.fetch(new Request('https://archive.test/api/chat/config'))).json()).ready,false);
   db.close();
 });
 test('invalid request floods use ingress quota, bounded even for distinct IPs', async () => {
   const {object,db}=fixture();
-  for(let i=0;i<12;i++) assert.equal((await object.fetch(request({question:''}))).status,400);
-  assert.equal((await object.fetch(request({question:''}))).status,429);
+  for(let i=0;i<12;i++) assert.equal((await post(object,{question:''})).status,400);
+  assert.equal((await post(object,{question:''})).status,429);
   for(let i=1;i<=108;i++) object.admit('ip-'+i);
   assert.throws(()=>object.admit('one-more'),ChatError);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM ingress').get().n,120);db.close();
@@ -98,9 +102,9 @@ test('opaque history token: forged, expired, other client; SQL injection stays d
 });
 test('active analysis slots and upload slots prevent extra requests', async () => {
   const {object,db}=fixture();object.receiving=4;
-  assert.equal((await object.fetch(request({question:'SOCI'}))).status,429);object.receiving=0;
+  assert.equal((await post(object,{question:'SOCI'})).status,429);object.receiving=0;
   for(let i=0;i<10;i++) object.active.set('request-'+i,'client-'+i);
-  assert.equal((await object.fetch(request({question:'SOCI'}))).status,429);db.close();
+  assert.equal((await post(object,{question:'SOCI'})).status,429);db.close();
 });
 // readFullDocuments: the whole-source read behind a validated [[SUMBER:...]] request.
 const readAll=async(archive,model,emit=()=>{})=>readFullDocuments(archive,model,'SOCI',[],emit,null,
@@ -163,24 +167,24 @@ test('ten concurrent requests allow five on shared Wi-Fi and release individual 
   const pending=[];
   try {
     for(let i=0;i<5;i++) {
-      const response=await object.fetch(request({question:'SOCI tanggal 17'}));
+      const response=await post(object,{question:'SOCI tanggal 17'});
       assert.equal(response.status,200);pending.push(response.text());
     }
     assert.equal(object.active.size,5);
-    const ipBlocked=await object.fetch(request({question:'SOCI tanggal 17'}));
+    const ipBlocked=await post(object,{question:'SOCI tanggal 17'});
     assert.equal(ipBlocked.status,429);assert.match((await ipBlocked.json()).error,/jaringan yang sama/);
     for(let i=0;i<5;i++) {
-      const response=await object.fetch(request({question:'SOCI tanggal 17'},'192.0.2.'+(i+10)));
+      const response=await post(object,{question:'SOCI tanggal 17'},'192.0.2.'+(i+10));
       assert.equal(response.status,200);pending.push(response.text());
     }
     assert.equal(object.active.size,10);
-    const globalBlocked=await object.fetch(request({question:'SOCI tanggal 17'},'192.0.2.99'));
+    const globalBlocked=await post(object,{question:'SOCI tanggal 17'},'192.0.2.99');
     assert.equal(globalBlocked.status,429);assert.match((await globalBlocked.json()).error,/Semua slot/);
     assert.equal(db.prepare('SELECT COUNT(*) n FROM requests').get().n,10);
     release();
     for(const text of await Promise.all(pending)) assert.match(text,/"type":"done"/);
     assert.equal(object.active.size,0);
-    const again=await object.fetch(request({question:'SOCI tanggal 17'}));
+    const again=await post(object,{question:'SOCI tanggal 17'});
     assert.equal(again.status,200);await again.text();assert.equal(object.active.size,0);
   } finally {release();await Promise.allSettled(pending);db.close();}
 });
