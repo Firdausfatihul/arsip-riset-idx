@@ -1,18 +1,10 @@
 // Isolated, offline adversarial harness. Never uses the real key or a public endpoint.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
-import {Archive, OpenRouter, ChatError, LIMITS, validate, readLimited, converse, size} from '../worker/core.mjs';
+import {Archive, OpenRouter, ChatError, LIMITS, validate, readLimited, converse, readFullDocuments, size} from '../worker/core.mjs';
+import router, {ArchiveChat} from '../worker/index.mjs';
 
-const sourceStoreURL = new URL('../worker/source-store.mjs', import.meta.url).href;
-const coreURL = new URL('../worker/core.mjs', import.meta.url).href;
-const source = (await readFile(new URL('../worker/index.mjs', import.meta.url), 'utf8'))
-  .replace("import {DurableObject} from 'cloudflare:workers';", 'class DurableObject { constructor(ctx,env) {this.ctx=ctx;this.env=env;} }')
-  .replace("'./core.mjs'", JSON.stringify(coreURL))
-  .replace("'./source-store.mjs'", JSON.stringify(sourceStoreURL))
-  .replace("'./agent.mjs'", JSON.stringify(new URL('../worker/agent.mjs', import.meta.url).href));
-const {ArchiveChat, default:router} = await import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const realFetch = globalThis.fetch;
 globalThis.fetch = () => { throw new Error('Network forbidden in attack harness'); };
 test.after(() => { globalThis.fetch = realFetch; });
@@ -114,10 +106,13 @@ test('active analysis slots and upload slots prevent extra requests', async () =
   for(let i=0;i<10;i++) object.active.set('request-'+i,'client-'+i);
   assert.equal((await object.fetch(request({question:'SOCI'}))).status,429);db.close();
 });
-test('broad document retrieval rejected before paid reading; five tickers rejected', async () => {
-  const archive={manifest:async()=>({tickers:['SOCI','SMDR','BBRI','BBCA','PGAS'],commonWords:[]}),search:async()=>[{sizes:[4000001]}]};
+// readFullDocuments: the whole-source read behind a validated [[SUMBER:...]] request.
+const readAll=async(archive,model,emit=()=>{})=>readFullDocuments(archive,model,'SOCI',[],emit,null,
+  {index:await archive.manifest(),terms:['SOCI'],selected:await archive.search(['SOCI'])});
+test('broad full reads rejected before paid reading; five tickers rejected', async () => {
+  const archive={manifest:async()=>({retrieval_version:'test',tickers:['SOCI','SMDR','BBRI','BBCA','PGAS'],commonWords:[]}),search:async()=>[{sizes:[4000001]}]};
   const model={complete:()=>{throw Error('Must not call provider');}};
-  await assert.rejects(converse(archive,model,'SOCI',[],()=>{}),/terlalu luas/);
+  await assert.rejects(readAll(archive,model),/terlalu luas/);
   await assert.rejects(converse(archive,model,'SOCI SMDR BBRI BBCA PGAS',[],()=>{}),/Maksimal empat/);
 });
 test('per-call and cumulative input, output, call limits apply before network', async () => {
@@ -146,12 +141,12 @@ test('two parallel readers preserve all parts/order and stop scheduling after fa
     const parts=JSON.parse(messages.at(-1).content.split('\n')[1]);seen.push(parts[0].source_id);
     await options.onActivity();await delay(parts[0].source_id==='D0'?35:5);active--;return parts[0].source_id;},
     answer:async(messages,emit)=>{const text=messages.at(-1).content;assert.ok(text.indexOf('"batch":1')<text.indexOf('"batch":2'));await emit({type:'delta',text:'ok'});return'ok';}};
-  const events=[];const result=await converse(archive,model,'SOCI',[],e=>events.push(e));
+  const events=[];const result=await readAll(archive,model,e=>events.push(e));
   assert.equal(peak,2);assert.equal(result.documents,4);assert.deepEqual(seen.sort(),['D0','D1','D2','D3']);
   assert.ok(events.some(e=>e.type==='activity'));assert.equal(events.filter(e=>e.type==='progress').at(-1).completed,4);
   let started=0,cancelled=false;
   const broken={complete:async()=>{started++;throw new ChatError('Simulated failure');},cancel:()=>{cancelled=true;},answer:()=>{throw Error('Must not answer');}};
-  await assert.rejects(converse(archive,broken,'SOCI',[],()=>{}),/Simulated failure/);
+  await assert.rejects(readAll(archive,broken),/Simulated failure/);
   assert.ok(started<=2 && cancelled);
 });
 test('document injection is data and cannot choose tools, endpoints, or expose secret', async () => {

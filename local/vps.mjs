@@ -15,13 +15,15 @@
 //   node local/vps.mjs login       interactive `claude auth login` on the VPS (open the URL on any browser)
 //   node local/vps.mjs push        copy code + archive + keys, build, pin the machine (first time), restart
 //   node local/vps.mjs status | logs | password
+//   node local/vps.mjs metrics [--days 7] [--limit 100] [--offset 0]   question/cost statistics as JSON (tools/chat_metrics.py)
 import {execFileSync, spawn, spawnSync} from 'node:child_process';
 import {existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, chmodSync} from 'node:fs';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {randomBytes} from 'node:crypto';
 import {newPassword, hashPassword} from './remote-auth.mjs';
 import {validate} from './remote.mjs';
+import {AGENTIC_DAILY} from './server.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = path.join(ROOT, '.local');
@@ -389,6 +391,25 @@ function logs(opt) {
   ssh(read(), `sudo journalctl -u arsip -n 200 --no-pager ${opt.follow ? '-f' : ''}`, {tty:!!opt.follow});
 }
 
+// CacheStore.report() over the VPS chat database, opened read-only: no table is created and nothing is written.
+// Piped to node on the VPS as the server user.
+export function metricsScript({days = 7, limit = 100, offset = 0} = {}, app = APP) {
+  const n = (value, low, high) => Math.max(low, Math.min(high, Math.trunc(Number(value)) || low));
+  return `import {DatabaseSync} from 'node:sqlite';
+import {CacheStore} from ${JSON.stringify(pathToFileURL(app + '/worker/cache.mjs').href)};
+const db = new DatabaseSync(${JSON.stringify(app + '/.local/chat.sqlite')}, {readOnly:true});
+const sql = {exec:(query, ...args) => ({toArray:() => db.prepare(query).all(...args)})};
+console.log(JSON.stringify(CacheStore.prototype.report.call({sql}, ${n(days, 1, 365)}, ${n(limit, 1, 500)}, ${n(offset, 0, 100000)})));
+`;
+}
+
+function metrics(opt) {
+  const r = must(ssh(read(), asArsip(`${NODE} --input-type=module`), {input:metricsScript(opt), capture:true}), 'Membaca statistik');
+  const data = jsonIn(r.stdout || '');
+  if (!data) throw new Error('Statistik VPS tidak terbaca.');
+  console.log(JSON.stringify({...data, agentic_daily:AGENTIC_DAILY}));
+}
+
 function password() {
   const config = read();
   const value = newPassword();
@@ -408,8 +429,9 @@ function apply() {
 
 const main = async () => {
   const opt = args(process.argv.slice(2));
-  const commands = {setup:() => setup(opt), bootstrap:() => bootstrap(opt), login, push:() => push(opt), status, logs:() => logs(opt), password, apply};
-  if (!commands[opt._[0]]) throw new Error('Perintah: setup | bootstrap | login | push | apply | status | logs | password');
+  const commands = {setup:() => setup(opt), bootstrap:() => bootstrap(opt), login, push:() => push(opt), status, logs:() => logs(opt), password, apply,
+    metrics:() => metrics(opt)};
+  if (!commands[opt._[0]]) throw new Error('Perintah: setup | bootstrap | login | push | apply | status | logs | password | metrics');
   await commands[opt._[0]]();
 };
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))

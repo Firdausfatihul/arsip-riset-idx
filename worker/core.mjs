@@ -147,10 +147,7 @@ export const rememberTurn = (history, question, result) => [...history,
     ...(result.context ? {context:result.context} : {})},
   {role:'assistant', content:result.answer.slice(0, 1500)}].slice(-6);
 
-export async function searchTerms(question, history, index, model) {
-  return (await searchQuery(question, history, index, model)).terms;
-}
-async function searchQuery(question, history, index, model, found = directTickers(question, index)) {
+export async function searchQuery(question, history, index, model, found = directTickers(question, index)) {
   const direct = text => directTickers(text, index);
   const previousTerms = [...history].reverse().find(t => t.role === 'user' && Array.isArray(t.terms))?.terms;
   if (!found.length && previousTerms?.length && FOLLOW_UP.test(question)) return {intent:'search', terms:previousTerms};
@@ -469,19 +466,9 @@ export class OpenRouter {
   }
 }
 
-export async function converseLegacy(archive, model, question, history, emit, signal) {
-  const index = await archive.manifest();
-  await emit({type:'status', text:'Mencari dokumen yang sesuai…'});
-  const terms = await searchTerms(question, history, index, model);
-  if (!terms.length) throw new ChatError('Sebutkan saham atau topik, misalnya “analisis SOCI”.');
-  if (terms.length > LIMITS.terms) throw new ChatError('Maksimal empat kode saham atau topik per pertanyaan.');
-  const selected = await archive.search(terms);
-  return readFullDocuments(archive,model,question,history,emit,signal,{index,terms,selected});
-}
-
-// Also used after a validated [[SUMBER:...]] request. At that point the sources and focus
+// Used after a validated [[SUMBER:...]] request. At that point the sources and focus
 // are already known, so expansion must not pay to classify the same question again.
-async function readFullDocuments(archive, model, question, history, emit, signal, {index,terms,selected}) {
+export async function readFullDocuments(archive, model, question, history, emit, signal, {index,terms,selected}) {
   if (!selected.length) throw new ChatError('Belum ditemukan dokumen untuk “' + terms.join(', ') + '”.');
   const bytes = selected.reduce((total, doc) => total + doc.sizes.reduce((a,b) => a+b, 0), 0);
   if (bytes > LIMITS.archive) throw new ChatError('Topik terlalu luas untuk satu analisis. Pilih kode saham atau topik yang lebih spesifik.');
@@ -813,7 +800,6 @@ async function tableRoute({archive, index, model, question, history, emit, stats
 
 export async function converse(archive, model, question, history, emit, signal, options = {}) {
   const index = await archive.manifest();
-  if (!index.retrieval_version || options.legacy) return converseLegacy(archive,model,question,history,emit,signal);
   const stats = options.metrics || {};
   Object.assign(stats,{pipeline:PIPELINE,source_cache_hits:0,note_cache_hits:0,note_reads:0,shared_reads:0,
     answer_cache_hit:false,baseline_source_bytes:0,selected_source_bytes:0,excluded_dated_records:0,fallback_documents:0});

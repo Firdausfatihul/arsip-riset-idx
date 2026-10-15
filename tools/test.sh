@@ -28,8 +28,6 @@ echo "== node --test"
 node --test --test-reporter=dot tests/*.mjs || status=1
 echo "== DOM"
 for t in tests/*.cjs; do
-  # Cloudflare runtime test (Miniflare); not part of the supported stack.
-  [ "$t" = tests/worker_runtime.cjs ] && continue
   if node "$t" >"$tmp/dom.log" 2>&1; then echo "ok   $t"; else cat "$tmp/dom.log"; echo "FAIL $t"; status=1; fi
 done
 [ $status = 0 ] && echo "== all tests passed" || echo "== FAILED"

@@ -86,7 +86,7 @@ class FakeRunner:
         if line == VPS_PUSH:
             self.state["vps"] += 1
             return r(0, "Mengirim 10 berkas ke 192.0.2.1…\nServer berjalan. Buka https://arsip.example di perangkat mana pun.\n")
-        if "wrangler" in line or "publish_chat" in line or "sync_chat_index" in line or "build_worker" in line:
+        if "wrangler" in line or "build_worker" in line:
             raise AssertionError(f"Cloudflare/Worker command must never run: {line}")
         return r()
 
@@ -163,14 +163,14 @@ class PublishTests(unittest.TestCase):
         commit = runner.calls[runner.index("git commit")]
         self.assertIn("Stockbit: ringkasan 2026-10-05", commit)
         self.assertFalse([c for c in runner.calls if "--force" in c or "push -f" in c])
-        self.assertTrue(self.no_calls(runner, "wrangler", "npx", "publish_chat", "sync_chat_index", "build_worker"))
+        self.assertTrue(self.no_calls(runner, "wrangler", "npx", "build_worker"))
         rec = self.records()[-1]
         self.assertEqual((rec["status"], rec["pre_sha"], rec["post_sha"], rec["tag"], rec["target"], rec["vps"]),
                          ("published", "pre1", "post1", "stockbit-publish-20261007-101500", "vps", True))
         self.assertFalse([k for k in rec if k.startswith("worker_") or k == "rollback_to"])
         self.assertEqual((summary["status"], summary["vps"]), ("published", True))
 
-    def test_docs_rebuilt_like_publish_chat_env(self):
+    def test_docs_build_env(self):
         runner = FakeRunner()
         with patch.dict("os.environ", {"CHAT_API_URL": "http://127.0.0.1:8788/api/chat"}):
             self.assertEqual(self.publish(runner)[0], 0, self.output)
@@ -751,7 +751,7 @@ class RollbackTests(unittest.TestCase):
         self.assertEqual(positions, sorted(positions), runner.calls)
         self.assertEqual(runner.state["vps"], 1)
         self.assertFalse([c for c in runner.calls if "--force" in c or "reset --hard" in c])
-        self.assertFalse([c for c in runner.calls if "wrangler" in c or "npx" in c or "sync_chat_index" in c])
+        self.assertFalse([c for c in runner.calls if "wrangler" in c or "npx" in c])
         # Old log records still carry worker_version_*: noted, never acted on.
         self.assertIn("Worker lama tidak dipakai lagi", self.output)
         rec = self.last()

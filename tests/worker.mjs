@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import {Archive, OpenRouter, ChatError, validate, searchTerms, batches, size, converseLegacy as converse, MODEL, LIMITS, readLimited} from '../worker/core.mjs';
+import {Archive, OpenRouter, ChatError, validate, searchQuery, batches, size, converse, readFullDocuments, MODEL, LIMITS, readLimited} from '../worker/core.mjs';
 import {tickerDocuments} from './helpers/archive-expectations.mjs';
 import {ROOT, SITE, assets} from './helpers/archive.mjs';
 
@@ -29,9 +29,9 @@ class FakeModel {
   }
   async answer(messages, emit) { this.final = messages; await emit({type:'delta', text:'Hasil SOCI [D47].'}); return 'Hasil SOCI [D47].'; }
 }
-function legacyFixture() {
+function fullFixture() {
   // Fixed multi-document/multi-batch source material. The real archive can grow
-  // beyond the legacy full-document budget without invalidating this contract.
+  // beyond the full-document budget without invalidating this contract.
   const payloads = {};
   const docs = ['SOCI', 'SOCI', 'SMDR'].map((ticker, i) => {
     const source_id = 'D' + (47 + i), asset = source_id + '.json';
@@ -48,10 +48,13 @@ function legacyFixture() {
     return data ? Response.json(data) : new Response('Not found', {status:404});
   }});
 }
-test('legacy full-document reader passes every selected part and preserves final batch order', async () => {
-  const sample = legacyFixture();
-  const model = new FakeModel(), events = [];
-  const result = await converse(sample, model, 'analisis soci', [], e => events.push(e));
+// readFullDocuments answers a validated [[SUMBER:...]] request with the whole sources.
+const readAll = async (archive, model, terms, events = []) => readFullDocuments(archive, model, 'analisis soci', [], e => events.push(e), null,
+  {index:await archive.manifest(), terms, selected:await archive.search(terms)});
+test('full-document reader passes every selected part and preserves final batch order', async () => {
+  const sample = fullFixture();
+  const model = new FakeModel();
+  const result = await readAll(sample, model, ['SOCI']);
   const docs = await sample.search(['SOCI']);
   assert.deepEqual(docs.map(d=>d.source_id), ['D48', 'D47']);
   assert.equal(result.documents, 2);
@@ -71,15 +74,15 @@ test('legacy full-document reader passes every selected part and preserves final
   assert.deepEqual(finalContext.map(c=>({batch:c.batch, ids:c.source_ids})),
     groups.map((group,i)=>({batch:i + 1, ids:[...new Set(group.map(x=>x.doc.source_id))]})));
 });
-test('current SOCI search includes every raw-source match and rejects oversized legacy reads before model calls', async () => {
+test('current SOCI search includes every raw-source match and rejects oversized full reads before model calls', async () => {
   const docs = await archive.search(['SOCI']);
   const expected = await tickerDocuments(await archive.manifest(), 'SOCI');
   assert.ok(expected.length > 0);
   assert.deepEqual(docs.map(d=>d.source_id).sort(), expected.map(d=>d.source_id).sort());
   const bytes = docs.reduce((total,doc)=>total + doc.sizes.reduce((a,b)=>a+b,0), 0);
-  assert.ok(bytes > LIMITS.archive, 'current corpus exceeds the legacy full-document budget');
+  assert.ok(bytes > LIMITS.archive, 'current corpus exceeds the full-document budget');
   const model = new FakeModel(), events = [];
-  await assert.rejects(converse(archive, model, 'analisis soci', [], e=>events.push(e)),
+  await assert.rejects(readAll(archive, model, ['SOCI'], events),
     error=>error instanceof ChatError && /Topik terlalu luas/.test(error.message));
   assert.equal(model.parts.length, 0);
   assert.equal(model.final, undefined);
@@ -98,6 +101,7 @@ test('search is word based and exact phrases do not match distant words', async 
 test('followups keep topic, comparisons add prior ticker, explicit new topic replaces it', async () => {
   const index = await archive.manifest(), model = new FakeModel();
   const history = [{role:'user', content:'SOCI'}];
+  const searchTerms = async (...args) => (await searchQuery(...args)).terms;
   assert.deepEqual(await searchTerms('berapa laba soci', [], index, model), ['SOCI']);
   assert.deepEqual(await searchTerms('bagaimana risikonya?', history, index, model), ['SOCI']);
   assert.deepEqual(await searchTerms('bandingkan dengan SMDR', history, index, model), ['SOCI','SMDR']);
@@ -109,7 +113,8 @@ test('no matches and incomplete model reads cannot produce done', async () => {
     {complete:async () => { throw new ChatError('Incomplete'); }}
   ]) {
     const events = [];
-    await assert.rejects(converse(archive, model, 'tolong riset', [], e => events.push(e)), ChatError);
+    // A word found nowhere in the archive, so the literal-word fallback finds nothing either.
+    await assert.rejects(converse(archive, model, 'qwzxv', [], e => events.push(e)), ChatError);
     assert.ok(!events.some(e => e.type === 'done'));
   }
 });

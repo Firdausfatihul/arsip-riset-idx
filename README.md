@@ -20,7 +20,7 @@ python3 -m http.server -d site 8000   # cek di http://localhost:8000
 Lalu upload **isi** folder `site/` ke host statis mana pun (lihat [Cara host ulang](#cara-host-ulang)).
 Untuk pemakaian sendiri dengan akun Claude, situs + chat di Mac ini: `node local/server.mjs` (lihat [Host lokal dengan akun Claude](#host-lokal-dengan-akun-claude-localservermjs)).
 Semua di VPS Jakarta (Mac boleh mati), setelah ada dokumen baru: `node local/vps.mjs push` (lihat [Semua di VPS Jakarta](#semua-di-vps-jakarta-localvpsmjs)).
-Sumber build: `needtobeindexed/`, `build.py`, `chat.js`, dan `chat.config.json` (alamat API publik).
+Sumber build: `needtobeindexed/`, `build.py`, dan `chat.js`.
 
 ---
 
@@ -39,16 +39,13 @@ archivescrapingweb/
 ├── report-shell.js       # pembungkus tepercaya untuk laporan HTML
 ├── tools/build_safety.py # batas aman sumber dan output build
 ├── chat.js               # antarmuka percakapan; digabung ke index.html saat build
-├── chat.config.json      # alamat API publik; bukan secret
-├── worker/               # API Cloudflare Worker + Durable Object
-├── local/                # host lokal: Worker yang sama di Node + jembatan Claude Code CLI (akun Claude)
+├── worker/               # kode chat (router + ArchiveChat), dijalankan local/server.mjs di Node
+├── local/                # server Mac/VPS: kode chat di Node + jembatan Claude Code CLI (akun Claude)
 ├── tools/build_worker.py # indeks pencarian, bagian sumber, dan indeks emiten untuk Worker
 ├── tools/evidence_index.py # pemisahan sumber tanpa AI, dengan lokasi dan hash isi
 ├── tools/event_index.py  # tabel aksi korporasi per emiten tanpa AI (events.json) untuk pertanyaan screening
 ├── tools/archive_tables.py # tabel klaim Stockbit, sebutan lintas emiten, nama, cek rumor, cakupan (tanpa AI) untuk chat
-├── tools/compare_chat_costs.mjs # pembanding alur lama/baru, simulasi atau API nyata
-├── tools/chat_metrics.py # laporan biaya aktual melalui endpoint privat
-├── tools/publish_chat.py # LAMA, manual: deploy Worker Cloudflare + docs/ (tidak dipakai desk/publish_stockbit)
+├── tools/chat_metrics.py # statistik pertanyaan/biaya dari database chat VPS (baca saja, lewat SSH)
 ├── tools/chat_archive.py # pembaca arsip dan pemisah teks untuk build Worker (Python 3.9+, stdlib)
 ├── tools/sync_idx.py     # salin data dari IDX Signal Desk lokal (http://127.0.0.1:8787) lalu build
 ├── tools/sync_prices.py  # harga penutupan per tanggal snapshot KSEI dari dataset broker summary riset → needtobeindexed/harga/harga.json
@@ -443,7 +440,7 @@ Kotak centang **Mode agen** membuat model memanggil alat baca-saja: `cari_arsip`
 transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di `worker/agent.mjs`.
 
 - Permintaan isi dokumen tanpa kode saham ("baca dokumen keterbukaan singapura, intinya apa", "ringkas KI 22 September") dialihkan ke alur arsip biasa yang membaca dokumen utuh; tidak memakai kuota mode agen. Mode agen hanya melihat kutipan pencarian pendek, jadi dulu menjawab dokumen SGX tidak ada.
-- Kuota: `CHAT_AGENTIC_DAILY` pertanyaan per hari UTC untuk seluruh situs (produksi 50 di `worker/wrangler.jsonc`; tanpa nilai 10). Jawaban tersimpan tidak memakai kuota.
+- Kuota: `CHAT_AGENTIC_DAILY` pertanyaan per hari UTC untuk seluruh situs (Mac/VPS: `AGENTIC_DAILY` 100 di `local/server.mjs`). Jawaban tersimpan tidak memakai kuota.
 - Key datacat disimpan sebagai secret Worker `DATACAT_API_KEY` (lokal di `.env.chat`), tidak pernah ke browser.
   Host, path, dan parameter ditetapkan kode; argumen alat divalidasi; endpoint tulis API tidak tersedia sebagai alat.
 - Batas per pertanyaan: 4 langkah model lalu jawaban maksimal 2.000 token, 18 panggilan alat, 6 KB per hasil dan 70 KB bahan;
@@ -488,9 +485,7 @@ transaksi, laporan keuangan, pengumuman, profil dan jaringan pihak). Kode ada di
     Dijalankan otomatis untuk nama tanpa profil datacat (banyak komisaris/direksi hanya tercatat di teks risalah atau prospektus).
     Kata yang tidak dikenal arsip tetap dianggap bagian nama bila bersebelahan dengan kata nama lain ("ferita lie").
   - Tautan `[O..]` membuka tab Kepemilikan dengan rentang bulan.
-- Uji: `node --test tests/agent.mjs` (tanpa jaringan) dan `node tools/eval_agentic.mjs --label nama`
-  (kasus dalam skrip, API nyata, ambang biaya bawaan US$0,50 yang diperbarui setelah tiap pertanyaan; bukan batas tagihan mutlak).
-  Proses selesai tidak sama dengan jawaban yang telah diuji kebenarannya.
+- Uji: `node --test tests/agent.mjs` (tanpa jaringan).
 - Statistik privat (`tools/chat_metrics.py --html`) memisahkan mode biasa dan mode agen: biaya, rata-rata, termahal, panggilan alat, cache.
 
 ### Cache bersama dan invalidasi
@@ -534,10 +529,8 @@ belum pernah diminta juga diimpor ke tabel sumber persisten tanpa AI; Assets tet
 
 ### Indeks teks persisten dan pertanyaan lintas negara
 
-`python3 tools/sync_chat_index.py` mengimpor dokumen yang belum ada melalui endpoint privat
-`/api/chat/index`, memakai token pengelola yang sama dengan laporan statistik. Tidak memakai AI,
-embedding, layanan baru, cron, atau perubahan dokumen asli. `tools/publish_chat.py` menjalankan
-sinkronisasi ini sesudah deploy Worker. Jika terputus, jalankan lagi; dokumen yang selesai dilewati.
+`local/server.mjs` mengimpor dokumen yang belum ada saat start, tanpa AI, embedding, cron, atau perubahan
+dokumen asli. Jika terputus, start berikutnya melanjutkan; dokumen yang selesai dilewati.
 
 Satu permintaan impor hanya membaca satu dokumen. Hash seluruh teks diverifikasi, lalu bagian dan
 indeks FTS5 ditulis dalam satu transaksi sebelum dokumen dinyatakan siap. Status indeks menyebutkan
@@ -578,12 +571,7 @@ nol. Batas anggaran byte/token tetap dicadangkan sebelum panggilan dan terpisah 
 Rincian biaya permintaan tersedia pada bagian yang dapat dibuka di bawah jawaban.
 
 ```bash
-node tools/eval_chat.mjs --label nama      # kasus tests/eval/cases.json, API nyata, ambang biaya US$2
-node tools/eval_chat.mjs --label cache --only optimization_sgx,optimization_sgx_stockbit --shared-cache 1 --concurrency 1
-node --test tests/eval_reporting.mjs       # kontrak laporan evaluasi, tanpa jaringan
 python3 -B -m unittest tests/test_chat_metrics.py # pemisahan ID tes dalam laporan, tanpa jaringan
-node tools/compare_chat_costs.mjs           # simulasi offline, tidak memanggil provider
-node tools/compare_chat_costs.mjs --live    # perbandingan API nyata, batas cadangan konservatif US$1
 python3 tools/chat_metrics.py --days 7 --out reports/private/chat-metrics.json --html reports/private/chat-statistics.html
 ```
 
@@ -606,29 +594,8 @@ Kunci penanda giliran kini disimpan di `.local/boundary.key`: jalankan arm `--br
 dari salinan berbeda, supaya arm kedua tidak membaca cache arm pertama. `--out` harus di luar repo atau di folder yang
 diabaikan Git (mis. `reports/private/`).
 
-Hasil pembanding berada di `reports/cache-comparison/`. Alur lama tetap tersedia sebagai
-`converseLegacy` untuk kontrol pengujian, bukan pilihan dari browser publik. Mode nyata memakai
-key khusus `.env.chat`; biaya aktual berasal dari respons provider. Batas US$1 adalah cadangan
-konservatif berdasarkan byte dan tarif tertinggi endpoint yang diverifikasi pada 20 September 2026;
-verifikasi ulang tarif sebelum menjalankan ulang jika harga/model berubah. Cache provider tidak
-dipaksa kosong, sehingga laporan mencantumkan cached token dan hasil yang benar-benar ditagih.
-
-Evaluasi normal secara default memakai cache aplikasi kosong per percobaan; `--shared-cache 1`
-khusus eksperimen penggunaan ulang. Cache respons provider dimatikan dalam evaluator. Total biaya/token
-dan receipts mencakup pertanyaan pembuka serta semua percobaan ulang, termasuk yang gagal;
-`final_usage`, jawaban dan pemeriksaan sumber menggambarkan percobaan terakhir. `--max-usd` evaluator
-adalah ambang yang diperiksa sebelum panggilan berikutnya, bukan batas tagihan keras untuk panggilan
-yang sedang berlangsung. Kasus `optimization_*` adalah benchmark sintetis, bukan pertanyaan pengguna riil.
-
-Kedua skrip evaluasi memakai fungsi lokal, bukan endpoint chat produksi. Hasilnya menyimpan ID run dan asal
-`test/local`. Ringkasan memisahkan `completed` dari `fixture_assessed`/`fixture_passed`, serta kegagalan pemeriksaan
-sumber, pola fakta, istilah dan ID rujukan. Kasus tanpa ekspektasi isi tidak dihitung sebagai lolos pemeriksaan isi.
-Pemeriksaan ini terbatas pada fixture; lolos bukan audit lengkap kebenaran jawaban. Field lama `ok` berarti proses selesai.
-
-Endpoint `GET /api/chat/metrics?days=7` memerlukan bearer `CHAT_METRICS_TOKEN`, secret terpisah dari
-key OpenRouter. Nilainya disimpan lokal di `.env.chat.metrics` (izin 600, diabaikan Git), diunggah
-sebagai secret Worker, dan tidak masuk frontend. Tanpa secret, endpoint menolak akses. Pengelola
-memakai `tools/chat_metrics.py`; token tidak dicetak atau ditaruh pada URL. Laporan menyediakan
+`tools/chat_metrics.py` membaca database chat VPS (`/srv/arsip/app/.local/chat.sqlite`) dalam mode baca saja lewat
+`node local/vps.mjs metrics` (SSH dengan host key yang dicatat `setup`); tidak ada endpoint HTTP statistik. Laporan menyediakan
 pertanyaan berulang, topik teratas, tren harian, token/biaya, hasil proses, dan cache hit. Teks pertanyaan
 ditampilkan dengan escaping HTML. Laporan JSON/HTML privat disimpan di `reports/private/` yang
 diabaikan Git. `--limit` (maksimal 500) dan `--offset` menyediakan halaman riwayat berikutnya.
@@ -671,116 +638,20 @@ Endpoint publik tanpa login masih bisa menghabiskan kuota melalui banyak IP. Bat
 bukan batas dolar; batasi kredit key OpenRouter secara terpisah jika diperlukan.
 
 Uji serangan dijalankan di salinan terpisah tanpa `.env.chat`, tanpa key asli, dan tanpa
-akses provider. `tests/security.mjs` memblokir global fetch; `tests/worker_runtime.cjs`
-memakai workerd/SQLite dengan seluruh jaringan keluar diganti model simulasi.
+akses provider. `tests/security.mjs` memblokir global fetch.
 
 ```bash
 node --test tests/worker.mjs tests/security.mjs tests/cache.mjs tests/source-store.mjs   # Node 22+ untuk node:sqlite
 NODE_PATH=/path/to/test-deps/node_modules node tests/chat_ui.cjs
-NODE_PATH=/path/to/test-deps/node_modules node tests/worker_runtime.cjs
 ```
 
-Runtime test memerlukan Miniflare 5 (adapter V4) dan esbuild dari alat Wrangler 4.135.0.
 Jangan menjalankan flood/attack test pada URL publik. Lihat `SECURITY_REVIEW.md` untuk
 cakupan, bukti, dan batas audit.
 
-### Memasang di situs publik
+### Riwayat: Cloudflare Worker
 
-> Sekarang `arsip.seekingomega.capital` dilayani VPS Jakarta (`node local/vps.mjs push`, lihat [Semua di VPS Jakarta](#semua-di-vps-jakarta-localvpsmjs)).
-> GitHub Pages dimatikan (repo hanya riwayat, `docs/` tetap di-commit) dan Worker Cloudflare tidak dipakai situs lagi.
-> Bagian ini dan `tools/publish_chat.py` adalah dokumentasi/alat lama untuk deploy manual ke Cloudflare.
-
-Frontend tetap **GitHub Pages**, domain `arsip.seekingomega.capital`, folder `docs/`.
-API publik memakai **Cloudflare Workers Free + SQLite Durable Object** di akun yang
-ditentukan `worker/wrangler.jsonc`. Model tetap OpenRouter `qwen/qwen3.7-flash`.
-
-- Worker luar hanya memeriksa origin dan meneruskan koneksi ke satu Durable Object.
-  Pembacaan arsip berjalan di Durable Object (batas CPU aktif 30 detik), sehingga
-  tidak bergantung pada batas CPU 10 ms Worker biasa. Waktu menunggu model tetap
-  membutuhkan waktu nyata dan dapat berlangsung beberapa menit.
-- `tools/build_worker.py` menyiapkan indeks kata dan potongan isi lengkap dari hasil
-  build. Seluruh sumber dan indeks bagian emiten dibundel sebagai Assets; tidak ada pemotongan
-  top-k. Data sumber lengkap tetap tersedia untuk fallback; Worker tidak membolehkan URL sumber
-  arbitrer dari pengguna. Berkas hasilnya ada di `worker/.assets/`, diabaikan Git.
-- Kuota 3.000 pertanyaan/hari UTC dan 120/alamat IP/jam disimpan dalam SQLite Durable
-  Object dan tetap ada setelah restart/deploy. Alamat koneksi Cloudflare di-hash.
-  Maksimal 10 analisis bersamaan, lima per IP, masing-masing 2 pembaca model. CORS
-  produksi hanya mengizinkan domain situs; lokal memerlukan override konfigurasi uji.
-- Tidak ada cron/keepalive atau server yang harus dinyalakan di Mac. Durable Object
-  dapat dikeluarkan dari memori saat tidak aktif dan diinisialisasi saat dibutuhkan;
-  ini bukan jaminan latensi nol, tetapi tidak memakai jeda bangun satu menit Render.
-- Free tier memiliki batas harian. Pemakaian OpenRouter tetap berbayar terpisah.
-  Kuota pertanyaan bukan batas dolar; gunakan batas kredit pada key khusus OpenRouter.
-  CORS bukan autentikasi, sehingga batas global juga diterapkan untuk klien non-browser.
-
-Batas produksi dikonfigurasi melalui `worker/wrangler.jsonc`: `CHAT_DAILY_REQUESTS`,
-`CHAT_HOURLY_PER_IP`, `CHAT_CONCURRENT_REQUESTS`, dan `CHAT_CONCURRENT_PER_IP`.
-Perubahan memerlukan deploy Worker; mengedit `.env.chat` saja tidak mengubah produksi.
-Slot aktif dihitung per permintaan, sehingga pengguna pada IP/Wi-Fi yang sama tidak
-menghapus slot pengguna lain saat selesai. Pesan slot global penuh dibedakan dari
-batas proses pada jaringan yang sama. Kuota pertanyaan tidak mengalahkan batas anggaran
-model harian: 500.000 token keluaran yang dicadangkan dapat habis sebelum 3.000
-pertanyaan baru; jawaban cache tidak membuat panggilan model baru.
-
-Alamat API tersimpan di `chat.config.json`, sehingga build/sinkron berikutnya tidak
-kembali ke `/api/chat` di GitHub Pages. `CHAT_API_URL` bisa mengalahkannya untuk uji lokal.
-
-**Memperbarui arsip dan chat setelah menambah dokumen (lama, Cloudflare; situs kini: `node local/vps.mjs push`):**
-
-```bash
-python3 tools/publish_chat.py
-# Periksa perubahan dan output kategori/tanggal, lalu commit/push untuk GitHub Pages.
-```
-
-Skrip membangun `site/`, membuat Assets, men-deploy Worker, menyinkronkan indeks SQLite, lalu membangun `docs/`.
-Jika deploy gagal, skrip berhenti sebelum memperbarui `docs/`. Skrip tidak melakukan
-commit/push. Worker dan GitHub Pages perlu diperbarui bersama supaya bahan chat dan
-tautan sumber mengikuti arsip yang sama. `build.py` biasa hanya memperbarui frontend.
-
-**Setup ulang Cloudflare / mengganti key:**
-
-```bash
-npx wrangler@4.135.0 login
-python3 build.py
-python3 tools/build_worker.py
-npx wrangler@4.135.0 deploy --config worker/wrangler.jsonc
-npx wrangler@4.135.0 secret put OPENROUTER_API_KEY --config worker/wrangler.jsonc
-```
-
-Masukkan key pada prompt secret; jangan menaruhnya dalam `wrangler.jsonc`,
-`chat.config.json`, atau command argument. Key tidak diunggah sebagai Assets.
-Jika memakai akun lain, sesuaikan `account_id` dan alamat API setelah deploy.
-
-**Uji Worker lokal tanpa key asli:**
-
-```bash
-python3 tools/build_worker.py
-node --test tests/worker.mjs
-npx wrangler@4.135.0 dev --config worker/wrangler.jsonc --local --port 8788
-```
-
-Key lokal dapat diisi di `worker/.dev.vars` sebagai `OPENROUTER_API_KEY=...`;
-file tersebut diabaikan Git. Tanpa key, API mengembalikan pesan belum diaktifkan.
-Runtime Worker tidak mempunyai dependency aplikasi npm; Wrangler hanya alat
-pengembangan/deployment. Untuk mencoba frontend lokal dengan Worker lokal,
-jalankan `CHAT_API_URL=http://127.0.0.1:8788/api/chat python3 build.py`, lalu
-`python3 -m http.server -d site 8017` dan buka `http://127.0.0.1:8017`.
-
-Pemeriksaan tanpa panggilan berbayar:
-
-```bash
-python3 tools/build_worker.py
-node --test tests/worker.mjs
-node --check chat.js
-```
-
-Uji DOM opsional memakai dependency pengujian saja, tidak dipakai server/build:
-
-```bash
-chat_test_deps=$(mktemp -d)
-npm install --prefix "$chat_test_deps" jsdom@26.1.0 marked@15.0.7 dompurify@3.4.15
-NODE_PATH="$chat_test_deps/node_modules" node tests/chat_ui.cjs
-```
+Sampai Oktober 2026 chat berjalan di Cloudflare Workers + OpenRouter (`tools/publish_chat.py`, `worker/wrangler.jsonc`),
+frontend di GitHub Pages. Keduanya dihapus; kodenya ada di riwayat git. Situs kini: `node local/vps.mjs push`.
 
 ## Host lokal dengan akun Claude (`local/server.mjs`)
 
@@ -797,7 +668,7 @@ node local/server.mjs           # berikutnya; tambah --build setelah ada dokumen
 - Kode Worker yang sama (`worker/index.mjs`, Durable Object `ArchiveChat`) dijalankan di Node 22. Penyimpanan Durable Object
   diganti SQLite lokal `.local/chat.sqlite`; aset Worker di `.local/assets`, situs di `.local/site` (dibangun dengan
   `CHAT_API_URL=/api/chat`, jadi chat satu origin dengan situs). Semua di `.local/` diabaikan Git. `docs/` dan Worker publik tidak diubah.
-- Saat start, indeks sumber SQLite diisi langsung tanpa AI (pengganti `tools/sync_chat_index.py`). Setelah semua dokumen
+- Saat start, indeks sumber SQLite diisi langsung tanpa AI. Setelah semua dokumen
   manifest aktif terimpor, `SourceStore.prune` menghapus dokumen versi lain (versi bukti lama atau hash lama), satu
   transaksi per dokumen. Selama impor belum lengkap tidak ada yang dihapus, dan baris versi bukti yang lebih baru
   (`issuer-passages-v3` > `-v2`) selalu disimpan: push yang gagal di tengah lalu kembali ke `app.old` tidak membuang
@@ -883,7 +754,7 @@ node local/vps.mjs status | logs [--follow] | password
 - Gagal kunci mesin atau login bukan langganan: exit 78, systemd tidak mengulang (`RestartPreventExitStatus=78`). Status login yang tidak
   terbaca sementara (timeout, update CLI): exit 1, diulang tiap 10 detik.
 - Di VPS hanya listener bersandi (`127.0.0.1:8018` di belakang Caddy) yang dibuka; tidak ada listener tanpa sandi.
-  Endpoint statistik/impor tidak tersedia di VPS.
+  Statistik dibaca dari database lewat SSH (`node local/vps.mjs metrics`, dipakai `tools/chat_metrics.py`).
 - `push` mengirim berkas Git (tercatat dan baru yang tidak diabaikan) kecuali `docs/`, `reports/`, `tests/`, `.env*`, `.local/`.
   Dari `.env.chat` hanya `DATACAT_API_KEY` dan `CHAT_METRICS_TOKEN` yang dikirim (key OpenRouter tetap di Mac). Build berjalan di salinan
   baru selagi server lama tetap melayani; database chat dan kunci dipindah, lalu server baru dijalankan. Bila gagal, versi lama dipulihkan.
@@ -918,7 +789,7 @@ node local/remote.mjs install     # server + tunnel jalan sekarang dan otomatis 
   (bawaan 2); perangkat berikutnya mendapat pesan slot penuh. Naikkan dengan `--concurrency 8` (maks 4 analisis), dengan risiko batas langganan Claude lebih cepat tercapai.
 - Pemeriksaan sandi berjalan di Mac, bukan di VPS. Tanpa sesi, semua halaman, berkas, dan `/api/` ditolak. Cookie
   `__Host-…; Secure; HttpOnly; SameSite=Strict`, ditandatangani HMAC. Masuk hanya dari origin domain itu; 5 kali gagal per
-  alamat per 15 menit, 30 kali gagal total per jam (lalu semua percobaan menunggu). Endpoint statistik/impor hanya lokal.
+  alamat per 15 menit, 30 kali gagal total per jam (lalu semua percobaan menunggu).
 - Listener lokal `127.0.0.1:8017` tetap tanpa sandi untuk Mac sendiri. Kunci mesin dan pemeriksaan zona tetap berlaku.
 - `install` memasang dua LaunchAgent (`capital.seekingomega.arsip.server` dengan `caffeinate -s`, dan `…tunnel`), log di
   `~/Library/Logs/arsip-*.log`. Mac harus menyala dan tersambung; dengan daya listrik Mac tidak tidur, tetapi menutup
@@ -1212,8 +1083,7 @@ Membuka `site/index.html` langsung dengan dobel klik (`file://`) juga bisa, tapi
 
 | Gejala | Penyebab / solusi |
 |---|---|
-| (Lama, hanya Worker Cloudflare) `publish_chat.py` macet/timeout di `sync_chat_index.py` setelah deploy | DNS ISP (mis. XL) mengarahkan `*.workers.dev` ke halaman blokir. Skrip otomatis memakai IP dari DNS-over-HTTPS; pengunjung di jaringan itu tetap tidak bisa memakai chat sampai API dipindah ke domain sendiri. |
-| Chat tidak menemukan dokumen baru, padahal tampil di situs | VPS belum diperbarui: `build.py --out docs` hanya memperbarui riwayat GitHub. Jalankan `node local/vps.mjs push` (atau publish dari desk). `tools/publish_chat.py` hanya untuk Worker Cloudflare lama yang tidak di-deploy lagi. |
+| Chat tidak menemukan dokumen baru, padahal tampil di situs | VPS belum diperbarui: `build.py --out docs` hanya memperbarui riwayat GitHub. Jalankan `node local/vps.mjs push` (atau publish dari desk). |
 | Dokumen masuk "Lainnya" | Nama file tidak cocok `prefixes`/`keywords`. Ganti nama file atau tambah kata kunci di `CATEGORIES`. |
 | Tanggal salah / hari ini | Tidak ada pola tanggal di nama file, jadi dipakai mtime. Tambahkan `YYYYMMDD` ke nama. |
 | Dokumen tampil sebagai teks mentah | CDN `cdnjs.cloudflare.com` diblokir / offline. Tunggu koneksi, atau ganti URL `LIBS` di `build.py`. |

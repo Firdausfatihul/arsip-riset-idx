@@ -1,5 +1,7 @@
-"""Offline report contract: test IDs never turn other traffic into verified users."""
+"""Offline report contract: test IDs never turn other traffic into verified users. The VPS read
+(`node local/vps.mjs metrics`, tests/vps_metrics.mjs) is replaced by a fake node on PATH."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -64,6 +66,38 @@ class ChatMetricsReportTest(unittest.TestCase):
             'run_id':'local-1', 'execution':'local', 'production_request_ids':['test-request']}])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Local evaluations cannot have production request IDs', result.stderr)
+
+
+    def vps(self, node_script, *extra):
+        """chat_metrics.py without --from-file, with `node` on PATH replaced by node_script (sh)."""
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            fake = directory / 'node'
+            fake.write_text('#!/bin/sh\necho "$@" > "$(dirname "$0")/args"\n' + node_script)
+            fake.chmod(0o755)
+            report = directory / 'report.html'
+            result = subprocess.run([sys.executable, str(ROOT / 'tools/chat_metrics.py'), '--days', '3', '--html', str(report), *extra],
+                                    capture_output=True, text=True, env={**os.environ, 'PATH': f'{directory}:{os.environ["PATH"]}'})
+            args = (directory / 'args').read_text().split()
+            return result, args, report.read_text() if report.exists() else None
+
+    def test_reads_the_vps_through_vps_mjs(self):
+        snapshot = {'days':3, 'total':{'inputs':1, 'anonymous_clients':1, 'known_cost_usd':0, 'answer_cache_hits':0, 'missing_usage_calls':0},
+                    'by_mode':[{'mode':'agentic', 'inputs':1, 'completed':1, 'failed':0, 'known_cost_usd':0, 'max_cost_usd':0,
+                                'provider_calls':1, 'tool_calls':2, 'prompt_tokens':5, 'completion_tokens':1, 'answer_cache_hits':0,
+                                'datacat_cache_hits':0, 'missing_usage_calls':0}],
+                    'daily_by_mode':[{'day':'2026-10-16', 'mode':'agentic', 'inputs':1, 'known_cost_usd':0}], 'top_questions':[],
+                    'expensive_questions':[], 'top_terms':[], 'daily':[], 'outcomes':[],
+                    'pagination':{'total':1, 'offset':5, 'limit':9}, 'questions':[], 'agentic_daily':100}
+        result, args, html = self.vps(f"echo '{json.dumps(snapshot)}'\n", '--limit', '9', '--offset', '5')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(args, [str(ROOT / 'local/vps.mjs'), 'metrics', '--days', '3', '--limit', '9', '--offset', '5'])
+        self.assertIn('kuota 100/hari', html)
+        self.assertEqual(json.loads(result.stdout)['inputs'], 1)
+
+    def test_vps_failure_stops_with_its_message(self):
+        result, _, html = self.vps('echo "Gagal: Belum di-setup." >&2\nexit 1\n')
+        self.assertEqual((result.returncode, result.stderr.strip(), html), (1, 'Gagal: Belum di-setup.', None))
 
 
 if __name__ == '__main__':

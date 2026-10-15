@@ -1,5 +1,5 @@
 """publish_stockbit.py / rollback_stockbit.py with BEI files on the VPS flow: injected command runner (the FakeRunner of
-test_stockbit_publish.py, which fails on any wrangler/npx/publish_chat/sync_chat_index/build_worker call), no git push,
+test_stockbit_publish.py, which fails on any wrangler/build_worker call), no git push,
 node, ssh, network or deploy."""
 import io
 import json
@@ -22,7 +22,7 @@ DEST = "needtobeindexed/idx-signal-desk/"
 BEI = ["beiringkas_2026-10-05_2026-10-05.md", "beidetail_2026-10-05_2026-10-05.md"]
 BOTH_BUILD = build_stdout([(SB[0], "stockbit-ringkasan", "2026-10-05"), (SB[1], "stockbit-detail", "2026-10-05"),
                            (BEI[0], "bei-ringkasan", "2026-10-05"), (BEI[1], "bei-detail", "2026-10-05")])
-CLOUDFLARE = ("wrangler", "npx", "publish_chat", "sync_chat_index", "build_worker")
+CLOUDFLARE = ("wrangler", "npx", "build_worker")
 
 
 def status(*paths, code="??"):

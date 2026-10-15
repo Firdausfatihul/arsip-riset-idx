@@ -525,7 +525,7 @@ def build_check(runner, dest=None):
 
 
 def publish_env():
-    """Lingkungan build docs/ yang sama dengan tools/publish_chat.py dulu: tanpa CHAT_API_URL lokal, BASE_URL domain situs."""
+    """Lingkungan build docs/: tanpa CHAT_API_URL lokal (bawaan /api/chat), BASE_URL domain situs."""
     env = dict(os.environ)
     env.pop("CHAT_API_URL", None)
     env["BASE_URL"] = "https://arsip.seekingomega.capital"

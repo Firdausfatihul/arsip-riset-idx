@@ -1,5 +1,4 @@
 import {SourceStore} from './source-store.mjs';
-import {DurableObject} from 'cloudflare:workers';
 import {Archive, CacheStore, hash, ChatError, OpenRouter, MODEL, LIMITS, validate, readLimited, converse, rememberTurn} from './core.mjs';
 import {agentic} from './agent.mjs';
 
@@ -19,22 +18,16 @@ function headers(request, type) {
 const json = (request, value, status = 200) => new Response(JSON.stringify(value),
   {status, headers:headers(request, 'application/json; charset=utf-8')});
 
-// The public Worker only routes requests. Document processing uses the Durable Object's
-// 30-second active CPU allowance; waiting for OpenRouter does not use that CPU budget.
+// Router in front of the single ArchiveChat object (local/server.mjs runs both on Node, storage in SQLite).
 export default {
   async fetch(request, env) {
     if (!allowed(request, env)) return new Response('Origin tidak diizinkan', {status:403});
     const path = new URL(request.url).pathname;
-    if (!['/api/chat', '/api/chat/config', '/api/chat/metrics', '/api/chat/index'].includes(path)) return new Response('Not found', {status:404});
-    if (path === '/api/chat/metrics' || path === '/api/chat/index') {
-      if ((path === '/api/chat/metrics' ? request.method !== 'GET' : !['GET','POST'].includes(request.method)) || !env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + env.CHAT_METRICS_TOKEN)
-        return json(request,{error:'Tidak diizinkan.'},403);
-      return env.CHAT.get(env.CHAT.idFromName('archive-global-v1')).fetch(request);
-    }
+    if (!['/api/chat', '/api/chat/config'].includes(path)) return new Response('Not found', {status:404});
     if (request.method === 'OPTIONS') return new Response(null, {status:204, headers:{
       ...headers(request, 'text/plain'), 'Access-Control-Allow-Methods':'POST, GET, OPTIONS',
       'Access-Control-Allow-Headers':'Content-Type', 'Access-Control-Max-Age':'600'}});
-    // The agentic quota lives in the Durable Object, so configuration is answered there.
+    // The agentic quota lives in ArchiveChat, so configuration is answered there.
     if (request.method === 'GET' && path === '/api/chat/config')
       return env.CHAT.get(env.CHAT.idFromName('archive-global-v1')).fetch(request);
     if (request.method !== 'POST' || path !== '/api/chat') return new Response('Method not allowed', {status:405});
@@ -44,9 +37,9 @@ export default {
   }
 };
 
-export class ArchiveChat extends DurableObject {
+export class ArchiveChat {
   constructor(ctx, env) {
-    super(ctx, env);
+    this.ctx = ctx; this.env = env;
     this.sources = new SourceStore(ctx);
     this.archive = new Archive(env.ASSETS,this.sources);
     this.active = new Map(); this.receiving = 0;
@@ -137,28 +130,6 @@ export class ArchiveChat extends DurableObject {
     if (new URL(request.url).pathname === '/api/chat/config')
       return json(request, {ready:!!this.env.OPENROUTER_API_KEY, model:this.modelLabel(),
         agentic:{enabled:!!(this.env.OPENROUTER_API_KEY && this.env.DATACAT_API_KEY), limit:limit(this.env, 'CHAT_AGENTIC_DAILY', 10), left:this.agenticLeft()}});
-    if (new URL(request.url).pathname === '/api/chat/index') {
-      if (!this.env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + this.env.CHAT_METRICS_TOKEN)
-        return json(request,{error:'Tidak diizinkan.'},403);
-      const index=await this.archive.manifest();
-      if(request.method==='GET')return json(request,this.sources.status(index));
-      if(request.method!=='POST')return json(request,{error:'Method not allowed'},405);
-      try {
-        const body=JSON.parse(await readLimited(request.body,4096,5000,request.signal));
-        const doc=index.docs.find(d=>d.document_id===body.document_id);
-        if(!doc || Object.keys(body).some(k=>k!=='document_id'))return json(request,{error:'Dokumen tidak dikenal.'},400);
-        return json(request,await this.sources.importDocument(index,doc,await this.archive.read(doc.evidence_asset)));
-      } catch { return json(request,{error:'Impor indeks gagal; dokumen belum diaktifkan.'},500); }
-    }
-    if (new URL(request.url).pathname === '/api/chat/metrics') {
-      if (!this.env.CHAT_METRICS_TOKEN || request.headers.get('Authorization') !== 'Bearer ' + this.env.CHAT_METRICS_TOKEN)
-        return json(request,{error:'Tidak diizinkan.'},403);
-      const params=new URL(request.url).searchParams;
-      const days = Math.max(1,Math.min(365,Number(params.get('days')) || 7));
-      const limit=Math.max(1,Math.min(500,Number(params.get('limit')) || 100));
-      const offset=Math.max(0,Math.min(100000,Number(params.get('offset')) || 0));
-      return json(request,this.cache.report(days,limit,offset));
-    }
     // Keep body uploads bounded before expensive decoding, parsing, or document retrieval.
     if (this.receiving >= 4) return json(request, {error:'Server sedang sibuk. Coba sebentar lagi.'}, 429);
     this.receiving++;
@@ -205,8 +176,7 @@ export class ArchiveChat extends DurableObject {
     const emit = value => { controller.signal.throwIfAborted(); return write(value); };
     const timer = setTimeout(() => controller.abort(), 8 * 60 * 1000);
     writer.closed.catch(() => controller.abort());
-    // MODEL_FETCHER exists only in the local server (local/server.mjs): the Claude Code CLI bridge. Cloudflare
-    // vars are strings, so a deployed Worker always uses fetch() to OpenRouter.
+    // MODEL_FETCHER is the Claude Code CLI bridge (local/server.mjs); without one (tests) the client uses fetch().
     const fetcher = typeof this.env.MODEL_FETCHER === 'function' ? this.env.MODEL_FETCHER : undefined;
     const model = new OpenRouter(this.env.OPENROUTER_API_KEY, controller.signal, fetcher, (bytes,tokens) => this.spend(bytes,tokens));
     const retrieval = {};

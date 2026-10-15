@@ -35,9 +35,7 @@ ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "needtobeindexed"
 OUT = ROOT / "site"
 BASE_URL = os.environ.get("BASE_URL", "").rstrip("/")
-CHAT_CONFIG = ROOT / "chat.config.json"
-CHAT_API_URL = os.environ.get("CHAT_API_URL", json.loads(CHAT_CONFIG.read_text()).get("api_url", "/api/chat")
-                             if CHAT_CONFIG.is_file() else "/api/chat").rstrip("/")
+CHAT_API_URL = os.environ.get("CHAT_API_URL", "/api/chat").rstrip("/")
 SITE_NAME = "Arsip Riset IDX"
 # BUILD_ID (YYYYMMDDhhmmss) juga tanggal "dibangun" di kaki halaman. Ditetapkan lewat env, dua build dari sumber
 # yang sama identik byte per byte.

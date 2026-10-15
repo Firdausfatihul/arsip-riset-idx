@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Read private chat cost metrics without printing the admin token.
+"""Private question/cost statistics of the chat on the VPS.
 
---from-file reads an existing snapshot without network access. --test-runs reads
+Reads the VPS chat database read-only over SSH: `node local/vps.mjs metrics`, with the SSH settings and pinned host
+key of local/vps.mjs. --from-file reads an existing snapshot without network access. --test-runs reads
 a private operator ledger, for example {"runs":[{"run_id":"smoke-1",
 "execution":"production","production_request_ids":["request-id"]}]}.
 Only explicitly recorded request IDs are labeled test. Unmatched rows remain
@@ -11,9 +12,8 @@ import argparse
 import html
 from datetime import datetime, timezone
 import json
-import re
 from pathlib import Path
-import urllib.request
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
@@ -45,14 +45,12 @@ if args.test_runs:
 if args.from_file:
     data = json.loads(args.from_file.read_text())
 else:
-    secret = ROOT / '.env.chat.metrics'
-    if not secret.exists():
-        raise SystemExit('Private metrics token has not been installed; see README.')
-    token = secret.read_text().strip().removeprefix('CHAT_METRICS_TOKEN=').strip().strip('\"\'')
-    endpoint = json.loads((ROOT / 'chat.config.json').read_text())['api_url']
-    request = urllib.request.Request(endpoint + f'/metrics?days={args.days}&limit={min(500,max(1,args.limit))}&offset={max(0,args.offset)}', headers={'Authorization': 'Bearer ' + token, 'User-Agent':'Mozilla/5.0 (Arsip operator metrics)'})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        data = json.load(response)
+    # CacheStore.report() (worker/cache.mjs) on the VPS, plus the server's daily agentic cap.
+    vps = subprocess.run(['node', str(ROOT / 'local/vps.mjs'), 'metrics', '--days', str(args.days), '--limit', str(args.limit),
+                          '--offset', str(args.offset)], capture_output=True, text=True)
+    if vps.returncode:
+        raise SystemExit(vps.stderr.strip() or 'Statistik VPS tidak terbaca.')
+    data = json.loads(vps.stdout)
 # Server aggregates include all traffic. Classify only the explicit IDs present
 # in this page; matching a question or anonymous client is not test provenance.
 questions = list({q['id']: q for q in data['questions']}.values())
@@ -89,9 +87,8 @@ if args.html:
     cohort_table=table(['Asal input pada halaman ini','Input unik','Proses selesai','Proses error','Biaya diketahui USD'],
       [('Tes teridentifikasi' if c['origin']=='test' else 'Belum diketahui',c['inputs'],c['completed'],c['errors'],f"{c['known_cost_usd']:.6f}") for c in cohorts])
     modes={m['mode']:m for m in data.get('by_mode',[])}
-    # Daily agentic cap as deployed (worker/wrangler.jsonc), so the worst-case line matches production.
-    cap_match=re.search(r'"CHAT_AGENTIC_DAILY"\s*:\s*"(\d+)"',(ROOT/'worker/wrangler.jsonc').read_text())
-    agentic_cap=int(cap_match.group(1)) if cap_match else 10
+    # Daily agentic cap of the server that wrote the data; older snapshots lack it (the worker default then).
+    agentic_cap=data.get('agentic_daily', 10)
     names={'archive':'Biasa','agentic':'Agen'}
     def per(m,key): return m[key]/m['inputs'] if m.get('inputs') else 0
     mode_rows=[(names.get(m['mode'],m['mode']),m['inputs'],m['completed'],m['failed'],f"{m['known_cost_usd']:.6f}",f"{per(m,'known_cost_usd'):.6f}",

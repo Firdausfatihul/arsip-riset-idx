@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // Arsip Riset IDX, hosted on this machine: the static viewer plus the archive chat, with the model answered by
-// the Claude Code CLI signed in to the owner's Claude account (see local/claude-bridge.mjs). Nothing runs on
-// Cloudflare: the same Worker code (worker/index.mjs) runs here on Node, with its Durable Object storage in a
-// local SQLite file.
+// the Claude Code CLI signed in to the owner's Claude account (see local/claude-bridge.mjs). The chat code
+// (worker/index.mjs) runs here on Node, with its storage in a local SQLite file.
 //
 //   node local/server.mjs --pin      first run on this machine: build, record the machine lock, serve
 //   node local/server.mjs            later runs (add --build after adding documents)
@@ -13,7 +12,6 @@
 // differs from the one recorded with --pin. The zone is checked again before every model call; a failure stops
 // the server. This guards against mistakes (a copied folder, a container started elsewhere); it is not a
 // security boundary against the machine's own administrator, and a time zone is not proof of location.
-import {registerHooks} from 'node:module';
 import {DatabaseSync} from 'node:sqlite';
 import {createServer} from 'node:http';
 import {Readable} from 'node:stream';
@@ -23,7 +21,7 @@ import {existsSync, readFileSync, readlinkSync, writeFileSync, mkdirSync, create
 import {networkInterfaces} from 'node:os';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
-import {fileURLToPath, pathToFileURL} from 'node:url';
+import {fileURLToPath} from 'node:url';
 import {claudeFetcher, cliEnv, checkAuth} from './claude-bridge.mjs';
 import {COOKIE, LOGIN_HEADERS, LoginLimiter, checkPassword, cookies, issueSession, loginPage, validSession} from './remote-auth.mjs';
 
@@ -37,6 +35,8 @@ const INDONESIA = ['Asia/Jakarta', 'Asia/Pontianak', 'Asia/Makassar', 'Asia/Jaya
 // Exit status for a failed machine lock or a missing Claude login; the VPS systemd unit does not restart on it
 // (RestartPreventExitStatus), so a server that must not run stays down instead of retrying.
 export const LOCK_FAILED = 78;
+// Agentic questions per UTC day for the whole site (CHAT_AGENTIC_DAILY overrides it); also shown by tools/chat_metrics.py.
+export const AGENTIC_DAILY = Number(process.env.CHAT_AGENTIC_DAILY) || 100;
 // A Linux VPS (ARSIP_ALLOW_VPS=1) must prove where it runs: Tencent Cloud instance metadata, which the hypervisor
 // answers per instance. A disk image copied to another instance or region keeps /etc/machine-id, the lock file and
 // the Claude login, but not the instance ID or the region, so it never starts.
@@ -130,12 +130,7 @@ export function machineCheck({pin = false, repin = false, lockFile = LOCK, id = 
   return {pinned:false, timeZone};
 }
 
-// ---- Durable Object runtime shim ----------------------------------------------------------------------
-const shim = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), 'cloudflare-workers.mjs')).href;
-registerHooks({resolve(specifier, context, next) {
-  return specifier === 'cloudflare:workers' ? {url:shim, shortCircuit:true} : next(specifier, context);
-}});
-
+// The storage API worker/index.mjs expects (sql.exec cursors, nested transactionSync), on a SQLite file.
 export function storage(file) {
   const db = new DatabaseSync(file);
   db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
@@ -269,7 +264,7 @@ async function main() {
     // Each analysis runs at most two model calls at once, so the analyses admitted never outnumber CLI slots.
     CHAT_DAILY_REQUESTS:'3000', CHAT_HOURLY_PER_IP:'300',
     CHAT_CONCURRENT_REQUESTS:String(Math.max(1, Math.floor(opt.concurrency / 2))), CHAT_CONCURRENT_PER_IP:String(Math.max(1, Math.floor(opt.concurrency / 2))),
-    CHAT_AGENTIC_DAILY:process.env.CHAT_AGENTIC_DAILY || '100', CHAT_DAILY_OUTPUT_TOKENS:'3000000', CHAT_DAILY_BYTES:'300000000',
+    CHAT_AGENTIC_DAILY:String(AGENTIC_DAILY), CHAT_DAILY_OUTPUT_TOKENS:'3000000', CHAT_DAILY_BYTES:'300000000',
     ...(secrets.DATACAT_API_KEY ? {DATACAT_API_KEY:secrets.DATACAT_API_KEY} : {}),
     ...(secrets.CHAT_METRICS_TOKEN ? {CHAT_METRICS_TOKEN:secrets.CHAT_METRICS_TOKEN} : {}),
     ASSETS:{async fetch(request) {
@@ -283,7 +278,7 @@ async function main() {
   const object = new ArchiveChat({storage:store, waitUntil:promise => { pending.add(promise); promise.finally(() => pending.delete(promise)).catch(() => {}); }}, env);
   env.CHAT = {idFromName:name => name, get:() => ({fetch:request => object.fetch(request)})};
 
-  // Persistent source index (what tools/sync_chat_index.py does for the Worker), in-process and without AI.
+  // Persistent source index, filled in-process and without AI.
   const index = await object.archive.manifest();
   const status = object.sources.status(index);
   for (const [n, id] of status.pending.entries()) {
@@ -306,7 +301,7 @@ async function main() {
     // Reached only through Caddy: on the VPS itself (local/vps.mjs), or through the SSH tunnel from the VPS
     // (local/remote.mjs). Caddy appends the device's address to X-Forwarded-For, so the last entry is the client.
     const forwarded = req => String(req.headers['x-forwarded-for'] || '').split(',').pop().trim() || 'remote';
-    remoteServer = createServer(handler({worker, env, hosts:new Set([remote.domain]), client:forwarded, auth:gate(remote, forwarded), admin:false}));
+    remoteServer = createServer(handler({worker, env, hosts:new Set([remote.domain]), client:forwarded, auth:gate(remote, forwarded)}));
     remoteServer.listen(remote.local_port, '127.0.0.1', () => console.log(`Akses jarak jauh: https://${remote.domain} (${remote.vps_host ? 'lewat VPS ' + remote.vps_host : 'Caddy di mesin ini'}, sandi wajib)`));
   }
   process.on('SIGINT', () => stop()); process.on('SIGTERM', () => stop());
@@ -355,7 +350,7 @@ export function gate(remote, client, limiter = new LoginLimiter()) {
   };
 }
 
-function handler({worker, env, hosts, client, auth = null, admin = true}) {
+function handler({worker, env, hosts, client, auth = null}) {
   return async (req, res) => {
     const url = new URL(req.url, 'http://local');
     const security = SECURITY;
@@ -363,8 +358,6 @@ function handler({worker, env, hosts, client, auth = null, admin = true}) {
     try {
       if (auth && !await auth(req, res, url)) return;
       if (url.pathname === '/api/chat' || url.pathname.startsWith('/api/chat/')) {
-        // Admin endpoints (statistics, index import) are local only.
-        if (!admin && url.pathname !== '/api/chat' && url.pathname !== '/api/chat/config') return plain(res, 404, 'Tidak ditemukan');
         const controller = new AbortController();
         res.on('close', () => { if (!res.writableFinished) controller.abort(); });
         const headers = new Headers();
@@ -403,5 +396,5 @@ function handler({worker, env, hosts, client, auth = null, admin = true}) {
   };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href)
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
   main().catch(error => { console.error('Gagal: ' + error.message); process.exit(1); });
