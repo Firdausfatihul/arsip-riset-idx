@@ -30,8 +30,8 @@ def status(*paths, code="??"):
 
 
 def temp_build(r, line):
-    """Temporary build check (build.py --out /tmp/...): both families; docs/ and site/ rebuilds: plain success."""
-    return r.result(0, BOTH_BUILD) if line.split("--out ")[1] not in ("docs", "site") else r.result(0, "")
+    """Temporary build check (build.py --out /tmp/...): both families; the docs/ rebuild: plain success."""
+    return r.result(0, BOTH_BUILD) if line.split("--out ")[1] != "docs" else r.result(0, "")
 
 
 class BeiPublishTests(unittest.TestCase):
@@ -179,7 +179,7 @@ class BeiPublishTests(unittest.TestCase):
         self.assertEqual(code, 7, self.output)
         self.assertIn(stale, summary["error"])
         self.assertEqual(runner.state["vps"], 0)
-        self.assertIn("git checkout -- docs site", runner.calls)
+        self.assertIn("git checkout -- docs", runner.calls)
         self.assertEqual(self.records()[-1]["status"], "gagal")
 
     def withheld_runner(self, hold_days, deleted, staged_days=None, derived=()):
@@ -317,8 +317,8 @@ class BeiRollbackTests(unittest.TestCase):
 
     def test_restore_mode_restores_bei_files_and_holds_recorded_bei_sha(self):
         # vps_not_committed: day_shas_bei (recorded before the VPS push) wins over the re-synced working-tree state (beiY);
-        # a legacy Worker-era record without it holds "*".
-        legacy = {"status": "deployed_index_pending", "worker_version_before": "v-b", "worker_version_after": "v-live"}
+        # an old record without it holds "*".
+        legacy = {"status": "vps_not_committed"}
         for label, fields in (("vps", {"status": "vps_not_committed", "target": "vps", "vps": True,
                                        "day_shas_bei": {"2026-10-05": "beiL"}}), ("legacy", legacy)):
             with self.subTest(label):
@@ -334,7 +334,7 @@ class BeiRollbackTests(unittest.TestCase):
                 self.assertFalse((dest / BEI[0]).exists())
                 self.assertIn(f"git checkout HEAD -- {DEST}bei-index.json {DEST}.sync-bei.json", runner.calls)
                 self.assertFalse([c for c in runner.calls if c.startswith(("git fetch", "git revert", "git push", "git pull"))])
-                self.assertLess(runner.index("git checkout -- docs site"), runner.index(VPS_PUSH))
+                self.assertLess(runner.index("git checkout -- docs"), runner.index(VPS_PUSH))
                 self.assertEqual(json.loads((self.root / HOLD_BEI).read_text())["days"]["2026-10-05"]["sha256"],
                                  "beiL" if label == "vps" else "*")
                 self.assertFalse((self.root / HOLD_SB).exists())
@@ -354,7 +354,7 @@ class BeiRollbackTests(unittest.TestCase):
         ok = self.runner(**{"git status": lambda r, l: r.result(0, f" M {HOLD_SB}\0 M {HOLD_BEI}\0 M docs/index.html\0")})
         self.assertEqual(self.rollback(ok)[0], 0, self.output)
         self.assertFalse([c for c in ok.calls if "revert" in c])
-        self.assertLess(ok.index("git checkout -- docs site"), ok.index(VPS_PUSH))
+        self.assertLess(ok.index("git checkout -- docs"), ok.index(VPS_PUSH))
         self.assertEqual(self.last()["status"], "rolled_back")
 
     def test_first_revert_or_reset_refuses_untracked_unpublished_files_but_allows_hold_files(self):

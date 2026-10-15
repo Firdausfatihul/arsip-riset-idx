@@ -57,8 +57,6 @@ class FakeRunner:
             return r(0, "main\n")
         if line == "git diff --cached --quiet":
             return r(1 if self.state["added"] and not self.state["committed"] else 0)
-        if line == "git ls-files -z -- docs site":
-            return r(0, "docs/index.html\0site/index.html\0")
         if line.startswith("git status"):
             return r(0, " M docs/index.html\0?? needtobeindexed/idx-signal-desk/sbringkas_2026-10-05_2026-10-05.md\0")
         if line.startswith("git rev-list --count"):
@@ -81,7 +79,7 @@ class FakeRunner:
         if line.startswith("git commit"):
             self.state["committed"] = True
             return r()
-        if "build.py --out" in line and line.split("--out ")[1] not in ("docs", "site"):
+        if "build.py --out" in line and line.split("--out ")[1] != "docs":
             return r(0, GOOD_BUILD)
         if line == VPS_PUSH:
             self.state["vps"] += 1
@@ -120,7 +118,7 @@ class PublishTests(unittest.TestCase):
         return [json.loads(l) for l in self.log.read_text().splitlines()] if self.log.exists() else []
 
     def test_publish_omits_ignored_site_from_staging(self):
-        runner = FakeRunner(**{"git ls-files -z -- docs site": lambda r, l: r.result(0, "docs/index.html\0")})
+        runner = FakeRunner()
         code, _ = self.publish(runner)
         self.assertEqual(code, 0, self.output)
         add = next(c for c in runner.calls if c.startswith("git add --"))
@@ -155,7 +153,7 @@ class PublishTests(unittest.TestCase):
         code, summary = self.publish(runner)
         self.assertEqual(code, 0, self.output)
         order = ["git fetch origin main", "sync_idx.py --stockbit-only --no-build", "build.py --out /", "build.py --out docs",
-                 VPS_PUSH, f"git add -- needtobeindexed/idx-signal-desk/{SB[0]} docs site", "git commit",
+                 VPS_PUSH, f"git add -- needtobeindexed/idx-signal-desk/{SB[0]} docs", "git commit",
                  "git push origin HEAD:main", "git tag -a stockbit-publish-20261007-101500", "git push origin refs/tags/"]
         positions = [runner.index(n) for n in order]
         self.assertEqual(positions, sorted(positions), runner.calls)
@@ -177,10 +175,6 @@ class PublishTests(unittest.TestCase):
         env = next(e for line, e in runner.envs if line.endswith("build.py --out docs"))
         self.assertNotIn("CHAT_API_URL", env)
         self.assertEqual(env["BASE_URL"], "https://arsip.seekingomega.capital")
-        # Legacy checkout that still tracks site/: rebuilt as well, before the VPS push.
-        self.assertLess(runner.index("build.py --out site"), runner.index(VPS_PUSH))
-        runner = FakeRunner(**{"git ls-files -z -- docs site": lambda r, l: r.result(0, "docs/index.html\0")})
-        self.assertEqual(self.publish(runner)[0], 0, self.output)
         self.assertTrue(self.no_calls(runner, "build.py --out site"))
 
     def test_preflight_needs_node_and_vps_config_not_npx(self):
@@ -234,7 +228,7 @@ class PublishTests(unittest.TestCase):
         code, summary = self.publish(runner)
         self.assertEqual(code, 7)
         self.assertFalse([c for c in runner.calls if c.startswith("git commit") or c.startswith("git push")])
-        self.assertIn(f"git reset -q -- needtobeindexed/idx-signal-desk/{SB[0]} docs site", runner.calls)
+        self.assertIn(f"git reset -q -- needtobeindexed/idx-signal-desk/{SB[0]} docs", runner.calls)
         rec = self.records()[-1]
         self.assertEqual((rec["status"], rec["vps"], summary["vps"]), ("vps_not_committed", True, True))
 
@@ -282,8 +276,7 @@ class PublishTests(unittest.TestCase):
         # build.py --out docs rebuilds tracked docs/ without the day: its copies become staged deletions too.
         copies = ["docs/files/stockbit-ringkasan/2026-10-03/sbringkas_2026-10-03_2026-10-03.md",
                   "docs/files/stockbit-detail/2026-10-03/sbdetail_2026-10-03_2026-10-03.md",
-                  "docs/files/stockbit-pekan/2026-09-28/sbpekan_2026-09-28_2026-10-04.md",
-                  "site/files/stockbit-ringkasan/2026-10-03/sbringkas_2026-10-03_2026-10-03.md"]
+                  "docs/files/stockbit-pekan/2026-09-28/sbpekan_2026-09-28_2026-10-04.md"]
         runner = self.withheld_runner({"2026-10-03": self.DESK}, derived=copies)
         code, summary = self.publish(runner)
         self.assertEqual(code, 0, self.output)
@@ -354,11 +347,11 @@ class PublishTests(unittest.TestCase):
                 self.assertIn("tidak boleh ikut publish Stockbit", self.output)
                 self.assertFalse([c for c in runner.calls if "sync_idx" in c])
         status = (" M needtobeindexed/idx-signal-desk/.sync.json\0?? needtobeindexed/idx-signal-desk/.sync-abc123\0"
-                  f"?? needtobeindexed/idx-signal-desk/{SB[0]}\0 M needtobeindexed/idx-signal-desk/stockbit-index.json\0 M site/index.html\0")
+                  f"?? needtobeindexed/idx-signal-desk/{SB[0]}\0 M needtobeindexed/idx-signal-desk/stockbit-index.json\0")
         runner = FakeRunner(**{"git status": lambda r, l: r.result(0, status)})
         self.assertEqual(self.publish(runner)[0], 0, self.output)
         add = runner.calls[runner.index("git add")]
-        self.assertEqual(add, f"git add -- needtobeindexed/idx-signal-desk/{SB[0]} needtobeindexed/idx-signal-desk/stockbit-index.json docs site")
+        self.assertEqual(add, f"git add -- needtobeindexed/idx-signal-desk/{SB[0]} needtobeindexed/idx-signal-desk/stockbit-index.json docs")
         commit = runner.calls[runner.index("git commit")]
         self.assertNotIn(".sync.json", commit)
 
@@ -375,9 +368,8 @@ class PublishTests(unittest.TestCase):
         self.log.parent.mkdir(parents=True)
         self.log.write_text("".join(json.dumps(r) + "\n" for r in [
             {"type": "publish", "status": "published", "tag": "t0", "worker_version_before": "v-0"},
-            # Old Worker-era record and a new VPS record, neither committed nor rolled back.
-            {"type": "publish", "status": "deployed_index_pending", "started_at": "s0", "worker_version_before": "v-old",
-             "worker_version_after": "v-live"},
+            # Two VPS records (the older one from before `target` was recorded), neither committed nor rolled back.
+            {"type": "publish", "status": "vps_not_committed", "started_at": "s0"},
             {"type": "publish", "status": "vps_not_committed", "target": "vps", "vps": True, "started_at": "s1"},
             {"type": "publish", "status": "vps_failed", "target": "vps", "started_at": "s2"},
             {"type": "publish", "status": "gagal", "started_at": "s3"}]))
@@ -542,7 +534,7 @@ class PublishTests(unittest.TestCase):
         self.assertEqual((code, summary["status"], summary["tag_pushed"]), (0, "published", False), self.output)
 
     def test_commit_failure_unstages_so_rerun_and_rollback_are_not_blocked(self):
-        paths = f"needtobeindexed/idx-signal-desk/{SB[0]} docs site"
+        paths = f"needtobeindexed/idx-signal-desk/{SB[0]} docs"
         def slow(r, l):
             raise subprocess.TimeoutExpired(l, 60)
         for label, fail in (("returns 1", lambda r, l: r.result(1, "pre-commit hook failed")), ("timeout", slow)):
@@ -592,7 +584,7 @@ class PublishTests(unittest.TestCase):
         self.assertIn(stale, summary["error"])
         self.assertEqual(runner.state["vps"], 0)
         self.assertTrue(self.no_calls(runner, "git add", "git commit"))
-        self.assertIn("git checkout -- docs site", runner.calls)  # docs/ restored: the next preflight is not blocked
+        self.assertIn("git checkout -- docs", runner.calls)  # docs/ restored: the next preflight is not blocked
         self.assertEqual(self.records()[-1]["status"], "gagal")
 
     def test_exit_8_advice_and_rerun_refused_while_commit_unpushed(self):
@@ -731,7 +723,7 @@ class RollbackTests(unittest.TestCase):
         state = json.dumps({"format": 1, "days": {"2026-10-05": {"fp": "shaX|t1|final"}}})
         base = {"git status": lambda r, l: r.result(0, "?? needtobeindexed/idx-signal-desk/.sync-abc123\0"),
                 "git show b1:": lambda r, l: r.result(0, state),
-                "git diff --name-only": lambda r, l: r.result(0, f"docs/index.html\nneedtobeindexed/idx-signal-desk/{SB[0]}\nsite/index.html\n")}
+                "git diff --name-only": lambda r, l: r.result(0, f"docs/index.html\nneedtobeindexed/idx-signal-desk/{SB[0]}\n")}
         return FakeRunner(**{**base, **overrides})
 
     def last(self):
@@ -744,7 +736,7 @@ class RollbackTests(unittest.TestCase):
         runner = self.runner()
         code, summary = self.rollback(runner)
         self.assertEqual(code, 0, self.output)
-        order = ["git fetch origin main", "git merge-base --is-ancestor b0 b1", "git checkout -- docs site",
+        order = ["git fetch origin main", "git merge-base --is-ancestor b0 b1", "git checkout -- docs",
                  "git revert --no-commit b0..b1", f"git add -- {HOLD}", "git commit -q -m Rollback Stockbit",
                  "git push origin HEAD:main", VPS_PUSH]
         positions = [runner.index(n) for n in order]
@@ -792,10 +784,10 @@ class RollbackTests(unittest.TestCase):
             self.assertFalse([c for c in foreign.calls if "revert" in c])
 
     def test_derived_and_sync_state_dirt_allowed_and_derived_discarded(self):
-        status = " M docs/index.html\0 M site/version.json\0 M needtobeindexed/idx-signal-desk/.sync.json\0"
+        status = " M docs/index.html\0 M needtobeindexed/idx-signal-desk/.sync.json\0"
         runner = self.runner(**{"git status": lambda r, l: r.result(0, status)})
         self.assertEqual(self.rollback(runner)[0], 0, self.output)
-        self.assertLess(runner.index("git checkout -- docs site"), runner.index("git revert --no-commit"))
+        self.assertLess(runner.index("git checkout -- docs"), runner.index("git revert --no-commit"))
         stockbit_dirty = self.runner(**{"git status": lambda r, l: r.result(0, " M needtobeindexed/idx-signal-desk/stockbit-index.json\0")})
         self.write([json.loads(l) for l in self.log.read_text().splitlines()][:3])
         self.assertEqual(self.rollback(stockbit_dirty)[0], 2)
@@ -827,9 +819,9 @@ class RollbackTests(unittest.TestCase):
         self.assertEqual([c for c in again.calls if not c.startswith(("git rev-parse --abbrev-ref", "git diff --cached --quiet",
                                                                       "git status", "git rev-parse -q --verify REVERT_HEAD",
                                                                       "git rev-parse --git-path sequencer", "git ls-files",
-                                                                      "git checkout -- docs site", "git clean -fdq -- docs site"))],
+                                                                      "git checkout -- docs", "git clean -fdq -- docs"))],
                          [VPS_PUSH])
-        self.assertLess(again.index("git checkout -- docs site"), again.index(VPS_PUSH))  # derived dirt not uploaded
+        self.assertLess(again.index("git checkout -- docs"), again.index(VPS_PUSH))  # derived dirt not uploaded
         self.assertEqual(self.last()["status"], "rolled_back")
         self.assertEqual(self.rollback(self.runner())[0], 2)
 
@@ -843,7 +835,7 @@ class RollbackTests(unittest.TestCase):
         self.assertEqual((self.last()["status"], self.last()["vps"], summary["vps"]), ("push_failed", True, True))
 
     def test_vps_without_commit_restores_tree_then_pushes_vps(self):
-        legacy = {"status": "deployed_index_pending", "worker_version_before": "v-b", "worker_version_after": "v-live"}
+        legacy = {"status": "vps_not_committed"}
         # day_shas (recorded before the VPS push) gives the live sha; an old record without it holds "*" rather than trusting
         # the working-tree state (shaZ here), which a later sync may have rewritten.
         for label, fields in (("vps", {"status": "vps_not_committed", "target": "vps", "vps": True,
@@ -854,7 +846,7 @@ class RollbackTests(unittest.TestCase):
                 dest = self.root / pub.DEST_REL; dest.mkdir(parents=True, exist_ok=True)
                 (dest / SB[0]).write_text("new day")
                 (dest / ".sync-stockbit.json").write_text(json.dumps({"format": 1, "days": {"2026-10-05": {"fp": "shaZ|t|final"}}}))
-                status = (f" M docs/index.html\0 M site/index.html\0?? needtobeindexed/idx-signal-desk/{SB[0]}\0"
+                status = (f" M docs/index.html\0?? needtobeindexed/idx-signal-desk/{SB[0]}\0"
                           " M needtobeindexed/idx-signal-desk/stockbit-index.json\0 M needtobeindexed/idx-signal-desk/.sync-stockbit.json\0")
                 runner = self.runner(**{"git status": lambda r, l: r.result(0, status)})
                 code, _ = self.rollback(runner)
@@ -862,13 +854,13 @@ class RollbackTests(unittest.TestCase):
                 self.assertFalse((dest / SB[0]).exists())
                 self.assertIn("git checkout HEAD -- needtobeindexed/idx-signal-desk/stockbit-index.json "
                               "needtobeindexed/idx-signal-desk/.sync-stockbit.json", runner.calls)
-                self.assertIn("git checkout -- docs site", runner.calls)
+                self.assertIn("git checkout -- docs", runner.calls)
                 self.assertFalse([c for c in runner.calls if c.startswith(("git fetch", "git revert", "git push", "git pull"))])
-                self.assertLess(runner.index("git checkout -- docs site"), runner.index(VPS_PUSH))
+                self.assertLess(runner.index("git checkout -- docs"), runner.index(VPS_PUSH))
                 self.assertEqual(self.hold()["2026-10-05"]["sha256"], "shaY" if label == "vps" else "*")
                 (self.root / HOLD).unlink()
                 self.assertEqual(self.last()["status"], "rolled_back")
-                self.assertEqual("Worker lama tidak dipakai lagi" in self.output, label == "legacy")
+                self.assertNotIn("Worker lama tidak dipakai lagi", self.output)
 
     def test_superseded_uncommitted_publish_is_covered(self):
         self.write([{"type": "publish", "status": "vps_not_committed", "target": "vps", "started_at": "s1", "vps": True},
@@ -924,11 +916,10 @@ class RollbackTests(unittest.TestCase):
                 self.assertEqual(runner.calls, [], "nothing reverted, reset, restored or rolled back")
                 self.assertFalse((self.root / HOLD).exists())
         # Deploy-without-commit variant (restore mode) is refused as well.
-        for status in ("vps_not_committed", "deployed_not_committed"):
-            self.write([{"type": "publish", "status": status, "started_at": "s1", "withheld": ["2026-10-03"]}])
-            runner = self.runner()
-            self.assertEqual(self.rollback(runner)[0], 2)
-            self.assertEqual(runner.calls, [])
+        self.write([{"type": "publish", "status": "vps_not_committed", "started_at": "s1", "withheld": ["2026-10-03"]}])
+        runner = self.runner()
+        self.assertEqual(self.rollback(runner)[0], 2)
+        self.assertEqual(runner.calls, [])
 
     # --- regressions from the VPS-flow review ---------------------------------------------------------------------------
 
@@ -1089,7 +1080,7 @@ class RollbackTests(unittest.TestCase):
                 ok = self.runner(**{"git status": lambda r, l: r.result(0, f" M {dest}.stockbit-hold.json\0 M docs/index.html\0"),
                                     "is-ancestor post1 origin/main": lambda r, l: r.result(0)})
                 self.assertEqual(self.rollback(ok)[0], 0, self.output)
-                self.assertLess(ok.index("git checkout -- docs site"), ok.index(VPS_PUSH))
+                self.assertLess(ok.index("git checkout -- docs"), ok.index(VPS_PUSH))
                 self.assertEqual(self.last()["status"], "rolled_back")
 
     def test_restore_holds_sha_recorded_at_publish_not_resynced_one(self):
@@ -1220,7 +1211,7 @@ class RollbackTests(unittest.TestCase):
 
 
 class IgnoredBuildGitTests(unittest.TestCase):
-    def test_current_and_legacy_build_folders_with_real_git(self):
+    def test_discard_derived_restores_docs_and_leaves_ignored_site(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             def runner(argv, timeout, **kwargs):
@@ -1236,13 +1227,12 @@ class IgnoredBuildGitTests(unittest.TestCase):
             (root / ".gitignore").write_text("site/\n")
             run("git", "add", ".gitignore", "docs")
             run("git", "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "fixture")
-            self.assertEqual(pub.tracked_derived_paths(runner), ["docs"])
             (root / "docs/index.html").write_text("changed")
+            (root / "docs/new.html").write_text("new")
             rb.discard_derived(runner, 3)
             self.assertEqual((root / "docs/index.html").read_text(), "original")
+            self.assertFalse((root / "docs/new.html").exists())
             self.assertEqual((root / "site/index.html").read_text(), "original")
-            run("git", "add", "-f", "site")
-            self.assertEqual(pub.tracked_derived_paths(runner), ["docs", "site"])
 
 
 if __name__ == "__main__":

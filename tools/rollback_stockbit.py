@@ -10,29 +10,28 @@ Tiga cara, menurut status publish yang dibatalkan:
            manual setelah `git pull --rebase`: salinannya di origin/main dicari lewat subjek + patch-id (`git cherry`), lalu
            yang di-revert tepat salinan itu, <induknya>..<salinan>; `rebased_from` di catatan rollback)
            Preflight: git dan node ada, .local/vps.json ada, cabang main, tidak ada yang di-stage, tidak ada berkas
-           dilacak yang kotor selain docs/ dan site/ (hasil build, dibuang) dan berkas titik non-Stockbit di
+           dilacak yang kotor selain docs/ (hasil build, dibuang) dan berkas titik non-Stockbit di
            needtobeindexed/idx-signal-desk/ (mis. .sync.json, dibiarkan), tidak ada commit lokal yang belum dipush,
            `git fetch` + `git pull --ff-only`. Rentang commit hanya boleh menyentuh berkas Stockbit (sb*.md,
            stockbit-index.json, .sync-stockbit.json, .stockbit-hold.json), berkas BEI (bei*.md, bei-index.json,
-           .sync-bei.json, .bei-hold.json), docs/, dan site/. Lalu
+           .sync-bei.json, .bei-hold.json), dan docs/. Lalu
            `git revert --no-commit <pre_sha>..<post_sha>`, tahanan hari ditulis, satu commit "Rollback Stockbit …", push
            (tanpa force push; sekali `git pull --rebase` kalau ditolak).
   reset    (push_failed, HEAD = commit publish yang belum pernah sampai ke origin/main)
            Commit itu tidak pernah publik: `git reset --keep <pre_sha>` (tanpa push), tahanan hari ditulis tanpa commit
            (ikut publish berikutnya).
-  restore  (vps_not_committed, atau status lama deployed_index_pending / deployed_not_committed: situs sudah diperbarui,
-           belum ada commit). Berkas Stockbit/BEI yang kotor dikembalikan ke HEAD (berkas baru dihapus), docs/ dan site/
-           dikembalikan, tahanan hari ditulis tanpa commit; hanya hari dari berkas yang tercatat di publish itu (`files`),
+  restore  (vps_not_committed: situs sudah diperbarui, belum ada commit). Berkas Stockbit/BEI yang kotor dikembalikan ke
+           HEAD (berkas baru dihapus), docs/ dikembalikan, tahanan hari ditulis tanpa commit; hanya hari dari berkas yang tercatat di publish itu (`files`),
            dengan sha dari `day_shas` (Stockbit) / `day_shas_bei` (BEI) publish itu (dicatat sebelum push VPS; catatan lama
            tanpa keduanya: "*").
 Semua cara (juga putaran ulang 'partial'/'push_failed') ditolak (exit 2) sebelum ada yang diubah kalau cabang bukan main,
 git sedang di tengah revert (REVERT_HEAD/sequencer: `git revert --abort` dulu), ada yang di-stage, atau ada perubahan
-(dilacak atau berkas baru) di luar berkas Stockbit/BEI, docs/, site/, dan berkas titik lain di
+(dilacak atau berkas baru) di luar berkas Stockbit/BEI, docs/, dan berkas titik lain di
 needtobeindexed/idx-signal-desk/: `node local/vps.mjs push` mengirim pohon kerja apa adanya, jadi kode atau dokumen yang
 belum di-commit akan ikut live. Putaran ulang juga ditolak kalau berkas Stockbit/BEI selain .stockbit-hold.json dan
 .bei-hold.json kotor (sinkron
 atau publish sesudahnya yang belum terbit; tanpa ini berkas yang belum lolos cek build ikut live); putaran pertama revert/reset
-juga menolak berkas Stockbit/BEI baru yang belum dilacak selain kedua berkas tahanan (alasan yang sama); docs/ dan site/ dikembalikan
+juga menolak berkas Stockbit/BEI baru yang belum dilacak selain kedua berkas tahanan (alasan yang sama); docs/ dikembalikan
 ke HEAD sebelum push VPS. Batas waktu di tengah `git revert`/`git commit` menjalankan `git revert --abort`.
 Setelah itu (semua cara):
   - `node local/vps.mjs push` supaya situs di VPS mengikuti pohon yang sudah dikembalikan (juga setelah push git revert
@@ -112,7 +111,7 @@ def choose(records, tag=None):
 def plan_for(target, previous=None):
     has_git = bool(target.get("pre_sha") and target.get("post_sha"))
     status = target.get("status")
-    if status in pub.DEPLOYED_ONLY:
+    if status in pub.UNCOMMITTED:
         mode = "restore"
     elif not has_git:
         # Ada commit (published/push_failed) tetapi rentangnya tidak tercatat: memulihkan pohon kerja tidak membatalkannya.
@@ -145,7 +144,7 @@ def check_vps_tree(runner, rerun=False):
     """Syarat setiap push VPS rollback: `vps.mjs push` mengirim berkas dilacak + berkas baru yang tidak diabaikan dari disk.
 
     Cabang main, tidak ada revert setengah jalan, tidak ada yang di-stage, tidak ada perubahan (dilacak atau baru) di luar
-    berkas Stockbit, docs/, site/, dan berkas titik non-Stockbit di DEST_REL: kode atau dokumen yang belum di-commit tidak
+    berkas Stockbit, docs/, dan berkas titik non-Stockbit di DEST_REL: kode atau dokumen yang belum di-commit tidak
     boleh ikut live lewat rollback. Putaran ulang (`rerun`, langkah git sudah selesai) juga menolak berkas Stockbit yang kotor
     selain berkas tahanan: pohon kerja setelah langkah git hanya mengubah berkas tahanan, jadi berkas Stockbit kotor lainnya
     berasal dari sinkron/publish sesudahnya yang belum lolos cek build atau belum terbit.
@@ -161,7 +160,7 @@ def check_vps_tree(runner, rerun=False):
     changes = pub.changed_paths(runner)
     outside = [path for _, path in changes if pub.dirty_kind(path) == "other"]
     if outside:
-        raise pub.Failure(2, "push VPS akan ikut mengirim perubahan di luar berkas Stockbit/BEI/docs/site (commit atau kembalikan "
+        raise pub.Failure(2, "push VPS akan ikut mengirim perubahan di luar berkas Stockbit/BEI/docs (commit atau kembalikan "
                              "dulu): " + ", ".join(outside[:15]))
     stale = [path for _, path in changes
              if rerun and pub.publish_owned(path) and path not in (pub.HOLD_REL, pub.BEI_HOLD_REL)]
@@ -244,7 +243,7 @@ def preflight(runner, target, plan):
     touched = pub.git_ok(runner, "diff", "--name-only", pre, post).splitlines()
     outside = [p for p in touched if pub.dirty_kind(p) not in ("derived", *pub.OWNED_KINDS)]
     if outside:
-        raise pub.Failure(2, "rentang commit menyentuh berkas di luar berkas Stockbit/BEI/docs/site: " + ", ".join(outside[:10]))
+        raise pub.Failure(2, "rentang commit menyentuh berkas di luar berkas Stockbit/BEI/docs: " + ", ".join(outside[:10]))
     return mode
 
 
@@ -444,7 +443,7 @@ def rollback(args, runner=pub.run_command, which=shutil.which, log=None, budget=
         elif plan["git_done"]:
             pub.say("  git: sudah dikembalikan oleh rollback sebelumnya (partial); dilewati")
         elif plan["mode"] == "restore":
-            pub.say("  git: belum ada commit; berkas Stockbit/BEI yang kotor dikembalikan ke HEAD, docs/ dan site/ dibuang")
+            pub.say("  git: belum ada commit; berkas Stockbit/BEI yang kotor dikembalikan ke HEAD, docs/ dibuang")
         elif plan["mode"] == "push_failed":
             pub.say(f"  git: {plan['revert']} (reset lokal kalau commit belum pernah dipush, selain itu revert + push)")
         else:
@@ -460,7 +459,7 @@ def rollback(args, runner=pub.run_command, which=shutil.which, log=None, budget=
         if plan["git_done"]:
             # Putaran ulang: hanya berkas tahanan yang boleh kotor (berkas Stockbit/BEI lain = sinkron sesudahnya, belum terbit).
             check_vps_tree(runner, rerun=True)
-            discard_derived(runner, 3)  # docs/ dan site/ sisa publish/build sesudahnya tidak ikut ke VPS
+            discard_derived(runner, 3)  # docs/ sisa publish/build sesudahnya tidak ikut ke VPS
             record["git_done"] = True
             if plan["push_pending"]:
                 finish_revert_push(runner, plan["push_pending"], record)

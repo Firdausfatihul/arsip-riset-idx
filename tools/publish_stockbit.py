@@ -11,7 +11,7 @@ Urutan:
   1. Preflight: git dan node ada, .local/vps.json ada, cabang main, tidak ada yang di-stage, tidak ada perubahan selain
      berkas Stockbit/BEI di needtobeindexed/idx-signal-desk/ (sb*.md, stockbit-index.json, .sync-stockbit.json,
      .stockbit-hold.json, bei*.md, bei-index.json, .sync-bei.json, .bei-hold.json; berkas titik lain seperti .sync.json
-     dibiarkan karena tidak ikut build), docs/, dan site/ (hasil build yang ikut dilacak git). digest_*/kepemilikan* yang belum di-commit menolak publish: push VPS akan ikut
+     dibiarkan karena tidak ikut build) dan docs/ (hasil build yang dilacak git). digest_*/kepemilikan* yang belum di-commit menolak publish: push VPS akan ikut
      mengirimnya dan rollback Stockbit akan ikut membatalkannya. Lalu tidak ada commit lokal yang belum dipush,
      `git fetch` + `git pull --ff-only` kalau tertinggal origin/main, ruang disk >= 1,5 GB.
   2. Catat HEAD. Kalau publish sebelumnya sudah memperbarui VPS tanpa commit (vps_not_committed, belum di-rollback),
@@ -79,9 +79,8 @@ LOG = ROOT / ".stockbit-publish" / "log.jsonl"
 VPS_PUSH = ["node", "local/vps.mjs", "push"]
 VPS_CONFIG_REL = ".local/vps.json"
 TARGET = "vps"
-# Folder hasil build yang diizinkan; hanya folder yang masih dilacak Git boleh di-stage.
-# main terbaru mengabaikan site/, sedangkan publikasi lama mungkin masih melacaknya.
-DERIVED_PATHS = ("docs", "site")
+# Folder hasil build yang dilacak Git (riwayat situs); site/ diabaikan Git.
+DERIVED_PATHS = ("docs",)
 # Di DEST_REL hanya berkas Stockbit/BEI ini (plus SB_FILE/BEI_FILE) yang boleh kotor dan di-commit; digest/kepemilikan tidak.
 STOCKBIT_NAMES = ("stockbit-index.json", ".sync-stockbit.json", ".stockbit-hold.json")
 HOLD_REL = f"{DEST_REL}/.stockbit-hold.json"
@@ -104,10 +103,8 @@ HOLDS = {"stockbit": HOLD_REL, "bei": BEI_HOLD_REL}
 STATES = {"stockbit": STATE_REL, "bei": BEI_STATE_REL}
 FAMILY_FILE = {"stockbit": SB_FILE, "bei": BEI_FILE}
 BUILD_LINE = re.compile(r" -> files/([^/\s]+)/(\d{4}-\d{2}-\d{2})/(\S+)\s*$")
-# Situs sudah diperbarui tetapi belum ada commit: vps_not_committed (VPS), dua status lama dari masa Worker Cloudflare.
-LEGACY_DEPLOYED = ("deployed_index_pending", "deployed_not_committed")
-UNCOMMITTED = ("vps_not_committed",) + LEGACY_DEPLOYED
-DEPLOYED_ONLY = UNCOMMITTED  # nama lama, dipakai rollback_stockbit.py
+# Situs sudah diperbarui tetapi belum ada commit.
+UNCOMMITTED = ("vps_not_committed",)
 ROLLBACKABLE = ("published", "push_failed") + UNCOMMITTED
 
 T_GIT, T_NET, T_SYNC, T_BUILD, T_VPS = 60, 180, 1800, 900, 1800
@@ -248,7 +245,7 @@ OWNED_KINDS = ("stockbit", "bei")
 
 
 def dirty_kind(path):
-    """derived (docs/, site/), stockbit, bei, ignored (berkas titik lain di DEST_REL: tidak ikut build), atau other."""
+    """derived (docs/), stockbit, bei, ignored (berkas titik lain di DEST_REL: tidak ikut build), atau other."""
     if inside(path, DERIVED_PATHS):
         return "derived"
     if stockbit_owned(path):
@@ -259,12 +256,6 @@ def dirty_kind(path):
     if folder == DEST_REL and name.startswith("."):
         return "ignored"
     return "other"
-
-
-def tracked_derived_paths(runner):
-    """Keep legacy tracked site/ compatible without staging today's ignored local build."""
-    tracked = git_ok(runner, "ls-files", "-z", "--", *DERIVED_PATHS).split("\0")
-    return [folder for folder in DERIVED_PATHS if any(inside(path, (folder,)) for path in tracked if path)]
 
 
 def stockbit_changes(runner):
@@ -336,7 +327,7 @@ def unrolled_uncommitted(records):
     """Rantai publish terakhir yang sudah memperbarui situs tanpa commit dan belum di-rollback (paling lama dulu).
 
     Berkasnya masih berubah terhadap HEAD, jadi putaran berikutnya meng-commit-nya; rollback putaran itu ikut menutup
-    rantai ini (`supersedes`). Status lama dari masa Worker (deployed_*) diperlakukan sama.
+    rantai ini (`supersedes`).
     """
     done, chain = rolled_back_keys(records), []
     for r in reversed(records):
@@ -395,7 +386,7 @@ def withheld_deletion(path, withheld):
 
     `withheld`: {"stockbit": hari, "bei": hari}; himpunan biasa = hari Stockbit (bentuk lama). Tahanan satu keluarga tidak
     pernah mengizinkan penghapusan berkas keluarga lain.
-    Berlaku untuk sumbernya di DEST_REL dan untuk salinannya di hasil build (docs/, site/): `build.py --out docs` membangun ulang
+    Berlaku untuk sumbernya di DEST_REL dan untuk salinannya di hasil build (docs/): `build.py --out docs` membangun ulang
     docs/ tanpa hari itu, jadi salinan files/stockbit-*/<tgl>/sb*.md (atau files/bei-*/…/bei*.md) ikut terhapus dan harus
     boleh di-commit.
     """
@@ -435,11 +426,9 @@ def check_no_deleted_sb(runner, code):
 
 
 def discard_derived(runner, code):
-    """docs/ dan site/ hanya hasil build (build.py menghapus dan membangun ulang folder itu): kembalikan yang dilacak ke HEAD."""
-    paths = tracked_derived_paths(runner)
-    if paths:
-        git_ok(runner, "checkout", "--", *paths, code=code, what="git checkout hasil build terlacak")
-        git_ok(runner, "clean", "-fdq", "--", *paths, code=code, what="git clean hasil build terlacak")
+    """docs/ hanya hasil build (build.py menghapus dan membangun ulang folder itu): kembalikan ke HEAD."""
+    git_ok(runner, "checkout", "--", *DERIVED_PATHS, code=code, what="git checkout hasil build terlacak")
+    git_ok(runner, "clean", "-fdq", "--", *DERIVED_PATHS, code=code, what="git clean hasil build terlacak")
 
 
 def check_tools(which=shutil.which):
@@ -462,7 +451,7 @@ def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_
     if outside:
         raise Failure(2, "ada perubahan yang tidak boleh ikut publish Stockbit (hanya sb*.md, " + ", ".join(STOCKBIT_NAMES)
                       + ", bei*.md, " + ", ".join(BEI_NAMES)
-                      + ", docs/, site/; commit atau kembalikan dulu): " + ", ".join(outside[:15]))
+                      + ", docs/; commit atau kembalikan dulu): " + ", ".join(outside[:15]))
     check_no_deleted_sb(runner, 2)
     git_ok(runner, "fetch", "origin", "main", timeout=T_NET)
     ahead = int(git_ok(runner, "rev-list", "--count", "origin/main..HEAD") or 0)
@@ -533,12 +522,10 @@ def publish_env():
 
 
 def build_docs(runner):
-    """Bangun ulang docs/ (dan site/ pada checkout lama yang masih melacaknya) untuk riwayat git."""
-    env = publish_env()
-    for folder in ["docs", *[f for f in tracked_derived_paths(runner) if f != "docs"]]:
-        result = runner([sys.executable, "-B", "build.py", "--out", folder], timeout=T_BUILD, env=env)
-        if result.returncode:
-            raise Failure(4, f"build.py --out {folder} gagal: {output(result).strip()[-600:]}")
+    """Bangun ulang docs/ untuk riwayat git."""
+    result = runner([sys.executable, "-B", "build.py", "--out", "docs"], timeout=T_BUILD, env=publish_env())
+    if result.returncode:
+        raise Failure(4, f"build.py --out docs gagal: {output(result).strip()[-600:]}")
 
 
 def vps_push(runner, timeout=T_VPS):
@@ -721,7 +708,7 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         record["vps"] = summary["vps"] = True
         del record["status"]
         say("5/6 commit")
-        paths = [*stockbit_changes(runner), *tracked_derived_paths(runner)]
+        paths = [*stockbit_changes(runner), *DERIVED_PATHS]
         staged = paths  # sebelum add: add yang terputus pun bisa meninggalkan entri di index
         git_ok(runner, "add", "--", *paths, code=6, what="git add")
         removed = [n for n in git_ok(runner, "diff", "--cached", "--diff-filter=D", "--name-only", code=6).splitlines() if PUB_FILE.search(n)]

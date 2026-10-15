@@ -889,16 +889,16 @@ python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
 - `publish_stockbit.py` (cwd akar arsip): situs live = VPS (`node local/vps.mjs push`), GitHub = riwayat; Worker Cloudflare tidak disentuh.
   Preflight (git & node ada di PATH, `.local/vps.json` ada, cabang `main`, tidak ada yang di-stage, perubahan hanya berkas Stockbit
   di `needtobeindexed/idx-signal-desk/` (`sb*.md`, `stockbit-index.json`, `.sync-stockbit.json`, `.stockbit-hold.json`; berkas titik lain seperti
-  `.sync.json` dibiarkan dan tidak di-commit), `docs/`, `site/`; `digest_*`/`kepemilikan*` yang belum di-commit menolak publish, tidak ada commit
+  `.sync.json` dibiarkan dan tidak di-commit), `docs/`; `digest_*`/`kepemilikan*` yang belum di-commit menolak publish, tidak ada commit
   lokal yang belum dipush, `git fetch` + `git pull --ff-only`, disk ≥ 1,5 GB), catat HEAD, sinkron `--stockbit-only --no-build --with-bei`
   (BEI ikut di staging yang sama, lihat bagian BEI di bawah; tidak ada berkas Stockbit/BEI yang berubah terhadap HEAD → selesai "tidak ada perubahan", tanpa build/VPS/commit; berkas dari putaran gagal sebelumnya tetap
   terhitung berubah), `build.py --out <folder sementara>` lalu cek tiap `sb*` masuk kategori dan tanggal yang benar (tabelnya dicetak),
   `build.py --out docs` (tanpa `CHAT_API_URL`, `BASE_URL=https://arsip.seekingomega.capital`), lalu `node local/vps.mjs push` **sebelum commit**
   (gagal → vps.mjs memulihkan versi lama, exit 5, tidak ada commit; jalankan ulang; sebelumnya penjaga `sb*` terhapus diulang pada `docs/`
   hasil build: salinan `sb*` yang hilang tanpa tahanan desk → `docs/` dikembalikan, exit 7, VPS tidak disentuh), `git add` hanya berkas Stockbit tadi plus folder hasil build
-  yang masih dilacak Git (`docs/`; `site/` hanya pada checkout lama), berhenti kalau ada `sb*` terhapus (kecuali berkas hari yang ditahan desk menurut `.stockbit-hold.json` yang ikut di-commit, termasuk salinannya di `docs/`/`site/`
+  `docs/`, berhenti kalau ada `sb*` terhapus (kecuali berkas hari yang ditahan desk menurut `.stockbit-hold.json` yang ikut di-commit, termasuk salinannya di `docs/`
   yang dibangun ulang tanpa hari itu; harinya dicatat sebagai `withheld` di log), commit `Stockbit: ringkasan <tanggal>` (atau `Stockbit: tahan <tanggal> dari web`), push (sekali `git pull --rebase` bila ditolak),
-  tag beranotasi `stockbit-publish-YYYYMMDD-HHMMSS`, push tag. `site/` kini diabaikan Git; hanya `docs/` yang di-commit. Kompatibilitas `site/` terlacak dipertahankan untuk checkout lama.
+  tag beranotasi `stockbit-publish-YYYYMMDD-HHMMSS`, push tag. `site/` diabaikan Git; hanya `docs/` yang di-commit.
   Exit: 0 ok/tidak ada perubahan, 2 preflight, 3 sinkron, 4 cek build/build `docs/`, 5 push VPS gagal atau sisa waktu tidak cukup
   (situs versi lama, tanpa commit), 6 VPS sudah diperbarui tapi commit gagal (situs mendahului git; berkas yang sudah di-stage dilepas
   lagi, jadi publish ulang atau rollback bisa langsung jalan), 7 ada `sb*` terhapus tanpa tahanan desk, 8 commit lokal ada tetapi push git
@@ -913,26 +913,26 @@ python3 -B tools/rollback_stockbit.py [--tag stockbit-publish-YYYYMMDD-HHMMSS]
 - Titik rollback dicatat di `.stockbit-publish/log.jsonl` (diabaikan git): `target: "vps"`, `vps`, `pre_sha`, `post_sha` (tepat satu commit publish),
   tag, `supersedes`, `files`, `day_shas` (`{tgl: sha256 ekspor}` hari harian yang dikirim putaran itu, dibaca sebelum push VPS), `withheld`, status (`published`, `vps_failed`, `vps_not_committed`, `push_failed`, `gagal`, `tidak ada perubahan`).
   Publish berikutnya setelah `vps_not_committed` yang belum di-rollback meng-commit berkasnya dan mencatatnya di `supersedes`.
-  Catatan lama dengan `worker_version_*`/`rollback_to` dan status `deployed_*` tetap terbaca. `rollback_stockbit.py` memakai entri terakhir
+  Catatan lama dengan `worker_version_*`/`rollback_to` tetap terbaca. `rollback_stockbit.py` memakai entri terakhir
   (atau `--tag`, ditolak selama ada publish lebih baru yang belum di-rollback):
-  - `published`: `git revert --no-commit <pre_sha>..<post_sha>` + tahanan + satu commit + push (tanpa force push, riwayat tetap ada). `docs/`/`site/`
+  - `published`: `git revert --no-commit <pre_sha>..<post_sha>` + tahanan + satu commit + push (tanpa force push, riwayat tetap ada). `docs/`
     yang kotor dibuang dulu (hasil build), berkas titik non-Stockbit seperti `.sync.json` dibiarkan, berkas dilacak lain yang kotor menolak;
-    rentang yang menyentuh selain berkas Stockbit/`docs/`/`site/` ditolak.
+    rentang yang menyentuh selain berkas Stockbit/`docs/` ditolak.
   - `push_failed` yang commit-nya tidak pernah sampai ke origin: `git reset --keep <pre_sha>` (tanpa push). Kalau HEAD bukan commit itu karena
     pemilik sudah `git pull --rebase` + push manual, salinannya di origin/main dicari (subjek sama dan `git cherry`/patch-id setara, harus tepat
     satu); yang di-revert hanya salinan itu (`<induk>..<salinan>`, commit orang lain di antaranya tidak ikut) dan dicatat sebagai `rebased_from`.
     Tidak ketemu: ditolak (exit 2), rollback manual. Commit revert rollback yang dipush manual setelah rebase dikenali dengan cara yang sama.
-  - `vps_not_committed` (dan status lama `deployed_index_pending`/`deployed_not_committed`): berkas Stockbit yang kotor
-    dikembalikan ke HEAD (yang baru dihapus), `docs/`/`site/` dikembalikan; yang ditahan hanya hari dari berkas yang tercatat di publish itu
+  - `vps_not_committed`: berkas Stockbit yang kotor
+    dikembalikan ke HEAD (yang baru dihapus), `docs/` dikembalikan; yang ditahan hanya hari dari berkas yang tercatat di publish itu
     (`files`), bukan berkas kotor dari sinkron sesudahnya, dengan sha dari `day_shas` publish itu (bukan `.sync-stockbit.json` pohon kerja
     yang mungkin sudah ditulis ulang sinkron sesudahnya; catatan lama tanpa `day_shas`: `"*"`, ditahan sampai entrinya dihapus).
     Tahanan di dua cara ini belum di-commit dan ikut publish berikutnya.
   - Semua cara, termasuk putaran ulang, ditolak (exit 2) sebelum ada yang diubah bila cabang bukan `main`, ada yang di-stage, atau ada perubahan
-    (dilacak atau berkas baru) di luar berkas Stockbit/`docs/`/`site/`/berkas titik non-Stockbit: `vps.mjs push` mengirim pohon kerja apa adanya,
+    (dilacak atau berkas baru) di luar berkas Stockbit/`docs/`/berkas titik non-Stockbit: `vps.mjs push` mengirim pohon kerja apa adanya,
     jadi kode atau dokumen yang belum di-commit akan ikut live. Commit atau kembalikan dulu. Juga ditolak bila git masih di tengah revert
     (REVERT_HEAD/sequencer; jalankan `git revert --abort`). Batas waktu di tengah `git revert`/`git commit` rollback langsung menjalankan
     `git revert --abort` (di luar anggaran total). Putaran ulang `partial`/`push_failed` juga ditolak bila berkas Stockbit selain
-    `.stockbit-hold.json` kotor (sisa sinkron/publish sesudahnya yang belum lolos cek build; kembalikan dulu), dan `docs/`/`site/` dikembalikan
+    `.stockbit-hold.json` kotor (sisa sinkron/publish sesudahnya yang belum lolos cek build; kembalikan dulu), dan `docs/` dikembalikan
     ke HEAD sebelum push VPS.
   - Publish yang mencabut hari yang ditahan desk (`withheld` di log) tidak bisa di-rollback (exit 2, tidak ada yang diubah): membatalkannya
     akan menerbitkan lagi hari itu. Pakai desk: tahan hari lain yang ingin dicabut, atau lepas tahanannya, lalu publish.
