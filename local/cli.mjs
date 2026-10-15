@@ -47,6 +47,32 @@ export function rotatePassword(config) {
   return password;
 }
 
+// Setup settings: a new device password (first setup or --new-password) is hashed into config, printed once, never stored.
+export function saveSetup(file, config, renew) {
+  const password = !config.password || renew ? rotatePassword(config) : null;
+  writeConfig(file, config);
+  console.log('Pengaturan tersimpan: ' + file);
+  if (password) console.log(`\nKATA SANDI untuk semua perangkat (simpan di pengelola sandi; tidak ditampilkan lagi):\n\n    ${password}\n`);
+}
+
+// Root bootstrap lines (with $DOMAIN set): Caddy serves HTTPS (Let's Encrypt) and forwards to 127.0.0.1:port. The chat
+// streams NDJSON, so responses are flushed immediately. An existing Caddyfile is kept as a dated backup.
+export const caddyScript = port => `[ -f /etc/caddy/Caddyfile ] && cp /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.bak.$(date +%Y%m%d%H%M%S)"
+cat > /etc/caddy/Caddyfile <<EOF
+$DOMAIN {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000"
+	header -Server
+	reverse_proxy 127.0.0.1:${port} {
+		flush_interval -1
+	}
+}
+EOF
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+systemctl enable --now caddy
+systemctl reload caddy
+`;
+
 export const shellQuote = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
 
 // KEY=value lines of an .env file (an `export` prefix and surrounding quotes allowed).

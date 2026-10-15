@@ -20,7 +20,7 @@ import {execFileSync, spawn, spawnSync} from 'node:child_process';
 import {existsSync, readFileSync, appendFileSync, mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {cli, parseEnv, readConfig, rotatePassword, shellQuote as q, writeConfig} from './cli.mjs';
+import {caddyScript, cli, parseEnv, readConfig, rotatePassword, saveSetup, shellQuote as q, writeConfig} from './cli.mjs';
 import {validate} from './remote.mjs';
 import {EFFORT_DEFAULT, MODEL_DEFAULT, checkModel} from './server.mjs';
 
@@ -176,22 +176,8 @@ systemctl daemon-reload
 systemctl enable arsip >/dev/null
 # Started by "push" once the archive and the Claude login are in place.
 
-# HTTPS (Let's Encrypt) in front of the password-gated listener. The chat streams NDJSON: flush immediately.
-[ -f /etc/caddy/Caddyfile ] && cp /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.bak.$(date +%Y%m%d%H%M%S)"
-cat > /etc/caddy/Caddyfile <<EOF
-$DOMAIN {
-	encode gzip
-	header Strict-Transport-Security "max-age=31536000"
-	header -Server
-	reverse_proxy 127.0.0.1:${PORT} {
-		flush_interval -1
-	}
-}
-EOF
-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-systemctl enable --now caddy
-systemctl reload caddy
-echo
+# HTTPS in front of the password-gated listener.
+${caddyScript(PORT)}echo
 echo "Zona waktu: $(timedatectl show -p Timezone --value)   Node: $(${NODE} --version)"
 free -m | head -3
 echo "Selesai. Berikutnya di Mac: node local/vps.mjs login, lalu node local/vps.mjs push"
@@ -214,10 +200,7 @@ function setup(opt) {
   serverEnv(config);
   validate({vps:config.host, domain:config.domain, sshPort:config.ssh_port, sshUser:config.ssh_user});
   if (config.host_key && !HOST_KEY.test(config.host_key)) throw new Error('--host-key harus SHA256:… (43 karakter), dari ssh-keygen -lf di konsol VPS.');
-  const password = !config.password || opt['new-password'] ? rotatePassword(config) : null;
-  writeConfig(CONFIG, config);
-  console.log('Pengaturan tersimpan: ' + CONFIG);
-  if (password) console.log(`\nKATA SANDI untuk semua perangkat (simpan di pengelola sandi; tidak ditampilkan lagi):\n\n    ${password}\n`);
+  saveSetup(CONFIG, config, opt['new-password']);
   console.log(`Langkah berikutnya:
   1. DNS: A record  ${config.domain}  ->  ${config.host}
   2. ${config.host_key ? 'Sidik jari host tercatat: ' + config.host_key : 'Konsol web VPS: ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub, lalu setup --host-key SHA256:…'}

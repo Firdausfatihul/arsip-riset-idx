@@ -14,7 +14,7 @@ import {existsSync, readFileSync, writeFileSync, mkdirSync, rmSync} from 'node:f
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {cli, readConfig, rotatePassword, shellQuote, writeConfig} from './cli.mjs';
+import {caddyScript, cli, readConfig, rotatePassword, saveSetup, shellQuote, writeConfig} from './cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = path.join(ROOT, '.local');
@@ -70,22 +70,8 @@ EOF
 sshd -t
 systemctl reload ssh 2>/dev/null || systemctl reload sshd
 
-# HTTPS (Let's Encrypt) and forwarding into the tunnel. The chat streams NDJSON: flush immediately.
-[ -f /etc/caddy/Caddyfile ] && cp /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.bak.$(date +%Y%m%d%H%M%S)"
-cat > /etc/caddy/Caddyfile <<EOF
-$DOMAIN {
-	encode gzip
-	header Strict-Transport-Security "max-age=31536000"
-	header -Server
-	reverse_proxy 127.0.0.1:$PORT {
-		flush_interval -1
-	}
-}
-EOF
-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-systemctl enable --now caddy
-systemctl reload caddy
-echo
+# HTTPS, forwarded into the tunnel.
+${caddyScript('$PORT')}echo
 echo "Selesai. Pastikan port 80 dan 443 terbuka di firewall penyedia VPS, dan A record $DOMAIN mengarah ke VPS ini."
 echo "Sidik jari host SSH VPS (cocokkan dengan yang tercatat di Mac saat tunnel pertama tersambung):"
 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
@@ -126,13 +112,10 @@ function setup(opt) {
     mkdirSync(path.dirname(KEY), {recursive:true, mode:0o700});
     execFileSync('ssh-keygen', ['-t', 'ed25519', '-N', '', '-C', 'arsip-tunnel', '-f', KEY], {stdio:'ignore'});
   }
-  const password = !config.password || opt['new-password'] ? rotatePassword(config) : null;
-  writeConfig(CONFIG, config);
+  saveSetup(CONFIG, config, opt['new-password']);
   const script = path.join(STATE, 'vps-setup.sh');
   writeFileSync(script, vpsScript({domain:config.domain, publicKey:readFileSync(KEY + '.pub', 'utf8').trim()}), {mode:0o600});
   const target = `${config.ssh_admin}@${config.vps_host}`, port = config.ssh_port === 22 ? '' : ` -P ${config.ssh_port}`, sshPort = config.ssh_port === 22 ? '' : ` -p ${config.ssh_port}`;
-  console.log(`Pengaturan tersimpan: ${CONFIG}`);
-  if (password) console.log(`\nKATA SANDI untuk semua perangkat (simpan di pengelola sandi; tidak ditampilkan lagi):\n\n    ${password}\n`);
   console.log(`Langkah berikutnya:
   1. DNS: buat A record  ${config.domain}  ->  ${config.vps_host}
   2. VPS:  scp${port} ${script} ${target}:/root/  &&  ssh${sshPort} ${target} bash /root/vps-setup.sh

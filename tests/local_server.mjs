@@ -433,7 +433,7 @@ test('VPS host: Jakarta zone, pinned Node, Claude for user arsip, no restart on 
     ['build.py', 'app.css', 'app.js', 'needtobeindexed/ki_20260915.md', 'local/server.mjs']);
 });
 
-test('local CLI helpers: options, settings file with mode 600, password rotation', async () => {
+test('local CLI helpers: options, settings file with mode 600, password rotation, setup password', async () => {
   const {parseArgs, readConfig, writeConfig, rotatePassword} = await import('../local/cli.mjs');
   assert.deepEqual(parseArgs(['push', '--repin', '--days', '7'], ['repin']), {_:['push'], repin:true, days:'7'});
   assert.throws(() => parseArgs(['metrics', '--days'], []), /--days perlu nilai/);
@@ -444,6 +444,17 @@ test('local CLI helpers: options, settings file with mode 600, password rotation
   writeConfig(file, config);
   assert.equal((await stat(file)).mode & 0o777, 0o600);
   assert.deepEqual(readConfig(file, ''), config);
+  // setup: a new password is printed once (first setup, or --new-password); a later setup keeps it.
+  const {saveSetup} = await import('../local/cli.mjs'), printed = [], log = console.log;
+  console.log = line => printed.push(line);
+  try {
+    const fresh = {version:1};
+    saveSetup(file, fresh, false); const first = fresh.password;
+    saveSetup(file, fresh, false); assert.equal(fresh.password, first);
+    saveSetup(file, fresh, true); assert.notEqual(fresh.password, first);
+  } finally { console.log = log; }
+  assert.equal(printed.filter(line => /KATA SANDI/.test(line)).length, 2);
+  assert.equal((await stat(file)).mode & 0o777, 0o600);
 });
 
 test('VPS lock: Jakarta region and this cloud instance, read from metadata; copies elsewhere fail closed', async () => {
