@@ -28,7 +28,8 @@ import {claudeFetcher, cliEnv, checkAuth} from './claude-bridge.mjs';
 import {COOKIE, LOGIN_HEADERS, LoginLimiter, checkPassword, cookies, issueSession, loginPage, validSession} from './remote-auth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const STATE = path.join(ROOT, '.local');
+// Machine lock, chat database, built site and assets, remote settings. ARSIP_STATE moves it (tests/server_startup.mjs).
+const STATE = process.env.ARSIP_STATE ? path.resolve(process.env.ARSIP_STATE) : path.join(ROOT, '.local');
 const SITE = path.join(STATE, 'site'), ASSETS = path.join(STATE, 'assets');
 const LOCK = path.join(STATE, 'machine-lock.json');
 export const REMOTE = path.join(STATE, 'remote.json');
@@ -261,6 +262,7 @@ async function main() {
     // Placeholder that marks the chat as enabled; the bridge never sends it anywhere.
     OPENROUTER_API_KEY:'local-claude-code',
     MODEL_FETCHER:claudeFetcher({bin:claude, model:opt.model, effort:opt.effort, concurrency:opt.concurrency, guard,
+      keyFile:path.join(STATE, 'boundary.key'),
       log:entry => console.log('[claude]', JSON.stringify(entry))}),
     MODEL_LABEL:'claude-code:' + opt.model,
     CHAT_ALLOWED_ORIGINS:origins.join(','),

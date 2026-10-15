@@ -1,0 +1,341 @@
+{
+ "lines": [
+  "Worker: 1 dokumen sumber yang dipensiunkan (digest-emiten) tidak diindeks chat (tetap di situs).",
+  "Worker: stockbit_05102026.md (stockbit, 2026-10-05–2026-10-05) tidak diindeks chat; harinya tercakup ringkasan Stockbit (tetap di situs).",
+  "Tabel arsip: 3 klaim, 0 subjek, 0 nama, 3 cek rumor -> <out>",
+  "Worker: 20 dokumen lengkap, 22 bagian, 189 kata indeks, 9 aksi korporasi -> <out>"
+ ],
+ "keys": [
+  "asset_hashes",
+  "commonWords",
+  "data_version",
+  "docs",
+  "handles",
+  "postings",
+  "retrieval_version",
+  "system",
+  "tables",
+  "termTickers",
+  "tickers",
+  "version",
+  "wordTickers"
+ ],
+ "docs": [
+  {
+   "name": "Analisis_Stockbit_25-31_Agustus_2026.md",
+   "cat": "stockbit",
+   "start": "2026-08-25",
+   "end": "2026-08-31",
+   "covers": [
+    "2026-08-25",
+    "2026-08-31"
+   ],
+   "document_hash": "383971fac9414b22c0238ecfa06eaa33854de95328b01829b33c0cd5410474cd",
+   "sizes": [
+    244
+   ]
+  },
+  {
+   "name": "Arsip_Stockbit_Juli_2026.md",
+   "cat": "stockbit",
+   "start": "2026-07-01",
+   "end": "2026-07-31",
+   "covers": [
+    "2026-07-01",
+    "2026-07-31"
+   ],
+   "document_hash": "b11a2afb621df6567055966ff572ea52e4d0c92a02495beca37ca01638648310",
+   "sizes": [
+    197
+   ]
+  },
+  {
+   "name": "Laporan_Stockbit_Agustus_September_2026.md",
+   "cat": "stockbit",
+   "start": "2026-08-01",
+   "end": "2026-09-05",
+   "covers": [
+    "2026-08-01",
+    "2026-09-05"
+   ],
+   "document_hash": "d78d8cdd164dfed3c8c5f00d30088ba587f232c09904231e076af094923a7949",
+   "sizes": [
+    163
+   ]
+  },
+  {
+   "name": "asx_20260913.md",
+   "cat": "keterbukaan-australia",
+   "start": "2026-09-13",
+   "end": "2026-09-13",
+   "covers": [
+    "2026-09-13",
+    "2026-09-13"
+   ],
+   "document_hash": "220883894fd72a4ad66f827aea8ebe72a678c498be95b4e7c7a169d5230450f4",
+   "sizes": [
+    179
+   ]
+  },
+  {
+   "name": "beidetail_2026-10-05_2026-10-05.md",
+   "cat": "bei-detail",
+   "start": "2026-10-05",
+   "end": "2026-10-05",
+   "covers": [
+    "2026-10-05",
+    "2026-10-05"
+   ],
+   "document_hash": "4be700af83a7f89b649cc3b780209d2de59101dfb9a12a569c516197ea815710",
+   "sizes": [
+    340
+   ],
+   "priority": "low"
+  },
+  {
+   "name": "beipekan_2026-09-28_2026-10-04.md",
+   "cat": "bei-pekan",
+   "start": "2026-09-28",
+   "end": "2026-10-04",
+   "covers": [
+    "2026-09-28",
+    "2026-10-04"
+   ],
+   "document_hash": "3bbb3e83296cd6f28d3373d5f5816c58af868068e11f7ac9bd8bd800892a72c9",
+   "sizes": [
+    235
+   ]
+  },
+  {
+   "name": "beiringkas_2026-10-05_2026-10-05.md",
+   "cat": "bei-ringkasan",
+   "start": "2026-10-05",
+   "end": "2026-10-05",
+   "covers": [
+    "2026-10-05",
+    "2026-10-05"
+   ],
+   "document_hash": "627c6df5f8a3aca135407bed8f2d00addf117710e34edccfcd43eecf0f80b262",
+   "sizes": [
+    226
+   ]
+  },
+  {
+   "name": "catatan_bebas.md",
+   "cat": "lainnya",
+   "start": "2026-10-01",
+   "end": "2026-10-01",
+   "covers": [
+    "2026-10-01",
+    "2026-10-01"
+   ],
+   "document_hash": "93fc919a8954bee7b95066e575f88a58c4ce6377604be3eeb456be68aa2ba4bc",
+   "sizes": [
+    169
+   ]
+  },
+  {
+   "name": "keterbukaan_sg_20092026_semua_kode.csv",
+   "cat": "keterbukaan-singapura",
+   "start": "2026-09-20",
+   "end": "2026-09-20",
+   "covers": [
+    "2026-09-20",
+    "2026-09-20"
+   ],
+   "document_hash": "a445c4491fb056204bce46cfef98204735cc0be181f1c1eec916476d1fb1193b",
+   "sizes": [
+    139
+   ]
+  },
+  {
+   "name": "ki_20260915.md",
+   "cat": "keterbukaan-informasi",
+   "start": "2026-09-15",
+   "end": "2026-09-15",
+   "covers": [
+    "2026-09-15",
+    "2026-09-15"
+   ],
+   "document_hash": "84b3a52e2c7dd70bfd1b2c2baf7b911a4da155784b0ed449d149c082d7f75e61",
+   "sizes": [
+    93847,
+    93841,
+    84680
+   ]
+  },
+  {
+   "name": "ki_22092026.md",
+   "cat": "keterbukaan-informasi",
+   "start": "2026-09-22",
+   "end": "2026-09-24",
+   "covers": [
+    "2026-09-22",
+    "2026-09-24"
+   ],
+   "document_hash": "f989c7aa56d33ad4469a9b033644659ba746dec50d3763e4a8d3aaf97442a30c",
+   "sizes": [
+    456
+   ]
+  },
+  {
+   "name": "pemeriksaan_55_emiten_14_September_2026.md",
+   "cat": "keterbukaan-informasi",
+   "start": "2026-09-14",
+   "end": "2026-09-14",
+   "covers": [
+    "2026-09-14",
+    "2026-09-14"
+   ],
+   "document_hash": "81a59e64024090d29b9b1640f9f96381d3e1043fbbf81563de3aca7295d60612",
+   "sizes": [
+    293
+   ]
+  },
+  {
+   "name": "sbdetail_2026-10-05_2026-10-05.md",
+   "cat": "stockbit-detail",
+   "start": "2026-10-05",
+   "end": "2026-10-05",
+   "covers": [
+    "2026-10-05",
+    "2026-10-05"
+   ],
+   "document_hash": "4e00c5f877d4d5d5a531a59fc139a18586a12c02bdf28d92bbb1058586e70403",
+   "sizes": [
+    964
+   ],
+   "priority": "low"
+  },
+  {
+   "name": "sbpekan_2026-09-28_2026-10-04.md",
+   "cat": "stockbit-pekan",
+   "start": "2026-09-28",
+   "end": "2026-10-04",
+   "covers": [
+    "2026-09-28",
+    "2026-10-04"
+   ],
+   "document_hash": "eb372c9c7701fbd708f7effdf7966efd2b71b67fb2a96b05ae3aa3bb0bcbc028",
+   "sizes": [
+    233
+   ]
+  },
+  {
+   "name": "sbringkas_2026-10-05_2026-10-05.md",
+   "cat": "stockbit-ringkasan",
+   "start": "2026-10-05",
+   "end": "2026-10-05",
+   "covers": [
+    "2026-10-05",
+    "2026-10-05"
+   ],
+   "document_hash": "d1ff230fc6f4fccd25566936ccfb4a52e1a2b27b4afc3b9d1ba405f19d8b3285",
+   "sizes": [
+    299
+   ]
+  },
+  {
+   "name": "sgx_29092026.md",
+   "cat": "keterbukaan-singapura",
+   "start": "2026-09-29",
+   "end": "2026-09-29",
+   "covers": [
+    "2026-09-29",
+    "2026-09-29"
+   ],
+   "document_hash": "664caf9b9e31df55a3de06949171a54f667ff83c3f1f90c6034117c8a208cb34",
+   "sizes": [
+    170
+   ]
+  },
+  {
+   "name": "sgx_january-20september2026.md",
+   "cat": "keterbukaan-singapura",
+   "start": "2026-09-20",
+   "end": "2026-09-20",
+   "covers": [
+    "2026-09-20",
+    "2026-09-20"
+   ],
+   "document_hash": "fc369c46734a2afdb02d93a233cd5ecc199fe741ecb46ad42cd8409318a6bf16",
+   "sizes": [
+    215
+   ]
+  },
+  {
+   "name": "stockbit_01092026.md",
+   "cat": "stockbit",
+   "start": "2026-09-01",
+   "end": "2026-09-01",
+   "covers": [
+    "2026-09-01",
+    "2026-09-01"
+   ],
+   "document_hash": "34bdf624574b46f7479e41e080461b09176e1259492b37d153763ff6d87b610d",
+   "sizes": [
+    184
+   ]
+  },
+  {
+   "name": "stockbit_ki_review_2026-09-05_2026-09-10.md",
+   "cat": "stockbit",
+   "start": "2026-09-05",
+   "end": "2026-09-10",
+   "covers": [
+    "2026-09-05",
+    "2026-09-10"
+   ],
+   "document_hash": "0d9af65b77d23253106435037d2dd700fae7fca637412ab50260a9f3ed6c5d23",
+   "sizes": [
+    144
+   ]
+  },
+  {
+   "name": "stockbit_review_2026-09-13_14.html",
+   "cat": "stockbit",
+   "start": "2026-09-13",
+   "end": "2026-09-14",
+   "covers": [
+    "2026-09-13",
+    "2026-09-14"
+   ],
+   "document_hash": "b62fbafbfa136b634e43ced78b1648fb2f555cb4f3bc57ad072343b65b4d81b5",
+   "sizes": [
+    395
+   ]
+  }
+ ],
+ "version": "73a6479ef4a770f1",
+ "retrieval_version": "issuer-passages-v3",
+ "tickers": [
+  "BAJA",
+  "BULL",
+  "DOOH",
+  "ESTA",
+  "EURO",
+  "FORU",
+  "MNCN",
+  "SOCI"
+ ],
+ "handles": [
+  "ojaisun",
+  "rujakberkah96",
+  "santoswah"
+ ],
+ "tables": {
+  "claims": "claims.json",
+  "subjects": "subjects.json",
+  "entities": "entities.json",
+  "links": "links.json",
+  "coverage": "coverage.json"
+ },
+ "asset_hashes": {
+  "events.json": "374120765bced51a5fb5bba867c88acc7fc01e3728362de767c52343b04850a2",
+  "claims.json": "be132aeb777440e351868813ae8cf67a2936d44362411f87521373229faab7dd",
+  "subjects.json": "491cfcb6735914d40655448078e1331a82ebfe401fa61fbcc80866a38d26a37a",
+  "entities.json": "66e20fa33c5abb0e89c84e581725ff2b07d336b213f6702f007a2f41d1dfe9ba",
+  "links.json": "0c57180f44c0a4a6b8c614d7ee63456899ff36fd08aca7b5e21ceb1da1a93b89",
+  "coverage.json": "7081c0f48a9bc74391b651f93f995b23876f0c39e0653b744e911a3e2dd99c7d"
+ }
+}

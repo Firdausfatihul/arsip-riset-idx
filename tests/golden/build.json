@@ -1,0 +1,460 @@
+{
+ "lines": [
+  "Stockbit               25–31 Agustus 2026       Analisis_Stockbit_25-31_Agustus_2026.md -> files/stockbit/2026-08-25/Analisis_Stockbit_25-31_Agustus_2026.md",
+  "Stockbit               Juli 2026                Arsip_Stockbit_Juli_2026.md -> files/stockbit/2026-07-01/Arsip_Stockbit_Juli_2026.md",
+  "Stockbit               1 Agustus–5 September 2026 Laporan_Stockbit_Agustus_September_2026.md -> files/stockbit/2026-08-01/Laporan_Stockbit_Agustus_September_2026.md",
+  "Keterbukaan Informasi Australia 13 September 2026        asx_20260913.md -> files/keterbukaan-australia/2026-09-13/asx_20260913.md",
+  "Detail BEI             5 Oktober 2026           beidetail_2026-10-05_2026-10-05.md -> files/bei-detail/2026-10-05/beidetail_2026-10-05_2026-10-05.md",
+  "BEI mingguan           28 September–4 Oktober 2026 beipekan_2026-09-28_2026-10-04.md -> files/bei-pekan/2026-09-28/beipekan_2026-09-28_2026-10-04.md",
+  "Ringkasan keterbukaan BEI 5 Oktober 2026           beiringkas_2026-10-05_2026-10-05.md -> files/bei-ringkasan/2026-10-05/beiringkas_2026-10-05_2026-10-05.md",
+  "Lainnya                1 Oktober 2026           catatan_bebas.md -> files/lainnya/2026-10-01/catatan_bebas.md",
+  "Digest Emiten          1–2 Oktober 2026         digest_2026-10-01_2026-10-02.md -> files/digest-emiten/2026-10-01/digest_2026-10-01_2026-10-02.md",
+  "Keterbukaan Informasi Singapura (SGX) 20 September 2026        keterbukaan_sg_20092026_semua_kode.csv -> files/keterbukaan-singapura/2026-09-20/keterbukaan_sg_20092026_semua_kode.csv",
+  "Analisis KI (legacy)   15 September 2026        ki_20260915.md -> files/keterbukaan-informasi/2026-09-15/ki_20260915.md",
+  "Analisis KI (legacy)   22–24 September 2026     ki_22092026.md -> files/keterbukaan-informasi/2026-09-22/ki_22092026.md",
+  "Analisis KI (legacy)   14 September 2026        pemeriksaan_55_emiten_14_September_2026.md -> files/keterbukaan-informasi/2026-09-14/pemeriksaan_55_emiten_14_September_2026.md",
+  "Detail Stockbit        5 Oktober 2026           sbdetail_2026-10-05_2026-10-05.md -> files/stockbit-detail/2026-10-05/sbdetail_2026-10-05_2026-10-05.md",
+  "Stockbit mingguan      28 September–4 Oktober 2026 sbpekan_2026-09-28_2026-10-04.md -> files/stockbit-pekan/2026-09-28/sbpekan_2026-09-28_2026-10-04.md",
+  "Ringkasan Stockbit     5 Oktober 2026           sbringkas_2026-10-05_2026-10-05.md -> files/stockbit-ringkasan/2026-10-05/sbringkas_2026-10-05_2026-10-05.md",
+  "Keterbukaan Informasi Singapura (SGX) 29 September 2026        sgx_29092026.md -> files/keterbukaan-singapura/2026-09-29/sgx_29092026.md",
+  "Keterbukaan Informasi Singapura (SGX) 20 September 2026        sgx_january-20september2026.md -> files/keterbukaan-singapura/2026-09-20/sgx_january-20september2026.md",
+  "Stockbit               1 September 2026         stockbit_01092026.md -> files/stockbit/2026-09-01/stockbit_01092026.md",
+  "Stockbit               5 Oktober 2026           stockbit_05102026.md -> files/stockbit/2026-10-05/stockbit_05102026.md",
+  "Stockbit               5–10 September 2026      stockbit_ki_review_2026-09-05_2026-09-10.md -> files/stockbit/2026-09-05/stockbit_ki_review_2026-09-05_2026-09-10.md",
+  "Stockbit               13–14 September 2026     stockbit_review_2026-09-13_14.html -> files/stockbit/2026-09-13/stockbit_review_2026-09-13_14.html",
+  "22 dokumen -> <out>"
+ ],
+ "payload_keys": [
+  "bei",
+  "chatApi",
+  "docs",
+  "own",
+  "stockbit",
+  "version"
+ ],
+ "docs": [
+  {
+   "name": "Analisis_Stockbit_25-31_Agustus_2026.md",
+   "cat": "stockbit",
+   "kind": "md",
+   "start": "2026-08-25",
+   "end": "2026-08-31",
+   "label": "25–31 Agustus 2026",
+   "path": "files/stockbit/2026-08-25/Analisis_Stockbit_25-31_Agustus_2026.md",
+   "title": "Analisis_Stockbit_25-31_Agustus_2026",
+   "desc": "Isi dokumen Analisis_Stockbit_25-31_Agustus_2026.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "Arsip_Stockbit_Juli_2026.md",
+   "cat": "stockbit",
+   "kind": "md",
+   "start": "2026-07-01",
+   "end": "2026-07-31",
+   "label": "Juli 2026",
+   "path": "files/stockbit/2026-07-01/Arsip_Stockbit_Juli_2026.md",
+   "title": "Arsip_Stockbit_Juli_2026",
+   "desc": "Isi dokumen Arsip_Stockbit_Juli_2026.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "Laporan_Stockbit_Agustus_September_2026.md",
+   "cat": "stockbit",
+   "kind": "md",
+   "start": "2026-08-01",
+   "end": "2026-09-05",
+   "label": "1 Agustus–5 September 2026",
+   "path": "files/stockbit/2026-08-01/Laporan_Stockbit_Agustus_September_2026.md",
+   "title": "Laporan",
+   "desc": "Arsip 1 Agustus–5 September 2026 dari Stockbit Ideas.",
+   "codes": [],
+   "tickers": []
+  },
+  {
+   "name": "asx_20260913.md",
+   "cat": "keterbukaan-australia",
+   "kind": "md",
+   "start": "2026-09-13",
+   "end": "2026-09-13",
+   "label": "13 September 2026",
+   "path": "files/keterbukaan-australia/2026-09-13/asx_20260913.md",
+   "title": "ASX 13 September",
+   "desc": "1. Ringkasan · 2. DOOH",
+   "codes": [
+    [
+     "DOOH",
+     "dooh"
+    ]
+   ],
+   "tickers": [
+    "DOOH"
+   ]
+  },
+  {
+   "name": "beidetail_2026-10-05_2026-10-05.md",
+   "cat": "bei-detail",
+   "kind": "md",
+   "start": "2026-10-05",
+   "end": "2026-10-05",
+   "label": "5 Oktober 2026",
+   "path": "files/bei-detail/2026-10-05/beidetail_2026-10-05_2026-10-05.md",
+   "title": "Detail BEI · 5 Oktober 2026",
+   "desc": "PT Esta Indonesia Tbk (ESTA) mengumumkan rencana rights issue 500 juta saham.",
+   "codes": [
+    [
+     "ESTA",
+     "esta"
+    ]
+   ],
+   "tickers": [
+    "ESTA",
+    "RUPS"
+   ],
+   "lazy": true
+  },
+  {
+   "name": "beipekan_2026-09-28_2026-10-04.md",
+   "cat": "bei-pekan",
+   "kind": "md",
+   "start": "2026-09-28",
+   "end": "2026-10-04",
+   "label": "28 September–4 Oktober 2026",
+   "path": "files/bei-pekan/2026-09-28/beipekan_2026-09-28_2026-10-04.md",
+   "title": "beipekan_2026-09-28_2026-10-04",
+   "desc": "Isi dokumen beipekan_2026-09-28_2026-10-04.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "beiringkas_2026-10-05_2026-10-05.md",
+   "cat": "bei-ringkasan",
+   "kind": "md",
+   "start": "2026-10-05",
+   "end": "2026-10-05",
+   "label": "5 Oktober 2026",
+   "path": "files/bei-ringkasan/2026-10-05/beiringkas_2026-10-05_2026-10-05.md",
+   "title": "beiringkas_2026-10-05_2026-10-05",
+   "desc": "Isi dokumen beiringkas_2026-10-05_2026-10-05.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "catatan_bebas.md",
+   "cat": "lainnya",
+   "kind": "md",
+   "start": "2026-10-01",
+   "end": "2026-10-01",
+   "label": "1 Oktober 2026",
+   "path": "files/lainnya/2026-10-01/catatan_bebas.md",
+   "title": "catatan_bebas",
+   "desc": "Isi dokumen catatan_bebas.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "digest_2026-10-01_2026-10-02.md",
+   "cat": "digest-emiten",
+   "kind": "md",
+   "start": "2026-10-01",
+   "end": "2026-10-02",
+   "label": "1–2 Oktober 2026",
+   "path": "files/digest-emiten/2026-10-01/digest_2026-10-01_2026-10-02.md",
+   "title": "Digest emiten 1–2 Oktober 2026",
+   "desc": "BAJA",
+   "codes": [
+    [
+     "BAJA",
+     "baja"
+    ]
+   ],
+   "tickers": [
+    "BAJA"
+   ],
+   "unlisted": true
+  },
+  {
+   "name": "keterbukaan_sg_20092026_semua_kode.csv",
+   "cat": "keterbukaan-singapura",
+   "kind": "csv",
+   "start": "2026-09-20",
+   "end": "2026-09-20",
+   "label": "20 September 2026",
+   "path": "files/keterbukaan-singapura/2026-09-20/keterbukaan_sg_20092026_semua_kode.csv",
+   "title": "keterbukaan sg 20092026 semua kode",
+   "desc": "Tabel CSV · baris pertama sebagai judul kolom.",
+   "codes": [],
+   "tickers": [
+    "OCBC"
+   ],
+   "delimiter": ","
+  },
+  {
+   "name": "ki_20260915.md",
+   "cat": "keterbukaan-informasi",
+   "kind": "md",
+   "start": "2026-09-15",
+   "end": "2026-09-15",
+   "label": "15 September 2026",
+   "path": "files/keterbukaan-informasi/2026-09-15/ki_20260915.md",
+   "title": "KI 15 September",
+   "desc": "Perseroan: PT Media Nusantara Citra Tbk.",
+   "codes": [
+    [
+     "MNCN",
+     "mncn"
+    ]
+   ],
+   "tickers": [
+    "MNCN"
+   ],
+   "lazy": true
+  },
+  {
+   "name": "ki_22092026.md",
+   "cat": "keterbukaan-informasi",
+   "kind": "md",
+   "start": "2026-09-22",
+   "end": "2026-09-24",
+   "label": "22–24 September 2026",
+   "path": "files/keterbukaan-informasi/2026-09-22/ki_22092026.md",
+   "title": "KI scan",
+   "desc": "Digest periode 22–24 September 2026, mencakup 60 perusahaan.",
+   "codes": [
+    [
+     "FORU",
+     "foru"
+    ],
+    [
+     "ESTA",
+     "esta"
+    ]
+   ],
+   "tickers": [
+    "ESTA",
+    "FORU",
+    "RUPS"
+   ]
+  },
+  {
+   "name": "pemeriksaan_55_emiten_14_September_2026.md",
+   "cat": "keterbukaan-informasi",
+   "kind": "md",
+   "start": "2026-09-14",
+   "end": "2026-09-14",
+   "label": "14 September 2026",
+   "path": "files/keterbukaan-informasi/2026-09-14/pemeriksaan_55_emiten_14_September_2026.md",
+   "title": "Pemeriksaan 55 emiten",
+   "desc": "PT Estee Gold Feet Tbk (EURO) akan melakukan rights issue 2 miliar saham.",
+   "codes": [
+    [
+     "EURO",
+     "euro"
+    ]
+   ],
+   "tickers": [
+    "EURO"
+   ]
+  },
+  {
+   "name": "sbdetail_2026-10-05_2026-10-05.md",
+   "cat": "stockbit-detail",
+   "kind": "md",
+   "start": "2026-10-05",
+   "end": "2026-10-05",
+   "label": "5 Oktober 2026",
+   "path": "files/stockbit-detail/2026-10-05/sbdetail_2026-10-05_2026-10-05.md",
+   "title": "Detail temuan Stockbit Ideas · 5 Oktober 2026",
+   "desc": "Cakupan: 3/3 posting utama diberi disposisi · 3 akun · 1 emiten · final",
+   "codes": [
+    [
+     "FORU",
+     "foru"
+    ]
+   ],
+   "tickers": [
+    "FORU"
+   ],
+   "lazy": true
+  },
+  {
+   "name": "sbpekan_2026-09-28_2026-10-04.md",
+   "cat": "stockbit-pekan",
+   "kind": "md",
+   "start": "2026-09-28",
+   "end": "2026-10-04",
+   "label": "28 September–4 Oktober 2026",
+   "path": "files/stockbit-pekan/2026-09-28/sbpekan_2026-09-28_2026-10-04.md",
+   "title": "sbpekan_2026-09-28_2026-10-04",
+   "desc": "Isi dokumen sbpekan_2026-09-28_2026-10-04.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "sbringkas_2026-10-05_2026-10-05.md",
+   "cat": "stockbit-ringkasan",
+   "kind": "md",
+   "start": "2026-10-05",
+   "end": "2026-10-05",
+   "label": "5 Oktober 2026",
+   "path": "files/stockbit-ringkasan/2026-10-05/sbringkas_2026-10-05_2026-10-05.md",
+   "title": "Ringkasan Stockbit Ideas · 5 Oktober 2026",
+   "desc": "Klaim pengguna, belum diverifikasi, bukan rekomendasi.",
+   "codes": [
+    [
+     "SOCI",
+     "soci"
+    ],
+    [
+     "BULL",
+     "bull"
+    ]
+   ],
+   "tickers": [
+    "BULL",
+    "SOCI"
+   ]
+  },
+  {
+   "name": "sgx_29092026.md",
+   "cat": "keterbukaan-singapura",
+   "kind": "md",
+   "start": "2026-09-29",
+   "end": "2026-09-29",
+   "label": "29 September 2026",
+   "path": "files/keterbukaan-singapura/2026-09-29/sgx_29092026.md",
+   "title": "sgx_29092026",
+   "desc": "Isi dokumen sgx_29092026.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "sgx_january-20september2026.md",
+   "cat": "keterbukaan-singapura",
+   "kind": "md",
+   "start": "2026-09-20",
+   "end": "2026-09-20",
+   "label": "20 September 2026",
+   "path": "files/keterbukaan-singapura/2026-09-20/sgx_january-20september2026.md",
+   "title": "sgx_january-20september2026",
+   "desc": "Isi dokumen sgx_january-20september2026.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "stockbit_01092026.md",
+   "cat": "stockbit",
+   "kind": "md",
+   "start": "2026-09-01",
+   "end": "2026-09-01",
+   "label": "1 September 2026",
+   "path": "files/stockbit/2026-09-01/stockbit_01092026.md",
+   "title": "stockbit_01092026",
+   "desc": "Isi dokumen stockbit_01092026.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "stockbit_05102026.md",
+   "cat": "stockbit",
+   "kind": "md",
+   "start": "2026-10-05",
+   "end": "2026-10-05",
+   "label": "5 Oktober 2026",
+   "path": "files/stockbit/2026-10-05/stockbit_05102026.md",
+   "title": "stockbit_05102026",
+   "desc": "Isi dokumen stockbit_05102026.md untuk uji build, dengan kode SOCI.",
+   "codes": [],
+   "tickers": [
+    "SOCI"
+   ]
+  },
+  {
+   "name": "stockbit_ki_review_2026-09-05_2026-09-10.md",
+   "cat": "stockbit",
+   "kind": "md",
+   "start": "2026-09-05",
+   "end": "2026-09-10",
+   "label": "5–10 September 2026",
+   "path": "files/stockbit/2026-09-05/stockbit_ki_review_2026-09-05_2026-09-10.md",
+   "title": "Review",
+   "desc": "Periode 1–12 September 2026 tidak dipakai.",
+   "codes": [],
+   "tickers": []
+  },
+  {
+   "name": "stockbit_review_2026-09-13_14.html",
+   "cat": "stockbit",
+   "kind": "html",
+   "start": "2026-09-13",
+   "end": "2026-09-14",
+   "label": "13–14 September 2026",
+   "path": "files/stockbit/2026-09-13/stockbit_review_2026-09-13_14.html",
+   "title": "Review Stockbit",
+   "desc": "Ringkasan dua hari diskusi.",
+   "codes": [
+    [
+     "SOCI",
+     null
+    ],
+    [
+     "BULL",
+     null
+    ]
+   ],
+   "tickers": [
+    "BULL",
+    "SOCI"
+   ]
+  }
+ ],
+ "files": [
+  ".nojekyll",
+  "files/bei-detail/2026-10-05/beidetail_2026-10-05_2026-10-05.md",
+  "files/bei-pekan/2026-09-28/beipekan_2026-09-28_2026-10-04.md",
+  "files/bei-ringkasan/2026-10-05/beiringkas_2026-10-05_2026-10-05.md",
+  "files/digest-emiten/2026-10-01/digest_2026-10-01_2026-10-02.md",
+  "files/keterbukaan-australia/2026-09-13/asx_20260913.md",
+  "files/keterbukaan-informasi/2026-09-14/pemeriksaan_55_emiten_14_September_2026.md",
+  "files/keterbukaan-informasi/2026-09-15/ki_20260915.md",
+  "files/keterbukaan-informasi/2026-09-22/ki_22092026.md",
+  "files/keterbukaan-singapura/2026-09-20/keterbukaan_sg_20092026_semua_kode.csv",
+  "files/keterbukaan-singapura/2026-09-20/sgx_january-20september2026.md",
+  "files/keterbukaan-singapura/2026-09-29/sgx_29092026.md",
+  "files/lainnya/2026-10-01/catatan_bebas.md",
+  "files/stockbit-detail/2026-10-05/sbdetail_2026-10-05_2026-10-05.md",
+  "files/stockbit-pekan/2026-09-28/sbpekan_2026-09-28_2026-10-04.md",
+  "files/stockbit-ringkasan/2026-10-05/sbringkas_2026-10-05_2026-10-05.md",
+  "files/stockbit/2026-07-01/Arsip_Stockbit_Juli_2026.md",
+  "files/stockbit/2026-08-01/Laporan_Stockbit_Agustus_September_2026.md",
+  "files/stockbit/2026-08-25/Analisis_Stockbit_25-31_Agustus_2026.md",
+  "files/stockbit/2026-09-01/stockbit_01092026.md",
+  "files/stockbit/2026-09-05/stockbit_ki_review_2026-09-05_2026-09-10.md",
+  "files/stockbit/2026-09-13/stockbit_review_2026-09-13_14.html",
+  "files/stockbit/2026-10-05/stockbit_05102026.md",
+  "index.html",
+  "robots.txt",
+  "sitemap.xml",
+  "version.json"
+ ],
+ "index_html_sha256": "d47800e570fa888f5ed6b6632f53a1a5f5d6ff1156fd449ecc4dbcdb40acfdbc"
+}

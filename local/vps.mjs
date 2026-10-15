@@ -310,6 +310,22 @@ export function carryState(from = 'app', to = 'app.new') {
     + `&& mv ${to}/.local/boundary.key.tmp ${to}/.local/boundary.key; fi; `;
 }
 
+// The other push steps, run in /srv/arsip as the arsip user (tests/vps_swap.mjs runs them on a temp folder).
+// Build the new copy while the old server keeps serving. The machine lock is pinned on the first push only; it is
+// bound to this Tencent instance and the Jakarta region, so a copied disk never matches without --repin.
+export const buildScript = ({repin = false, node = NODE} = {}) => carryState()
+  + `cd app.new; if [ ! -f .local/machine-lock.json ]; then PIN=--pin; fi; `
+  + `PATH=${PATH_VPS} ARSIP_ALLOW_VPS=1 ${node} local/server.mjs --build-only \${PIN:-} ${repin ? '--repin' : ''}`;
+const moveDb = to => `for f in app/.local/chat.sqlite*; do if [ -e "$f" ]; then mkdir -p -m 700 ${to}/.local; mv "$f" ${to}/.local/; fi; done; `;
+// Swap (server stopped): the chat database and keys move to the new copy; the old copy stays as app.old until the
+// new server is up.
+export const swapScript = () => moveDb('app.new')
+  + `if [ -f app/.env.chat ]; then cp -p app/.env.chat app.new/; fi; rm -rf app.old app.failed; mv app app.old; mv app.new app`;
+// Restore after a failed swap or start: the database goes back to app.old, which becomes app again; the new copy is
+// kept as app.failed.
+export const restoreScript = () => `if [ -d app.old ]; then ${moveDb('app.old')}rm -rf app.failed; `
+  + `if [ -d app ]; then mv app app.failed; fi; mv app.old app; fi`;
+
 async function push(opt) {
   const config = read();
   const auth = vpsAuth(config);
@@ -319,22 +335,15 @@ async function push(opt) {
     .split('\0').filter(f => f && existsSync(path.join(ROOT, f))));
   console.log(`Mengirim ${files.length} berkas ke ${config.host}…`);
   await upload(config, files);
-  // Build the new copy while the old server keeps serving. The machine lock is pinned on the first push only; it is
-  // bound to this Tencent instance and the Jakarta region, so a copied disk never matches without --repin.
   const arsip = script => `sudo -u arsip -H sh -c ${q('set -e; cd /srv/arsip; ' + script)}`;
-  must(ssh(config, arsip(carryState() + `cd app.new; if [ ! -f .local/machine-lock.json ]; then PIN=--pin; fi; `
-    + `PATH=${PATH_VPS} ARSIP_ALLOW_VPS=1 ${NODE} local/server.mjs --build-only \${PIN:-} ${opt.repin ? '--repin' : ''}`)), 'Build di VPS (server lama tetap jalan)');
-  // Swap: the chat database and keys move to the new copy; the old copy stays as app.old until the new server is up.
-  const moveDb = to => `for f in app/.local/chat.sqlite*; do if [ -e "$f" ]; then mkdir -p -m 700 ${to}/.local; mv "$f" ${to}/.local/; fi; done; `;
+  must(ssh(config, arsip(buildScript({repin:opt.repin}))), 'Build di VPS (server lama tetap jalan)');
   try {
-    must(ssh(config, 'sudo systemctl stop arsip && ' + arsip(moveDb('app.new')
-      + `if [ -f app/.env.chat ]; then cp -p app/.env.chat app.new/; fi; rm -rf app.old app.failed; mv app app.old; mv app.new app`)), 'Mengganti versi');
+    must(ssh(config, 'sudo systemctl stop arsip && ' + arsip(swapScript())), 'Mengganti versi');
     sendSecrets(config);
     restart(config);
   } catch (error) {
     console.error('Gagal: ' + error.message + '\nMengembalikan versi sebelumnya…');
-    ssh(config, 'sudo systemctl stop arsip; ' + arsip(`if [ -d app.old ]; then ${moveDb('app.old')}rm -rf app.failed; `
-      + `if [ -d app ]; then mv app app.failed; fi; mv app.old app; fi`) + '; sudo systemctl start arsip');
+    ssh(config, 'sudo systemctl stop arsip; ' + arsip(restoreScript()) + '; sudo systemctl start arsip');
     throw new Error('Versi baru tidak dipakai; versi sebelumnya dijalankan lagi. Salinan gagal: /srv/arsip/app.failed');
   }
   must(ssh(config, arsip('rm -rf app.old app.failed')), 'Membersihkan');

@@ -17,7 +17,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-// Same folder as local/server.mjs STATE (repository/.local), independent of the working directory.
+// Default: repository/.local, independent of the working directory; local/server.mjs passes its own STATE folder.
 const KEY_FILE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.local', 'boundary.key');
 // Thinking is not capped (no MAX_THINKING_TOKENS): the effort level decides how much the model thinks. The CLI's
 // output ceiling is the Worker's text budget plus this room, so thinking never eats the answer; the text itself is

@@ -48,7 +48,8 @@ BEI_DETAIL = 'bei-detail'
 LOW_PRIORITY = (STOCKBIT_DETAIL, BEI_DETAIL)
 # Retired sources: still on the static site (old #doc= links), no longer indexed by chat.
 RETIRED = ('digest-emiten',)
-STOCKBIT_INDEX = ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'stockbit-index.json'
+# Signal Desk data read next to the built site: KSEI ownership, Stockbit and BEI indexes.
+DESK = ROOT / 'needtobeindexed' / 'idx-signal-desk'
 STOCKBIT_RULE = ('Konten Stockbit (ringkasan, detail, rekap pekan, laporan mentah) adalah klaim pengguna yang belum '
                  'diverifikasi, bukan keterbukaan resmi atau rekomendasi; balasan (reply) posting tidak dikumpulkan. '
                  'Baris "penilaian" adalah penilaian otomatis atas argumen di posting, bukan atas orangnya.\n')
@@ -233,15 +234,14 @@ def build(directory, out):
                 'wordTickers': sorted(t for t in tickers if t.lower() in WORD_TICKERS),
                 'termTickers': term_tickers(tickers)}
     # Month-over-month and cross-issuer KSEI joins for the agentic engine (tools/ksei_signals.py).
-    signals = ksei_signals.write(ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan.json', out)
+    signals = ksei_signals.write(DESK / 'kepemilikan.json', out)
     if signals:
         manifest['signals'] = signals
-    ownership = ownership_index(ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan.json',
-                                ROOT / 'needtobeindexed' / 'idx-signal-desk' / 'kepemilikan-laporan.json')
+    ownership = ownership_index(DESK / 'kepemilikan.json', DESK / 'kepemilikan-laporan.json')
     if ownership:
         (out / 'ownership.json').write_text(json.dumps(ownership, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         manifest['ownership'] = {'asset': 'ownership.json', 'companies': len(ownership['c']), 'month': ownership['m']}
-    stockbit = stockbit_index(STOCKBIT_INDEX)
+    stockbit = stockbit_index(DESK / 'stockbit-index.json')
     if stockbit:
         (out / 'stockbit.json').write_text(json.dumps(stockbit, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
         manifest['stockbit'] = {'asset': 'stockbit.json', 'tickers': len(stockbit['tickers']),
@@ -250,7 +250,7 @@ def build(directory, out):
     events = make_events(docs, tickers, evidences, name_docs=docs + [d for d in excluded if d['cat'] in RETIRED])
     (out / 'events.json').write_text(json.dumps(events, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     # Code-built tables (claims, subjects, entities, rumor checks, coverage) for worker/tables.mjs.
-    manifest['tables'] = archive_tables.write(out, docs, tickers, set(postings))
+    manifest['tables'] = archive_tables.write(out, docs, tickers, set(postings), desk=DESK)
     manifest.update(auxiliary_versions(out))
     (out / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
     print(f'Worker: {len(docs)} dokumen lengkap, {sum(len(d["sizes"]) for d in metadata)} bagian, '

@@ -39,7 +39,8 @@ CHAT_CONFIG = ROOT / "chat.config.json"
 CHAT_API_URL = os.environ.get("CHAT_API_URL", json.loads(CHAT_CONFIG.read_text()).get("api_url", "/api/chat")
                              if CHAT_CONFIG.is_file() else "/api/chat").rstrip("/")
 SITE_NAME = "Arsip Riset IDX"
-# BUILD_ID tetap (env) membuat dua build dari sumber yang sama identik byte per byte.
+# BUILD_ID (YYYYMMDDhhmmss) juga tanggal "dibangun" di kaki halaman. Ditetapkan lewat env, dua build dari sumber
+# yang sama identik byte per byte.
 BUILD_ID = os.environ.get("BUILD_ID") or datetime.now().strftime("%Y%m%d%H%M%S")
 
 # Urutan di sini = urutan tampil. Konvensi nama: stockbit_YYYYMMDD.md dan ki_YYYYMMDD.md.
@@ -3402,6 +3403,7 @@ def build_page(docs, by_cat, own=None, sb=None, bei=None):
                         + (legacy_link() if key == "bei-ringkasan" and "keterbukaan-informasi" in by_cat else "")
                         + f'<div class="ledger">{"".join(days_main)}</div></section>')
 
+    built = datetime.strptime(BUILD_ID[:8], "%Y%m%d").date()
     raw_links = "".join(f'<li><a href="{esc(d["path"])}">{esc(d["title"])}</a> ({esc(d["label"])})</li>' for d in docs)
     entries = embed_entries(docs)
     payload = {
@@ -3476,7 +3478,7 @@ def build_page(docs, by_cat, own=None, sb=None, bei=None):
             + f'<div class="cats">{"".join(sections)}</div>'
             + '<p class="empty" id="kosong" hidden>Tidak ada yang cocok. Coba kode 4 huruf, nama, atau bulan.</p>'
             f'<noscript><p class="empty">JavaScript mati. Buka berkas mentahnya:</p><ul>{raw_links}</ul></noscript>'
-            f'<footer class="foot"><span>{SITE_NAME}</span><span>dibangun {esc(date_label(date.today(), date.today()))}</span>'
+            f'<footer class="foot"><span>{SITE_NAME}</span><span>dibangun {esc(date_label(built, built))}</span>'
             + (f"<span>data terbaru {esc(date_label(last, last))}</span>" if last else "") + "</footer></div>"
             '<article id="reader" hidden></article></main></div>' + own_view +
             f'<script type="application/json" id="arsip-data">{data_json}</script>'

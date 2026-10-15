@@ -6,7 +6,8 @@
 # Exit status is non-zero when anything fails.
 set -u
 cd "$(dirname "$0")/.." || exit 1
-tmp=$(mktemp -d "${TMPDIR:-/tmp}/arsip-test.XXXXXX") || exit 1
+base=${TMPDIR:-/tmp}
+tmp=$(mktemp -d "${base%/}/arsip-test.XXXXXX") || exit 1
 trap 'rm -rf "$tmp"' EXIT
 deps=${ARSIP_TEST_DEPS:-$HOME/.cache/arsip-test-deps}
 libs="jsdom@26.1.0 marked@15.0.7 dompurify@3.4.15"
