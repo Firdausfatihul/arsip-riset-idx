@@ -1,13 +1,15 @@
 // Agentic mode: the model may call a fixed set of read-only tools, the archive and the datacat
 // API (structured IDX disclosures). Host, paths, key and limits are server-side; every tool
 // argument is validated. Tool results are data, never instructions.
-import {MODEL, ChatError, converse, directTickers, hash, nearestWord, plainHistory, readLimited, size} from './core.mjs';
+import {MODEL, ChatError, converse, directTickers, nearestWord, plainHistory, readLimited} from './core.mjs';
+import {cacheOnce, hash} from './cache.mjs';
+import {escapeRegExp, jsonBytes, MONTH_WORDS} from './text.mjs';
 import {citations} from './citations.mjs';
 export {citations} from './citations.mjs';
 import {dateQuery, documentRequest, selectRecords} from './retrieval.mjs';
 import {wrongNames, nameNotice} from './screening.mjs';
 import {ExternalBudget, answerChecks, datacatSlot, typedMinutes, worded} from './facts.mjs';
-import {SCREENING, coverage, dataVersion, hopParties, knownPart, loadSignals, mustCover, screeningView, signalView} from './signals.mjs';
+import {SCREENING, coverage, dataVersion, hopParties, knownPart, loadSignals, mustCover, perVersion, screeningView, signalView} from './signals.mjs';
 
 // Input tokens are most of the cost: every round resends instructions, tools and earlier results.
 // Internal prompts and tool results are therefore terse; only the answer to the user is normal prose.
@@ -119,7 +121,7 @@ function ticker(v) {
 class ToolError extends Error {}
 
 // Correct the observed "latest = today" mistake without overriding a date or period the user chose.
-const TIME_SCOPE = /\b(hari ini|kemarin|besok|today|yesterday|tanggal|tgl|tggl|sejak|hingga|sampai|sebelum|sesudah|setelah|before|after|since|until|between|20\d{2}|januari|january|jan|februari|february|feb|maret|march|mar|april|apr|mei|may|juni|june|jun|juli|july|jul|agustus|august|agu|aug|september|sep|sept|oktober|october|okt|oct|november|nov|desember|december|des|dec|q[1-4]|tw[1-4])\b|\b(?:tahun|bulan|pekan|minggu|kuartal|triwulan|semester)\s+(?:ini|lalu|terakhir|depan)\b|\b\d+\s+(?:hari|minggu|pekan|bulan|tahun)\b|\b\d{1,2}[/-]\d{1,2}\b/i;
+const TIME_SCOPE = new RegExp(String.raw`\b(hari ini|kemarin|besok|today|yesterday|tanggal|tgl|tggl|sejak|hingga|sampai|sebelum|sesudah|setelah|before|after|since|until|between|20\d{2}|${MONTH_WORDS}|q[1-4]|tw[1-4])\b|\b(?:tahun|bulan|pekan|minggu|kuartal|triwulan|semester)\s+(?:ini|lalu|terakhir|depan)\b|\b\d+\s+(?:hari|minggu|pekan|bulan|tahun)\b|\b\d{1,2}[/-]\d{1,2}\b`, 'i');
 export function latestArgs(args, question, today, history = []) {
   if (!/\b(terbaru|terakhir|latest|paling baru)\b/i.test(question) || TIME_SCOPE.test(question)) return args;
   // A short follow-up can still refer to the period in the preceding user turn.
@@ -281,7 +283,9 @@ export function compact(value, refs, {long = false} = {}) {
   // Even pathological wide objects retain an explicit warning; never silently cut the serialized result.
   return terse({bahan_dipangkas:true, catatan:'hasil terlalu besar; cuplikan bukan daftar lengkap', cuplikan:out.slice(0, 2400)});
 }
-export class Refs {
+// URLs cited by agent tool results, numbered per kind: [K…] datacat pages, [O…] ownership tab links.
+// Archive documents use tables.mjs DocRefs ([D…]).
+export class DatacatRefs {
   constructor() { this.byUrl = new Map(); this.count = {}; }
   add(url, title, date, kind = 'K') {
     if (!this.byUrl.has(url)) {
@@ -320,7 +324,7 @@ export async function fetchDatacat({key, cache, signal, fetcher = fetch, budget,
     if (!response.ok) { response.body?.cancel().catch(() => {}); throw new ToolError('datacat gagal (' + response.status + ')'); }
     const data = prune(JSON.parse(await readLimited(response.body, 4000000, 20000, signal))) ?? {};
     signal?.throwIfAborted();
-    if (size(data) <= 300000) cache?.put('datacat', cacheKey, data, AGENT.dataTtl);
+    if (jsonBytes(data) <= 300000) cache?.put('datacat', cacheKey, data, AGENT.dataTtl);
     return {data, cached:false};
   })();
   // Per-question memo also reuses large results without adding them to persistent storage.
@@ -397,7 +401,7 @@ export async function archiveTool(archive, index, args, used) {
   const tickers = new Set(index.tickers), codes = terms.filter(t => tickers.has(t)), words = terms.filter(t => !tickers.has(t));
   // With a ticker, generic words ("pemegang saham") must not pull in passages about other issuers.
   const docs = (await archive.search(codes.length ? codes : terms)).slice(0, 8), out = [];
-  const wordRes = words.map(w => new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  const wordRes = words.map(w => new RegExp(escapeRegExp(w), 'i'));
   let budget = AGENT.resultBytes - 300;
   for (const doc of docs) {
     let data = null;
@@ -444,13 +448,8 @@ async function userTickers(archive, index, terms, tickers) {
 
 // ---- Our KSEI ownership index (tools/build_worker.py ownership_index) -------------------------
 const fold = t => String(t).toLowerCase().replace(/\b(pt|tbk|persero)\b|[.,()]/g, ' ').replace(/\s+/g, ' ').trim();
-let ownershipCache = null;
-async function ownershipData(archive, index) {
-  if (!index.ownership?.asset) return null;
-  const version = dataVersion(index);
-  if (ownershipCache?.version !== version) ownershipCache = {version, data:archive.read(index.ownership.asset)};
-  return ownershipCache.data;
-}
+const ownershipRead = perVersion((archive, index) => archive.read(index.ownership.asset));
+const ownershipData = async (archive, index) => index.ownership?.asset ? ownershipRead(archive, index) : null;
 export function ownershipTool(data, args, refs) {
   if (!data) throw new ToolError('data kepemilikan belum tersedia');
   const code = clean(args.ticker, 8).toUpperCase(), name = fold(clean(args.nama, 100));
@@ -535,7 +534,7 @@ export function biography(text, name) {
   if (!key) return null;
   const headers = [...flat.matchAll(HEADER)].map(m => m.index);
   let best = null, bestScore = 0;
-  for (const m of low.matchAll(new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))) {
+  for (const m of low.matchAll(new RegExp(escapeRegExp(key), 'g'))) {
     // Name inside its own list ("Pengalaman Kerja: ... Yoel ... "): start at the nearest header before it.
     // Name heading its list ("Yoel  Tempat/Tanggal Lahir ... Pengalaman Kerja ..."): start at the name, skip its own headers.
     const before = headers.filter(h => h <= m.index && h >= m.index - 300), after = headers.filter(h => h > m.index + 40 && h <= m.index + 900);
@@ -600,13 +599,7 @@ export async function agentic(options) {
     signal?.throwIfAborted();
     return result;
   };
-  let cached;
-  if (cache?.once) cached = await cache.once('agentic', answerKey, compute, AGENT.answerTtl, {signal, retrySharedFailure:true});
-  else {
-    const saved = cache?.get('agentic', answerKey);
-    cached = saved ? {value:saved, hit:true} : {value:await compute(), hit:false};
-    if (!cached.hit && !cached.value.incomplete) cache?.put('agentic', answerKey, cached.value, AGENT.answerTtl);
-  }
+  const cached = await cacheOnce(cache, 'agentic', answerKey, compute, AGENT.answerTtl, {signal, retrySharedFailure:true});
   if (!cached.hit) return cached.value;
   signal?.throwIfAborted();
   stats.answer_cache_hit = true;
@@ -619,7 +612,7 @@ export async function agentic(options) {
 
 async function runAgent({archive, model, question, history, emit, signal, cache, env, client, stats, reserveQuota = () => {}, fetcher, date, index}) {
   await reserveQuota();
-  const refs = new Refs(), used = new Map(), seen = new Map(), callKeys = new WeakMap(), delivered = new Map(), evidence = [], retains = [];
+  const refs = new DatacatRefs(), used = new Map(), seen = new Map(), callKeys = new WeakMap(), delivered = new Map(), evidence = [], retains = [];
   const budget = new ExternalBudget(AGENT.subrequests), requests = new Map();
   // Every OpenRouter request, retries included, uses one of the per-request subrequests.
   if (typeof model.fetcher === 'function' && !model.budgeted) {

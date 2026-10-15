@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import {Archive, OpenRouter, ChatError, validate, searchQuery, batches, size, converse, readFullDocuments, MODEL, LIMITS, readLimited} from '../worker/core.mjs';
+import {Archive, OpenRouter, ChatError, validate, searchQuery, batches, converse, readFullDocuments, MODEL, LIMITS} from '../worker/core.mjs';
+import {jsonBytes} from '../worker/text.mjs';
 import {tickerDocuments} from './helpers/archive-expectations.mjs';
 import {ROOT, SITE, assets} from './helpers/archive.mjs';
 
@@ -39,7 +40,7 @@ function fullFixture() {
       text:`${ticker} dokumen ${i}, bagian ${part + 1}. ` + 'Bukti kapal 🚢 dan angka 123. '.repeat(5000)}));
     payloads[asset] = {parts, search:parts.map(p=>p.text).join('')};
     return {source_id, asset, title:ticker + ' document ' + i, name:asset, path:'files/' + asset,
-      end:'2026-09-0' + (i + 1), label:'September 2026', sizes:parts.map(p=>size(p))};
+      end:'2026-09-0' + (i + 1), label:'September 2026', sizes:parts.map(p=>jsonBytes(p))};
   });
   payloads['manifest.json'] = {docs, tickers:['SOCI', 'SMDR'], commonWords:[], handles:[],
     postings:{soci:['D47', 'D48'], smdr:['D49']}, system:'Gunakan seluruh bukti dan pertahankan sumber.'};
@@ -68,7 +69,7 @@ test('full-document reader passes every selected part and preserves final batch 
   assert.equal(result.batches, groups.length);
   for (const group of groups) {
     const parts = await Promise.all(group.map(async ({doc, part}) => (await sample.read(doc.asset)).parts[part]));
-    assert.ok(size(parts) <= LIMITS.batch);
+    assert.ok(jsonBytes(parts) <= LIMITS.batch);
   }
   const finalContext = JSON.parse(model.final.at(-1).content.split('\n').at(-1));
   assert.deepEqual(finalContext.map(c=>({batch:c.batch, ids:c.source_ids})),

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
-import {DatabaseSync} from 'node:sqlite';
+import {storage} from '../local/sqlite-storage.mjs';
 import {Archive, OpenRouter, converse, directTickers, nearestWord, rememberTurn} from '../worker/core.mjs';
 import {dateQuery, documentRequest} from '../worker/retrieval.mjs';
 import {SourceStore} from '../worker/source-store.mjs';
@@ -22,10 +22,9 @@ test('word-like tickers need capitals or a cue; real codes in any case still wor
 });
 
 test('ticker search is case-sensitive in SQLite and in the asset fallback', async () => {
-  const db = new DatabaseSync(':memory:');
-  const sql = {exec(q, ...a) { const s = db.prepare(q), rows = s.columns().length ? s.all(...a) : (s.run(...a), []); return {toArray:() => rows}; }};
-  const store = new SourceStore({storage:{sql, transactionSync:fn => fn()}});
-  for (const doc of manifest.docs) await store.importDocument(manifest, doc, await read(doc.evidence_asset));
+  const {db, storage:s} = storage();
+  const store = new SourceStore({storage:s});
+  await store.importPending(manifest, doc => read(doc.evidence_asset));
   // Exactly the documents that write NAIK in capitals; the ordinary word "naik" is everywhere.
   const expected = (await tickerDocuments(manifest, 'NAIK')).map(d => d.name).sort();
   for (const archive of [new Archive(assets, store), new Archive(assets)]) {

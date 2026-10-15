@@ -5,6 +5,7 @@
 //   entityMaterial / handleMaterial / rareRumorMaterial: single-call routes (core.mjs tableRoute)
 //   claimTail      short code-written list of rumors the answer did not discuss (table routes only)
 import {modelText} from './retrieval.mjs';
+import {BULAN, clip, escapeRegExp, utf8Bytes} from './text.mjs';
 
 export const TABLE_RULES = '\nSetiap klaim Stockbit dirujuk dengan F-id; keterbukaan dengan [D..]. Status di baris CEK tidak boleh dinaikkan. '
   + 'Pisahkan: fakta resmi, data KSEI, rumor/klaim pengguna. Bila menyatakan sesuatu tidak ada, sebut cakupan tanggal sumbernya.';
@@ -12,10 +13,6 @@ export const RELATION = /\b(?:pengendali|pemilik|pemegang(?: saham)?|grup|group|
 export const RARE = /\b(jarang|sedikit dibahas|sedikit yang|sepi|kurang dibahas|belum banyak dibahas|tidak banyak dibahas)\b/i;
 const KIND_LABEL = {R:'Rumor', K:'Klaim penulis', P:'Pertanyaan', M:'Mengutip keterbukaan', H:'Hitungan penulis', G:'Guyon/kode'};
 const MENTION_BUDGET = 4000, ENTITY_BUDGET = 28000;
-const encoder = new TextEncoder();
-export const bytes = text => encoder.encode(text).length;
-const clip = (text, n = 240) => { const t = String(text ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
-const BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const monthName = m => { const [y, mo] = String(m || '').split('-'); return mo ? `${BULAN[+mo - 1]} ${y}` : String(m || ''); };
 const pct = p => typeof p === 'number' ? p.toFixed(2).replace('.', ',') + '%' : '';
 const VERDICT_RANK = {didukung:0, bertentangan:1, tercatat:2, tidak_dapat:3, lain:4, tanpa_dasar:5};
@@ -37,7 +34,7 @@ export function docLookup(index) {
 }
 
 // Documents cited by the material, in first-use order; their source_ids are the only valid [D…] references.
-export class Refs {
+export class DocRefs {
   constructor() { this.docs = []; this.ids = new Set(); }
   add(doc) { if (!doc) return ''; if (!this.ids.has(doc.source_id)) { this.ids.add(doc.source_id); this.docs.push(doc); } return '[' + doc.source_id + ']'; }
   sources() { return this.docs.map(({source_id, title, path, label}) => ({source_id, title, path, label})); }
@@ -67,7 +64,7 @@ export function claimLine(row, code, tables, verdicts = 2) {
 // Only rows the case-sensitive ticker search cannot find: the sentence does not contain the code in capitals
 // (lowercase "grpm", the official name). Share transactions first, then newest; creditor rows only for credit questions.
 export function mentionsBlock(codes, tables, index, question, {rows = 8, budget = MENTION_BUDGET} = {}) {
-  const lookup = docLookup(index), refs = new Refs(), credit = /utang|pinjam|kredit/i.test(question), lines = [];
+  const lookup = docLookup(index), refs = new DocRefs(), credit = /utang|pinjam|kredit/i.test(question), lines = [];
   let used = 0;
   for (const code of codes) {
     const upper = new RegExp('(?<![A-Za-z0-9])' + code + '(?![A-Za-z0-9])');
@@ -80,8 +77,8 @@ export function mentionsBlock(codes, tables, index, question, {rows = 8, budget 
       const key = s[1] + s[5].slice(0, 80), doc = lookup.byName(s[2]);
       if (seen.has(key) || !doc || n >= rows) continue;
       const line = `- ${code} ← ${s[0]} · pengumuman ${s[1]} · ${s[4]}: "${modelText(s[5])}" [${doc.source_id}] baris ${s[3]}`;
-      if (used + bytes(line) > budget) break;
-      seen.add(key); n++; used += bytes(line) + 1; refs.add(doc); lines.push(line);
+      if (used + utf8Bytes(line) > budget) break;
+      seen.add(key); n++; used += utf8Bytes(line) + 1; refs.add(doc); lines.push(line);
     }
   }
   return lines.length ? {text:'[A2] KODE DISEBUT DI PENGUMUMAN EMITEN LAIN (huruf kecil atau nama resmi, tidak ditemukan pencarian kode; kutipan persis):\n'
@@ -163,7 +160,7 @@ const roleText = rows => rows.slice(0, 3).map(r => [r[0], /^\d{4}-\d{2}$/.test(r
 
 // [H] HUBUNGAN TERCATAT between 2+ tickers: exact names in both (KSEI/DPS/BEI roles) and announcements linking them.
 export function relationBlock(codes, tables, index) {
-  const ix = entityIndex(tables.entities), lookup = docLookup(index), refs = new Refs(), lines = [];
+  const ix = entityIndex(tables.entities), lookup = docLookup(index), refs = new DocRefs(), lines = [];
   for (let i = 0; i < codes.length; i++) for (let j = i + 1; j < codes.length; j++) {
     const [a, b] = [codes[i], codes[j]], rows = [];
     for (const norm of (ix?.byTicker.get(a) || []).filter(n => (tables.entities.names[n].t || {})[b])) {
@@ -189,8 +186,7 @@ export function relationBlock(codes, tables, index) {
 const plainHtml = text => String(text).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ')
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'");
 const tidy = text => modelText(plainHtml(text)).replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim();
-const escape = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const wordRx = words => new RegExp('(?<![\\p{L}\\p{N}_])(?:' + words.map(escape).join('|') + ')(?![\\p{L}\\p{N}_])', 'iu');
+const wordRx = words => new RegExp('(?<![\\p{L}\\p{N}_])(?:' + words.map(escapeRegExp).join('|') + ')(?![\\p{L}\\p{N}_])', 'iu');
 const recordsOf = async (archive, index, doc) => { try { return (archive.store?.read?.(doc, index) || await archive.read(doc.evidence_asset))?.records || []; } catch { return []; } };
 const coverageHead = cov => `cakupan Stockbit ${cov.stockbit?.[0] || '?'}..${cov.stockbit?.[1] || '?'}; BEI ${cov.bei?.[0] || '?'}..${cov.bei?.[1] || '?'}; KSEI s.d. ${monthName(cov.ksei?.[1]) || '?'}`;
 
@@ -198,7 +194,7 @@ const coverageHead = cov => `cakupan Stockbit ${cov.stockbit?.[0] || '?'}..${cov
 export async function entityMaterial(question, ctx) {
   const {index, tables, archive} = ctx, ents = tables.entities, found = entityLookup(question, ents, index);
   if (!found) return null;
-  const lookup = docLookup(index), refs = new Refs(), ix = entityIndex(ents);
+  const lookup = docLookup(index), refs = new DocRefs(), ix = entityIndex(ents);
   const norms = [...new Set(found.matched.flatMap(m => m.names))];
   const aliasOf = n => [...(ents.alias?.[n] || [])];
   // Explicit aliases ("PT X, bagian Rimau Group") are always followed; spelling variants only as a fallback.
@@ -268,8 +264,8 @@ export async function entityMaterial(question, ctx) {
   for (const {doc, r, text} of passages) {
     const ctxLine = String(r.context || '').split('\n').filter(Boolean).pop() || '';
     const line = `- ${refs.add(doc)} ${doc.name} (${doc.label})${ctxLine ? ' · ' + clip(plainHtml(ctxLine), 80) : ''}: ${clip(tidy(text), 1500)}`;
-    if (used + bytes(line) > ENTITY_BUDGET) break;
-    pLines.push(line); used += bytes(line) + 1;
+    if (used + utf8Bytes(line) > ENTITY_BUDGET) break;
+    pLines.push(line); used += utf8Bytes(line) + 1;
   }
   // Claims naming the entity: content words first, then rumors/quotes, newest first.
   const crx = content.map(w => wordRx([w]));
@@ -298,7 +294,7 @@ export async function entityMaterial(question, ctx) {
 // Corporate-action rumors/quoted disclosures of issuers whose such rumors come from ≤maxAccounts accounts on ≤maxDays days,
 // plus the desk's own "Jarang disebut tapi material" lists.
 export async function rareRumorMaterial(ctx, {maxAccounts = 3, maxDays = 2, limit = 60, deskBudget = 12000} = {}) {
-  const {index, tables, archive} = ctx, lookup = docLookup(index), refs = new Refs();
+  const {index, tables, archive} = ctx, lookup = docLookup(index), refs = new DocRefs();
   const topics = tables.claims?.topics || [], ca = CA_TOPICS.reduce((m, t) => topics.includes(t) ? m | (1 << topics.indexOf(t)) : m, 0);
   const found = [], issuers = new Set();
   for (const [code, rows] of Object.entries(tables.claims?.by_ticker || {})) {
@@ -327,8 +323,8 @@ export async function rareRumorMaterial(ctx, {maxAccounts = 3, maxDays = 2, limi
     for (const r of (await recordsOf(archive, index, doc)).filter(r => /(^|\n)Jarang disebut tapi material\s*$/.test(r.context || '')))
       for (const item of r.content.split('\n').filter(l => /^- /.test(l))) {
         const line = `${modelText(item).trim()} ${refs.add(doc)}`;
-        if (used + bytes(line) > deskBudget) break;
-        desk.push(line); used += bytes(line) + 1;
+        if (used + utf8Bytes(line) > deskBudget) break;
+        desk.push(line); used += utf8Bytes(line) + 1;
       }
   }
   const text = `=== RUMOR AKSI KORPORASI YANG JARANG DIBAHAS (disusun sistem dari indeks temuan Stockbit ${cov.stockbit?.[0]}..${cov.stockbit?.[1]}) ===\n`
@@ -345,7 +341,7 @@ export async function rareRumorMaterial(ctx, {maxAccounts = 3, maxDays = 2, limi
 // ---- Stockbit handle ------------------------------------------------------------------------------------------------
 // Extras next to stockbit.mjs stockbitHandleBlock: the handle's findings with checks, topic counts and the desk's thread.
 export function handleMaterial(handle, ctx, {limit = 60} = {}) {
-  const {index, tables, sbTable} = ctx, lookup = docLookup(index), refs = new Refs();
+  const {index, tables, sbTable} = ctx, lookup = docLookup(index), refs = new DocRefs();
   const rows = [], seen = new Set();
   for (const [code, list] of Object.entries(tables.claims?.by_ticker || {})) for (const row of list)
     if (row[4] === handle && !seen.has(row[0])) { seen.add(row[0]); rows.push({code, row}); }

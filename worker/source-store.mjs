@@ -1,4 +1,4 @@
-// Durable, lossless source index. Populated by the private sync endpoint, never by a model.
+// Durable, lossless source index. Filled at server start-up (local/server.mjs), never by a model.
 import {hash} from './cache.mjs';
 import {pattern} from './retrieval.mjs';
 export const SOURCE_SCHEMA = 'sources-v1';
@@ -65,6 +65,11 @@ export class SourceStore {
       this.sql.exec('INSERT INTO source_documents VALUES(?,?)',key,data.records.length);
     });
     return {skipped:false,records:data.records.length};
+  }
+  // Imports every document of the index not stored yet; read(doc) gives its evidence data, progress(n,total) follows.
+  async importPending(index,read,progress=()=>{}) {
+    const pending=this.status(index).pending.map(id=>index.docs.find(d=>d.document_id===id));
+    for(const [n,doc] of pending.entries()){await this.importDocument(index,doc,await read(doc));progress(n+1,pending.length);}
   }
   read(doc,index) {
     const key=keyOf(doc,index.retrieval_version);

@@ -9,7 +9,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {CacheStore} from '../worker/cache.mjs';
-import {storage} from '../local/server.mjs';
+import {storage} from '../local/sqlite-storage.mjs';
 import {metricsScript} from '../local/vps.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');

@@ -1,10 +1,9 @@
-const months = {januari:1,january:1,jan:1,februari:2,february:2,feb:2,maret:3,march:3,mar:3,april:4,apr:4,mei:5,may:5,juni:6,june:6,jun:6,juli:7,july:7,jul:7,agustus:8,august:8,agu:8,aug:8,september:9,sep:9,sept:9,oktober:10,october:10,okt:10,oct:10,november:11,nov:11,desember:12,december:12,des:12,dec:12};
-const monthNames = Object.keys(months).join('|');
+import {escapeRegExp, MONTHS, MONTH_WORDS} from './text.mjs';
 // "22 Septembet - 5 Oct": a word next to a day number, one edit away from a full month name with the same first three
 // letters, is that month. Without this the range silently shrank to "5 Oct". Only clear misspellings count: the word
 // and the month both have six or more letters (so "market" ~ maret and "marsh" ~ march stay words), and a few real
 // words one edit away from a month are listed (NOT_MONTHS; a scan of an English word list finds no other).
-const FULL_MONTHS = Object.keys(months).filter(m => m.length >= 6);
+const FULL_MONTHS = Object.keys(MONTHS).filter(m => m.length >= 6);
 const NOT_MONTHS = new Set(['market', 'markets', 'marah', 'marsh', 'marco', 'marek', 'augusta', 'augusti', 'augustus']);
 function oneEdit(a, b) {
   if (Math.abs(a.length - b.length) > 1) return false;
@@ -18,7 +17,7 @@ function oneEdit(a, b) {
 }
 const monthFix = word => {
   const w = word.toLowerCase();
-  if (Object.hasOwn(months, w) || NOT_MONTHS.has(w)) return word;
+  if (Object.hasOwn(MONTHS, w) || NOT_MONTHS.has(w)) return word;
   return FULL_MONTHS.find(m => m.slice(0,3) === w.slice(0,3) &&
     Math.min(w.length, m.length) >= 6 && oneEdit(w, m)) || word;
 };
@@ -26,7 +25,7 @@ export const fixMonths = text => String(text)
   .replace(/(\b\d{1,2}\s+)([A-Za-z]{5,})\b/g, (m, day, word) => day + monthFix(word))
   .replace(/\b([A-Za-z]{5,})(\s+\d{1,2})(?!\d)/g, (m, word, day) => monthFix(word) + day);
 // A short correction such as "september 22" carries the same date as "22 september".
-const dateOrder = text => fixMonths(text).replace(new RegExp('\\b(' + monthNames + ')\\s+(\\d{1,2})(?!\\d)\\b,?','gi'), '$2 $1');
+const dateOrder = text => fixMonths(text).replace(new RegExp('\\b(' + MONTH_WORDS + ')\\s+(\\d{1,2})(?!\\d)\\b,?','gi'), '$2 $1');
 function validDate(y,m,d) {
   const date = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   const parsed = new Date(date + 'T00:00:00Z');
@@ -35,15 +34,15 @@ function validDate(y,m,d) {
 // Keep complete endpoints together: "3 October 2026 sampai tanggal 5 October 2026"
 // is one inclusive range, while "3 October dan 5 October" is still a date list.
 function dateRanges(question, year) {
-  const endpoint = '(?:20\\d{2}-\\d{1,2}-\\d{1,2}|\\d{1,2}[/-]\\d{1,2}(?:[/-]20\\d{2})?|\\d{1,2}\\s+(?:' + monthNames + ')(?:\\s+20\\d{2})?)';
+  const endpoint = '(?:20\\d{2}-\\d{1,2}-\\d{1,2}|\\d{1,2}[/-]\\d{1,2}(?:[/-]20\\d{2})?|\\d{1,2}\\s+(?:' + MONTH_WORDS + ')(?:\\s+20\\d{2})?)';
   const range = new RegExp('\\b(' + endpoint + ')\\s*(?:sampai|hingga|s/d|[–—-])\\s*(?:(?:tanggal|tgl|tggl)\\s*)?(' + endpoint + ')\\b', 'gi');
   const parts = text => {
     let m = text.match(/^(20\d{2})-(\d{1,2})-(\d{1,2})$/);
     if (m) return {year:m[1], month:m[2], day:m[3]};
     m = text.match(/^(\d{1,2})[/-](\d{1,2})(?:[/-](20\d{2}))?$/);
     if (m) return {year:m[3], month:m[2], day:m[1]};
-    m = text.match(new RegExp('^(\\d{1,2})\\s+(' + monthNames + ')(?:\\s+(20\\d{2}))?$', 'i'));
-    return {year:m[3], month:months[m[2].toLowerCase()], day:m[1]};
+    m = text.match(new RegExp('^(\\d{1,2})\\s+(' + MONTH_WORDS + ')(?:\\s+(20\\d{2}))?$', 'i'));
+    return {year:m[3], month:MONTHS[m[2].toLowerCase()], day:m[1]};
   };
   const dates = [];
   let invalid = false;
@@ -68,40 +67,40 @@ export function dateQuery(question, history = [], years = []) {
     if (m) return validDate(+m[1],+m[2],+m[3]);
     m = text.match(/\b(\d{1,2})[\/-](\d{1,2})[\/-](20\d{2})\b/);
     if (m) return validDate(+m[3],+m[2],+m[1]);
-    m = text.match(new RegExp('\\b(\\d{1,2})\\s+(' + monthNames + ')\\s+(20\\d{2})\\b','i'));
-    return m ? validDate(+m[3],months[m[2].toLowerCase()],+m[1]) : null;
+    m = text.match(new RegExp('\\b(\\d{1,2})\\s+(' + MONTH_WORDS + ')\\s+(20\\d{2})\\b','i'));
+    return m ? validDate(+m[3],MONTHS[m[2].toLowerCase()],+m[1]) : null;
   };
   let date = full(question);
   const previous = [...history].reverse().find(t => t.role === 'user');
   const previousDay = previous?.content.match(/\b(?:tanggal|tgl|tggl)\s*(\d{1,2})(?!\d)/i);
-  const suppliedMonth = question.match(new RegExp('\\b(' + monthNames + ')\\s+(20\\d{2})\\b','i'));
-  if (!date && previousDay && suppliedMonth) date=validDate(+suppliedMonth[2],months[suppliedMonth[1].toLowerCase()],+previousDay[1]);
+  const suppliedMonth = question.match(new RegExp('\\b(' + MONTH_WORDS + ')\\s+(20\\d{2})\\b','i'));
+  if (!date && previousDay && suppliedMonth) date=validDate(+suppliedMonth[2],MONTHS[suppliedMonth[1].toLowerCase()],+previousDay[1]);
   const range = ranges.dates.length > 0 || /\b(sebelum|sesudah|setelah|sampai|hingga|sejak|antara|before|after|between|until)\b/i.test(question) ||
-    new RegExp('\\b\\d{1,2}\\s*[–-]\\s*\\d{1,2}\\s+(?:'+monthNames+')\\b','i').test(question) ||
+    new RegExp('\\b\\d{1,2}\\s*[–-]\\s*\\d{1,2}\\s+(?:'+MONTH_WORDS+')\\b','i').test(question) ||
     (question.match(/\b20\d{2}-\d{1,2}-\d{1,2}\b/g) || []).length > 1;
   if (date) return {date, filter:!range};
   if (/\b20\d{2}-\d{1,2}-\d{1,2}\b|\b\d{1,2}[\/-]\d{1,2}[\/-]20\d{2}\b/.test(question))
     return {clarification:'Tanggal tersebut tidak valid. Tuliskan tanggal lengkap yang benar, misalnya 17 September 2026.',filter:false};
   const short = question.match(/\b(?:tanggal|tgl|tggl|pada)\s*(\d{1,2})(?!\d)/i) ||
-    question.match(new RegExp('\\b(\\d{1,2})\\s+(?:' + monthNames + ')\\b','i'));
+    question.match(new RegExp('\\b(\\d{1,2})\\s+(?:' + MONTH_WORDS + ')\\b','i'));
   if (!short) return {date:null, filter:false};
   // Inherit only a fully specified date from the preceding user turn, never from file dates.
   const inherited = previous && full(previous.content);
-  if (inherited && !new RegExp(monthNames,'i').test(question)) {
+  if (inherited && !new RegExp(MONTH_WORDS,'i').test(question)) {
     const value = validDate(+inherited.slice(0,4),+inherited.slice(5,7),+short[1]);
     if (value) return {date:value, filter:!range, inherited:true};
   }
   // Day and month without a year are unambiguous when the whole archive lies in one year.
-  const dayMonth = question.match(new RegExp('\\b(\\d{1,2})\\s+(' + monthNames + ')\\b(?!\\s+20\\d{2})','i'));
+  const dayMonth = question.match(new RegExp('\\b(\\d{1,2})\\s+(' + MONTH_WORDS + ')\\b(?!\\s+20\\d{2})','i'));
   if (dayMonth && years.length === 1) {
-    const value = validDate(years[0],months[dayMonth[2].toLowerCase()],+dayMonth[1]);
+    const value = validDate(years[0],MONTHS[dayMonth[2].toLowerCase()],+dayMonth[1]);
     if (value) return {date:value, filter:!range, inferredYear:true};
   }
   return {clarification:`Tanggal ${short[1]} bulan dan tahun berapa? Contoh: “tanggal ${short[1]} September 2026”.`, filter:false};
 }
 
 // Ticker codes match case-sensitively: "naik" in prose is not the ticker NAIK.
-export const pattern = (term, tickers = new Set()) => new RegExp('(?<![\\p{L}\\p{N}_])' + term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'\\s+') + '(?![\\p{L}\\p{N}_])',
+export const pattern = (term, tickers = new Set()) => new RegExp('(?<![\\p{L}\\p{N}_])' + escapeRegExp(term).replace(/\s+/g,'\\s+') + '(?![\\p{L}\\p{N}_])',
   tickers.has(term) ? 'u' : 'iu');
 // "Tidak ada aksi korporasi seperti rights issue" mentions a topic without it happening.
 // Keep in sync with NEGATION in tools/event_index.py.
@@ -291,9 +290,9 @@ export function requestedDates(question, year, today = todayWIB()) {
   const out = [...ranges.dates], add = (y,m,d) => { const v = validDate(+y,+m,+d); if (v) out.push({from:v, to:v}); };
   for (const m of question.matchAll(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/g)) add(m[1],m[2],m[3]);
   for (const m of question.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(20\d{2}))?\b/g)) if (m[3] || year) add(m[3] || year,m[2],m[1]);
-  const list = new RegExp('\\b(\\d{1,2})((?:\\s*(?:,|&|dan|-|–|sampai|hingga|s/d)\\s*\\d{1,2})*)\\s+(' + monthNames + ')\\b(?:\\s+(20\\d{2}))?','gi');
+  const list = new RegExp('\\b(\\d{1,2})((?:\\s*(?:,|&|dan|-|–|sampai|hingga|s/d)\\s*\\d{1,2})*)\\s+(' + MONTH_WORDS + ')\\b(?:\\s+(20\\d{2}))?','gi');
   for (const m of question.matchAll(list)) {
-    const y = m[4] || year, mo = months[m[3].toLowerCase()];
+    const y = m[4] || year, mo = MONTHS[m[3].toLowerCase()];
     if (!y) continue;
     const rest = [...m[2].matchAll(/(,|&|dan|-|–|sampai|hingga|s\/d)\s*(\d{1,2})/gi)];
     if (rest.length === 1 && /^(-|–|sampai|hingga|s\/d)$/i.test(rest[0][1])) {
@@ -305,9 +304,9 @@ export function requestedDates(question, year, today = todayWIB()) {
   // "stockbit oktober" is the whole month. Only for Stockbit questions (other sources keep their old
   // scoping), and only when no day of any month was written, so a day list or range
   // ("3 dan 5 oktober", "30 september sampai 2 oktober") is never widened.
-  if (!out.length && categories(question).includes('stockbit') && !new RegExp('\\b\\d{1,2}\\s+(?:' + monthNames + ')\\b|\\b\\d{1,2}[/-]\\d{1,2}\\b','i').test(question))
+  if (!out.length && categories(question).includes('stockbit') && !new RegExp('\\b\\d{1,2}\\s+(?:' + MONTH_WORDS + ')\\b|\\b\\d{1,2}[/-]\\d{1,2}\\b','i').test(question))
     for (const m of question.matchAll(MONTH_ONLY)) {
-      const y = m[2] || year, mo = months[m[1].toLowerCase()];
+      const y = m[2] || year, mo = MONTHS[m[1].toLowerCase()];
       if (!y) continue;
       const from = validDate(+y,mo,1), to = new Date(Date.UTC(+y,mo,0)).toISOString().slice(0,10);
       if (from && !out.some(r => r.from === from && r.to === to)) out.push({from, to});

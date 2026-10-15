@@ -1,11 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DatabaseSync} from 'node:sqlite';
+import {storage} from '../local/sqlite-storage.mjs';
 import {converse,CacheStore,hash} from '../worker/core.mjs';
 
 function fixture() {
-  const db=new DatabaseSync(':memory:');
-  const sql={exec(q,...args){const s=db.prepare(q),rows=s.columns().length?s.all(...args):(s.run(...args),[]);return {toArray:()=>rows};}};
+  const {db,storage:{sql}}=storage();
   const cache=new CacheStore(sql),bodies=['ALFA alpha beta. '.repeat(55000),'SGX temuan singkat.','Stockbit tambahan.'];
   const pieces=body=>body.match(/[\s\S]{1,95000}/g)||[];
   const docs=bodies.map((body,i)=>({source_id:'D'+(i+2),document_id:'stable-'+i,document_hash:'hash-'+i,

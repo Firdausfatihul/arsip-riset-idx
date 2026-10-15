@@ -1,17 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DatabaseSync} from 'node:sqlite';
-import {CacheStore, MODEL, hash} from '../worker/core.mjs';
+import {storage} from '../local/sqlite-storage.mjs';
+import {Archive, CacheStore, MODEL, hash} from '../worker/core.mjs';
 import {AGENT, DATACAT_CACHE_VERSION, WEB_CACHE_VERSION, agentic, agenticKey, datacatRequest, fetchDatacat, requestIdentity, searchText} from '../worker/agent.mjs';
-import {dataVersion, loadSignals} from '../worker/signals.mjs';
+import {dataVersion, loadSignals, perVersion} from '../worker/signals.mjs';
 
 globalThis.fetch = () => { throw new Error('Network forbidden in optimization tests'); };
 const pause = ms => new Promise(done => setTimeout(done, ms));
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return {promise, resolve}; };
 function cache() {
-  const db = new DatabaseSync(':memory:');
-  const sql = {exec(q, ...args) { const stmt = db.prepare(q), rows = stmt.columns().length ? stmt.all(...args) : (stmt.run(...args), []);
-    return {toArray:() => rows, one:() => rows[0]}; }};
+  const {db, storage:{sql}} = storage();
   return {db, cache:new CacheStore(sql)};
 }
 const index = {version:'optimization-docs', data_version:'optimization-data', docs:[], tickers:['BBCA'], postings:{}, handles:[], commonWords:[]};
@@ -153,4 +151,19 @@ test('auxiliary content and legacy metadata changes reload signals without archi
   const next={...legacy,signals:{...legacy.signals,month:'2026-09'}};
   assert.notEqual(dataVersion(legacy),dataVersion(next)); assert.equal((await loadSignals(fake,next)).signals.asof,3);
   assert.equal(reads,8);
+});
+
+test('data files are read once per data version or Archive, and a failed read is retried', async () => {
+  let reads = 0;
+  const load = perVersion(async () => { if (++reads === 1) throw Error('read failed'); return reads; });
+  await assert.rejects(load(null, {data_version:'v1'}), /read failed/);
+  assert.equal(await load(null, {data_version:'v1'}), 2);
+  assert.equal(await load(null, {data_version:'v1'}), 2);
+  assert.equal(await load(null, {data_version:'v2'}), 3);
+  let fetches = 0;
+  const archive = new Archive({fetch:async () => ++fetches === 1 ? new Response('', {status:503}) : Response.json({names:{}})});
+  await assert.rejects(archive.events());
+  assert.deepEqual(await archive.events(), {names:{}});
+  await archive.events();
+  assert.equal(fetches, 2);
 });

@@ -1,8 +1,13 @@
 // Shared source-derived data. No conversations or user text are stored in cache keys.
+import {utf8Bytes} from './text.mjs';
 export async function hash(value) {
   const bytes = new TextEncoder().encode(typeof value === 'string' ? value : JSON.stringify(value));
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), b => b.toString(16).padStart(2, '0')).join('');
 }
+
+// cache.once when there is a shared cache; without one (tests, tools) the work just runs.
+export const cacheOnce = async (cache, kind, key, compute, ttl, options) => cache?.once
+  ? cache.once(kind, key, compute, ttl, options) : {value:await compute(), hit:false, shared:false};
 
 // A cancelled caller stops waiting without cancelling another caller's work.
 function waitFor(pending, signal) {
@@ -47,7 +52,7 @@ export class CacheStore {
     return JSON.parse(row.content);
   }
   put(kind, key, value, ttl) {
-    const content = JSON.stringify(value), bytes = new TextEncoder().encode(content).length;
+    const content = JSON.stringify(value), bytes = utf8Bytes(content);
     if (bytes > 1000000) return; // Oversize entries never displace the entire shared cache.
     const now = Date.now();
     this.sql.exec('DELETE FROM evidence_cache WHERE expires <= ?', now);

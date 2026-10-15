@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DatabaseSync} from 'node:sqlite';
-import {Archive, CacheStore, ChatError, LIMITS, OpenRouter, converse, size, validate} from '../worker/core.mjs';
+import {storage} from '../local/sqlite-storage.mjs';
+import {Archive, CacheStore, ChatError, LIMITS, OpenRouter, converse, validate} from '../worker/core.mjs';
+import {jsonBytes} from '../worker/text.mjs';
 import {agentic} from '../worker/agent.mjs';
 import {modelText} from '../worker/retrieval.mjs';
 import {assetsAt, historicalAssets} from './helpers/archive.mjs';
@@ -20,12 +21,7 @@ const answer = 'Ringkasan sumber Stockbit menurut materialitas, dengan fakta dan
 const modelCopy = async doc => (await archive.read(doc.evidence_asset)).records.map(row => modelText(row.content)).join('');
 
 function cacheFixture() {
-  const db = new DatabaseSync(':memory:');
-  const sql = {exec(query, ...args) {
-    const statement = db.prepare(query);
-    const rows = statement.columns().length ? statement.all(...args) : (statement.run(...args), []);
-    return {toArray:() => rows};
-  }};
+  const {db, storage:{sql}} = storage();
   return {db, cache:new CacheStore(sql), count:kind =>
     db.prepare('SELECT COUNT(*) n FROM evidence_cache WHERE kind = ?').get(kind).n};
 }
@@ -98,7 +94,7 @@ test('a whole report under RAW_LIMIT answers in one call from its complete model
     assert.equal(model.calls, 1);
     assert.equal(model.output, 24000);
     assert.equal(stats.answer_reserved_tokens, 24000);
-    assert.ok(size(requests[0].messages) <= LIMITS.documentMessage);
+    assert.ok(jsonBytes(requests[0].messages) <= LIMITS.documentMessage);
     assert.ok(model.input <= LIMITS.input);
     assert.equal(model.usage().missing_usage_calls, 0, 'Truncated streams retain their trailing usage receipts');
     assert.equal(stats.exhaustive_summary, true);
@@ -145,7 +141,7 @@ test('all four raw reports of 3–5 October: agent request reads every matching 
     assert.ok(model.input <= LIMITS.input);
     assert.equal(model.calls, requests.length);
     assert.ok(model.calls <= LIMITS.calls);
-    assert.ok(requests.every(request => size(request.messages) <= LIMITS.message));
+    assert.ok(requests.every(request => jsonBytes(request.messages) <= LIMITS.message));
     assert.equal(model.usage().missing_usage_calls, 0);
     assert.equal(result.incomplete, undefined);
     assert.equal(fixture.count('notes'), notes.length);

@@ -2,8 +2,7 @@
 // retrieval index's headings and table headers for every paragraph/table row.
 // Offsets count Unicode code points, matching tools/evidence_index.py.
 import {modelText} from './retrieval.mjs';
-const encoder = new TextEncoder();
-const bytes = value => encoder.encode(JSON.stringify(value)).length;
+import {jsonBytes, utf8Bytes} from './text.mjs';
 const UNIT_LIMIT = 220000;
 const PART_LENGTH = 22000;
 
@@ -33,7 +32,7 @@ export function documentUnits(doc, records, {transform = null} = {}) {
       // headings and headers are already present in the unmodified source text.
       context: row.context || '', part: ++part, text: content
     };
-    const partBytes = bytes(value);
+    const partBytes = jsonBytes(value);
     if (partBytes + 2 > UNIT_LIMIT) throw new Error('Document source context exceeds the material limit.');
     if (parts.length && unitBytes + 1 + partBytes > UNIT_LIMIT) {
       units.push({doc, parts, ...(transform ? {checked:''} : {})});
@@ -70,7 +69,6 @@ const HEAD = /^(?:sorotan|yang berubah|jarang disebut)/i;
 const APPENDIX = /^lampiran\b/i;
 const LEAD = 1100;
 const DEFER = 10;
-const utf8 = text => encoder.encode(text).length;
 // In-page anchors ("[ABMM](#kepemilikan=ABMM)") carry no evidence either.
 export const deskText = text => modelText(text).replace(/\[([^\[\]\n]{1,120})\]\(#[^)\s]*\)/g, '$1');
 const RINGKAS = {'stockbit-ringkasan':'stockbit-detail', 'bei-ringkasan':'bei-detail'};
@@ -108,12 +106,12 @@ export function deskSegments(text, tickers) {
 }
 // Cut at a line boundary within `limit` bytes; the cut is marked.
 function cut(text, limit, note = 'sisa bagian ini tidak dikirim') {
-  if (utf8(text) <= limit) return text;
+  if (utf8Bytes(text) <= limit) return text;
   const lines = text.split(/(?<=\n)/);
   let out = '', n = 0;
   for (const line of lines) {
-    if (out && utf8(out + line) > limit - 80) break;
-    out += utf8(line) > limit ? [...line].slice(0, Math.max(100, limit - 120)).join('') + '…\n' : line;
+    if (out && utf8Bytes(out + line) > limit - 80) break;
+    out += utf8Bytes(line) > limit ? [...line].slice(0, Math.max(100, limit - 120)).join('') + '…\n' : line;
     n++;
   }
   const rest = lines.slice(n).filter(l => l.trim()).length;
@@ -131,13 +129,13 @@ function lead(text) {
   const paras = text.split(/(?<=\n\s*\n)/);
   let out = '';
   for (const p of paras) {
-    if (out && utf8(out + p) > LEAD && /\S/.test(out.replace(/^#.*\n/, ''))) break;
+    if (out && utf8Bytes(out + p) > LEAD && /\S/.test(out.replace(/^#.*\n/, ''))) break;
     out += p;
   }
   if (out.length >= text.length) return text;
-  if (utf8(out) > LEAD + 600) out = cut(out, LEAD + 600, LEAD_NOTE).replace(/\(… [^\n]*\)\n\n$/, '');
+  if (utf8Bytes(out) > LEAD + 600) out = cut(out, LEAD + 600, LEAD_NOTE).replace(/\(… [^\n]*\)\n\n$/, '');
   const quotes = text.slice(out.length).split(/(?<=\n)/).filter(l => QUOTE.test(l)).slice(0, LEAD_QUOTES)
-    .map(l => utf8(l) > 400 ? [...l].slice(0, 380).join('').replace(/\n$/, '') + '…\n' : l);
+    .map(l => utf8Bytes(l) > 400 ? [...l].slice(0, 380).join('').replace(/\n$/, '') + '…\n' : l);
   return out.replace(/\n*$/, quotes.length ? '\n\n' : '\n') + quotes.join('') + `(… ${LEAD_NOTE})\n\n`;
 }
 // Rich leads (broad and detail requests). A Stockbit section's lead carries up to RICH_QUOTES finding lines, those quoting
@@ -149,7 +147,6 @@ function lead(text) {
 const RICH_QUOTES = 3, LATE_QUOTES = 2, LEAD_FACTS = 320, GROW_FACTS = 1400;
 const NUMBER = /(?:Rp|US\$|A\$|S\$|USD|IDR)\s?\d|\d[\d.,]*\s?(?:%|(?:persen|juta|jt|miliar|triliun)\b)|\d[\d.,]*\s?[MT]\b/i;
 const FINDING = /^- \[/;
-export const hasNumber = text => NUMBER.test(text);
 const isBrief = text => /^\*\*Hari ini\*\*/m.test(text) && /^ {2}- Ringkasan:/m.test(text);
 function brief(text, facts) {
   let out = '', keep = true, inFacts = false, factBytes = 0, dropped = 0, left = false;
@@ -164,8 +161,8 @@ function brief(text, facts) {
     }
     if (!keep) continue;
     if (inFacts && /^ {4}- /.test(line)) {
-      if (factBytes + utf8(line) > facts) { dropped++; continue; }
-      factBytes += utf8(line);
+      if (factBytes + utf8Bytes(line) > facts) { dropped++; continue; }
+      factBytes += utf8Bytes(line);
     }
     out += line;
   }
@@ -177,22 +174,22 @@ function richLead(text, quotes = RICH_QUOTES) {
   const paras = text.split(/(?<=\n\s*\n)/);
   let out = '';
   for (const p of paras) {
-    if (out && (FINDING.test(p) || utf8(out + p) > LEAD) && /\S/.test(out.replace(/^#.*\n/, ''))) break;
+    if (out && (FINDING.test(p) || utf8Bytes(out + p) > LEAD) && /\S/.test(out.replace(/^#.*\n/, ''))) break;
     out += p;
   }
   if (out.length >= text.length) return text;
-  if (utf8(out) > LEAD + 600) out = cut(out, LEAD + 600, LEAD_NOTE).replace(/\(… [^\n]*\)\n\n$/, '');
+  if (utf8Bytes(out) > LEAD + 600) out = cut(out, LEAD + 600, LEAD_NOTE).replace(/\(… [^\n]*\)\n\n$/, '');
   const lines = text.slice(out.length).split(/(?<=\n)/).filter(l => FINDING.test(l));
   const rank = l => /^- \[Pertanyaan/.test(l) ? 3 : QUOTE.test(l) && NUMBER.test(l) ? 0 : NUMBER.test(l) ? 1 : QUOTE.test(l) ? 2 : 3;
   const picked = lines.map((l, i) => [l, i]).filter(([l]) => rank(l) < 3).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1])
     .slice(0, quotes).sort((a, b) => a[1] - b[1])
-    .map(([l]) => utf8(l) > 400 ? [...l].slice(0, 380).join('').replace(/\n$/, '') + '…\n' : l);
+    .map(([l]) => utf8Bytes(l) > 400 ? [...l].slice(0, 380).join('').replace(/\n$/, '') + '…\n' : l);
   return out.replace(/\n*$/, picked.length ? '\n\n' : '\n') + picked.join('') + `(… ${LEAD_NOTE})\n\n`;
 }
 // Growth of a rich lead: a BEI detail brief with more Fakta bullets (cut at `cap` bytes); another section whole when it
 // fits `cap`, else it keeps its lead (a cut would drop the finding lines the lead picked from further down).
-const richGrow = (text, cap, current) => isBrief(text) ? (b => utf8(b) <= cap ? b : cut(b, cap, LEAD_NOTE))(brief(text, GROW_FACTS))
-  : utf8(text) <= cap ? text : current;
+const richGrow = (text, cap, current) => isBrief(text) ? (b => utf8Bytes(b) <= cap ? b : cut(b, cap, LEAD_NOTE))(brief(text, GROW_FACTS))
+  : utf8Bytes(text) <= cap ? text : current;
 // One line for a section that is not sent: heading and the opening clause ("inti: …" for Stockbit).
 function listLine(seg) {
   const body = (seg.text.split('\n').slice(1).map(l => l.trim()).find(l => l && !/^#/.test(l)) || '').replace(/^[-*]\s+/, '').replace(/^\|.*/, '');
@@ -234,7 +231,7 @@ export function deskDigest(entries, {budget = DIGEST_BUDGET.normal, exhaustive =
         s.model = `## ${s.heading}\n\n(Lampiran tidak dikirim: ${items} butir; daftar lengkapnya ada di dokumen sumber.)\n\n`;
         s.kind = 'note';
       } else if (s.kind === 'appendix') s.kind = 'aux';
-      s.size = utf8(s.model); s.taken = null;
+      s.size = utf8Bytes(s.model); s.taken = null;
       if (s.kind === 'issuer' && prefer.has(s.code)) { s.tier = 1; s.preferred = true; }
     }
     return {...e, segs, headOnly:!!RINGKAS[e.doc.cat] && days.has(RINGKAS[e.doc.cat] + ':' + span(e.doc).join('/'))};
@@ -261,7 +258,7 @@ export function deskDigest(entries, {budget = DIGEST_BUDGET.normal, exhaustive =
         if (s.size <= room) s.taken = s.model;
         else if (room >= 600) s.taken = cut(s.model, room, 'butir lain bagian ini tidak dikirim');
         else continue;
-        own += utf8(s.taken);
+        own += utf8Bytes(s.taken);
       }
       used += own;
     }
@@ -292,8 +289,8 @@ export function deskDigest(entries, {budget = DIGEST_BUDGET.normal, exhaustive =
     // Rich leads of codes that topped an earlier day (late) carry LATE_QUOTES finding lines.
     const first = rich ? (m, s) => richLead(m, s?.late ? LATE_QUOTES : RICH_QUOTES) : lead;
     const leadBudget = rich ? left : Math.floor(left * (exhaustive ? 0.4 : 0.55));
-    const leadCost = s => utf8(first(s.model, s)) + intro(s);
-    const takeLead = s => { used += intro(s); takeIntro(s); s.taken = first(s.model, s); used += utf8(s.taken); };
+    const leadCost = s => utf8Bytes(first(s.model, s)) + intro(s);
+    const takeLead = s => { used += intro(s); takeIntro(s); s.taken = first(s.model, s); used += utf8Bytes(s.taken); };
     const wholeCost = s => s.size + intro(s), takeWhole = s => { used += intro(s); takeIntro(s); s.taken = s.model; used += s.size; };
     const numbered = () => open.map(q => q.filter(s => s.kind === 'issuer' && s.tier === 2 && !s.taken && NUMBER.test(s.model)));
     // Rich: the leads of every day's codes that are new, then the late codes' leads (the same hot stories carry each
@@ -307,7 +304,7 @@ export function deskDigest(entries, {budget = DIGEST_BUDGET.normal, exhaustive =
     }
     const cap = Math.max(6000, Math.floor(left / Math.max(1, plans.length * 3)));
     const grown = s => rich ? richGrow(s.model, cap, s.taken) : cut(s.model, cap);
-    const grow = s => utf8(grown(s)) - utf8(s.taken || '');
+    const grow = s => utf8Bytes(grown(s)) - utf8Bytes(s.taken || '');
     left = roundRobin(tier1.map(q => q.filter(s => s.taken && s.taken !== s.model)), left, s => Math.max(0, grow(s)), s => {
       if (grow(s) > 0) { used += grow(s); s.taken = grown(s); }
     });
@@ -332,7 +329,7 @@ export function deskDigest(entries, {budget = DIGEST_BUDGET.normal, exhaustive =
   const LISTING = 'DAFTAR BAGIAN YANG TIDAK DIKIRIM (isinya tidak dibaca; hanya judul dan kalimat awal):\n';
   plans.forEach((p, i) => {
     // The share counts the header line too, in bytes, so the listings never push the material over the budget.
-    const share = Math.floor(listLeft / (plans.length - i)) - utf8(LISTING);
+    const share = Math.floor(listLeft / (plans.length - i)) - utf8Bytes(LISTING);
     const missing = p.segs.filter(s => !s.taken && s.kind !== 'intro' && own(p, s));
     const issuers = p.segs.filter(s => s.kind === 'issuer'), partial = issuers.filter(s => s.taken && s.taken !== s.model);
     let listing = '';
@@ -343,8 +340,8 @@ export function deskDigest(entries, {budget = DIGEST_BUDGET.normal, exhaustive =
       let n = 0;
       for (const s of missing) {
         const line = listLine(s) + '\n';
-        if (n + utf8(line) > share * 0.8) break;
-        lines.push(line); n += utf8(line);
+        if (n + utf8Bytes(line) > share * 0.8) break;
+        lines.push(line); n += utf8Bytes(line);
         if (s.kind === 'issuer') named++;
       }
       const rest = missing.slice(lines.length);
@@ -355,7 +352,7 @@ export function deskDigest(entries, {budget = DIGEST_BUDGET.normal, exhaustive =
         let list = '', k = 0;
         for (const s of shown) {
           const c = s.code || s.heading;
-          if (n + utf8(tail) + utf8(list) + utf8(c) + 40 > share) break;
+          if (n + utf8Bytes(tail) + utf8Bytes(list) + utf8Bytes(c) + 40 > share) break;
           list += (list ? ', ' : '') + c; k++;
           if (s.kind === 'issuer') named++;
         }
@@ -364,7 +361,7 @@ export function deskDigest(entries, {budget = DIGEST_BUDGET.normal, exhaustive =
         tail += '\n';
       }
       listing = LISTING + lines.join('') + tail;
-      listLeft -= utf8(listing);
+      listLeft -= utf8Bytes(listing);
     }
     const sent = p.segs.filter(s => s.taken);
     const pieces = sent.map(s => ({text:s.taken, line:s.line, heading:s.heading}));
@@ -384,7 +381,7 @@ export function deskDigest(entries, {budget = DIGEST_BUDGET.normal, exhaustive =
         + (counted ? `, ${counted} hanya dihitung di daftar itu (tanpa judul)` : '') + '.' + otherNote;
     }
     result.set(p.doc, {whole:whole && !p.headOnly, headOnly:p.headOnly, pieces, coverage,
-      codes:issuers.filter(s => s.taken).map(s => s.code), sent:pieces.reduce((n, x) => n + utf8(x.text), 0),
+      codes:issuers.filter(s => s.taken).map(s => s.code), sent:pieces.reduce((n, x) => n + utf8Bytes(x.text), 0),
       stats:{issuers:issuers.length, full:issuers.filter(s => s.taken === s.model).length, partial:partial.length, listed}});
   });
   return result;
@@ -410,16 +407,16 @@ export function kiHead(rows, tickers) {
     items.push((m[1].length < 3 ? '\n## ' : '- ') + text + '\n');
   }
   let list = '', n = 0;
-  for (const item of items) { if (utf8(list + item) > KI_LINES) break; list += item; n++; }
+  for (const item of items) { if (utf8Bytes(list + item) > KI_LINES) break; list += item; n++; }
   const rest = items.length - n;
   list = list.replace(/^\n/, '') + (rest ? `- (… ${rest} judul lain tidak dikirim)\n` : '');
   const tail = items.length ? '\n\nJUDUL PEMBAHASAN LAIN DALAM ANALISIS INI (isinya tidak dikirim; judul ditulis penyusun KI):\n' + list : '';
-  const head = cut(lines.slice(0, first).join(''), KI_HEAD_BUDGET - utf8(tail), 'sisa bagian pembuka tidak dikirim');
+  const head = cut(lines.slice(0, first).join(''), KI_HEAD_BUDGET - utf8Bytes(tail), 'sisa bagian pembuka tidak dikirim');
   const pieces = [{text:head, line:1, heading:''}];
   if (tail) pieces.push({text:tail, line:null, heading:'Judul pembahasan lain'});
   return {whole:false, pieces, codes:[],
     coverage:'Analisis KI lama dipadatkan sistem: bagian pembuka, tabel update dan judul tiap pembahasan dikirim; rincian per emiten tidak dikirim. Isinya analisis penyusun KI atas pengumuman pada tanggal yang dicakupnya.',
-    sent:pieces.reduce((k, x) => k + utf8(x.text), 0)};
+    sent:pieces.reduce((k, x) => k + utf8Bytes(x.text), 0)};
 }
 // Units of a digest: parts of up to PART_LENGTH characters that start at a section (a longer section continues with its
 // heading as context). `checked` is the full original text (number check); `digest` keeps the unit out of the notes path.
@@ -442,7 +439,7 @@ export function digestUnits(doc, digest, original) {
   }
   const units = []; let current = [], size = 2;
   for (const p of merged) {
-    const n = bytes(p) + 1;
+    const n = jsonBytes(p) + 1;
     if (current.length && size + n > UNIT_LIMIT) { units.push(current); current = []; size = 2; }
     current.push(p); size += n;
   }

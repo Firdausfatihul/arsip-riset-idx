@@ -12,7 +12,6 @@
 // differs from the one recorded with --pin. The zone is checked again before every model call; a failure stops
 // the server. This guards against mistakes (a copied folder, a container started elsewhere); it is not a
 // security boundary against the machine's own administrator, and a time zone is not proof of location.
-import {DatabaseSync} from 'node:sqlite';
 import {createServer} from 'node:http';
 import {Readable} from 'node:stream';
 import {execFileSync, spawnSync} from 'node:child_process';
@@ -23,6 +22,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {claudeFetcher, cliEnv, checkAuth} from './claude-bridge.mjs';
+import {storage} from './sqlite-storage.mjs';
 import {COOKIE, LOGIN_HEADERS, LoginLimiter, checkPassword, cookies, issueSession, loginPage, validSession} from './remote-auth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -128,27 +128,6 @@ export function machineCheck({pin = false, repin = false, lockFile = LOCK, id = 
   if (lock.version !== 1 || lock.machine !== digest)
     throw new Error('ID mesin berbeda dari yang dikunci. Server tidak dijalankan. Kalau ini memang mesin baru yang sah, jalankan dengan --pin.');
   return {pinned:false, timeZone};
-}
-
-// The storage API worker/index.mjs expects (sql.exec cursors, nested transactionSync), on a SQLite file.
-export function storage(file) {
-  const db = new DatabaseSync(file);
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;');
-  const cursor = rows => ({toArray:() => rows, one() { if (rows.length !== 1) throw new Error('Expected exactly one row'); return rows[0]; },
-    [Symbol.iterator]:() => rows[Symbol.iterator]()});
-  const sql = {exec(query, ...args) {
-    const statement = db.prepare(query);
-    return cursor(statement.columns().length ? statement.all(...args) : (statement.run(...args), []));
-  }};
-  let depth = 0;
-  const transactionSync = fn => {
-    const name = 'tx' + depth++;
-    db.exec('SAVEPOINT ' + name);
-    try { const result = fn(); db.exec('RELEASE ' + name); return result; }
-    catch (error) { db.exec('ROLLBACK TO ' + name); db.exec('RELEASE ' + name); throw error; }
-    finally { depth--; }
-  };
-  return {db, storage:{sql, transactionSync}};
 }
 
 const TYPES = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8',
@@ -280,12 +259,9 @@ async function main() {
 
   // Persistent source index, filled in-process and without AI.
   const index = await object.archive.manifest();
-  const status = object.sources.status(index);
-  for (const [n, id] of status.pending.entries()) {
-    const doc = index.docs.find(d => d.document_id === id);
-    await object.sources.importDocument(index, doc, await object.archive.read(doc.evidence_asset));
-    if ((n + 1) % 10 === 0 || n + 1 === status.pending.length) console.log(`Indeks sumber: ${n + 1}/${status.pending.length} dokumen baru.`);
-  }
+  await object.sources.importPending(index, doc => object.archive.read(doc.evidence_asset), (n, total) => {
+    if (n % 10 === 0 || n === total) console.log(`Indeks sumber: ${n}/${total} dokumen baru.`);
+  });
   // After the import: rows of other versions go only once this version is complete (prune defers itself otherwise),
   // so a push that fails half way and the rollback to app.old keep both versions' progress.
   const pruned = object.sources.prune(index);

@@ -1,20 +1,16 @@
 // Isolated, offline adversarial harness. Never uses the real key or a public endpoint.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DatabaseSync} from 'node:sqlite';
-import {Archive, OpenRouter, ChatError, LIMITS, validate, readLimited, converse, readFullDocuments, size} from '../worker/core.mjs';
+import {storage} from '../local/sqlite-storage.mjs';
+import {Archive, OpenRouter, ChatError, LIMITS, validate, readLimited, converse, readFullDocuments} from '../worker/core.mjs';
 import router, {ArchiveChat} from '../worker/index.mjs';
 
 const realFetch = globalThis.fetch;
 globalThis.fetch = () => { throw new Error('Network forbidden in attack harness'); };
 test.after(() => { globalThis.fetch = realFetch; });
 function fixture() {
-  const db = new DatabaseSync(':memory:');
-  const sql = {exec(query, ...args) {
-    const statement = db.prepare(query), rows = statement.columns().length ? statement.all(...args) : (statement.run(...args), []);
-    return {one:() => { assert.equal(rows.length,1); return rows[0]; }, toArray:() => rows};
-  }};
-  const ctx = {storage:{sql, transactionSync(fn) { db.exec('BEGIN'); try {const result=fn();db.exec('COMMIT');return result;} catch(e) {db.exec('ROLLBACK');throw e;} }}, waitUntil(p) { p.catch(() => {}); }};
+  const {db, storage:store} = storage();
+  const ctx = {storage:store, waitUntil(p) { p.catch(() => {}); }};
   const env = {OPENROUTER_API_KEY:'OFFLINE-CANARY-KEY', CHAT_ALLOWED_ORIGINS:'https://archive.test', ASSETS:{fetch:async () => Response.json({docs:[],tickers:['SOCI'],commonWords:[],postings:{}})}};
   const object = new ArchiveChat(ctx, env);
   env.CHAT = {idFromName:x=>x, get:()=>object};

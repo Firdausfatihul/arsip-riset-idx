@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {DatabaseSync} from 'node:sqlite';
-import {Archive, CacheStore, OpenRouter, converse, size} from '../worker/core.mjs';
-import {dateQuery,filterRecords,selectRecords} from '../worker/retrieval.mjs';
+import {storage} from '../local/sqlite-storage.mjs';
+import {Archive, CacheStore, OpenRouter, converse} from '../worker/core.mjs';
+import {jsonBytes} from '../worker/text.mjs';
+import {dateQuery,filterRecords} from '../worker/retrieval.mjs';
 import {tickerDocuments} from './helpers/archive-expectations.mjs';
 import {assets} from './helpers/archive.mjs';
 
 function cacheFixture() {
- const db=new DatabaseSync(':memory:');
- const sql={exec(query,...args){const stmt=db.prepare(query);const rows=stmt.columns().length?stmt.all(...args):(stmt.run(...args),[]);return {toArray:()=>rows};}};
+ const {db,storage:{sql}}=storage();
  return {db,sql,cache:new CacheStore(sql)};
 }
 const archive=new Archive(assets);
@@ -39,7 +39,7 @@ test('SOCI uses every matching source and raw issuer text with >95% lower model 
  assert.ok(first.documents>0&&first.documents<=expected.length);assert.equal(model.calls.length,1);assert.equal(metrics.fallback_documents,0);
  const read=new Set(first.sources.map(s=>s.path));
  for(const d of expected.filter(d=>/-detail$/.test(d.cat)))assert.ok(read.has(d.path),d.name);
- assert.ok(size(model.calls[0])<metrics.baseline_source_bytes*0.05);
+ assert.ok(jsonBytes(model.calls[0])<metrics.baseline_source_bytes*0.05);
  const next=new Fake(),repeat={};await converse(archive,next,'di soci ada apa ya?',[],()=>{},null,{cache,metrics:repeat,client:'b'});
  assert.equal(next.calls.length,0);assert.equal(repeat.answer_cache_hit,true);
  const different=new Fake(),stats={};await converse(archive,different,'SOCI tanggal 17 September 2026',[],()=>{},null,{cache,metrics:stats,client:'b'});

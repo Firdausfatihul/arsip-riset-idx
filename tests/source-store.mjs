@@ -1,18 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DatabaseSync} from 'node:sqlite';
 import {SourceStore} from '../worker/source-store.mjs';
-import {Archive,converse,size,OpenRouter,CacheStore} from '../worker/core.mjs';
+import {Archive,converse,OpenRouter,CacheStore} from '../worker/core.mjs';
+import {jsonBytes} from '../worker/text.mjs';
 import {tickerDocuments} from './helpers/archive-expectations.mjs';
 import {readAsset} from './helpers/archive.mjs';
 import {hash} from '../worker/cache.mjs';
-import {storage} from '../local/server.mjs';
+import {storage} from '../local/sqlite-storage.mjs';
 const manifest=await readAsset('manifest.json');
 function fixture(){
- const db=new DatabaseSync(':memory:');
- const sql={exec(q,...args){const s=db.prepare(q),rows=s.columns().length?s.all(...args):(s.run(...args),[]);return {toArray:()=>rows};}};
- const ctx={storage:{sql,transactionSync(fn){db.exec('BEGIN');try{const r=fn();db.exec('COMMIT');return r;}catch(e){db.exec('ROLLBACK');throw e;}}}};
- return {db,store:new SourceStore(ctx)};
+ const {db,storage:s}=storage();
+ return {db,store:new SourceStore({storage:s})};
 }
 const evidence=doc=>readAsset(doc.evidence_asset);
 test('source import verifies hashes, is atomic/idempotent, and only trusts active document versions',async()=>{
@@ -36,7 +34,7 @@ test('source import verifies hashes, is atomic/idempotent, and only trusts activ
 });
 test('full archive queries use SQLite, retain known evidence and finish cross-market screening without asset reads',async()=>{
  const {store,db}=fixture();
- for(const doc of manifest.docs)await store.importDocument(manifest,doc,await evidence(doc));
+ await store.importPending(manifest,evidence);
  assert.equal(store.status(manifest).ready,manifest.docs.length);
  const archive=new Archive({fetch:()=>{throw Error('No per-query asset fetch allowed');}},store);archive.index=Promise.resolve(manifest);
  const expected=await tickerDocuments(manifest,'SOCI');assert.ok(expected.length>0);
@@ -52,8 +50,8 @@ test('full archive queries use SQLite, retain known evidence and finish cross-ma
  assert.ok(result.documents>2);assert.equal(notes,0);assert.ok(stats.candidates_selected<stats.candidates_found);
  const payload=JSON.stringify([...calls,messages]);
  for(const anchor of ['Orbit Marketing','ERA Graharealty','Marco Polo','KORIKA','Bintan Investment Management'])assert.ok(payload.includes(anchor),anchor);
- assert.ok(size(messages)<350000);assert.ok(stats.database_source_reads>0);
- console.log(JSON.stringify({thematicBytes:size(messages),documents:result.documents,sourceReads:stats.database_source_reads,modelCalls:calls.length+1}));
+ assert.ok(jsonBytes(messages)<350000);assert.ok(stats.database_source_reads>0);
+ console.log(JSON.stringify({thematicBytes:jsonBytes(messages),documents:result.documents,sourceReads:stats.database_source_reads,modelCalls:calls.length+1}));
  const second={};const before=calls.length;
  await converse(archive,model,'Jelaskan hubungan emiten Indonesia dengan ASX dan Singapura',[],async()=>{},new AbortController().signal,{metrics:second,cache});
  assert.equal(second.candidate_cache_hit,true);assert.equal(calls.length,before);assert.equal(second.source_cache_hits,second.documents_checked);
@@ -79,43 +77,41 @@ async function synthetic(version,docs){
  return {index:out,data};
 }
 const counts=db=>Object.fromEntries(['source_documents','source_passages','source_fts'].map(t=>[t,db.prepare(`SELECT COUNT(*) n FROM ${t}`).get().n]));
-async function load(store,{index,data}){for(const doc of index.docs)await store.importDocument(index,doc,data[doc.document_id]);}
+const load=(store,{index,data})=>store.importPending(index,doc=>data[doc.document_id]);
 
 test('prune removes documents of an older evidence version or hash, idempotently, and keeps every active key',async()=>{
- for(const make of [fixture,()=>{const s=storage(':memory:');return {db:s.db,store:new SourceStore({storage:s.storage})};}]){
-  const {db,store}=make();
-  const old=await synthetic('issuer-passages-v2',{a:['SOCI kapal ','tanker'],b:['Rights issue SOCI']});
-  const now=await synthetic('issuer-passages-v3',{a:['SOCI kapal ','tanker'],b:['Rights issue SOCI ','HMETD'],c:['dokumen baru']});
-  await load(store,old);
-  // An empty or version-less manifest (failed load) never removes anything.
-  for(const bad of [{docs:[],retrieval_version:'issuer-passages-v3'},{docs:now.index.docs},null])
-   assert.deepEqual(store.prune(bad),{removed:0,records:0});
-  assert.deepEqual(counts(db),{source_documents:2,source_passages:3,source_fts:3});
-  await load(store,now);
-  // Active a under v2 is unchanged text but a different key (version is part of it): both copies exist until pruned.
-  assert.deepEqual(counts(db),{source_documents:5,source_passages:8,source_fts:8});
-  const before=JSON.stringify(now.index.docs.map(d=>store.read(d,now.index)));
-  assert.deepEqual(store.prune(now.index),{removed:2,records:3});
-  assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
-  assert.equal(JSON.stringify(now.index.docs.map(d=>store.read(d,now.index))),before);
-  assert.equal(store.status(now.index).ready,3);assert.deepEqual(store.status(now.index).pending,[]);
-  for(const d of old.index.docs)assert.equal(store.read(d,old.index),null);
-  // FTS rows of removed passages are gone; active ones are still found.
-  assert.deepEqual(store.search(now.index,['HMETD']).map(d=>d.document_id),['b']);
-  assert.deepEqual(store.search(now.index,['SOCI']).map(d=>d.document_id).sort(),['a','b']);
-  assert.equal(db.prepare("SELECT COUNT(*) n FROM source_fts WHERE source_fts MATCH 'tanker'").get().n,1);
-  assert.equal(db.prepare('SELECT COUNT(*) n FROM source_fts WHERE rowid NOT IN (SELECT id FROM source_passages)').get().n,0);
-  // Idempotent.
-  assert.deepEqual(store.prune(now.index),{removed:0,records:0});
-  assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
-  // A changed hash for one document removes only that document's previous copy.
-  const next=await synthetic('issuer-passages-v3',{a:['SOCI kapal ','tanker'],b:['Rights issue SOCI ','HMETD'],c:['dokumen baru, revisi']});
-  await load(store,next);
-  assert.deepEqual(store.prune(next.index),{removed:1,records:1});
-  assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
-  assert.equal(store.read(now.index.docs[2],now.index),null);assert.ok(store.read(next.index.docs[2],next.index));
-  db.close();
- }
+ const {db,store}=fixture();
+ const old=await synthetic('issuer-passages-v2',{a:['SOCI kapal ','tanker'],b:['Rights issue SOCI']});
+ const now=await synthetic('issuer-passages-v3',{a:['SOCI kapal ','tanker'],b:['Rights issue SOCI ','HMETD'],c:['dokumen baru']});
+ await load(store,old);
+ // An empty or version-less manifest (failed load) never removes anything.
+ for(const bad of [{docs:[],retrieval_version:'issuer-passages-v3'},{docs:now.index.docs},null])
+  assert.deepEqual(store.prune(bad),{removed:0,records:0});
+ assert.deepEqual(counts(db),{source_documents:2,source_passages:3,source_fts:3});
+ await load(store,now);
+ // Active a under v2 is unchanged text but a different key (version is part of it): both copies exist until pruned.
+ assert.deepEqual(counts(db),{source_documents:5,source_passages:8,source_fts:8});
+ const before=JSON.stringify(now.index.docs.map(d=>store.read(d,now.index)));
+ assert.deepEqual(store.prune(now.index),{removed:2,records:3});
+ assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
+ assert.equal(JSON.stringify(now.index.docs.map(d=>store.read(d,now.index))),before);
+ assert.equal(store.status(now.index).ready,3);assert.deepEqual(store.status(now.index).pending,[]);
+ for(const d of old.index.docs)assert.equal(store.read(d,old.index),null);
+ // FTS rows of removed passages are gone; active ones are still found.
+ assert.deepEqual(store.search(now.index,['HMETD']).map(d=>d.document_id),['b']);
+ assert.deepEqual(store.search(now.index,['SOCI']).map(d=>d.document_id).sort(),['a','b']);
+ assert.equal(db.prepare("SELECT COUNT(*) n FROM source_fts WHERE source_fts MATCH 'tanker'").get().n,1);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM source_fts WHERE rowid NOT IN (SELECT id FROM source_passages)').get().n,0);
+ // Idempotent.
+ assert.deepEqual(store.prune(now.index),{removed:0,records:0});
+ assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
+ // A changed hash for one document removes only that document's previous copy.
+ const next=await synthetic('issuer-passages-v3',{a:['SOCI kapal ','tanker'],b:['Rights issue SOCI ','HMETD'],c:['dokumen baru, revisi']});
+ await load(store,next);
+ assert.deepEqual(store.prune(next.index),{removed:1,records:1});
+ assert.deepEqual(counts(db),{source_documents:3,source_passages:5,source_fts:5});
+ assert.equal(store.read(now.index.docs[2],now.index),null);assert.ok(store.read(next.index.docs[2],next.index));
+ db.close();
 });
 
 test('prune waits until the active version is fully imported (a half-done start keeps both versions)',async()=>{

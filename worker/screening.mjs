@@ -1,6 +1,7 @@
 // Answers that need counting or listing across many issuers. Lists and totals are built by code
 // from the archive; the model only summarises. Nothing here calls a model directly.
 
+import {BULAN, clip, oneLine, utf8Bytes} from './text.mjs';
 const STOCKBIT_SUMMARY_LABEL = 'ringkasan diskusi Stockbit (bukan keterbukaan resmi)';
 const BEI_SUMMARY_LABEL = 'ringkasan otomatis pengumuman resmi BEI (bukan rekomendasi; angka belum diaudit ulang)';
 const KIND_LABEL = {digest:'digest keterbukaan', ki:'analisis keterbukaan', bei:'ringkasan keterbukaan resmi BEI', stockbit:'diskusi Stockbit', other:'arsip lain',
@@ -11,10 +12,9 @@ export const sourceLabel = cat => cat?.startsWith('stockbit-') ? KIND_LABEL[cat]
   : cat?.startsWith('bei-') ? BEI_SUMMARY_LABEL : null;
 const OFFICIAL = new Set(['digest', 'ki', 'bei']);
 const TABLE_ROWS = 80, ITEMS = 4, EXCERPT = 170;
-const monthNames = 'Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember';
 
-const cell = text => String(text).replace(/\|/g, '/').replace(/\s+/g, ' ').trim();
-const excerpt = text => { const t = cell(text); return t.length > EXCERPT ? t.slice(0, EXCERPT - 1) + '…' : t; };
+const cell = text => oneLine(String(text).replace(/\|/g, '/'));
+const excerpt = text => clip(cell(text), EXCERPT);
 
 // Corporate-action types named by the question (or by the search terms chosen for it).
 export function questionTypes(question, terms, types) {
@@ -55,7 +55,7 @@ export function screeningMaterial(groups, labels, budget, names = {}) {
   for (const items of [ITEMS, 2, 1]) {
     const text = groups.map(g => g.ticker + (names[g.ticker] ? ' (' + names[g.ticker] + ')' : ' (nama tidak tercantum)') + ' — ' + [...g.types].map(t => labels[t]).join(', ') + ' — terakhir ' + g.last + '\n'
       + g.items.slice(0, items).map(i => `  - [${i.source_id}] ${i.end} · ${KIND_LABEL[i.kind] || i.kind} · baris ${i.line}: ${i.text}`).join('\n')).join('\n');
-    if (new TextEncoder().encode(text).length <= budget) return text;
+    if (utf8Bytes(text) <= budget) return text;
   }
   return null;
 }
@@ -97,7 +97,7 @@ export function documentFacts(doc, records, tickers) {
     const head = r.content.match(/^\s*#{1,6}\s+(?:\d+(?:\.\d+)*\.?\s+)?([A-Z0-9]{4})\b/);
     if (head && tickers.has(head[1]) && !sections.includes(head[1])) sections.push(head[1]);
     for (const line of r.content.split('\n')) {
-      const m = line.match(new RegExp('^\\|\\s*\\**\\s*(\\d{1,2} (?:' + monthNames + ')|20\\d\\d-\\d\\d-\\d\\d)', 'i'));
+      const m = line.match(new RegExp('^\\|\\s*\\**\\s*(\\d{1,2} (?:' + BULAN.join('|') + ')|20\\d\\d-\\d\\d-\\d\\d)', 'i'));
       if (!m) continue;
       const code = (line.match(/\b[A-Z0-9]{4}\b/g) || []).find(c => tickers.has(c));
       const d = dated.get(m[1]) || {rows:0, codes:new Set()};

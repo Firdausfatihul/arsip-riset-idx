@@ -2,6 +2,7 @@
 // stockbit.json (tools/build_worker.py). The same budget serves BEI daily files and legacy reports
 // for ticker questions. Nothing here calls a model; every line is written by code.
 import {headingTicker, modelText} from './retrieval.mjs';
+import {clip, oneLine} from './text.mjs';
 
 // Ticker sections of stockbit-ringkasan/detail read whole per question, newest day first.
 export const STOCKBIT_TICKER_BUDGET = 90000;
@@ -17,8 +18,6 @@ export const LEGACY_TICKER_BUDGET = 60000;
 export const PENILAIAN_LABEL = 'Penilaian otomatis atas argumen di posting, bukan atas orangnya';
 const DAY_LINES = 30;
 
-const cell = text => String(text ?? '').replace(/\s+/g, ' ').trim();
-const clip = (text, n = 220) => { const t = cell(text); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
 const angka = n => Number.isFinite(+n) ? (+n).toLocaleString('id-ID') : '?';
 
 // entries: [{doc, bytes, covered?}] for one family's daily summary/detail docs whose sections matched the
@@ -57,7 +56,6 @@ export function familyBudget(entries, budget, detailCat) {
   const dropped = new Set(entries.map(e => e.doc).filter(doc => !keep.has(doc)));
   return {read, listed, dropped, trimmed, used};
 }
-export const stockbitBudget = (entries, budget = STOCKBIT_TICKER_BUDGET) => familyBudget(entries, budget, 'stockbit-detail');
 // Retired raw Stockbit reports and manual KI analyses (no daily index). entries: [{doc, bytes, core?, own?}]: core
 // counts the rows about the ticker (its own section, else the rows naming it), own marks a document with an own
 // section. Pass 1 reads the core of every document that fits, documents with an own section first, each group newest
@@ -88,7 +86,7 @@ export function stockbitListing(listed, tickers, handles, table) {
     for (const code of tickers) {
       const row = table?.tickers?.[code]?.find(r => r[0] === day);
       if (row) parts.push(`${code} ${angka(row[2])} posting / ${angka(row[3])} akun · ${angka(row[4])} temuan`
-        + (row[5] ? ' · inti (diskusi pengguna, belum diverifikasi): ' + clip(modelText(row[5])) : ''));
+        + (row[5] ? ' · inti (diskusi pengguna, belum diverifikasi): ' + clip(modelText(row[5]), 220) : ''));
     }
     for (const handle of handles) {
       const row = table?.users?.[handle]?.find(r => r[0] === day);
@@ -113,7 +111,7 @@ export function stockbitListing(listed, tickers, handles, table) {
 export function sectionLine(rows, codes, {mention = false} = {}) {
   const re = codes.map(c => new RegExp('(?<![\\p{L}\\p{N}_])' + c + '(?![\\p{L}\\p{N}_])', 'u'));
   const own = rows.filter(r => r.kind === 'issuer_section' && codes.includes(headingTicker(r.content)));
-  const clean = text => text.split('\n').map(l => cell(modelText(l).replace(/<[^>]+>/g, ' ').replace(/^\s*(?:[-*+>]|\|)\s*/, '').replace(/[*`]/g, '')))
+  const clean = text => text.split('\n').map(l => oneLine(modelText(l).replace(/<[^>]+>/g, ' ').replace(/^\s*(?:[-*+>]|\|)\s*/, '').replace(/[*`]/g, '')))
     .filter(l => l && !/^#{1,6}\s/.test(l));
   const ownLines = own.flatMap(r => clean(r.content.replace(/^[^\n]*\n?/, '')));
   const named = [...ownLines, ...rows.filter(r => !own.includes(r)).flatMap(r => clean(r.content))].filter(l => re.some(r => r.test(l)));

@@ -550,12 +550,6 @@ NAME_NOISE = {"PT", "TBK", "PERSERO", "PERSEROAN", "PERUSAHAAN", "LTD", "LIMITED
 ACCOUNT_NAME = re.compile(r"\b(?:A\s*[/.-]\s*C|AC|ACCT|ACCOUNT|REKENING|QQ|Q[. ]*Q|NOMINEE[S]?)\b", re.I)
 
 
-def name_tokens(name):
-    """Kata inti lengkap; nomor rekening dan kata pembeda tetap dipertahankan."""
-    return {t for t in re.split(r"[^A-Z0-9]+", str(name or "").upper())
-            if t and t not in NAME_NOISE}
-
-
 def investor_signature(name):
     """Normalisasi dekorasi nama, tanpa fuzzy/subset atau menghapus identitas rekening.
 
@@ -572,19 +566,6 @@ def investor_signature(name):
 def same_investor(a, b):
     a, b = investor_signature(a), investor_signature(b)
     return bool(a and a == b)
-
-
-def match_renamed(now, old):
-    """KSEI kadang menulis nama investor berbeda antarbulan (TASPEN / PT TASPEN (PERSERO)).
-
-    Semua kata inti harus sama dan pasangan harus unik di kedua sisi. Perubahan lembar tidak
-    mengubah identitas. Kemiripan sebagian nama atau jumlah lembar sama bukan bukti identitas.
-    """
-    gone = {k: g for k, g in old.items() if k not in now}
-    candidates = {k: [p for p, o in gone.items() if same_investor(o["name"], g["name"])]
-                  for k, g in now.items() if k not in old}
-    uses = collections.Counter(p for ps in candidates.values() for p in ps)
-    return {k: gone[ps[0]] for k, ps in candidates.items() if len(ps) == 1 and uses[ps[0]] == 1}
 
 
 def assign_investor_ids(groups, history):
@@ -1080,11 +1061,6 @@ def read_stockbit_hold():
 def hold_sha(entry):
     sha = entry.get("sha256") if isinstance(entry, dict) else entry
     return str(sha or "*").lower()
-
-
-def load_stockbit_hold():
-    """Hari yang ditahan (rollback atau desk): {tgl: sha256 atau "*"}."""
-    return {day: hold_sha(entry) for day, entry in read_stockbit_hold().items()}
 
 
 # Entri tahanan yang dibuat sinkron untuk hari terbit yang ditahan desk ("tahan dari web").

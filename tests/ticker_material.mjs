@@ -2,7 +2,7 @@
 // ringkas/detail dedupe, family budgets with listings, compact passages, name list and notes-mode caps.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DatabaseSync} from 'node:sqlite';
+import {storage} from '../local/sqlite-storage.mjs';
 import {selectRecords, modelText, modelRows, plainContext, headingTicker} from '../worker/retrieval.mjs';
 import {familyBudget, docBudget, beiListing, legacyListing, sectionLine, LEGACY_TICKER_BUDGET} from '../worker/stockbit.mjs';
 import {converse, CacheStore, LIMITS} from '../worker/core.mjs';
@@ -142,8 +142,7 @@ test('notes mode: size-based note allowances are scaled to fit the analysis outp
 });
 // ---- converse with a small BEI/Stockbit archive -------------------------------------------
 function archive({extra = []} = {}) {
-  const db = new DatabaseSync(':memory:');
-  const sql = {exec(q, ...args) { const s = db.prepare(q), rows = s.columns().length ? s.all(...args) : (s.run(...args), []); return {toArray:() => rows}; }};
+  const {db, storage:{sql}} = storage();
   const docs = [], evidence = new Map();
   const add = (name, cat, d, records) => {
     const doc = {name, cat, start:d, end:d, covers:[d, d], title:name, label:d, path:`files/${cat}/${d}/${name}`,

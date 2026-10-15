@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync, readFileSync} from 'node:fs';
-import {DatabaseSync} from 'node:sqlite';
+import {storage} from '../local/sqlite-storage.mjs';
 import {dateQuery, requestScope, requestedDates, documentRequest, fixMonths} from '../worker/retrieval.mjs';
 import {deskDigest, deskSegments, deskText, digestUnits, kiHead, DIGEST_BUDGET, KI_HEAD_BUDGET} from '../worker/document-material.mjs';
 import {converse, CacheStore, OpenRouter, EXHAUSTIVE} from '../worker/core.mjs';
@@ -220,8 +220,7 @@ test('real desk files: six Stockbit days and a BEI detail day stay within budget
 
 // ---- converse with a synthetic archive -------------------------------------------------------------------------
 function fixture(count = 6) {
-  const db = new DatabaseSync(':memory:');
-  const sql = {exec(q, ...args) { const s = db.prepare(q), rows = s.columns().length ? s.all(...args) : (s.run(...args), []); return {toArray:() => rows}; }};
+  const {db, storage:{sql}} = storage();
   const docs = [], bodies = new Map(), tickers = new Set();
   for (let i = 1; i <= count; i++) {
     const {text, codes} = sbringkas(day(i));

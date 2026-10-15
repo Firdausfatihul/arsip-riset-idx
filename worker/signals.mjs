@@ -2,19 +2,22 @@
 // picks what matters for the question, hands it to the model with worded sentences, and checks the answer
 // covered it. Signals are holding patterns from month-end KSEI lists, never proof of intent.
 
-let loaded = null;
 // Generated data has a content fingerprint; older fixtures also retain metadata in their identity.
 export const dataVersion = index => index.data_version || JSON.stringify([index.version, index.signals || null, index.ownership || null]);
-export async function loadSignals(archive, index) {
-  if (!index.signals?.asset) return null;
-  const version = dataVersion(index);
-  if (loaded?.version !== version) {
-    loaded = {version, data:Promise.all([archive.read(index.signals.asset), archive.read(index.signals.history)])
-      .then(([signals, history]) => ({signals, history, known:knownNames(signals)}))
-      .catch(error => { loaded = null; throw error; })};
-  }
-  return loaded.data;
+// load(archive, index) once per data version, shared by every Archive; a failed read is retried on the next call.
+export function perVersion(load) {
+  let memo = null;
+  return (archive, index) => {
+    const version = dataVersion(index);
+    if (memo?.version !== version) {
+      const entry = memo = {version, data:load(archive, index).catch(error => { if (memo === entry) memo = null; throw error; })};
+    }
+    return memo.data;
+  };
 }
+const signalData = perVersion((archive, index) => Promise.all([archive.read(index.signals.asset), archive.read(index.signals.history)])
+  .then(([signals, history]) => ({signals, history, known:knownNames(signals)})));
+export const loadSignals = async (archive, index) => index.signals?.asset ? signalData(archive, index) : null;
 
 // Same folding as tools/ksei_signals.py tokkey(): legal forms dropped, word order ignored.
 const LEGAL = /\b(PT|TBK|PERSEROAN TERBATAS|THE|LTD|LIMITED|INC|CORP|CORPORATION|PTE|CO|LLC|SA|AG|BV|NV|PERSERO)\b/g;

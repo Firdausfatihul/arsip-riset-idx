@@ -37,7 +37,6 @@ class InvestorIdentityTests(unittest.TestCase):
         self.assertEqual(sync.assign_investor_ids(mar, history), [])
         self.assertEqual(feb["old"]["inv"], mar["new"]["inv"])
         self.assertEqual(mar["new"]["total"] - feb["old"]["total"], 547100)
-        self.assertEqual(sync.match_renamed(mar, feb), {"new": feb["old"]})
 
     def test_meja_order_and_uob_legal_suffixes_are_equivalent(self):
         self.assertTrue(sync.same_investor("PT TRIPLE BERKAH BERSAMA", "PT TRIPLE BERSAMA BERKAH"))
@@ -50,11 +49,13 @@ class InvestorIdentityTests(unittest.TestCase):
                      ("TASPEN", "TASPENNA")]:
             with self.subTest(a=a, b=b):
                 self.assertFalse(sync.same_investor(a, b))
-                self.assertEqual(sync.match_renamed({"new": group(b)}, {"old": group(a)}), {})
+                old, new, history = {"old": group(a)}, {"new": group(b)}, {}
+                sync.assign_investor_ids(old, history)
+                sync.assign_investor_ids(new, history)
+                self.assertNotEqual(old["old"]["inv"], new["new"]["inv"])
 
     def test_ambiguous_many_to_one_is_not_arbitrarily_matched(self):
         old = {"a": group("PT TASPEN"), "b": group("TASPEN (PERSERO)")}
-        self.assertEqual(sync.match_renamed({"new": group("TASPEN")}, old), {})
         history = {}
         issues = sync.assign_investor_ids(old, history)
         new = {"new": group("TASPEN")}

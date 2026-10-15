@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DatabaseSync} from 'node:sqlite';
+import {storage} from '../local/sqlite-storage.mjs';
 import {Archive, CacheStore, validate} from '../worker/core.mjs';
-import {AGENT, agentic, citations, compact, datacatRequest, fetchDatacat, latestArgs, needsOwnership, prune, Refs, TOOLS} from '../worker/agent.mjs';
+import {AGENT, agentic, citations, compact, datacatRequest, fetchDatacat, latestArgs, needsOwnership, prune, DatacatRefs, TOOLS} from '../worker/agent.mjs';
 import {latestSourceDocuments} from './helpers/archive-expectations.mjs';
 import {assets, readAsset} from './helpers/archive.mjs';
 
@@ -11,10 +11,7 @@ const realFetch = globalThis.fetch;
 globalThis.fetch = () => { throw new Error('Network forbidden in agent tests'); };
 test.after(() => { globalThis.fetch = realFetch; });
 
-function sqlite() {
-  const db = new DatabaseSync(':memory:');
-  return {db, sql:{exec(q, ...a) { const s = db.prepare(q), rows = s.columns().length ? s.all(...a) : (s.run(...a), []); return {toArray:() => rows, one:() => rows[0]}; }}};
-}
+const sqlite = () => { const {db, storage:{sql}} = storage(); return {db, sql}; };
 const issuer = {account:{id:194, name:'SOCI', ticker:'SOCI', url:'https://quant.renr.ai/api/v1/issuers/SOCI/', html_url:'https://quant.renr.ai/issuer/SOCI/', name_normalized:'SOCI'},
   holdings_registry:[{holder:{id:3230, name:'PT Pilar Sukses Utama', html_url:'https://quant.renr.ai/account/3230/'}, pct:'35.10', date:'2026-08-31'}],
   linked_documents:Array.from({length:40}, (_, i) => ({id:i, doc_type:'RUPS_MINUTES', filename:'x'.repeat(900), extracted_at:'2026', html_url:'https://quant.renr.ai/document/' + i + '/'}))};
@@ -42,7 +39,7 @@ test('tool arguments are validated; paths are fixed and ids cannot escape them',
 });
 
 test('datacat responses are pruned, capped, and links become citation ids', () => {
-  const refs = new Refs(), text = compact(issuer, refs);
+  const refs = new DatacatRefs(), text = compact(issuer, refs);
   assert.ok(text.length <= 6000, text.length);
   assert.ok(!text.includes('https://'), 'links never reach the model');
   assert.ok(text.includes('ref:K1') && text.includes('lagi'), text.slice(0, 300));
@@ -55,7 +52,7 @@ test('coverage reports the rows actually displayed after compression, without ex
   const data = {count:257, count_is_capped:true, next:'https://quant.renr.ai/api/v1/movements/?offset=25', offset:0, limit:25,
     coverage_hint:'Belum seluruh laporan diproses.', results:Array.from({length:25}, (_, i) =>
       ({id:i + 1, name:'Pemegang ' + i, description:'x'.repeat(1500), other:'y'.repeat(1500)}))};
-  const text = compact(data, new Refs()), shown = Number(text.match(/ditampilkan:(\d+)/)?.[1]);
+  const text = compact(data, new DatacatRefs()), shown = Number(text.match(/ditampilkan:(\d+)/)?.[1]);
   assert.ok(shown > 0 && shown < 25, text);
   assert.equal((text.match(/id_baris:/g) || []).length, shown);
   assert.match(text, /diterima:25,total:257,terbatas:true/);
@@ -64,8 +61,8 @@ test('coverage reports the rows actually displayed after compression, without ex
   assert.match(text, /coverage_hint:/);
   assert.doesNotMatch(text, /https?:/);
   assert.ok(text.length <= AGENT.resultBytes);
-  assert.match(compact({count:1, next:null, results:[{id:1}]}, new Refs()), /ditampilkan:1,diterima:1,total:1,terbatas:false/);
-  assert.match(compact({results:[]}, new Refs()), /total:tidak diketahui,terbatas:true/);
+  assert.match(compact({count:1, next:null, results:[{id:1}]}, new DatacatRefs()), /ditampilkan:1,diterima:1,total:1,terbatas:false/);
+  assert.match(compact({results:[]}, new DatacatRefs()), /total:tidak diketahui,terbatas:true/);
 });
 
 test('latest removes an invented today-only filter while explicit dates, periods and dated follow-ups remain', () => {
@@ -90,7 +87,7 @@ test('unsupported filters are refused instead of returning unrelated rows; ids a
   assert.throws(() => datacatRequest('datacat_daftar', {jenis:'transaksi'}), /memerlukan ticker/);
   assert.equal(datacatRequest('datacat_daftar', {jenis:'pengumuman', q:'rights issue'}).params.q, 'rights issue');
   const text = compact({results:[{id:5, board_role:'DIREKTUR', person:{id:12117, name:'A', html_url:'https://quant.renr.ai/account/12117/'},
-    document:{id:167162, html_url:'https://quant.renr.ai/document/167162/'}}]}, new Refs());
+    document:{id:167162, html_url:'https://quant.renr.ai/document/167162/'}}]}, new DatacatRefs());
   assert.ok(text.includes('id_baris:5') && text.includes('id_pihak:12117') && text.includes('id_dokumen:167162'), text);
 });
 
@@ -268,7 +265,7 @@ test('relationship tools: ownership name search across issuers, user terms first
   const {ownershipTool, entityTerms} = await import('../worker/agent.mjs');
   const manifest = await readAsset('manifest.json');
   const data = await readAsset('ownership.json');
-  const refs = new Refs(), found = ownershipTool(data, {nama:'Tancorp'}, refs);
+  const refs = new DatacatRefs(), found = ownershipTool(data, {nama:'Tancorp'}, refs);
   for (const code of ['MERI', 'BLES', 'RISE', 'CLEO']) assert.ok(found.includes('ticker:' + code), code);
   assert.ok(refs.list().every(r => /^O\d+$/.test(r.source_id) && /^#kepemilikan=[A-Z0-9]+$/.test(r.url)));
   assert.ok(ownershipTool(data, {ticker:'MERI'}, refs).includes('19.32'));
@@ -358,7 +355,7 @@ test('signals: pack with must-cover items, O links with the months, coverage app
   const {loadSignals, signalView, coverage, mustCover} = await import('../worker/signals.mjs');
   const {terse} = await import('../worker/agent.mjs');
   const manifest = await readAsset('manifest.json');
-  const sig = await loadSignals(new Archive(assets), manifest), refs = new Refs();
+  const sig = await loadSignals(new Archive(assets), manifest), refs = new DatacatRefs();
   const pack = signalView(sig, {ticker:'LUCY', bagian:'sinyal'}, refs, terse);
   assert.match(pack, /wajib:1/); assert.match(pack, /378\.693\.473/);
   assert.ok(refs.list().some(r => r.url === '#kepemilikan=LUCY&dari=2026-05&sampai=2026-06'), refs.list().map(r => r.url).join());

@@ -26,7 +26,7 @@
 import {readFile, writeFile, mkdir} from 'node:fs/promises';
 import {existsSync, realpathSync, readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
-import {DatabaseSync} from 'node:sqlite';
+import {storage} from '../local/sqlite-storage.mjs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 
@@ -129,20 +129,6 @@ function stub(payload, kind, q) {
   return payload.stream ? sse(text) : reply(text);
 }
 
-function sqlite() {
-  const db = new DatabaseSync(':memory:');
-  const cursor = rows => ({toArray:() => rows, one() { if (rows.length !== 1) throw new Error('Expected exactly one row'); return rows[0]; },
-    [Symbol.iterator]:() => rows[Symbol.iterator]()});
-  const sql = {exec(query, ...args) { const s = db.prepare(query); return cursor(s.columns().length ? s.all(...args) : (s.run(...args), [])); }};
-  let depth = 0;
-  const transactionSync = fn => {
-    const name = 'tx' + depth++; db.exec('SAVEPOINT ' + name);
-    try { const result = fn(); db.exec('RELEASE ' + name); return result; }
-    catch (error) { db.exec('ROLLBACK TO ' + name); db.exec('RELEASE ' + name); throw error; }
-    finally { depth--; }
-  };
-  return {db, sql, ctx:{storage:{sql, transactionSync}}};
-}
 
 const SUM = ['input_bytes', 'est_tokens', 'output_token_budget', 'prompt_tokens', 'cached_tokens', 'cache_write_tokens', 'cache_write_1h',
   'cache_write_5m', 'thinking_tokens', 'completion_tokens', 'estimated_cost_usd'];
@@ -217,7 +203,7 @@ async function run(opt) {
   const assetFetch = {fetch:async request => { try { return new Response(await readAsset(decodeURIComponent(new URL(request.url).pathname.slice(1)))); } catch { return new Response('Not found', {status:404}); } }};
   let store = null;
   if (!opt.flags.has('no-store')) {
-    store = new SourceStore(sqlite().ctx);
+    store = new SourceStore(storage());
     for (const doc of manifest.docs) await store.importDocument(manifest, doc, JSON.parse(await readAsset(doc.evidence_asset)));
   }
   const header = {tool:'bench_tokens', format:1, mode:bridge ? 'bridge' : 'offline', impl:root, bridge:bridgePath,
@@ -232,7 +218,7 @@ async function run(opt) {
     await writeFile(out, JSON.stringify({...header, totals:totals(done), rows:done}, null, 2) + '\n'); };
 
   async function ask(q) {
-    const own = sqlite(), cache = new CacheStore(own.sql), calls = [];
+    const own = storage(), cache = new CacheStore(own.storage.sql), calls = [];
     const archive = new Archive(assetFetch, store);
     let model;
     const wrapped = async (url, init = {}) => {

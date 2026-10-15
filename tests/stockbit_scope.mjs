@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DatabaseSync} from 'node:sqlite';
+import {storage} from '../local/sqlite-storage.mjs';
 import {dateQuery, requestScope, requestedDates, scopeDocuments, documentRequest} from '../worker/retrieval.mjs';
 import {converse, CacheStore} from '../worker/core.mjs';
-import {stockbitBudget, stockbitHandles, PENILAIAN_LABEL} from '../worker/stockbit.mjs';
+import {familyBudget, stockbitHandles, PENILAIAN_LABEL} from '../worker/stockbit.mjs';
 
 const doc = (name, cat, start, end = start, extra = {}) => ({name, cat, start, end, title:name, label:end, path:`files/${cat}/${start}/${name}`, ...extra});
 const sb = d => doc(`sbringkas_${d}_${d}.md`, 'stockbit-ringkasan', d);
@@ -98,15 +98,15 @@ test('"posting asli" is not a raw-report request; raw requests fall back to summ
 test('budget reads newest days first and lists the rest; detail only after summaries fit', () => {
   const entries = ['2026-10-03','2026-10-04','2026-10-05'].flatMap(d => [
     {doc:sb(d), bytes:30000}, {doc:detail(d), bytes:20000}]);
-  const plan = stockbitBudget(entries, 90000);
+  const plan = familyBudget(entries, 90000, 'stockbit-detail');
   assert.deepEqual(plan.read, ['2026-10-05','2026-10-04','2026-10-03']);
   assert.deepEqual(plan.listed, []);
   assert.equal(plan.dropped.size, 3);
   assert.ok([...plan.dropped].every(d => d.cat === 'stockbit-detail'));
-  const tight = stockbitBudget(entries, 50000);
+  const tight = familyBudget(entries, 50000, 'stockbit-detail');
   assert.deepEqual(tight.read, ['2026-10-05']);
   assert.deepEqual(tight.listed.map(l => l.day), ['2026-10-04','2026-10-03']);
-  assert.deepEqual(stockbitBudget([{doc:sb('2026-10-05'), bytes:200000}], 90000).read, ['2026-10-05']);
+  assert.deepEqual(familyBudget([{doc:sb('2026-10-05'), bytes:200000}], 90000, 'stockbit-detail').read, ['2026-10-05']);
 });
 
 test('handles are matched by @ or as known usernames only', () => {
@@ -119,8 +119,7 @@ test('handles are matched by @ or as known usernames only', () => {
 
 // ---- converse with a synthetic 120-day FORU archive -------------------------------------
 function fixture() {
-  const db = new DatabaseSync(':memory:');
-  const sql = {exec(q, ...args) { const s = db.prepare(q), rows = s.columns().length ? s.all(...args) : (s.run(...args), []); return {toArray:() => rows}; }};
+  const {db, storage:{sql}} = storage();
   const start = Date.parse('2026-10-01T00:00:00Z');
   const days = Array.from({length:120}, (_, i) => new Date(start + i * 86400000).toISOString().slice(0,10));
   const docs = [], bodies = new Map(), table = {days:{}, tickers:{FORU:[]}, users:{budi_trader:[]}, user_notes:{}};

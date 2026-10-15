@@ -70,7 +70,6 @@ TOPIC_BIT = {name: 1 << i for i, name in enumerate(TOPIC_NAMES)}
 # Corporate-action topics: rumors of these are checked against disclosures and listed by the rare-rumor route.
 CA_TOPICS = ('rights_issue', 'private_placement', 'tender_offer', 'akuisisi_pengendali', 'merger', 'buyback', 'stock_split',
              'go_private', 'pailit')
-CA_MASK = sum(TOPIC_BIT[t] for t in CA_TOPICS)
 # BEI categories that can carry each topic (bei-index rows); the row's own text must match the topic too.
 TOPIC_CATEGORIES = {
     'akuisisi_pengendali': ('pengurus_pengendali', 'aksi_korporasi'),

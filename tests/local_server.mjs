@@ -7,7 +7,8 @@ import {existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {claudeFetcher, render, failureStatus, cliEnv, checkAuth, stableBoundary, parseJson, parseStep, boundaryKey, usageOf} from '../local/claude-bridge.mjs';
-import {machineCheck, zoneCheck, options, inside, storage, cloudIdentity} from '../local/server.mjs';
+import {machineCheck, zoneCheck, options, inside, cloudIdentity} from '../local/server.mjs';
+import {storage} from '../local/sqlite-storage.mjs';
 import {OpenRouter} from '../worker/core.mjs';
 
 const dir = await realpath(await mkdtemp(path.join(tmpdir(), 'arsip-local-')));
