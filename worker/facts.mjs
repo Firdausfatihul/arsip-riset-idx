@@ -95,7 +95,7 @@ export class ExternalBudget {
   }
 }
 
-// One datacat key serves every analysis in the Durable Object; the API allows 60 requests per minute.
+// One datacat key serves every analysis in ArchiveChat; the API allows 60 requests per minute.
 const recent = [];
 export async function datacatSlot(perMinute = 45, wait = 2500) {
   for (let waited = 0; ; waited += 250) {

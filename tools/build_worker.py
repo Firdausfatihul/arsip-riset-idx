@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare immutable search postings and full document parts for Cloudflare Assets."""
+"""Prepare immutable search postings and full document parts: the chat assets local/server.mjs serves."""
 import argparse
 import hashlib
 import json

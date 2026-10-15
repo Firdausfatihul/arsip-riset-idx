@@ -4,8 +4,7 @@
     python3 -B tools/publish_stockbit.py             # preflight, sinkron, cek build, docs/, push VPS, commit+tag, push git
     python3 -B tools/publish_stockbit.py --dry-run   # preflight + sinkron + cek build saja (tanpa VPS/commit/push)
 
-Situs live = VPS Jakarta (`node local/vps.mjs push`); GitHub hanya riwayat (docs/ ikut di-commit). Worker Cloudflare
-tidak dipakai lagi dan tidak pernah disentuh skrip ini.
+Situs live = VPS Jakarta (`node local/vps.mjs push`); GitHub hanya riwayat (docs/ ikut di-commit).
 
 Urutan:
   1. Preflight: git dan node ada, .local/vps.json ada, cabang main, tidak ada yang di-stage, tidak ada perubahan selain
