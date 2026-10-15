@@ -10,12 +10,11 @@
 //   node local/remote.mjs install                             start server + tunnel now and at login (launchd)
 //   node local/remote.mjs status | uninstall | password | tunnel
 import {execFileSync, spawnSync} from 'node:child_process';
-import {existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, chmodSync} from 'node:fs';
+import {existsSync, readFileSync, writeFileSync, mkdirSync, rmSync} from 'node:fs';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {randomBytes} from 'node:crypto';
-import {newPassword, hashPassword} from './remote-auth.mjs';
+import {cli, readConfig, rotatePassword, shellQuote, writeConfig} from './cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = path.join(ROOT, '.local');
@@ -27,20 +26,7 @@ const LOGS = path.join(homedir(), 'Library', 'Logs');
 const LABELS = {server:'capital.seekingomega.arsip.server', tunnel:'capital.seekingomega.arsip.tunnel'};
 const VPS_PORT = 18017, LOCAL_PORT = 8018;
 
-function args(argv) {
-  const out = {_:[]};
-  for (let i = 0; i < argv.length; i++) {
-    if (!argv[i].startsWith('--')) { out._.push(argv[i]); continue; }
-    const key = argv[i].slice(2);
-    if (['new-password'].includes(key)) { out[key] = true; continue; }
-    if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error('Opsi --' + key + ' perlu nilai.');
-    out[key] = argv[++i];
-  }
-  return out;
-}
-const read = () => { if (!existsSync(CONFIG)) throw new Error('Belum di-setup. Jalankan: node local/remote.mjs setup --vps <ip> --domain <nama>'); return JSON.parse(readFileSync(CONFIG, 'utf8')); };
-const write = config => { mkdirSync(STATE, {recursive:true, mode:0o700}); writeFileSync(CONFIG, JSON.stringify(config, null, 2) + '\n', {mode:0o600}); chmodSync(CONFIG, 0o600); };
-const shellQuote = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
+const read = () => readConfig(CONFIG, 'node local/remote.mjs setup --vps <ip> --domain <nama>');
 
 export function validate({vps, domain, sshPort, sshUser}) {
   if (!/^[A-Za-z0-9.:-]+$/.test(vps || '')) throw new Error('--vps harus alamat IP atau nama host VPS.');
@@ -140,9 +126,8 @@ function setup(opt) {
     mkdirSync(path.dirname(KEY), {recursive:true, mode:0o700});
     execFileSync('ssh-keygen', ['-t', 'ed25519', '-N', '', '-C', 'arsip-tunnel', '-f', KEY], {stdio:'ignore'});
   }
-  let password = null;
-  if (!config.password || opt['new-password']) { password = newPassword(); config.password = hashPassword(password); config.secret = randomBytes(32).toString('hex'); }
-  write(config);
+  const password = !config.password || opt['new-password'] ? rotatePassword(config) : null;
+  writeConfig(CONFIG, config);
   const script = path.join(STATE, 'vps-setup.sh');
   writeFileSync(script, vpsScript({domain:config.domain, publicKey:readFileSync(KEY + '.pub', 'utf8').trim()}), {mode:0o600});
   const target = `${config.ssh_admin}@${config.vps_host}`, port = config.ssh_port === 22 ? '' : ` -P ${config.ssh_port}`, sshPort = config.ssh_port === 22 ? '' : ` -p ${config.ssh_port}`;
@@ -193,10 +178,8 @@ function status() {
 }
 
 function password() {
-  const config = read();
-  const value = newPassword();
-  config.password = hashPassword(value); config.secret = randomBytes(32).toString('hex');
-  write(config);
+  const config = read(), value = rotatePassword(config);
+  writeConfig(CONFIG, config);
   console.log(`Kata sandi baru (semua sesi lama keluar setelah server dimulai ulang):\n\n    ${value}\n`);
   if (spawnSync('launchctl', ['print', `gui/${uid()}/${LABELS.server}`], {stdio:'ignore'}).status === 0) {
     spawnSync('launchctl', ['kickstart', '-k', `gui/${uid()}/${LABELS.server}`], {stdio:'inherit'});
@@ -209,12 +192,4 @@ function tunnel() {
   process.exit(r.status ?? 1);
 }
 
-const main = () => {
-  const opt = args(process.argv.slice(2));
-  const command = opt._[0];
-  const commands = {setup:() => setup(opt), install, uninstall, status, password, tunnel};
-  if (!commands[command]) throw new Error('Perintah: setup | install | uninstall | status | password | tunnel');
-  commands[command]();
-};
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
-  try { main(); } catch (error) { console.error('Gagal: ' + error.message); process.exit(1); }
+cli(import.meta.url, ['new-password'], {setup, install, uninstall, status, password, tunnel});

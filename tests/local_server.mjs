@@ -408,7 +408,7 @@ test('the server only accepts the Claude subscription login', () => {
 });
 
 test('VPS host: Jakarta zone, pinned Node, Claude for user arsip, no restart on lock failure, secrets filtered', async () => {
-  const {bootstrapScript, serverSecrets, pushable} = await import('../local/vps.mjs');
+  const {bootstrapScript, serverSecrets, serverEnv, pushable} = await import('../local/vps.mjs');
   const script = bootstrapScript({domain:'arsip.seekingomega.capital', claudeVersion:'2.1.296'});
   assert.match(script, /timedatectl set-timezone Asia\/Jakarta/);
   assert.match(script, /sha256sum -c/); assert.match(script, /[0-9a-f]{64}/);
@@ -424,9 +424,26 @@ test('VPS host: Jakarta zone, pinned Node, Claude for user arsip, no restart on 
   assert.throws(() => bootstrapScript({domain:'a.b', claudeVersion:'2.1; rm -rf /'}), /tidak valid/);
   assert.equal(serverSecrets('OPENROUTER_API_KEY=sk-or-1\nexport DATACAT_API_KEY="dc 1"\nDATACAT_API_KEY=dc2\nCHAT_METRICS_TOKEN=m\nOTHER=x\n'),
     'DATACAT_API_KEY=dc2\nCHAT_METRICS_TOKEN=m\n');
+  // The VPS unit runs the same model and effort as a plain `node local/server.mjs`, unless setup chose others.
+  const plain = options([], {});
+  assert.equal(serverEnv(), `ARSIP_CLAUDE_MODEL=${plain.model}\nARSIP_CLAUDE_EFFORT=${plain.effort}\n`);
+  assert.throws(() => serverEnv({effort:'turbo'}), /Effort/);
   assert.deepEqual(pushable(['build.py', 'docs/index.html', 'reports/a.md', 'tests/x.mjs', '.env.chat', '.env.chat.example', '.local/remote.json',
     'tools/__pycache__/a.pyc', 'needtobeindexed/ki_20260915.md', 'local/server.mjs', 'site/index.html']),
     ['build.py', 'needtobeindexed/ki_20260915.md', 'local/server.mjs']);
+});
+
+test('local CLI helpers: options, settings file with mode 600, password rotation', async () => {
+  const {parseArgs, readConfig, writeConfig, rotatePassword} = await import('../local/cli.mjs');
+  assert.deepEqual(parseArgs(['push', '--repin', '--days', '7'], ['repin']), {_:['push'], repin:true, days:'7'});
+  assert.throws(() => parseArgs(['metrics', '--days'], []), /--days perlu nilai/);
+  const file = path.join(await mkdtemp(path.join(tmpdir(), 'arsip-cli-')), '.local', 'x.json');
+  assert.throws(() => readConfig(file, 'node local/x.mjs setup'), /Belum di-setup\. Jalankan: node local\/x\.mjs setup/);
+  const config = {version:1}, value = rotatePassword(config);
+  assert.ok(checkPassword(value, config.password)); assert.match(config.secret, /^[0-9a-f]{64}$/);
+  writeConfig(file, config);
+  assert.equal((await stat(file)).mode & 0o777, 0o600);
+  assert.deepEqual(readConfig(file, ''), config);
 });
 
 test('VPS lock: Jakarta region and this cloud instance, read from metadata; copies elsewhere fail closed', async () => {

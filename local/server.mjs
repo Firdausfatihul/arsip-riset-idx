@@ -23,6 +23,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {claudeFetcher, cliEnv, checkAuth} from './claude-bridge.mjs';
 import {storage} from './sqlite-storage.mjs';
+import {parseEnv} from './cli.mjs';
 import {COOKIE, LOGIN_HEADERS, LoginLimiter, checkPassword, cookies, issueSession, loginPage, validSession} from './remote-auth.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -43,6 +44,12 @@ export const AGENTIC_DAILY = Number(process.env.CHAT_AGENTIC_DAILY) || 100;
 const METADATA = 'http://metadata.tencentyun.com/latest/meta-data/';
 export const VPS_REGIONS = ['ap-jakarta'];
 
+// `claude -p` model and effort unless --model/--effort or ARSIP_CLAUDE_MODEL/_EFFORT (the VPS: local/vps.mjs setup) say otherwise.
+export const MODEL_DEFAULT = 'sonnet', EFFORT_DEFAULT = 'medium';
+export function checkModel(model, effort) {
+  if (!/^[a-z0-9.\[\]-]+$/i.test(model)) throw new Error('Model tidak valid.');
+  if (!['low','medium','high','xhigh','max'].includes(effort)) throw new Error('Effort harus low, medium, high, xhigh, atau max.');
+}
 export function options(argv, env = process.env) {
   const flags = new Set(['--pin','--repin','--build','--build-only','--allow-lan']), valued = new Set(['--port','--host','--model','--effort','--concurrency']);
   const seen = {};
@@ -57,12 +64,11 @@ export function options(argv, env = process.env) {
   const opt = {pin:!!(seen['--pin'] || seen['--repin']), repin:!!seen['--repin'], allowLan:!!seen['--allow-lan'],
     build:!!(seen['--build'] || seen['--build-only'] || seen['--pin'] || seen['--repin']), buildOnly:!!seen['--build-only'],
     port:Number(seen['--port'] ?? env.ARSIP_PORT ?? 8017), host:seen['--host'] ?? env.ARSIP_HOST ?? '127.0.0.1',
-    model:seen['--model'] ?? env.ARSIP_CLAUDE_MODEL ?? 'sonnet', effort:seen['--effort'] ?? env.ARSIP_CLAUDE_EFFORT ?? 'medium',
+    model:seen['--model'] ?? env.ARSIP_CLAUDE_MODEL ?? MODEL_DEFAULT, effort:seen['--effort'] ?? env.ARSIP_CLAUDE_EFFORT ?? EFFORT_DEFAULT,
     concurrency:Number(seen['--concurrency'] ?? env.ARSIP_CLAUDE_CONCURRENCY ?? 4)};
   if (!Number.isSafeInteger(opt.port) || opt.port < 1 || opt.port > 65535) throw new Error('Port tidak valid.');
   if (!Number.isSafeInteger(opt.concurrency) || opt.concurrency < 1 || opt.concurrency > 8) throw new Error('--concurrency harus 1 sampai 8.');
-  if (!/^[a-z0-9.\[\]-]+$/i.test(opt.model)) throw new Error('Model tidak valid.');
-  if (!['low','medium','high','xhigh','max'].includes(opt.effort)) throw new Error('Effort harus low, medium, high, xhigh, atau max.');
+  checkModel(opt.model, opt.effort);
   return opt;
 }
 
@@ -154,16 +160,6 @@ export function readRemote(file = REMOTE) {
   return remote;
 }
 
-function readEnvFile(file) {
-  const values = {};
-  if (!existsSync(file)) return values;
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    const m = line.match(/^\s*(?:export\s+)?([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (m) values[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
-  }
-  return values;
-}
-
 function build() {
   const run = (args, env = {}) => {
     console.log('$ python3 ' + args.join(' '));
@@ -207,7 +203,7 @@ async function main() {
   console.log('Claude Code ' + probe.stdout.trim() + ', login ' + auth.method + ' (' + auth.subscription + '), model ' + opt.model
     + ', effort ' + opt.effort + ', maks ' + opt.concurrency + ' proses.');
 
-  const secrets = readEnvFile(path.join(ROOT, '.env.chat'));
+  const envFile = path.join(ROOT, '.env.chat'), secrets = existsSync(envFile) ? parseEnv(readFileSync(envFile, 'utf8')) : {};
   const {storage:store} = storage(path.join(STATE, 'chat.sqlite'));
   // Addresses this server answers to; the browser's Origin and Host must be one of them (DNS rebinding, CSRF).
   const hostOf = address => address.includes(':') ? '[' + address + ']' : address;

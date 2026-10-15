@@ -17,13 +17,12 @@
 //   node local/vps.mjs status | logs | password
 //   node local/vps.mjs metrics [--days 7] [--limit 100] [--offset 0]   question/cost statistics as JSON (tools/chat_metrics.py)
 import {execFileSync, spawn, spawnSync} from 'node:child_process';
-import {existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, chmodSync} from 'node:fs';
+import {existsSync, readFileSync, appendFileSync, mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {randomBytes} from 'node:crypto';
-import {newPassword, hashPassword} from './remote-auth.mjs';
+import {cli, parseEnv, readConfig, rotatePassword, shellQuote as q, writeConfig} from './cli.mjs';
 import {validate} from './remote.mjs';
-import {AGENTIC_DAILY} from './server.mjs';
+import {AGENTIC_DAILY, EFFORT_DEFAULT, MODEL_DEFAULT, checkModel} from './server.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const STATE = path.join(ROOT, '.local');
@@ -39,25 +38,11 @@ const NODE_SHA = {x64:'ff04bc7c3ed7699ceb708dbaaf3580d899ff8bf67f17114f979e83aa7
 // Built on the VPS, never copied: published site, reports, tests, and every local secret except the two below.
 const SKIP = /^(docs|reports|tests|site|output|removed-from-archive|\.local|\.stockbit-publish)\/|^\.env/;
 
-function args(argv) {
-  const out = {_:[]};
-  for (let i = 0; i < argv.length; i++) {
-    if (!argv[i].startsWith('--')) { out._.push(argv[i]); continue; }
-    const key = argv[i].slice(2);
-    if (['new-password', 'repin', 'follow'].includes(key)) { out[key] = true; continue; }
-    if (argv[i + 1] === undefined || argv[i + 1].startsWith('--')) throw new Error('Opsi --' + key + ' perlu nilai.');
-    out[key] = argv[++i];
-  }
-  return out;
-}
 const read = () => {
-  if (!existsSync(CONFIG)) throw new Error('Belum di-setup. Jalankan: node local/vps.mjs setup --host <ip> --domain <nama>');
-  const config = JSON.parse(readFileSync(CONFIG, 'utf8'));
+  const config = readConfig(CONFIG, 'node local/vps.mjs setup --host <ip> --domain <nama>');
   validate({vps:config.host, domain:config.domain, sshPort:config.ssh_port, sshUser:config.ssh_user});
   return config;
 };
-const write = config => { mkdirSync(STATE, {recursive:true, mode:0o700}); writeFileSync(CONFIG, JSON.stringify(config, null, 2) + '\n', {mode:0o600}); chmodSync(CONFIG, 0o600); };
-const q = value => "'" + String(value).replaceAll("'", "'\\''") + "'";
 
 const sshBase = config => ['-o', 'StrictHostKeyChecking=yes', '-o', 'HostKeyAlgorithms=ssh-ed25519', '-o', 'UserKnownHostsFile=' + KNOWN,
   '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=20', '-p', String(config.ssh_port)];
@@ -98,15 +83,9 @@ const must = (r, what) => { if (r.status !== 0) throw new Error(what + ' gagal (
 // Runs as the server user with a login-shell environment, as if the owner typed it in a terminal on the VPS.
 const asArsip = command => `sudo -iu arsip ${command}`;
 
-// Only the keys the server uses; the OpenRouter key and anything else in .env.chat stays on this Mac.
-export function serverSecrets(text) {
-  const keep = {};
-  for (const line of String(text).split('\n')) {
-    const m = line.match(/^\s*(?:export\s+)?(DATACAT_API_KEY|CHAT_METRICS_TOKEN)\s*=\s*(.*?)\s*$/);
-    if (m) keep[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2');
-  }
-  return Object.entries(keep).filter(([, v]) => /^[\x21-\x7e]+$/.test(v)).map(([k, v]) => `${k}=${v}\n`).join('');
-}
+// Only the keys the server uses; anything else in .env.chat stays on this Mac.
+export const serverSecrets = text => Object.entries(parseEnv(text))
+  .filter(([k, v]) => ['DATACAT_API_KEY', 'CHAT_METRICS_TOKEN'].includes(k) && /^[\x21-\x7e]+$/.test(v)).map(([k, v]) => `${k}=${v}\n`).join('');
 export const pushable = files => files.filter(f => f && !SKIP.test(f) && !f.split('/').includes('__pycache__'));
 
 // Root script for a fresh Ubuntu 24.04 / Debian 12 VPS, piped to `sudo bash -s`. Idempotent.
@@ -230,14 +209,13 @@ function setup(opt) {
   const old = existsSync(CONFIG) ? JSON.parse(readFileSync(CONFIG, 'utf8')) : null;
   const config = {version:1, host:opt.host || old?.host, domain:(opt.domain || old?.domain || '').toLowerCase(),
     ssh_user:opt['ssh-user'] || old?.ssh_user || 'ubuntu', ssh_port:Number(opt['ssh-port'] || old?.ssh_port || 22),
-    host_key:opt['host-key'] || old?.host_key, model:opt.model || old?.model || 'sonnet', effort:opt.effort || old?.effort || 'medium',
+    host_key:opt['host-key'] || old?.host_key, model:opt.model || old?.model || MODEL_DEFAULT, effort:opt.effort || old?.effort || EFFORT_DEFAULT,
     secret:old?.secret, password:old?.password};
   serverEnv(config);
   validate({vps:config.host, domain:config.domain, sshPort:config.ssh_port, sshUser:config.ssh_user});
   if (config.host_key && !HOST_KEY.test(config.host_key)) throw new Error('--host-key harus SHA256:… (43 karakter), dari ssh-keygen -lf di konsol VPS.');
-  let password = null;
-  if (!config.password || opt['new-password']) { password = newPassword(); config.password = hashPassword(password); config.secret = randomBytes(32).toString('hex'); }
-  write(config);
+  const password = !config.password || opt['new-password'] ? rotatePassword(config) : null;
+  writeConfig(CONFIG, config);
   console.log('Pengaturan tersimpan: ' + CONFIG);
   if (password) console.log(`\nKATA SANDI untuk semua perangkat (simpan di pengelola sandi; tidak ditampilkan lagi):\n\n    ${password}\n`);
   console.log(`Langkah berikutnya:
@@ -352,9 +330,8 @@ async function push(opt) {
 }
 
 // Server settings for the systemd unit (EnvironmentFile). Validated like local/server.mjs options.
-export function serverEnv({model = 'sonnet', effort = 'medium'} = {}) {
-  if (!/^[a-z0-9.\[\]-]+$/i.test(model)) throw new Error('--model tidak valid.');
-  if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(effort)) throw new Error('--effort harus low, medium, high, xhigh, atau max.');
+export function serverEnv({model = MODEL_DEFAULT, effort = EFFORT_DEFAULT} = {}) {
+  checkModel(model, effort);
   return `ARSIP_CLAUDE_MODEL=${model}\nARSIP_CLAUDE_EFFORT=${effort}\n`;
 }
 
@@ -411,10 +388,8 @@ function metrics(opt) {
 }
 
 function password() {
-  const config = read();
-  const value = newPassword();
-  config.password = hashPassword(value); config.secret = randomBytes(32).toString('hex');
-  write(config);
+  const config = read(), value = rotatePassword(config);
+  writeConfig(CONFIG, config);
   console.log(`Kata sandi baru (semua perangkat keluar):\n\n    ${value}\n`);
   sendSecrets(config);
   restart(config);
@@ -422,17 +397,9 @@ function password() {
 
 function apply() {
   const config = read();
-  console.log(`Model ${config.model || 'sonnet'}, effort ${config.effort || 'medium'}.`);
+  console.log(`Model ${config.model || MODEL_DEFAULT}, effort ${config.effort || EFFORT_DEFAULT}.`);
   sendSecrets(config);
   restart(config);
 }
 
-const main = async () => {
-  const opt = args(process.argv.slice(2));
-  const commands = {setup:() => setup(opt), bootstrap:() => bootstrap(opt), login, push:() => push(opt), status, logs:() => logs(opt), password, apply,
-    metrics:() => metrics(opt)};
-  if (!commands[opt._[0]]) throw new Error('Perintah: setup | bootstrap | login | push | apply | status | logs | password | metrics');
-  await commands[opt._[0]]();
-};
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))
-  main().catch(error => { console.error('Gagal: ' + error.message); process.exit(1); });
+cli(import.meta.url, ['new-password', 'repin', 'follow'], {setup, bootstrap, login, push, apply, status, logs, password, metrics});
