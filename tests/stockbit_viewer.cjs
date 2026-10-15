@@ -176,6 +176,14 @@ try {
       assert.equal(s.w.location.hash, '#pengguna=Golden%20Dirt');
       await s.go('#emiten=BBCA', () => s.reader.querySelector('[data-sb-retry]'));
       assert.match(s.reader.textContent, /gagal dimuat/);
+      // A failed load is not kept: "Coba lagi" fetches the index again.
+      const failing = s.w.fetch, index = s.data.stockbit.path;
+      s.w.fetch = async url => decodeURIComponent(String(url).split('?')[0]) === index
+        ? new Response(fs.readFileSync(path.join(site, index))) : failing(url);
+      s.reader.querySelector('[data-sb-retry]').click();
+      for (let i = 0; i < 200 && !s.reader.querySelector('table'); i++) await delay(5);
+      assert.equal(s.reader.querySelector('h1').textContent, 'BBCA');
+      assert.ok(s.reader.querySelector('table'));
       s.safe();
     });
 

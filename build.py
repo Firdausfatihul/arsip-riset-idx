@@ -972,6 +972,32 @@ APP_JS = r"""
   var data = JSON.parse(document.getElementById('arsip-data').textContent);
 
   var BUILD_VERSION = data.version || '';
+  // Berkas build ini (bukan salinan lama di cache browser), sebagai 'json' atau 'text'.
+  function fetchBuild(path, as){
+    return fetch(path + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r[as]();
+    });
+  }
+  // Pemuat yang mengambil satu berkas JSON sekali: ready(d) memvalidasi dan menyimpan datanya; yang gagal dicoba lagi pada panggilan berikutnya.
+  function jsonOnce(path, ready){
+    var loading = null;
+    return function(){
+      if (!loading) loading = fetchBuild(path, 'json').then(ready).catch(function(e){ loading = null; throw e; });
+      return loading;
+    };
+  }
+  // Pemeriksaan struktur data; setiap yang gagal melempar pesan msg.
+  function checker(msg){
+    var k = {require: function(ok){ if (!ok) throw new Error(msg); }};
+    k.array = function(a, max){ k.require(Array.isArray(a) && a.length <= max); return a; };
+    k.number = function(v){ k.require(v === null || (typeof v === 'number' && Number.isFinite(v))); };
+    k.index = function(v, table){ k.require(Number.isSafeInteger(v) && v >= 0 && v < table.length); };
+    k.flag = function(v){ k.require(v === 0 || v === 1); };
+    k.url = function(v){ k.require(v === null || (typeof v === 'string' && v.length <= 4096)); };
+    k.map = function(v){ return v != null && typeof v === 'object' && !Array.isArray(v); };
+    return k;
+  }
 
   fetch('version.json?t=' + Date.now(), {cache: 'no-store'})
     .then(function(r){ return r.json(); })
@@ -1002,12 +1028,7 @@ APP_JS = r"""
   function loadDoc(d){
     if (d.content != null) return Promise.resolve(d);
     if (!d.loading){
-      d.loading = fetch(d.path + '?v=' + encodeURIComponent(BUILD_VERSION), {
-      cache: 'no-store'
-      }).then(function(r){
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.text();
-      }).then(function(t){
+      d.loading = fetchBuild(d.path, 'text').then(function(t){
         d.content = t; d.body = t.toLowerCase(); d.failed = false; d.loading = null;
         return d;
       }, function(e){ d.failed = true; d.failedAt = Date.now(); d.loading = null; throw e; });
@@ -1437,7 +1458,7 @@ APP_JS = r"""
   var own = data.own, ownView = document.getElementById('own'), ownBody = document.getElementById('own-body'),
       ownSearch = document.getElementById('own-cari'), ownPick = document.getElementById('own-emiten'),
       ownFrom = document.getElementById('own-dari'), ownTo = document.getElementById('own-sampai');
-  var ownData = null, ownLoading = null, ownState = {t: '', from: 0, to: 0, sort: 'besar', all: false, chartAll: true, refocus: null};
+  var ownData = null, ownState = {t: '', from: 0, to: 0, sort: 'besar', all: false, chartAll: true, refocus: null};
   var DEF_FROM = 0;
   if (own) for (var di = 0; di < own.months.length; di++) if (own.months[di].asOf){ DEF_FROM = di; break; }
   var BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -1471,12 +1492,8 @@ APP_JS = r"""
   }
 
   function validateOwn(d){
-    function require(ok){ if (!ok) throw new Error('Struktur data kepemilikan tidak valid.'); }
-    function array(a, max){ require(Array.isArray(a) && a.length <= max); return a; }
-    function number(v){ require(v === null || (typeof v === 'number' && Number.isFinite(v))); }
-    function index(v, table){ require(Number.isSafeInteger(v) && v >= 0 && v < table.length); }
-    function flag(v){ require(v === 0 || v === 1); }
-    function url(v){ require(v === null || (typeof v === 'string' && v.length <= 4096)); }
+    var k = checker('Struktur data kepemilikan tidak valid.'), require = k.require, array = k.array, number = k.number,
+        index = k.index, flag = k.flag, url = k.url;
     require(d && d.format === 6);  // 6 = identitas KSEI dan validasi sumber diperketat; jangan memakai cache format lama.
     array(d.months,240); require(d.months.length === own.months.length && d.months.length > 0);
     d.months.forEach(function(m,i){ require(m && /^\d{4}-(0[1-9]|1[0-2])$/.test(m.p) && m.p === own.months[i].p); url(m.url); });
@@ -1508,10 +1525,7 @@ APP_JS = r"""
   // Harga penutupan opsional: gagal dimuat atau tidak valid berarti indikator memakai lot, bukan rupiah.
   function loadPrices(d){
     if (!own.prices) return Promise.resolve();
-    return fetch(own.prices + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    }).then(function(p){
+    return fetchBuild(own.prices, 'json').then(function(p){
       var ok = p && p.format === 1 && Array.isArray(p.d) && p.d.length <= 240 && p.d.every(function(x){ return /^\d{4}-\d{2}-\d{2}$/.test(x); }) &&
         p.c && typeof p.c === 'object' && Object.keys(p.c).length <= 5000 && Object.keys(p.c).every(function(t){
           var v = p.c[t]; return /^[A-Z0-9]{2,12}$/.test(t) && Array.isArray(v) && v.length === p.d.length &&
@@ -1531,33 +1545,20 @@ APP_JS = r"""
     var a = Math.abs(v), u = a >= 1e12 ? [1e12, ' T'] : a >= 1e9 ? [1e9, ' M'] : a >= 1e6 ? [1e6, ' jt'] : a >= 1e3 ? [1e3, ' rb'] : [1, ''];
     return 'Rp' + num(v / u[0], u[0] === 1 ? 0 : a / u[0] >= 100 ? 0 : 1) + u[1];
   }
-  function loadOwn(){
-    if (ownData) return Promise.resolve(ownData);
-    if (!ownLoading){
-      ownLoading = fetch(own.path + '?v=' + encodeURIComponent(BUILD_VERSION), {
-        cache: 'no-store'
-      }).then(function(r){
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      }).then(function(d){
-        validateOwn(d);
-        d.byT = Object.create(null);
-        d.companies.forEach(function(c){ d.byT[c.t] = c; c.hay = (c.t + ' ' + c.n).toLowerCase(); c.g = []; });
-        ownPick.innerHTML = '<option value="">Semua emiten</option>' + d.companies.map(function(c){
-          return '<option value="' + esc(c.t) + '">' + esc(c.t + (c.n ? ' · ' + c.n : '')) + '</option>';
-        }).join('');
-        ownData = d; ownLoading = null;
-        return loadPrices(d).then(function(){ return d; });
-      }).catch(function(e){ ownLoading = null; throw e; });
-    }
-    return ownLoading;
-  }
+  var loadOwn = jsonOnce(own && own.path, function(d){
+    validateOwn(d);
+    d.byT = Object.create(null);
+    d.companies.forEach(function(c){ d.byT[c.t] = c; c.hay = (c.t + ' ' + c.n).toLowerCase(); c.g = []; });
+    ownPick.innerHTML = '<option value="">Semua emiten</option>' + d.companies.map(function(c){
+      return '<option value="' + esc(c.t) + '">' + esc(c.t + (c.n ? ' · ' + c.n : '')) + '</option>';
+    }).join('');
+    ownData = d;
+    return loadPrices(d).then(function(){ return d; });
+  });
 
   // Laporan perubahan kepemilikan (formulir KSEI/IDX, surat BAE), berkas terpisah; diambil saat satu emiten dibuka.
-  var changesData = null, changesLoading = null;
   function validateChanges(d){
-    function require(ok){ if (!ok) throw new Error('Struktur laporan perubahan tidak valid.'); }
-    function number(v){ require(v === null || (typeof v === 'number' && Number.isFinite(v))); }
+    var k = checker('Struktur laporan perubahan tidak valid.'), require = k.require, number = k.number;
     function text(v, max){ require(typeof v === 'string' && v.length <= max); }
     function day(v){ require(v === null || (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v))); }
     require(d && d.format === 1 && d.companies && typeof d.companies === 'object' && !Array.isArray(d.companies));
@@ -1580,27 +1581,13 @@ APP_JS = r"""
       });
     });
   }
-  function loadChanges(){
-    if (changesData) return Promise.resolve(changesData);
-    if (!changesLoading){
-      changesLoading = fetch(own.changes + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      }).then(function(d){ validateChanges(d); changesData = d; changesLoading = null; return d; })
-        .catch(function(e){ changesLoading = null; throw e; });
-    }
-    return changesLoading;
-  }
+  var loadChanges = jsonOnce(own && own.changes, function(d){ validateChanges(d); return d; });
 
   // Daftar pemegang saham, jenis pemilik BAE, dan tautan laporan emiten (kepemilikan-laporan.json); diambil saat satu emiten dibuka.
-  var reportsData = null, reportsLoading = null;
+  var reportsData = null;
   function validateReports(d){
-    function require(ok){ if (!ok) throw new Error('Struktur laporan emiten tidak valid.'); }
-    function array(a, max){ require(Array.isArray(a) && a.length <= max); return a; }
-    function number(v){ require(v === null || (typeof v === 'number' && Number.isFinite(v))); }
-    function flag(v){ require(v === 0 || v === 1); }
-    function index(v, table){ require(Number.isSafeInteger(v) && v >= 0 && v < table.length); }
-    function url(v){ require(v === null || (typeof v === 'string' && v.length <= 4096)); }
+    var k = checker('Struktur laporan emiten tidak valid.'), require = k.require, array = k.array, number = k.number,
+        flag = k.flag, index = k.index, url = k.url;
     var n = own.months.length, count = 0;
     require(d && (d.format === 1 || d.format === 2) && /^https:\/\/[^\s]{1,200}$/.test(d.base) && d.companies && typeof d.companies === 'object' && !Array.isArray(d.companies));
     array(d.months, 240); require(d.months.length === n && d.months.every(function(m, i){ return m === own.months[i].p; }));
@@ -1632,17 +1619,7 @@ APP_JS = r"""
       }
     });
   }
-  function loadReports(){
-    if (reportsData) return Promise.resolve(reportsData);
-    if (!reportsLoading){
-      reportsLoading = fetch(own.reports + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      }).then(function(d){ validateReports(d); d.decoded = Object.create(null); reportsData = d; reportsLoading = null; return d; })
-        .catch(function(e){ reportsLoading = null; throw e; });
-    }
-    return reportsLoading;
-  }
+  var loadReports = jsonOnce(own && own.reports, function(d){ validateReports(d); d.decoded = Object.create(null); return (reportsData = d); });
   // Laporan satu emiten: d = daftar pemegang per bulan ({h, s, u}; nomor bulan = daftar persis sama dengan bulan itu), b = jenis pemilik.
   function reportsFor(t){
     var d = reportsData, out = d.decoded[t];
@@ -2650,7 +2627,7 @@ APP_JS = r"""
   // #emiten=KODE dan #pengguna=nama membaca files/stockbit-index/stockbit-index.json (tools/sync_idx.py --stockbit-only),
   // diambil sekali saat rute pertama dibuka. Nama berkas hari diubah ke path lewat daftar dokumen (byName), bukan ditulis tetap.
   // Semua string dari indeks masuk lewat textContent/atribut DOM, tidak pernah sebagai HTML.
-  var sbMeta = data.stockbit, sbData = null, sbLoading = null, sbRoute = '';
+  var sbMeta = data.stockbit, sbData = null, sbRoute = '';
   var SB_EP = {D: 'keterbukaan', A: 'hitungan', C: 'klaim', R: 'rumor', Q: 'pertanyaan', J: 'guyon'};
   var SB_NOTE = 'Klaim pengguna Stockbit, belum diverifikasi, bukan keterbukaan resmi.';
   var SB_JUDGEMENT = 'Penilaian otomatis atas argumen di posting, bukan atas orangnya';
@@ -2672,23 +2649,12 @@ APP_JS = r"""
   }
   function sbDoc(name){ return typeof name === 'string' && hasKey(byName, name) ? byName[name] : null; }
   function validateSb(d){
-    function require(ok){ if (!ok) throw new Error('Struktur indeks Stockbit tidak valid.'); }
-    function map(v){ return v != null && typeof v === 'object' && !Array.isArray(v); }
+    var k = checker('Struktur indeks Stockbit tidak valid.'), require = k.require, map = k.map;
     require(map(d) && d.format === 1 && Array.isArray(d.days) && d.days.length <= 20000 && map(d.tickers) && map(d.users));
     require(d.user_notes == null || map(d.user_notes));
     d.days.forEach(function(x){ require(map(x) && typeof x.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.d)); });
   }
-  function loadSb(){
-    if (sbData) return Promise.resolve(sbData);
-    if (!sbLoading){
-      sbLoading = fetch(sbMeta.path + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      }).then(function(d){ validateSb(d); sbData = d; sbLoading = null; return d; })
-        .catch(function(e){ sbLoading = null; throw e; });
-    }
-    return sbLoading;
-  }
+  var loadSb = jsonOnce(sbMeta && sbMeta.path, function(d){ validateSb(d); return (sbData = d); });
   // Baris [hariIdx, ...] yang hari-nya ada di indeks, terbaru dulu.
   function sbRows(d, list){
     if (!Array.isArray(list)) return [];
@@ -2896,26 +2862,15 @@ APP_JS = r"""
   // diambil sekali. Bagian BEI di atas, Stockbit di bawah; label dan disclaimer terpisah. Kode yang hanya ada di salah satu
   // indeks tetap punya halaman, dan satu indeks yang gagal dimuat tidak menyembunyikan bagian lainnya.
   // Semua string dari indeks masuk lewat textContent/atribut DOM, tidak pernah sebagai HTML.
-  var beiMeta = data.bei, beiData = null, beiLoading = null;
+  var beiMeta = data.bei, beiData = null;
   var BEI_NOTE = 'Ringkasan otomatis dari pengumuman resmi di idx.co.id; bukan rekomendasi. Angka dikutip dari dokumen emiten dan belum diaudit ulang.';
   function validateBei(d){
-    function require(ok){ if (!ok) throw new Error('Struktur indeks BEI tidak valid.'); }
-    function map(v){ return v != null && typeof v === 'object' && !Array.isArray(v); }
+    var k = checker('Struktur indeks BEI tidak valid.'), require = k.require, map = k.map;
     require(map(d) && d.format === 1 && Array.isArray(d.days) && d.days.length <= 20000 && map(d.tickers));
     require(d.names == null || map(d.names));
     d.days.forEach(function(x){ require(map(x) && typeof x.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.d)); });
   }
-  function loadBei(){
-    if (beiData) return Promise.resolve(beiData);
-    if (!beiLoading){
-      beiLoading = fetch(beiMeta.path + '?v=' + encodeURIComponent(BUILD_VERSION), {cache: 'no-store'}).then(function(r){
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      }).then(function(d){ validateBei(d); beiData = d; beiLoading = null; return d; })
-        .catch(function(e){ beiLoading = null; throw e; });
-    }
-    return beiLoading;
-  }
+  var loadBei = jsonOnce(beiMeta && beiMeta.path, function(d){ validateBei(d); return (beiData = d); });
   function emSection(cat, cls, title, note, meta){
     var sec = sbEl('section', {'class': 'em-sec ' + cls, 'data-cat': cat, 'aria-label': title}, [
       sbEl('h2', {'class': 'em-title'}, [sbEl('span', {'class': 'swatch'}), title]),
