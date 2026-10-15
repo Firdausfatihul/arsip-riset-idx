@@ -9,9 +9,10 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {loadQuestions, classify, diffRuns, diffTable, estTokens} from '../tools/bench_tokens.mjs';
+import {ASSETS} from './helpers/archive.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), script = path.join(root, 'tools/bench_tokens.mjs');
-const assets = path.join(root, 'worker/.assets'), haveAssets = existsSync(path.join(assets, 'manifest.json'));
+const assets = ASSETS, haveAssets = existsSync(path.join(assets, 'manifest.json'));
 const bench = (...args) => spawnSync(process.execPath, ['--no-warnings', script, ...args], {encoding:'utf8', cwd:root, timeout:120000});
 
 test('loadQuestions: VPS dump, agentic skipped, duplicates merged, plain lists', () => {

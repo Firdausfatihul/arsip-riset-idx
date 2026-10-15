@@ -1,20 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
-import {readFile} from 'node:fs/promises';
 import {SourceStore} from '../worker/source-store.mjs';
 import {Archive,converse,size,OpenRouter,CacheStore} from '../worker/core.mjs';
 import {tickerDocuments} from './helpers/archive-expectations.mjs';
+import {readAsset} from './helpers/archive.mjs';
 import {hash} from '../worker/cache.mjs';
 import {storage} from '../local/server.mjs';
-const manifest=JSON.parse(await readFile(new URL('../worker/.assets/manifest.json',import.meta.url),'utf8'));
+const manifest=await readAsset('manifest.json');
 function fixture(){
  const db=new DatabaseSync(':memory:');
  const sql={exec(q,...args){const s=db.prepare(q),rows=s.columns().length?s.all(...args):(s.run(...args),[]);return {toArray:()=>rows};}};
  const ctx={storage:{sql,transactionSync(fn){db.exec('BEGIN');try{const r=fn();db.exec('COMMIT');return r;}catch(e){db.exec('ROLLBACK');throw e;}}}};
  return {db,store:new SourceStore(ctx)};
 }
-const evidence=async doc=>JSON.parse(await readFile(new URL('../worker/.assets/'+doc.evidence_asset,import.meta.url),'utf8'));
+const evidence=doc=>readAsset(doc.evidence_asset);
 test('source import verifies hashes, is atomic/idempotent, and only trusts active document versions',async()=>{
  const {store,db}=fixture(),doc=manifest.docs[0],data=await evidence(doc);
  const bad=structuredClone(data);bad.records[0].content+='changed';

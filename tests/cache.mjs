@@ -1,17 +1,17 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {readFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {Archive, CacheStore, OpenRouter, converse, size} from '../worker/core.mjs';
 import {dateQuery,filterRecords,selectRecords} from '../worker/retrieval.mjs';
 import {tickerDocuments} from './helpers/archive-expectations.mjs';
+import {assets} from './helpers/archive.mjs';
 
 function cacheFixture() {
  const db=new DatabaseSync(':memory:');
  const sql={exec(query,...args){const stmt=db.prepare(query);const rows=stmt.columns().length?stmt.all(...args):(stmt.run(...args),[]);return {toArray:()=>rows};}};
  return {db,sql,cache:new CacheStore(sql)};
 }
-const archive=new Archive({fetch:async r=>new Response(await readFile(new URL('../worker/.assets'+new URL(r.url).pathname,import.meta.url)))});
+const archive=new Archive(assets);
 class Fake {
  constructor(){this.calls=[];}
  async complete(m,o){this.calls.push(m);if(o.jsonMode)return '{"terms":["SOCI"]}';await o.onActivity?.();return 'Bukti [D1].';}
@@ -26,7 +26,8 @@ test('all source partitions reconstruct originals, including scripts, tables and
   const codepoints=Array.from(raw);
   let end=0;for(const r of d.records){assert.equal(r.start,end);assert.equal(codepoints.slice(r.start,r.end).join(''),r.content);end=r.end;}
   assert.equal(end,codepoints.length);
-  for(const r of d.records) if(/\bSOCI\b/i.test(r.content))assert.ok(r.tickers.includes('SOCI'));
+  // Tickers are matched case-sensitively: lowercase "soci" in a post is not the code.
+  for(const r of d.records) if(/(?<![\p{L}\p{N}_])SOCI(?![\p{L}\p{N}_])/u.test(r.content))assert.ok(r.tickers.includes('SOCI'));
  }
 });
 test('SOCI uses every matching source and raw issuer text with >95% lower model input; exact answer reuses across clients',async()=>{

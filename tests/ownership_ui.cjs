@@ -9,19 +9,20 @@ const {marked} = require('marked');
 const purify = require('dompurify');
 const root = path.resolve(__dirname, '..');
 const source = process.argv.includes('--source');
-const base = path.join(root, source ? 'needtobeindexed/idx-signal-desk' : 'site/files/kepemilikan');
+const site = process.env.ARSIP_TEST_SITE || path.join(root, 'site');
+const base = source ? path.join(root, 'needtobeindexed/idx-signal-desk') : path.join(site, 'files/kepemilikan');
 const read = name => JSON.parse(fs.readFileSync(path.join(base, name), 'utf8'));
 const ownership = read('kepemilikan.json');
 const reports = read('kepemilikan-laporan.json');
 const changes = read('kepemilikan-perubahan.json');
-const prices = JSON.parse(fs.readFileSync(path.join(root, source ? 'needtobeindexed/harga/harga.json' : 'site/files/kepemilikan/harga.json'), 'utf8'));
+const prices = JSON.parse(fs.readFileSync(source ? path.join(root, 'needtobeindexed/harga/harga.json') : path.join(base, 'harga.json'), 'utf8'));
 // Keep real rows and name tables; limit each isolated DOM to the issuers under test.
 const tickers = new Set(['BBCA', 'ABMM', 'ATIC', 'CNTX', 'ARII']);
 ownership.companies = ownership.companies.filter(c => tickers.has(c.t));
 for (const dataset of [reports, changes]) dataset.companies = Object.fromEntries(Object.entries(dataset.companies).filter(([ticker]) => tickers.has(ticker)));
 const rawHtml = source ? execFileSync('python3', ['-B', '-c',
   'import build; h,b=build.build_page([], {}, build.ownership_meta()); print("<!doctype html><html><head>"+h+"</head><body>"+b+"</body></html>")'
-], {cwd: root, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024}) : fs.readFileSync(path.join(root, 'site/index.html'), 'utf8');
+], {cwd: root, encoding: 'utf8', maxBuffer: 20 * 1024 * 1024}) : fs.readFileSync(path.join(site, 'index.html'), 'utf8');
 const html = rawHtml.replace(/<style>[\s\S]*?<\/style>/g, '');
 const index = month => ownership.months.findIndex(m => m.p === month);
 const f = index('2026-07'), t = index('2026-08');

@@ -1,27 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
-import {createHash} from 'node:crypto';
 import {Archive, CacheStore, ChatError, LIMITS, OpenRouter, converse, size, validate} from '../worker/core.mjs';
 import {agentic} from '../worker/agent.mjs';
+import {modelText} from '../worker/retrieval.mjs';
+import {assetsAt, historicalAssets} from './helpers/archive.mjs';
 
+// Raw Stockbit reports of 3–5 October, as chat indexed them before sbringkas covered those days.
 const question = 'stockbit tanggal 3 oktober 2026 sampai tanggal 5 oktober 2026, ringkas semua, jangan hilangkan detail, ringkas dan urutkan dari yg plg menarik';
-const archive = new Archive({fetch:async request => new Response(await readFile(
-  new URL('../worker/.assets' + new URL(request.url).pathname, import.meta.url)))});
-const sourceNames = ['stockbit_03102026.md', 'stockbit_05102026.md', 'stockbit_05102026_1.md'];
+const archive = new Archive(assetsAt(historicalAssets()));
 const currentIndex = await archive.manifest();
-const sourceDocs = currentIndex.docs.filter(doc => sourceNames.includes(doc.name));
-const sourceIds = sourceDocs.map(doc => doc.source_id).sort();
-assert.equal(sourceIds.length, 3, 'All regression source documents must be present');
-// Reproduce the three documents available when the failure was reported. New
-// archive imports must not silently turn this raw-document regression into a
-// different (notes) path; the current corpus has its own integration test below.
-const historicalArchive = new Archive(archive.assets);
-historicalArchive.index = Promise.resolve({...currentIndex,
-  version:currentIndex.version + '-historical-three-documents', docs:sourceDocs});
-const answer = 'Ringkasan sumber Stockbit menurut materialitas, dengan fakta dan rumor dibedakan '
-  + sourceIds.map(id => '[' + id + ']').join(' ') + '.';
+// One 140 KB report fits RAW_LIMIT (240 KB): a completeness request reads it whole in one call with the 24k answer.
+const rawQuestion = 'stockbit tanggal 3 oktober 2026, ringkas semua, jangan hilangkan detail';
+const rawDoc = currentIndex.docs.find(doc => doc.name === 'stockbit_03102026.md');
+const rawArchive = new Archive(archive.assets);
+rawArchive.index = Promise.resolve({...currentIndex, version:currentIndex.version + '-one-report', docs:[rawDoc]});
+const answer = 'Ringkasan sumber Stockbit menurut materialitas, dengan fakta dan rumor dibedakan [' + rawDoc.source_id + '].';
+// A Markdown report reaches the model as its model copy: link URLs and desk IDs removed (retrieval.mjs modelText).
+const modelCopy = async doc => (await archive.read(doc.evidence_asset)).records.map(row => modelText(row.content)).join('');
 
 function cacheFixture() {
   const db = new DatabaseSync(':memory:');
@@ -60,8 +56,8 @@ function provider({cutNotes = false, emptyFirst = false, topic = false, answerTe
   return {model, requests};
 }
 
-async function ask(model, cache, stats = {}, events = [], selectedArchive = historicalArchive) {
-  return agentic({archive:selectedArchive, model, question, cache, stats, emit:async event => events.push(event),
+async function ask(model, cache, stats = {}, events = [], selectedArchive = rawArchive, q = rawQuestion) {
+  return agentic({archive:selectedArchive, model, question:q, cache, stats, emit:async event => events.push(event),
     env:{DATACAT_API_KEY:'OFFLINE-NOT-USED'}, today:'2026-10-05'});
 }
 
@@ -87,25 +83,23 @@ const fallbackArchive = largeArchive();
 const askFallback = (model, cache, stats = {}) => converse(fallbackArchive, model,
   'ringkas semua Stockbit tanggal 5 Oktober 2026', [], async () => {}, null, {cache, metrics:stats});
 
-test('historical three-document agent request answers in one call with every original source character intact', async () => {
+test('a whole report under RAW_LIMIT answers in one call from its complete model copy', async () => {
   const fixture = cacheFixture(), {model, requests} = provider(), stats = {}, events = [];
   try {
     const result = await ask(model, fixture.cache, stats, events);
     assert.equal(stats.agent_redirect, 'document_request');
     assert.equal(stats.agent_tool_calls, 0);
-    assert.deepEqual(result.sources.map(source => source.source_id).sort(), sourceIds);
-    assert.equal(result.documents, 3);
+    assert.deepEqual(result.sources.map(source => source.source_id), [rawDoc.source_id]);
+    assert.equal(result.documents, 1);
     assert.equal(stats.evidence_mode, 'original-text');
     assert.equal(stats.note_reads, 0);
     assert.equal(requests.length, 1);
-    assert.ok(requests.every(request => request.max_tokens === 24000));
+    assert.equal(requests[0].max_tokens, 24000);
     assert.equal(model.calls, 1);
     assert.equal(model.output, 24000);
     assert.equal(stats.answer_reserved_tokens, 24000);
-    assert.ok(size(requests[0].messages) > LIMITS.message, 'This regression exercises the larger document-only allowance');
-    assert.ok(requests.every(request => size(request.messages) <= LIMITS.documentMessage));
+    assert.ok(size(requests[0].messages) <= LIMITS.documentMessage);
     assert.ok(model.input <= LIMITS.input);
-    assert.ok(model.output <= LIMITS.output);
     assert.equal(model.usage().missing_usage_calls, 0, 'Truncated streams retain their trailing usage receipts');
     assert.equal(stats.exhaustive_summary, true);
     assert.match(requests[0].messages.at(-1).content, /jangan batasi menjadi 3–5/);
@@ -118,26 +112,21 @@ test('historical three-document agent request answers in one call with every ori
     const context = JSON.parse(material.content.slice(material.content.indexOf('\n') + 1)
       .split('\n\nFAKTA TERHITUNG SISTEM')[0].split('\n\nNAMA EMITEN')[0]);
     assert.ok(context.every(unit => unit.raw && !unit.notes));
-    for (const doc of sourceDocs) {
-      const sent = context.filter(unit => unit.source_id === doc.source_id)
-        .flatMap(unit => unit.raw).map(part => part.text).join('');
-      const original = (await archive.read(doc.asset)).parts.map(part => part.text).join('');
-      assert.equal(sent, original, doc.name);
-      assert.equal(createHash('sha256').update(sent).digest('hex'), doc.document_hash, doc.name);
-    }
+    const sent = context.flatMap(unit => unit.raw).sort((x, y) => x.part - y.part).map(part => part.text).join('');
+    assert.equal(sent, await modelCopy(rawDoc));
   } finally { fixture.db.close(); }
 });
 
-test('current-corpus agent request reads every matching document and reserves the final answer within budget', async () => {
+test('all four raw reports of 3–5 October: agent request reads every matching document and reserves the final answer within budget', async () => {
   const docs = currentIndex.docs.filter(doc => doc.cat === 'stockbit'
     && doc.start <= '2026-10-05' && doc.end >= '2026-10-03');
-  assert.equal(docs.length, 4, 'Current regression corpus includes the added 3 October source');
+  assert.equal(docs.length, 4, 'The corpus includes the added 3 October source');
   const ids = docs.map(doc => doc.source_id).sort();
   const fixture = cacheFixture(), stats = {}, events = [];
   const {model, requests} = provider({answerText:'Bukti seluruh sumber '
     + ids.map(id => '[' + id + ']').join(' ') + '.'});
   try {
-    const result = await ask(model, fixture.cache, stats, events, archive);
+    const result = await ask(model, fixture.cache, stats, events, archive, question);
     assert.equal(stats.agent_redirect, 'document_request');
     assert.equal(stats.agent_tool_calls, 0);
     assert.deepEqual(result.sources.map(source => source.source_id).sort(), ids);
@@ -171,11 +160,8 @@ test('current-corpus agent request reads every matching document and reserves th
         .includes('Sumber unit ini: ' + doc.title + ' (' + doc.label + ').'))
         .flatMap(request => JSON.parse(request.messages[1].content.slice(request.messages[1].content.indexOf('\n') + 1)));
       const rawParts = context.filter(unit => unit.source_id === doc.source_id).flatMap(unit => unit.raw || []);
-      const sent = [...noteParts, ...rawParts].sort((a, b) => a.source_start - b.source_start)
-        .map(part => part.text).join('');
-      const original = (await archive.read(doc.asset)).parts.map(part => part.text).join('');
-      assert.equal(sent, original, doc.name + ': every source character reaches the provider');
-      assert.equal(createHash('sha256').update(sent).digest('hex'), doc.document_hash, doc.name);
+      const sent = [...noteParts, ...rawParts].sort((a, b) => a.part - b.part).map(part => part.text).join('');
+      assert.equal(sent, await modelCopy(doc), doc.name + ': every model-copy character reaches the provider');
     }
   } finally { fixture.db.close(); }
 });
@@ -208,23 +194,23 @@ test('constrained document budget shares remaining tokens across every note and 
   } finally { fixture.db.close(); }
 });
 
-test('topic notes retain bounded retries and reserve unread notes plus the final answer', async () => {
+test('topic notes are sized per unit, scaled to the allowance left after the answer, and never retried', async () => {
   const fixture = cacheFixture();
-  const {model, requests} = provider({cutNotes:true, topic:true, answerText:'Temuan ALFA [D2].'}), stats = {};
+  const {model, requests} = provider({cutNotes:true, answerText:'Temuan ALFA [D2].'}), stats = {};
+  // Five 220 KB units each want 4,000 tokens; 18,500 remain after the 6,500 answer, so each note gets 3,700.
   model.output = 11000;
   try {
     const result = await converse(fallbackArchive, model, 'analisis ALFA', [], async () => {}, null,
       {cache:fixture.cache, metrics:stats});
-    assert.equal(stats.note_output_tokens, 1800);
-    assert.equal(stats.note_reads, 5);
-    assert.equal(requests.filter(request => request.max_tokens === 1800).length, 5);
-    assert.equal(requests.filter(request => request.max_tokens === 3600).length, 2);
-    assert.equal(requests.at(-1).max_tokens, 6500);
-    assert.equal(stats.skipped_note_retries, 3);
-    assert.equal(stats.truncated_notes, 3);
-    assert.equal(model.output, 33700);
+    // Identical units read at the same time share one call.
+    assert.equal(stats.note_reads + stats.shared_reads, 5);
+    assert.equal(stats.note_output_tokens, 3700);
+    assert.deepEqual(requests.map(request => request.max_tokens), [...Array(stats.note_reads).fill(3700), 6500],
+      'A cut note is used once, marked, and not resent at a larger limit');
+    assert.equal(stats.truncated_notes, stats.note_reads);
+    assert.equal(model.output, 11000 + stats.note_reads * 3700 + 6500);
     assert.equal(result.incomplete, true);
-    assert.equal(fixture.count('notes'), 2);
+    assert.equal(fixture.count('notes'), 0, 'Cut notes are never cached');
     assert.equal(fixture.count('answer'), 0);
   } finally { fixture.db.close(); }
 });
@@ -367,11 +353,11 @@ test('successful preflight does not relax per-request or cumulative provider lim
   assert.equal(requests.length, 0);
 });
 
-test('larger message and output limits require the server document flag and retain absolute caps', async () => {
+test('the larger answer allowance requires the server document flag; document messages keep their own cap', async () => {
   const {model, requests} = provider();
-  const messages = [{role:'user', content:'x'.repeat(500000)}];
+  const messages = [{role:'user', content:'x'.repeat(300000)}];
   assert.throws(() => validate({question:'ringkas Stockbit', fullDocument:true}), ChatError);
-  await assert.rejects(model.request(messages, {maxTokens:6500}), ChatError);
+  await assert.rejects(model.request([{role:'user', content:'x'.repeat(LIMITS.message)}], {maxTokens:6500}), ChatError);
   await assert.rejects(model.request([], {maxTokens:24000}), ChatError);
   assert.equal(requests.length, 0);
   const result = await model.answer(messages, async () => {}, {fullDocument:true, maxTokens:24000});

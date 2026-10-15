@@ -1,11 +1,11 @@
 // Offline DOM regression and payload tests. Never contacts the public site.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {JSDOM,VirtualConsole}=require('jsdom'),{marked}=require('marked'),purify=require('dompurify');
-const root=path.resolve(__dirname,'..'),html=fs.readFileSync(path.join(root,'site/index.html'),'utf8').replace(/<style>[\s\S]*?<\/style>/g,'');
-const ownership=JSON.parse(fs.readFileSync(path.join(root,'site/files/kepemilikan/kepemilikan.json'),'utf8'));
-const changesFile=path.join(root,'site/files/kepemilikan/kepemilikan-perubahan.json');
+const root=path.resolve(__dirname,'..'),site=process.env.ARSIP_TEST_SITE||path.join(root,'site'),html=fs.readFileSync(path.join(site,'index.html'),'utf8').replace(/<style>[\s\S]*?<\/style>/g,'');
+const ownership=JSON.parse(fs.readFileSync(path.join(site,'files/kepemilikan/kepemilikan.json'),'utf8'));
+const changesFile=path.join(site,'files/kepemilikan/kepemilikan-perubahan.json');
 const changes=fs.existsSync(changesFile)?JSON.parse(fs.readFileSync(changesFile,'utf8')):{format:1,coverage:null,companies:{}};
-const reportsFile=path.join(root,'site/files/kepemilikan/kepemilikan-laporan.json');
+const reportsFile=path.join(site,'files/kepemilikan/kepemilikan-laporan.json');
 const reports=fs.existsSync(reportsFile)?JSON.parse(fs.readFileSync(reportsFile,'utf8')):null;
 const delay=ms=>new Promise(r=>setTimeout(r,ms));let checks=0;
 function setup(mutate,mutateChanges,fetchDoc,mutateReports){
@@ -20,7 +20,7 @@ function setup(mutate,mutateChanges,fetchDoc,mutateReports){
   if(data.own.changes&&String(url).startsWith(data.own.changes))return Response.json(ch);
   if(data.own.reports&&String(url).startsWith(data.own.reports))return Response.json(rep);
   const file=data.docs.find(x=>String(url).split('?')[0]===x.path);
-  if(file)return fetchDoc ? fetchDoc(file) : new Response(fs.readFileSync(path.join(root,'site',file.path),'utf8'));
+  if(file)return fetchDoc ? fetchDoc(file) : new Response(fs.readFileSync(path.join(site,file.path),'utf8'));
   throw Error('Network forbidden: '+url);
  };
  w.eval([...d.querySelectorAll('script')].at(-1).textContent);
@@ -151,7 +151,7 @@ async function test(name,fn){await fn();checks++;console.log('PASS',name);}
  await test('six HTML report URLs contain opaque sandboxes and unmodified source',async()=>{
   const {dom,data}=setup();const bridge=fs.readFileSync(path.join(root,'report-frame.js'),'utf8');
   for(const doc of data.docs.filter(d=>d.kind==='html')){
-   const report=new JSDOM(fs.readFileSync(path.join(root,'site',doc.path),'utf8'));
+   const report=new JSDOM(fs.readFileSync(path.join(site,doc.path),'utf8'));
    const frame=report.window.document.getElementById('report-content');assert.equal(frame.getAttribute('sandbox'),'allow-scripts allow-popups');assert.ok(!frame.sandbox?.contains('allow-same-origin'));
    const original=fs.readFileSync(path.join(root,'needtobeindexed',doc.name),'utf8');assert.equal(frame.getAttribute('srcdoc'),original+'<script>'+bridge+'</script>');
    assert.equal(report.window.document.querySelectorAll('script').length,1);

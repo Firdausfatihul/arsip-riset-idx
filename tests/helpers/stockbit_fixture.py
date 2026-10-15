@@ -3,17 +3,12 @@
 CLI (used by tests/stockbit_viewer.cjs): python3 -B tests/helpers/stockbit_fixture.py OUT_DIR
 builds OUT_DIR/sources (fixture) and OUT_DIR/site (build output) with a hostile stockbit-index.json.
 """
-from contextlib import redirect_stdout
-import io
 import json
 from pathlib import Path
 import sys
-from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-import build  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from build_fixture import build_site  # noqa: E402,F401  (fx.build_site in the tests)
 
 EVIL = '<img src=x onerror="window.pwned=1">'
 
@@ -83,17 +78,6 @@ def write_fixture(src, evil=False, with_index=True):
     if with_index:
         (src / "idx-signal-desk").mkdir(exist_ok=True)
         (src / "idx-signal-desk" / "stockbit-index.json").write_text(json.dumps(index_json(evil)), encoding="utf-8")
-
-
-def build_site(src, out, base_url="https://arsip.test"):
-    """Run build.main() against the fixture; returns (stdout, stderr)."""
-    stdout, stderr = io.StringIO(), io.StringIO()
-    with patch.multiple(build, SRC=src, OWN_SRC=src / "missing.json", SB_INDEX_SRC=src / "idx-signal-desk" / "stockbit-index.json",
-                        BASE_URL=base_url, CHAT_API_URL="/api/chat"), \
-            patch.object(sys, "argv", ["build.py", "--out", str(out)]), \
-            redirect_stdout(stdout), patch.object(sys, "stderr", stderr):
-        build.main()
-    return stdout.getvalue(), stderr.getvalue()
 
 
 if __name__ == "__main__":

@@ -1,17 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
 import {DatabaseSync} from 'node:sqlite';
 import {Archive, CacheStore, validate} from '../worker/core.mjs';
 import {AGENT, agentic, citations, compact, datacatRequest, fetchDatacat, latestArgs, needsOwnership, prune, Refs, TOOLS} from '../worker/agent.mjs';
 import {latestSourceDocuments} from './helpers/archive-expectations.mjs';
+import {assets, readAsset} from './helpers/archive.mjs';
 
 // No network: every datacat and model call below is simulated.
 const realFetch = globalThis.fetch;
 globalThis.fetch = () => { throw new Error('Network forbidden in agent tests'); };
 test.after(() => { globalThis.fetch = realFetch; });
 
-const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
 function sqlite() {
   const db = new DatabaseSync(':memory:');
   return {db, sql:{exec(q, ...a) { const s = db.prepare(q), rows = s.columns().length ? s.all(...a) : (s.run(...a), []); return {toArray:() => rows, one:() => rows[0]}; }}};
@@ -267,8 +266,8 @@ test('a provider rate limit is retried; an unrecoverable step still answers from
 
 test('relationship tools: ownership name search across issuers, user terms first, person trail from filings', async () => {
   const {ownershipTool, entityTerms} = await import('../worker/agent.mjs');
-  const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
-  const data = JSON.parse(await readFile(new URL('../worker/.assets/ownership.json', import.meta.url), 'utf8'));
+  const manifest = await readAsset('manifest.json');
+  const data = await readAsset('ownership.json');
   const refs = new Refs(), found = ownershipTool(data, {nama:'Tancorp'}, refs);
   for (const code of ['MERI', 'BLES', 'RISE', 'CLEO']) assert.ok(found.includes('ticker:' + code), code);
   assert.ok(refs.list().every(r => /^O\d+$/.test(r.source_id) && /^#kepemilikan=[A-Z0-9]+$/.test(r.url)));
@@ -346,7 +345,7 @@ test('minutes: resolutions and attendance are typed; checks after the answer', a
 test('names: verbs, months and glued words are dropped; known names are kept whole', async () => {
   const {entityTerms} = await import('../worker/agent.mjs');
   const {loadSignals} = await import('../worker/signals.mjs');
-  const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
+  const manifest = await readAsset('manifest.json');
   const sig = await loadSignals(new Archive(assets), manifest);
   const t = q => entityTerms(q, manifest, sig.known);
   assert.ok(t('EPAC diambil alih PT Triple Berkah Bersama. Siapa pemilik sebenarnya, di harga berapa ia membeli?').phrases.includes('Triple Berkah Bersama'));
@@ -358,7 +357,7 @@ test('names: verbs, months and glued words are dropped; known names are kept who
 test('signals: pack with must-cover items, O links with the months, coverage appendix, screening route', async () => {
   const {loadSignals, signalView, coverage, mustCover} = await import('../worker/signals.mjs');
   const {terse} = await import('../worker/agent.mjs');
-  const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
+  const manifest = await readAsset('manifest.json');
   const sig = await loadSignals(new Archive(assets), manifest), refs = new Refs();
   const pack = signalView(sig, {ticker:'LUCY', bagian:'sinyal'}, refs, terse);
   assert.match(pack, /wajib:1/); assert.match(pack, /378\.693\.473/);
@@ -396,7 +395,7 @@ test('full-text search: exact phrase on the public site, no API key, fail-closed
   assert.deepEqual([rows[0].emiten, rows[0].tanggal], ['BULL', '27 Apr 2026']);
   assert.match(rows[0].kutipan, /Ferita Lie sebagai Komisaris Independen/);
   assert.equal(parseSearch('<html>new layout</html>'), null, 'an unreadable page is an error, not "no results"');
-  const manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8'));
+  const manifest = await readAsset('manifest.json');
   assert.deepEqual(entityTerms('kenapa bu ferita lie suka ngibul', manifest).phrases, ['ferita lie']);
   assert.deepEqual(entityTerms('kenapa bu ferita liee itu suka banget ngibul', manifest).phrases, ['ferita liee'], 'banget is not @BangGent');
   assert.deepEqual(entityTerms('user zeinfahrozi suka ngomgin apa sih?', manifest).phrases, ['zeinihzafahrozi']);
@@ -410,8 +409,7 @@ test('full-text search: exact phrase on the public site, no API key, fail-closed
 });
 
 test('a Stockbit username gets the stocks it posts about, counted by code', async () => {
-  const root = new URL('../worker/.assets/', import.meta.url);
-  const archive = new Archive({fetch:async r => new Response(await readFile(new URL(new URL(r.url).pathname.slice(1), root)))});
+  const archive = new Archive(assets);
   const {archiveTool} = await import('../worker/agent.mjs');
   const out = await archiveTool(archive, await archive.manifest(), {kata:['zeinihzafahrozi']}, new Map());
   assert.match(out, /saham_dibahas_pengguna:\[\{pengguna:"@zeinihzafahrozi",saham:"PACK \d+x/);

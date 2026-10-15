@@ -1,17 +1,16 @@
 """CSV build regressions using temporary sources and output; no network or real archives."""
-from contextlib import redirect_stdout
-import io
 import json
 from pathlib import Path
 import re
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "tests" / "helpers"))
 import build
+from build_fixture import build_site
 from tools.chat_archive import read_archive
 
 
@@ -28,11 +27,7 @@ class CsvViewerTests(unittest.TestCase):
             path = self.source / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(raw)
-        with patch.multiple(build, SRC=self.source, OWN_SRC=self.source / "missing.json",
-                            BASE_URL="", CHAT_API_URL="/api/chat"), \
-                patch.object(sys, "argv", ["build.py", "--out", str(self.output)]), \
-                redirect_stdout(io.StringIO()):
-            build.main()
+        build_site(self.source, self.output, base_url="")
         page = (self.output / "index.html").read_text(encoding="utf-8")
         payload = re.search(r'id="arsip-data">(.*?)</script>', page, re.S)[1]
         return json.loads(payload)["docs"]

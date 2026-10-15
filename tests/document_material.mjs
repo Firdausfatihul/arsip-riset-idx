@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {documentUnits} from '../worker/document-material.mjs';
+import {historicalAssets, readAsset} from './helpers/archive.mjs';
 
 const bytes = value => Buffer.byteLength(JSON.stringify(value));
 const sha256 = text => createHash('sha256').update(text).digest('hex');
-const asset = async name => JSON.parse(await readFile(new URL('../worker/.assets/' + name, import.meta.url), 'utf8'));
+const asset = name => readAsset(name);
 
 function verify(doc, records, original) {
   const units = documentUnits(doc, records), parts = units.flatMap(unit => unit.parts);
@@ -82,13 +82,13 @@ test('all current archive documents preserve original text, hashes, offsets and 
 });
 
 test('historical three Stockbit sources from 3–5 October retain every character within five note units', async () => {
-  const manifest = await asset('manifest.json');
+  const dir = historicalAssets(), manifest = await readAsset('manifest.json', dir);
   const names = ['stockbit_03102026.md', 'stockbit_05102026.md', 'stockbit_05102026_1.md'];
   const docs = manifest.docs.filter(doc => names.includes(doc.name));
   assert.equal(docs.length, 3, 'Regression sources must be present');
   let selectedBytes = 0, notes = 0;
   for (const doc of docs) {
-    const evidence = await asset(doc.evidence_asset);
+    const evidence = await readAsset(doc.evidence_asset, dir);
     const units = verify(doc, evidence.records, evidence.records.map(row => row.content).join(''));
     selectedBytes += units.reduce((sum, unit) => sum + bytes(unit.parts), 0);
     notes += units.filter(unit => bytes(unit.parts) > 24000).length;

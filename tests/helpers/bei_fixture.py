@@ -3,18 +3,12 @@
 CLI (used by tests/bei_viewer.cjs): python3 -B tests/helpers/bei_fixture.py OUT_DIR
 builds OUT_DIR/sources (fixture) and OUT_DIR/site (build output) with hostile strings in bei-index.json.
 """
-from contextlib import redirect_stdout
-import io
 import json
 from pathlib import Path
 import sys
-from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[2]
-for extra in (ROOT, ROOT / "tests" / "helpers"):
-    if str(extra) not in sys.path:
-        sys.path.insert(0, str(extra))
-import build  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from build_fixture import build_site  # noqa: E402,F401  (fx.build_site in the tests)
 import stockbit_fixture  # noqa: E402
 
 EVIL = stockbit_fixture.EVIL
@@ -160,17 +154,6 @@ def write_fixture(src, evil=False, with_index=True, with_stockbit=True):
         encoding="utf-8")
     if with_index:
         (desk / "bei-index.json").write_text(json.dumps(index_json(evil)), encoding="utf-8")
-
-
-def build_site(src, out, base_url="https://arsip.test"):
-    """Run build.main() against the fixture; returns (stdout, stderr)."""
-    stdout, stderr = io.StringIO(), io.StringIO()
-    with patch.multiple(build, SRC=src, OWN_SRC=src / "missing.json", SB_INDEX_SRC=src / "idx-signal-desk" / "stockbit-index.json",
-                        BEI_INDEX_SRC=src / "idx-signal-desk" / "bei-index.json", BASE_URL=base_url, CHAT_API_URL="/api/chat"), \
-            patch.object(sys, "argv", ["build.py", "--out", str(out)]), \
-            redirect_stdout(stdout), patch.object(sys, "stderr", stderr):
-        build.main()
-    return stdout.getvalue(), stderr.getvalue()
 
 
 if __name__ == "__main__":

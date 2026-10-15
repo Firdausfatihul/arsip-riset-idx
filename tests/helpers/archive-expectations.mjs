@@ -1,10 +1,10 @@
 // Independent corpus checks: growing archives must not freeze old document counts.
-import {readFile} from 'node:fs/promises';
+import {readAsset} from './archive.mjs';
 
 export async function tickerDocuments(manifest, code) {
   const found = [], token = new RegExp('(?<![\\p{L}\\p{N}_])' + code + '(?![\\p{L}\\p{N}_])', 'u');
   for (const doc of manifest.docs) {
-    const source = JSON.parse(await readFile(new URL('../../worker/.assets/' + doc.asset, import.meta.url), 'utf8'));
+    const source = await readAsset(doc.asset);
     if (token.test(source.search) || token.test(doc.title)) found.push(doc);
   }
   return found;

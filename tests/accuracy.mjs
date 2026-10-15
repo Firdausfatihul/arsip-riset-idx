@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {Archive, OpenRouter, converse, directTickers, nearestWord, rememberTurn} from '../worker/core.mjs';
 import {dateQuery, documentRequest} from '../worker/retrieval.mjs';
 import {SourceStore} from '../worker/source-store.mjs';
 import {latestSourceDocuments, tickerDocuments} from './helpers/archive-expectations.mjs';
+import {ROOT, assets, readAsset as read} from './helpers/archive.mjs';
 
-const read = name => readFile(new URL('../worker/.assets/' + name, import.meta.url), 'utf8').then(JSON.parse);
 const manifest = await read('manifest.json');
 
 test('word-like tickers need capitals or a cue; real codes in any case still work', () => {
@@ -25,11 +26,11 @@ test('ticker search is case-sensitive in SQLite and in the asset fallback', asyn
   const sql = {exec(q, ...a) { const s = db.prepare(q), rows = s.columns().length ? s.all(...a) : (s.run(...a), []); return {toArray:() => rows}; }};
   const store = new SourceStore({storage:{sql, transactionSync:fn => fn()}});
   for (const doc of manifest.docs) await store.importDocument(manifest, doc, await read(doc.evidence_asset));
-  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
+  // Exactly the documents that write NAIK in capitals; the ordinary word "naik" is everywhere.
+  const expected = (await tickerDocuments(manifest, 'NAIK')).map(d => d.name).sort();
   for (const archive of [new Archive(assets, store), new Archive(assets)]) {
     const docs = await archive.search(['NAIK']);
-    for (const doc of docs) assert.match((await archive.read(doc.asset)).search, /(?<![\p{L}\p{N}_])NAIK(?![\p{L}\p{N}_])/u);
-    assert.ok(docs.length < 10, 'lowercase "naik" must not match the ticker: ' + docs.length);
+    assert.deepEqual(docs.map(d => d.name).sort(), expected);
   }
   db.close();
 });
@@ -38,9 +39,10 @@ test('whole-document requests resolve by category and date, including a missing 
   const years = [...new Set(manifest.docs.map(d => +d.end.slice(0, 4)))];
   const scope = dateQuery('summary dokumen keterbukaan informasi tanggal 22 september', [], years);
   assert.equal(scope.date, '2026-09-22');
-  // KI 24 September covers 22–24 September (its opening states the period), so it matches too.
+  // The BEI summary of 22 September replaces the legacy KI analysis of that day. KI 24 September covers 22–24
+  // September (its opening states the period) and the selected BEI file covers only the 22nd, so it stays.
   const names = documentRequest('summary dokumen keterbukaan informasi tanggal 22 september', scope, manifest).map(d => d.name);
-  assert.ok(names.includes('ki_22092026.md') && names.every(n => n.startsWith('ki_')), names.join());
+  assert.deepEqual(names.sort(), ['beiringkas_2026-09-22_2026-09-22.md', 'ki_24092026.md']);
   assert.equal(documentRequest('SOCI tanggal 17 September 2026', dateQuery('SOCI tanggal 17 September 2026'), manifest), null);
   assert.ok(dateQuery('SOCI tanggal 17', [], years).clarification, 'day without month still asks');
 });
@@ -61,22 +63,24 @@ test('document requests: every date, range, numeric date, pasted title and per-s
     'Simpulkan tanggal 23 september 2026 dari stockbit summary dan bei keterbukaan informasi': ['ki_24092026.md', 'stockbit_24092026.md'],
     'simpulkan postingan stockbit dari 23-24 sept': ['stockbit_24092026.md'],
     'Stockbit — 20–22 September 2026 jelaskan kesimpulan': ['stockbit_22092026.md'],
-    'ada loh itu disini Keterbukaan Informasi · 22 September 2026': ['ki_22092026.md'],
+    // A pasted legacy title is a date request like any other: BEI 22 September replaces the KI analysis of that day.
+    'ada loh itu disini Keterbukaan Informasi · 22 September 2026': ['beiringkas_2026-09-22_2026-09-22.md'],
     'stockbit 22 dan 25 september ada apa aja': ['stockbit_22092026.md', 'stockbit_25092026.md'],
-    'bandingkan ki 18 september dengan ki 19 september': ['ki_18092026.md', 'ki_19092026.md'],
-    'keterbukaan terbaru sama stockbit terbaru, mana yang paling menarik': ['keterbukaan-informasi','stockbit'].map(cat =>
+    // "KI" reads the Indonesia family: BEI summaries replace the legacy KI analyses of the days they cover.
+    'bandingkan ki 18 september dengan ki 19 september': ['beiringkas_2026-09-18_2026-09-18.md', 'beiringkas_2026-09-19_2026-09-19.md'],
+    'keterbukaan terbaru sama stockbit terbaru, mana yang paling menarik': ['bei-ringkasan','stockbit-ringkasan'].map(cat =>
       manifest.docs.filter(d => d.cat === cat).sort((a,b) => b.end.localeCompare(a.end))[0].name),
     'KI 26/9 ada corporate action apa': ['ki_26092026.md'],
     'stockbit 24/9 sama KI 24/9 bandingin': ['stockbit_24092026.md', 'ki_24092026.md'],
     'apa yang dibahas di stockbit 20 sampai 22 september': ['stockbit_22092026.md'],
-    'ringkas semua dokumen tanggal 22 september': ['ki_22092026.md', 'ki_24092026.md', 'stockbit_22092026.md'],
+    'ringkas semua dokumen tanggal 22 september': ['beiringkas_2026-09-22_2026-09-22.md', 'ki_24092026.md', 'stockbit_22092026.md'],
     'rights issue september siapa aja': [], 'ada berita apa soal emiten nikel minggu ini': [],
     'siapa yang beli saham di pasar nego tanggal 22 september 2026': [],
     // A source named without a date: its documents (few) or its newest one; the CSV twin of a .md is read once.
     'baca dokumen keterbukaan singapura / sgx , intinya apa? apa yang menarik singkat padat jelas':
       latestSourceDocuments(manifest, 'keterbukaan-singapura').map(d=>d.name),
     'ringkas dokumen asx': latestSourceDocuments(manifest, 'keterbukaan-australia').map(d=>d.name),
-    'baca stockbit, intinya apa': latestSourceDocuments(manifest, 'stockbit').map(d=>d.name),
+    'baca stockbit, intinya apa': latestSourceDocuments(manifest, 'stockbit-ringkasan').map(d=>d.name), // newest daily summary
     'keterbukaan singapura soal delisting apa aja': [],
   };
   for (const [q, need] of Object.entries(cases)) {
@@ -99,7 +103,6 @@ test('misspelled names reach the archive spelling; unknown names are not forced 
 });
 
 test('a username in the question is searched even when the model returns no terms', async () => {
-  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
   const model = {complete:async () => '{"terms":[]}',
     answer:async (m, emit) => { await emit({type:'delta', text:'Ringkasan.'}); return 'Ringkasan.'; }};
   const result = await converse(new Archive(assets), model, 'user zeinfahrozi suka ngomgin apa sih? sp nya apa aja, singkat padat, jelas', [], async () => {});
@@ -130,7 +133,6 @@ test('invalid citations become a notice; follow-up terms are reused from the sto
 });
 
 test('zero-hit model terms get one retry with other wording, never repeating the failed terms', async () => {
-  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
   const archive = new Archive(assets), prompts = [];
   const replies = ['{"terms":["transaksi nego gede"]}', '{"terms":["transaksi nego gede","pasar negosiasi","crossing"]}'];
   const model = {complete:async m => { prompts.push(m[0].content); return replies.shift(); },
@@ -145,24 +147,23 @@ test('zero-hit model terms get one retry with other wording, never repeating the
 
 test('when model terms and the retry both miss, the user\'s own distinctive words are searched', async () => {
   // Without the archive tables, so the search path's last resort is exercised (the entity route would answer first).
-  const assets = {fetch:async r => {
-    const path = new URL(r.url).pathname, raw = await readFile(new URL('../worker/.assets' + path, import.meta.url));
-    if (path !== '/manifest.json') return new Response(raw);
-    const {tables, ...rest} = JSON.parse(raw);
-    return new Response(JSON.stringify(rest));
+  const noTables = {fetch:async r => {
+    const response = await assets.fetch(r);
+    if (new URL(r.url).pathname !== '/manifest.json') return response;
+    const {tables, ...rest} = await response.json();
+    return Response.json(rest);
   }};
   const replies = ['{"terms":["Tanoto Foundation"]}', '{"terms":[]}'];
   const model = {complete:async () => replies.shift(), answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
   const stats = {};
   // Lowercase, so the capitalised-name guard does not apply and the last-resort path is exercised.
-  const result = await converse(new Archive(assets), model, 'tanoko?', [], () => {}, null, {metrics:stats});
+  const result = await converse(new Archive(noTables), model, 'tanoko?', [], () => {}, null, {metrics:stats});
   assert.equal(stats.route, undefined);
   assert.deepEqual(result.terms, ['tanoko']);
   assert.equal(result.documents, 2);
 });
 
 test('a name the model would "correct" (tanoko -> Tanoto) is found by exact name in the archive tables, without a term call', async () => {
-  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
   const replies = ['{"terms":["Tanoto Foundation"]}', '{"terms":[]}'];
   const model = {complete:async () => replies.shift(), answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
   const stats = {};
@@ -188,7 +189,6 @@ test('corporate-action table skips negations, routine treasury holdings and KBLI
 });
 
 test('screening questions are answered from the table: code writes the full list and the count', async () => {
-  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
   let calls = 0, material = '';
   const model = {complete:async () => '{"terms":["rights issue","HMETD"]}',
     answer:async (m, emit) => { calls++; material = m[1].content; const t = 'Ringkasan: EURO rights issue 2 miliar saham.'; await emit({type:'delta', text:t}); return t; }};
@@ -224,14 +224,13 @@ test('counts recognize thousands separators without accepting numeric suffixes o
     'An unrelated amount cannot validate an exact count');
   assert.deepEqual(unverifiedNumbers('GTSI: 1.603 transaksi.','GTSI 1603 98'),[],
     'Existing issuer-table counts accept equivalent integer spellings');
-  const doc = manifest.docs.find(d => d.name === 'stockbit_05102026.md');
-  const material = (await read(doc.asset)).parts.map(p => p.text).join('');
+  // A raw report chat no longer indexes (sbringkas covers its days); its asset text is the source file itself.
+  const material = await readFile(path.join(ROOT, 'needtobeindexed/stockbit_05102026.md'), 'utf8');
   assert.deepEqual(unverifiedNumbers('Dokumen mencakup 1.603 postingan unik.',material),[],
     'The reported live answer must not emit a warning about 603 postingan');
 });
 
 test('a name the user wrote is searched even when the model "corrects" it', async () => {
-  const assets = {fetch:async r => new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url)))};
   const model = {complete:async () => '{"terms":["Tanoto","TPI"]}', answer:async (m, emit) => { await emit({type:'delta', text:'ok'}); return 'ok'; }};
   const result = await converse(new Archive(assets), model, 'Tanoko?', [], () => {}, null, {metrics:{}});
   assert.equal(result.terms[0], 'Tanoko');

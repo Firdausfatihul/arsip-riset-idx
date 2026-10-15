@@ -3,7 +3,7 @@
 // No network; the model is a fake.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {assets, readAsset} from './helpers/archive.mjs';
 import {Archive, converse, rememberTurn} from '../worker/core.mjs';
 import {claimLine, claimTail, relationBlock, entityLookup, rareRumorMaterial, mentionsBlock, RELATION} from '../worker/tables.mjs';
 
@@ -126,9 +126,8 @@ test('rare rumors: corporate-action rumors of thinly discussed issuers, one per 
 });
 
 // ---- integration on the built assets ------------------------------------------------------------------------------
-const assets = {fetch:async r => { try { return new Response(await readFile(new URL('../worker/.assets' + new URL(r.url).pathname, import.meta.url))); } catch { return new Response('nf', {status:404}); } }};
 let manifest = {};
-try { manifest = JSON.parse(await readFile(new URL('../worker/.assets/manifest.json', import.meta.url), 'utf8')); } catch { /* no build */ }
+try { manifest = await readAsset('manifest.json'); } catch { /* no build */ }
 const hasTables = !!manifest.tables?.subjects;
 class Fake {
   constructor() { this.calls = []; }

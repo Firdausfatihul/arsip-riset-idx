@@ -1,21 +1,22 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import path from 'node:path';
 import test from 'node:test';
 import {Archive, OpenRouter, ChatError, validate, searchTerms, batches, size, converseLegacy as converse, MODEL, LIMITS, readLimited} from '../worker/core.mjs';
 import {tickerDocuments} from './helpers/archive-expectations.mjs';
+import {ROOT, SITE, assets} from './helpers/archive.mjs';
 
-const assets = {async fetch(request) {
-  try { return new Response(await readFile(new URL('../worker/.assets' + new URL(request.url).pathname, import.meta.url))); }
-  catch { return new Response('Not found', {status:404}); }
-}};
 const archive = new Archive(assets);
-test('all generated parts reconstruct every original research document exactly', async () => {
+test('all generated parts reconstruct every indexed research document exactly', async () => {
   const index = await archive.manifest();
-  const site = JSON.parse((await readFile(new URL('../site/index.html', import.meta.url), 'utf8')).match(/id="arsip-data">(.*?)<\/script>/s)[1]);
-  assert.equal(index.docs.length, site.docs.length);
+  const site = JSON.parse((await readFile(path.join(SITE, 'index.html'), 'utf8')).match(/id="arsip-data">(.*?)<\/script>/s)[1]);
+  // build_worker.worker_docs leaves out retired Digest Emiten and raw Stockbit reports whose days sbringkas covers.
+  const indexed = new Set(index.docs.map(doc => doc.name)), left = site.docs.filter(doc => !indexed.has(doc.name));
+  assert.ok(left.every(doc => ['digest-emiten', 'stockbit'].includes(doc.cat)), left.map(doc => doc.name).join());
+  assert.equal(index.docs.length + left.length, site.docs.length);
   for (const doc of index.docs) {
     const data = await archive.read(doc.asset);
-    const source = await readFile(new URL(doc.path.endsWith('.html') ? '../needtobeindexed/' + doc.name : '../site/' + doc.path, import.meta.url), 'utf8');
+    const source = await readFile(doc.path.endsWith('.html') ? path.join(ROOT, 'needtobeindexed', doc.name) : path.join(SITE, doc.path), 'utf8');
     assert.equal(data.parts.map(p => p.text).join(''), source, doc.name);
   }
 });

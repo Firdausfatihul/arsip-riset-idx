@@ -39,7 +39,8 @@ CHAT_CONFIG = ROOT / "chat.config.json"
 CHAT_API_URL = os.environ.get("CHAT_API_URL", json.loads(CHAT_CONFIG.read_text()).get("api_url", "/api/chat")
                              if CHAT_CONFIG.is_file() else "/api/chat").rstrip("/")
 SITE_NAME = "Arsip Riset IDX"
-BUILD_ID = datetime.now().strftime("%Y%m%d%H%M%S")
+# BUILD_ID tetap (env) membuat dua build dari sumber yang sama identik byte per byte.
+BUILD_ID = os.environ.get("BUILD_ID") or datetime.now().strftime("%Y%m%d%H%M%S")
 
 # Urutan di sini = urutan tampil. Konvensi nama: stockbit_YYYYMMDD.md dan ki_YYYYMMDD.md.
 # "prefixes" dicocokkan dengan kata pertama nama berkas, "keywords" dengan bagian mana pun.
@@ -164,23 +165,24 @@ LIBS = (
 # Markdown/CSV di atas batas ini diambil dari files/… saat dibuka atau dicari.
 EMBED_LIMIT = 256 * 1024
 EXPLICIT_RANGE = re.compile(r"\d{4}-\d{2}-\d{2}[_\-\s]+(?:to[_\-\s]+)?\d{4}-\d{2}-\d{2}")
+# Berkas *_SRC di bawah ini relatif terhadap SRC (tes cukup mengganti SRC); *_PATH = lokasinya di situs.
 # Data tab Kepemilikan Saham: disalin apa adanya, viewer mengambilnya saat tab dibuka.
-OWN_SRC = SRC / "idx-signal-desk" / "kepemilikan.json"
+OWN_SRC = "idx-signal-desk/kepemilikan.json"
 OWN_PATH = "files/kepemilikan/kepemilikan.json"
 # Laporan perubahan kepemilikan (tools/sync_idx.py), diambil viewer saat satu emiten dibuka.
-CHANGES_SRC = SRC / "idx-signal-desk" / "kepemilikan-perubahan.json"
+CHANGES_SRC = "idx-signal-desk/kepemilikan-perubahan.json"
 CHANGES_PATH = "files/kepemilikan/kepemilikan-perubahan.json"
 # Daftar pemegang saham, jenis pemilik BAE, dan tautan laporan bulanan emiten; diambil saat satu emiten dibuka.
-REPORTS_SRC = SRC / "idx-signal-desk" / "kepemilikan-laporan.json"
+REPORTS_SRC = "idx-signal-desk/kepemilikan-laporan.json"
 REPORTS_PATH = "files/kepemilikan/kepemilikan-laporan.json"
 # Harga penutupan per tanggal snapshot KSEI (tools/sync_prices.py), dimuat bersama data kepemilikan.
-PRICES_SRC = SRC / "harga" / "harga.json"
+PRICES_SRC = "harga/harga.json"
 PRICES_PATH = "files/kepemilikan/harga.json"
 # Indeks lintas hari ringkasan Stockbit (tools/sync_idx.py --stockbit-only); viewer mengambilnya untuk #emiten= / #pengguna=.
-SB_INDEX_SRC = SRC / "idx-signal-desk" / "stockbit-index.json"
+SB_INDEX_SRC = "idx-signal-desk/stockbit-index.json"
 SB_INDEX_PATH = "files/stockbit-index/stockbit-index.json"
 # Indeks lintas hari ringkasan keterbukaan BEI (tools/sync_idx.py --bei-only); bagian BEI di halaman #emiten=.
-BEI_INDEX_SRC = SRC / "idx-signal-desk" / "bei-index.json"
+BEI_INDEX_SRC = "idx-signal-desk/bei-index.json"
 BEI_INDEX_PATH = "files/bei-index/bei-index.json"
 # Ringkasan Stockbit/BEI yang lebih tua dari ini (dihitung dari hari ringkasan terbaru sumbernya) diambil saat dibuka, tidak di-embed.
 SB_EMBED_DAYS = 7
@@ -3487,10 +3489,10 @@ def build_page(docs, by_cat, own=None, sb=None, bei=None):
 
 def ownership_meta():
     """Ringkasan kepemilikan.json untuk tab Kepemilikan Saham, atau None kalau belum disinkron."""
-    if not OWN_SRC.is_file():
+    if not (SRC / OWN_SRC).is_file():
         return None
-    check_source(OWN_SRC, SRC)
-    raw = json.loads(OWN_SRC.read_text(encoding="utf-8"))
+    check_source(SRC / OWN_SRC, SRC)
+    raw = json.loads((SRC / OWN_SRC).read_text(encoding="utf-8"))
     months = [{"p": m["p"], "asOf": m.get("asOf")} for m in raw.get("months") or []]
     companies = raw.get("companies") or []
     if len(months) > 240 or any(not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", m["p"]) or
@@ -3499,14 +3501,14 @@ def ownership_meta():
     if not months or not companies:
         return None
     changes = reports = prices = None
-    if PRICES_SRC.is_file():
-        check_source(PRICES_SRC, SRC)
+    if (SRC / PRICES_SRC).is_file():
+        check_source(SRC / PRICES_SRC, SRC)
         prices = PRICES_PATH
-    if CHANGES_SRC.is_file():
-        check_source(CHANGES_SRC, SRC)
+    if (SRC / CHANGES_SRC).is_file():
+        check_source(SRC / CHANGES_SRC, SRC)
         changes = CHANGES_PATH
-    if REPORTS_SRC.is_file():
-        check_source(REPORTS_SRC, SRC)
+    if (SRC / REPORTS_SRC).is_file():
+        check_source(SRC / REPORTS_SRC, SRC)
         reports = REPORTS_PATH
     return {"path": OWN_PATH, "changes": changes, "reports": reports, "prices": prices, "months": months, "count": len(companies),
             "tickers": [c["t"] for c in companies]}
@@ -3514,10 +3516,10 @@ def ownership_meta():
 
 def stockbit_meta():
     """Ringkasan stockbit-index.json untuk payload halaman, atau None kalau belum disinkron."""
-    if not SB_INDEX_SRC.is_file():
+    if not (SRC / SB_INDEX_SRC).is_file():
         return None
-    check_source(SB_INDEX_SRC, SRC)
-    raw = json.loads(SB_INDEX_SRC.read_text(encoding="utf-8"))
+    check_source(SRC / SB_INDEX_SRC, SRC)
+    raw = json.loads((SRC / SB_INDEX_SRC).read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or raw.get("format") != 1:
         raise ValueError("Format stockbit-index.json tidak dikenal.")
     days, tickers, users = raw.get("days") or [], raw.get("tickers") or {}, raw.get("users") or {}
@@ -3532,10 +3534,10 @@ def bei_meta():
 
     Hanya bentuk luar yang diperiksa di sini (format dan tanggal); viewer memvalidasi ulang setiap baris saat dimuat.
     """
-    if not BEI_INDEX_SRC.is_file():
+    if not (SRC / BEI_INDEX_SRC).is_file():
         return None
-    check_source(BEI_INDEX_SRC, SRC)
-    raw = json.loads(BEI_INDEX_SRC.read_text(encoding="utf-8"))
+    check_source(SRC / BEI_INDEX_SRC, SRC)
+    raw = json.loads((SRC / BEI_INDEX_SRC).read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or raw.get("format") != 1:
         raise ValueError("Format bei-index.json tidak dikenal.")
     days, tickers, names = raw.get("days") or [], raw.get("tickers") or {}, raw.get("names") or {}
@@ -3609,21 +3611,21 @@ def main():
     own = ownership_meta()
     if own:
         (out / OWN_PATH).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(OWN_SRC, out / OWN_PATH)
+        shutil.copy2(SRC / OWN_SRC, out / OWN_PATH)
         if own["changes"]:
-            shutil.copy2(CHANGES_SRC, out / CHANGES_PATH)
+            shutil.copy2(SRC / CHANGES_SRC, out / CHANGES_PATH)
         if own["reports"]:
-            shutil.copy2(REPORTS_SRC, out / REPORTS_PATH)
+            shutil.copy2(SRC / REPORTS_SRC, out / REPORTS_PATH)
         if own["prices"]:
-            shutil.copy2(PRICES_SRC, out / PRICES_PATH)
+            shutil.copy2(SRC / PRICES_SRC, out / PRICES_PATH)
     sb = stockbit_meta()
     if sb:
         (out / SB_INDEX_PATH).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(SB_INDEX_SRC, out / SB_INDEX_PATH)
+        shutil.copy2(SRC / SB_INDEX_SRC, out / SB_INDEX_PATH)
     bei = bei_meta()
     if bei:
         (out / BEI_INDEX_PATH).parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(BEI_INDEX_SRC, out / BEI_INDEX_PATH)
+        shutil.copy2(SRC / BEI_INDEX_SRC, out / BEI_INDEX_PATH)
     head, body = build_page(docs, by_cat, own, sb, bei)
     chat_js = (ROOT / "chat.js").read_text()
     endpoint = urlsplit(CHAT_API_URL)
@@ -3662,11 +3664,11 @@ def main():
         print(f"{d['catName']:<22} {d['label']:<24} {d['name']} -> {d['path']}")
     if sb:
         print(f"{'Indeks Stockbit':<22} {sb['days']} hari, {sb['tickers']} emiten, {sb['users']} pengguna "
-              f"{SB_INDEX_SRC.name} -> {SB_INDEX_PATH}")
+              f"{(SRC / SB_INDEX_SRC).name} -> {SB_INDEX_PATH}")
     if bei:
-        print(f"{'Indeks BEI':<22} {bei['days']} hari, {bei['tickers']} emiten {BEI_INDEX_SRC.name} -> {BEI_INDEX_PATH}")
+        print(f"{'Indeks BEI':<22} {bei['days']} hari, {bei['tickers']} emiten {(SRC / BEI_INDEX_SRC).name} -> {BEI_INDEX_PATH}")
     if own:
-        print(f"{'Kepemilikan Saham':<22} {own['months'][0]['p']} s/d {own['months'][-1]['p']:<12} {OWN_SRC.name} -> {OWN_PATH} "
+        print(f"{'Kepemilikan Saham':<22} {own['months'][0]['p']} s/d {own['months'][-1]['p']:<12} {(SRC / OWN_SRC).name} -> {OWN_PATH} "
               f"({own['count']} emiten, {len(own['months'])} bulan, {sum(1 for m in own['months'] if m['asOf'])} bulan KSEI)")
     print(f"{len(docs)} dokumen" + (" + tab Kepemilikan Saham" if own else "") + f" -> {out}")
 

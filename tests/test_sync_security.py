@@ -1,6 +1,7 @@
 """Isolated filesystem/HTTP tests. No real Signal Desk, user sources or credentials."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -10,6 +11,7 @@ from unittest.mock import patch
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+SITE = Path(os.environ.get('ARSIP_TEST_SITE') or ROOT/'site')  # tools/test.sh builds it into a temp folder
 sys.path.insert(0,str(ROOT));sys.path.insert(0,str(ROOT/'tools'))
 from build_safety import check_output, check_source
 import build
@@ -100,7 +102,9 @@ class SecurityTests(unittest.TestCase):
         redacted=sync.redact('Hubungi 0812-3456-7890 passcode: 123456 https://example.test?pwd=12345')
         self.assertNotIn('0812-3456-7890',redacted);self.assertNotIn('123456',redacted);self.assertNotIn('pwd=12345',redacted)
     def test_all_wrapped_reports_restore_original_for_AI(self):
-        for p in (ROOT/'site/files').rglob('*.html'):
+        if not (SITE/'index.html').is_file():self.skipTest('site belum dibangun (tools/test.sh)')
+        reports=list((SITE/'files').rglob('*.html'));self.assertTrue(reports)
+        for p in reports:
             self.assertEqual(report_source(p.read_text()),(ROOT/'needtobeindexed'/p.name).read_text())
     def test_script_data_cannot_close_script_or_enter_comment_state(self):
         doc=build.load_doc(next((ROOT/'needtobeindexed').glob('*.md')),0)
