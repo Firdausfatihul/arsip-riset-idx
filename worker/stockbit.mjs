@@ -98,11 +98,9 @@ export function stockbitListing(listed, tickers, handles, table) {
     }
     return `- ${day} · ${parts.join(' · ')}${ref(doc)}`;
   });
-  const head = `**${listed.length} hari lain (tidak dibaca utuh)**`;
-  const note = 'Disusun sistem dari indeks Stockbit tanpa AI; buka dokumennya untuk rincian. Isi adalah klaim pengguna yang belum diverifikasi.';
-  const text = head + '\n\n' + note + '\n\n' + lines.join('\n');
-  return {material:'INDEKS STOCKBIT, ' + listed.length + ' hari lain (tidak dibaca utuh; satu baris per hari dari indeks, bukan isi dokumen):\n' + lines.join('\n'),
-    tail:text, lines:lines.length};
+  return listingText('INDEKS STOCKBIT', 'hari lain', lines,
+    'Disusun sistem dari indeks Stockbit tanpa AI; buka dokumennya untuk rincian. Isi adalah klaim pengguna yang belum diverifikasi.',
+    'satu baris per hari dari indeks, bukan isi dokumen');
 }
 
 // One code-built line for a day or document that is listed, not read. Daily files: the ticker's own section's
@@ -118,8 +116,12 @@ export function sectionLine(rows, codes, {mention = false} = {}) {
   const line = mention ? named[0] || ownLines[0] : ownLines[0] || named[0];
   return line ? clip(line, 200) : '';
 }
-function listingText(kind, label, lines, note) {
-  return {material:`${kind}, ${lines.length} ${label} (tidak dibaca utuh; satu baris per ${label.split(' ')[0]} disusun sistem dari teks dokumen, bukan isi lengkap. Bila relevan, sebutkan bahwa ${label.split(' ')[0]} ini hanya terdaftar, bukan dibaca):\n` + lines.join('\n'),
+// Days/documents listed, not read: `material` for the model, `tail` shown under the answer.
+// `how` says what each line is; by default a line written by code from the document text.
+function listingText(kind, label, lines, note, how) {
+  const unit = label.split(' ')[0];
+  how ||= `satu baris per ${unit} disusun sistem dari teks dokumen, bukan isi lengkap. Bila relevan, sebutkan bahwa ${unit} ini hanya terdaftar, bukan dibaca`;
+  return {material:`${kind}, ${lines.length} ${label} (tidak dibaca utuh; ${how}):\n` + lines.join('\n'),
     tail:`**${lines.length} ${label} (tidak dibaca utuh)**\n\n${note}\n\n` + lines.join('\n'), lines:lines.length};
 }
 // BEI days over the budget: listed: [{day, docs}] from familyBudget; rowsOf(doc) gives that doc's selected rows.
