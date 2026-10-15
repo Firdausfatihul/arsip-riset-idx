@@ -8,9 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
-const {JSDOM, VirtualConsole} = require('jsdom');
-const optional = name => { try { return require(name); } catch { return null; } };
-const markedLib = optional('marked'), purify = optional('dompurify');
+const {viewer, pageHtml, delay, assertSafe, withMarkdown} = require('./helpers/dom.cjs');
 const root = path.resolve(__dirname, '..');
 const EVIL = '<img src=x onerror="window.pwned=1">';
 const BEI_NOTE = 'Ringkasan otomatis dari pengumuman resmi di idx.co.id; bukan rekomendasi.';
@@ -23,45 +21,14 @@ function fixture(extra = []) {
   tmps.push(tmp);
   execFileSync('python3', ['-B', path.join(root, 'tests/helpers/bei_fixture.py'), tmp, ...extra], {cwd: root, encoding: 'utf8'});
   const site = path.join(tmp, 'site');
-  return {site, html: fs.readFileSync(path.join(site, 'index.html'), 'utf8').replace(/<style>[\s\S]*?<\/style>/g, '')};
+  return {site, html: pageHtml(path.join(site, 'index.html'))};
 }
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function setup({site, html}, {fail = []} = {}) {
-  const errors = [], vc = new VirtualConsole();
-  vc.on('jsdomError', error => errors.push(error.message));
-  const dom = new JSDOM(html, {url: 'https://archive.test/', runScripts: 'outside-only', virtualConsole: vc});
-  const w = dom.window, d = w.document;
-  const data = JSON.parse(d.getElementById('arsip-data').textContent);
-  if (markedLib && purify) { w.marked = markedLib.marked; w.DOMPurify = purify(w); }
-  w.matchMedia = () => ({matches: false, addEventListener() {}});
-  w.scrollTo = () => {}; w.HTMLElement.prototype.scrollIntoView = () => {};
-  const fetched = [];
-  w.fetch = async url => {
-    const p = decodeURIComponent(String(url).split('?')[0]);
-    fetched.push(p);
-    if (p === 'version.json') return Response.json({version: data.version});
-    if (fail.includes(p)) return new Response('nope', {status: 500});
-    const file = path.join(site, p);
-    if (!file.startsWith(site + path.sep) || !fs.existsSync(file)) throw new Error('Network forbidden in bei test: ' + url);
-    return new Response(fs.readFileSync(file));
-  };
-  w.eval([...d.querySelectorAll('script')].at(-1).textContent);
-  async function go(hash, ready) {
-    w.history.replaceState(null, '', hash); w.dispatchEvent(new w.HashChangeEvent('hashchange'));
-    for (let i = 0; i < 200; i++) { await delay(5); if (ready()) break; }
-    assert.deepEqual(errors, []);
-  }
-  const reader = d.getElementById('reader');
-  const safe = () => {
-    assert.equal(reader.querySelectorAll('img,script,iframe,svg').length, 0, 'no injected elements');
-    for (const el of reader.querySelectorAll('*'))
-      for (const a of el.attributes) assert.ok(!/^on/i.test(a.name), 'no event handler attribute ' + a.name);
-    for (const a of reader.querySelectorAll('a[href]')) assert.match(a.getAttribute('href'), /^(#|https:\/\/|files\/)/);
-    assert.equal(w.pwned, undefined);
-  };
-  const docs = Object.fromEntries(data.docs.map(x => [x.name, x]));
-  return {w, d, data, docs, reader, go, safe, fetched, close: () => w.close()};
+  const page = viewer(html, {site, fail: p => fail.includes(p)}), reader = page.d.getElementById('reader');
+  page.start();
+  const docs = Object.fromEntries(page.data.docs.map(x => [x.name, x]));
+  return {...page, docs, reader, safe: () => assertSafe(page.w, reader), close: () => page.w.close()};
 }
 const text = el => el.textContent.replace(/\s+/g, ' ');
 const sec = (s, cls) => s.reader.querySelector('.em-sec.' + cls);
@@ -321,6 +288,6 @@ const sec = (s, cls) => s.reader.querySelector('.em-sec.' + cls);
     s.safe();
   }, beiOnly);
 
-  console.log(`${checks} BEI viewer checks passed` + (markedLib && purify ? '' : ' (marked/dompurify absent: doc markdown checks reduced)'));
+  console.log(`${checks} BEI viewer checks passed` + (withMarkdown ? '' : ' (marked/dompurify absent: doc markdown checks reduced)'));
 })().catch(error => { console.error(error); process.exitCode = 1; })
   .finally(() => tmps.forEach(t => fs.rmSync(t, {recursive: true, force: true})));

@@ -1,19 +1,16 @@
 // Offline DOM regression and payload tests. Never contacts the public site.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const {JSDOM,VirtualConsole}=require('jsdom'),{marked}=require('marked'),purify=require('dompurify');
+const {JSDOM}=require('jsdom'),{viewer,delay}=require('./helpers/dom.cjs');
 const root=path.resolve(__dirname,'..'),site=process.env.ARSIP_TEST_SITE||path.join(root,'site'),html=fs.readFileSync(path.join(site,'index.html'),'utf8').replace(/<style>[\s\S]*?<\/style>/g,'');
 const ownership=JSON.parse(fs.readFileSync(path.join(site,'files/kepemilikan/kepemilikan.json'),'utf8'));
 const changesFile=path.join(site,'files/kepemilikan/kepemilikan-perubahan.json');
 const changes=fs.existsSync(changesFile)?JSON.parse(fs.readFileSync(changesFile,'utf8')):{format:1,coverage:null,companies:{}};
 const reportsFile=path.join(site,'files/kepemilikan/kepemilikan-laporan.json');
 const reports=fs.existsSync(reportsFile)?JSON.parse(fs.readFileSync(reportsFile,'utf8')):null;
-const delay=ms=>new Promise(r=>setTimeout(r,ms));let checks=0;
+let checks=0;
 function setup(mutate,mutateChanges,fetchDoc,mutateReports){
- const errors=[],console=new VirtualConsole();console.on('jsdomError',e=>errors.push(e.message));
- const dom=new JSDOM(html,{url:'https://archive.test/',runScripts:'outside-only',virtualConsole:console});
- const w=dom.window,d=w.document;let data=JSON.parse(d.getElementById('arsip-data').textContent),own=structuredClone(ownership),ch=structuredClone(changes),rep=reports&&structuredClone(reports);
+ const {dom,w,d,data,errors,start}=viewer(html),own=structuredClone(ownership),ch=structuredClone(changes),rep=reports&&structuredClone(reports);
  if(mutate)mutate(data,own);if(mutateChanges)mutateChanges(ch);if(mutateReports)mutateReports(rep);d.getElementById('arsip-data').textContent=JSON.stringify(data);
- w.marked=marked;w.DOMPurify=purify(w);w.TextDecoder=TextDecoder;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.fetch=async url=>{
   if(String(url).startsWith('version.json'))return Response.json({version:data.version});
   if(String(url).startsWith(data.own.path))return Response.json(own);
@@ -23,7 +20,7 @@ function setup(mutate,mutateChanges,fetchDoc,mutateReports){
   if(file)return fetchDoc ? fetchDoc(file) : new Response(fs.readFileSync(path.join(site,file.path),'utf8'));
   throw Error('Network forbidden: '+url);
  };
- w.eval([...d.querySelectorAll('script')].at(-1).textContent);
+ start();
  const route=hash=>{w.history.replaceState(null,'',hash);w.dispatchEvent(new w.HashChangeEvent('hashchange'));};
  return {w,d,data,dom,errors,route};
 }

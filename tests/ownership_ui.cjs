@@ -4,9 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
-const {JSDOM, VirtualConsole} = require('jsdom');
-const {marked} = require('marked');
-const purify = require('dompurify');
+const {JSDOM} = require('jsdom');
+const {viewer, delay} = require('./helpers/dom.cjs');
 const root = path.resolve(__dirname, '..');
 const source = process.argv.includes('--source');
 const site = process.env.ARSIP_TEST_SITE || path.join(root, 'site');
@@ -26,20 +25,12 @@ const rawHtml = source ? execFileSync('python3', ['-B', '-c',
 const html = rawHtml.replace(/<style>[\s\S]*?<\/style>/g, '');
 const index = month => ownership.months.findIndex(m => m.p === month);
 const f = index('2026-07'), t = index('2026-08');
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 let checks = 0;
 
 function setup(mutate) {
-  const errors = [], vc = new VirtualConsole();
-  vc.on('jsdomError', error => errors.push(error.message));
-  const dom = new JSDOM(html, {url: 'https://archive.test/', runScripts: 'outside-only', virtualConsole: vc});
-  const w = dom.window, d = w.document;
-  const data = JSON.parse(d.getElementById('arsip-data').textContent);
+  const {w, d, data, errors, start} = viewer(html);
   const own = structuredClone(ownership), rep = structuredClone(reports), ch = structuredClone(changes), pr = structuredClone(prices);
   if (mutate) mutate(own, rep, ch, pr);
-  w.marked = marked; w.DOMPurify = purify(w); w.TextDecoder = TextDecoder;
-  w.matchMedia = () => ({matches: false, addEventListener() {}});
-  w.scrollTo = () => {}; w.HTMLElement.prototype.scrollIntoView = () => {};
   w.fetch = async url => {
     const p = String(url).split('?')[0];
     if (p === 'version.json') return Response.json({version: data.version});
@@ -49,7 +40,7 @@ function setup(mutate) {
     if (p === data.own.prices) return Response.json(pr);
     throw new Error('Network forbidden in ownership test: ' + url);
   };
-  w.eval([...d.querySelectorAll('script')].at(-1).textContent);
+  start();
   async function route(ticker, from, to) {
     const hash = '#kepemilikan=' + ticker + '&dari=' + from + '&sampai=' + to;
     w.history.replaceState(null, '', hash); w.dispatchEvent(new w.HashChangeEvent('hashchange'));

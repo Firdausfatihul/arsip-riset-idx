@@ -7,9 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
-const {JSDOM, VirtualConsole} = require('jsdom');
-const optional = name => { try { return require(name); } catch { return null; } };
-const markedLib = optional('marked'), purify = optional('dompurify');
+const {viewer, pageHtml, delay, assertSafe, withMarkdown} = require('./helpers/dom.cjs');
 const root = path.resolve(__dirname, '..');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-viewer-'));
 const EVIL = '<img src=x onerror="window.pwned=1">';
@@ -18,43 +16,12 @@ let checks = 0;
 try {
   execFileSync('python3', ['-B', path.join(root, 'tests/helpers/stockbit_fixture.py'), tmp], {cwd: root, encoding: 'utf8'});
   const site = path.join(tmp, 'site');
-  const html = fs.readFileSync(path.join(site, 'index.html'), 'utf8').replace(/<style>[\s\S]*?<\/style>/g, '');
-  const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const html = pageHtml(path.join(site, 'index.html'));
 
   function setup({failIndex = false} = {}) {
-    const errors = [], vc = new VirtualConsole();
-    vc.on('jsdomError', error => errors.push(error.message));
-    const dom = new JSDOM(html, {url: 'https://archive.test/', runScripts: 'outside-only', virtualConsole: vc});
-    const w = dom.window, d = w.document;
-    const data = JSON.parse(d.getElementById('arsip-data').textContent);
-    if (markedLib && purify) { w.marked = markedLib.marked; w.DOMPurify = purify(w); }
-    w.matchMedia = () => ({matches: false, addEventListener() {}});
-    w.scrollTo = () => {}; w.HTMLElement.prototype.scrollIntoView = () => {};
-    const fetched = [];
-    w.fetch = async url => {
-      const p = decodeURIComponent(String(url).split('?')[0]);
-      fetched.push(p);
-      if (p === 'version.json') return Response.json({version: data.version});
-      if (p === data.stockbit.path && failIndex) return new Response('nope', {status: 500});
-      const file = path.join(site, p);
-      if (!file.startsWith(site + path.sep) || !fs.existsSync(file)) throw new Error('Network forbidden in stockbit test: ' + url);
-      return new Response(fs.readFileSync(file));
-    };
-    w.eval([...d.querySelectorAll('script')].at(-1).textContent);
-    async function go(hash, ready) {
-      w.history.replaceState(null, '', hash); w.dispatchEvent(new w.HashChangeEvent('hashchange'));
-      for (let i = 0; i < 200; i++) { await delay(5); if (ready()) break; }
-      assert.deepEqual(errors, []);
-    }
-    const reader = d.getElementById('reader');
-    const safe = () => {
-      assert.equal(reader.querySelectorAll('img,script,iframe,svg').length, 0, 'no injected elements');
-      for (const el of reader.querySelectorAll('*'))
-        for (const a of el.attributes) assert.ok(!/^on/i.test(a.name), 'no event handler attribute ' + a.name);
-      for (const a of reader.querySelectorAll('a[href]')) assert.match(a.getAttribute('href'), /^(#|https:\/\/|files\/)/);
-      assert.equal(w.pwned, undefined);
-    };
-    return {w, d, data, reader, go, safe, fetched, close: () => w.close()};
+    const page = viewer(html, {site, fail: p => failIndex && p === page.data.stockbit.path}), reader = page.d.getElementById('reader');
+    page.start();
+    return {...page, reader, safe: () => assertSafe(page.w, reader), close: () => page.w.close()};
   }
   async function test(name, opts, fn) {
     const s = setup(opts);
@@ -202,7 +169,7 @@ try {
       assert.ok(s.fetched.some(p => /sbringkas_2026-09-20/.test(p)), 'old ringkasan still searchable');
     });
 
-    console.log(`${checks} Stockbit viewer checks passed` + (markedLib && purify ? '' : ' (marked/dompurify absent: doc markdown checks reduced)'));
+    console.log(`${checks} Stockbit viewer checks passed` + (withMarkdown ? '' : ' (marked/dompurify absent: doc markdown checks reduced)'));
   })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => fs.rmSync(tmp, {recursive: true, force: true}));
 } catch (error) {
   fs.rmSync(tmp, {recursive: true, force: true});

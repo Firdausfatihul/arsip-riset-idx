@@ -7,34 +7,16 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
-const {JSDOM, VirtualConsole} = require('jsdom');
-const {marked} = require('marked');
-const purify = require('dompurify');
+const {viewer, pageHtml, delay} = require('./helpers/dom.cjs');
 const root = path.resolve(__dirname, '..');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'doc-viewer-'));
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const KI = 'files/keterbukaan-informasi/2026-09-22/ki_22092026.md', LAZY = 'files/keterbukaan-informasi/2026-09-15/ki_20260915.md';
 let checks = 0;
 
 function setup(site, {failing = new Set()} = {}) {
-  const errors = [], vc = new VirtualConsole();
-  vc.on('jsdomError', error => errors.push(error.message));
-  const html = fs.readFileSync(path.join(site, 'index.html'), 'utf8').replace(/<style>[\s\S]*?<\/style>/g, '');
-  const dom = new JSDOM(html, {url: 'https://archive.test/', runScripts: 'outside-only', virtualConsole: vc});
-  const w = dom.window, d = w.document, scrolled = [];
-  const data = JSON.parse(d.getElementById('arsip-data').textContent);
-  w.marked = marked; w.DOMPurify = purify(w);
-  w.matchMedia = () => ({matches: false, addEventListener() {}});
-  w.scrollTo = () => {}; w.HTMLElement.prototype.scrollIntoView = function () { scrolled.push(this.id); };
-  w.fetch = async url => {
-    const p = decodeURIComponent(String(url).split('?')[0]);
-    if (p === 'version.json') return Response.json({version: data.version});
-    if (failing.has(p)) return new Response('nope', {status: 500});
-    const file = path.join(site, p);
-    if (!file.startsWith(site + path.sep) || !fs.existsSync(file)) throw new Error('Network forbidden in doc test: ' + url);
-    return new Response(fs.readFileSync(file));
-  };
-  w.eval([...d.querySelectorAll('script')].at(-1).textContent);
+  const {w, d, data, errors, start} = viewer(pageHtml(path.join(site, 'index.html')), {site, fail: p => failing.has(p)}), scrolled = [];
+  w.HTMLElement.prototype.scrollIntoView = function () { scrolled.push(this.id); };
+  start();
   const reader = d.getElementById('reader');
   async function until(ready) {
     for (let i = 0; i < 200 && !ready(); i++) await delay(5);
