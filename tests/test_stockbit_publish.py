@@ -1229,7 +1229,7 @@ class IgnoredBuildGitTests(unittest.TestCase):
             run("git", "-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "-qm", "fixture")
             (root / "docs/index.html").write_text("changed")
             (root / "docs/new.html").write_text("new")
-            rb.discard_derived(runner, 3)
+            pub.discard_derived(runner, 3)
             self.assertEqual((root / "docs/index.html").read_text(), "original")
             self.assertFalse((root / "docs/new.html").exists())
             self.assertEqual((root / "site/index.html").read_text(), "original")

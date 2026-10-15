@@ -136,8 +136,9 @@ angka yang tidak ada di bahan (`unverifiedNumbers`); nama emiten yang tidak sesu
 (KODE)" di `events.json`); sinyal KSEI `wajib` yang tidak dibahas ditambahkan (`signals.mjs` `coverage`); rute tabel menambah
 maks 8 klaim yang tidak dibahas (`claimTail`). Hitungan ("FAKTA TERHITUNG SISTEM") selalu dari kode.
 
-Mode agen: alat baca-saja `cari_arsip`, `data_kepemilikan`, `datacat_cari`, `datacat_daftar`, `datacat_detail`, `cari_teks`,
-`tulis_jawaban` (host `quant.renr.ai`, path tetap). Batas `AGENT`: 4 langkah, 18 alat, 6 KB/hasil, 70 KB total, jawaban 2.000
+Mode agen: alat baca-saja `cari_arsip`, `data_kepemilikan`, `datacat_cari`, `datacat_daftar`, `datacat_detail`, `cari_teks`
+(`TOOLS` di `worker/agent.mjs`; datacat di host `quant.renr.ai`, path tetap). Jawaban akhir dibingkai sebagai panggilan sintetis
+`tulis_jawaban`, bukan alat yang bisa dipanggil model. Batas `AGENT`: 4 langkah, 18 alat, 6 KB/hasil, 70 KB total, jawaban 2.000
 token, 44 koneksi keluar. Kuota `agenticDaily` (`worker/index.mjs`: `CHAT_AGENTIC_DAILY`, bawaan 100/hari UTC). Permintaan isi dokumen dialihkan ke alur biasa.
 
 ## 6. Penyimpanan dan cache (`.local/chat.sqlite`)
@@ -292,10 +293,14 @@ menjalankan `python3 -B -m unittest discover -s tests -p 'test_*.py'`, `node --t
 | Invarian | Tes |
 |---|---|
 | Aturan nama/tanggal, output build, hash `index.html` | `tests/test_build_golden.py` (`tests/golden/build.json`) |
-| Aset chat (manifest, hash, pengecualian, tabel) | `tests/test_worker_assets_golden.py` (`tests/golden/worker.json`) |
+| Build per sumber: Stockbit, BEI, CSV | `tests/test_stockbit_build.py`, `tests/test_bei_build.py`, `tests/test_csv_viewer.py` |
+| Aset chat (manifest, hash, pengecualian, tabel) | `tests/test_worker_assets_golden.py` (`tests/golden/worker.json`), `tests/test_build_worker_stockbit.py`, `tests/test_build_worker_versions.py` |
+| Pemisahan sumber, tabel aksi korporasi, tabel arsip | `tests/test_evidence_split.py`, `tests/test_event_index.py`, `tests/test_archive_tables.py` |
 | Viewer, `#doc=`, `#emiten=`, kepemilikan, payload jahat | `tests/doc_viewer.cjs`, `tests/bei_viewer.cjs`, `tests/stockbit_viewer.cjs`, `tests/ownership_ui.cjs`, `tests/web_security.cjs` |
 | Kotak chat | `tests/chat_ui.cjs` |
-| Rute dan bahan chat | `tests/accuracy.mjs`, `tests/reading_budget.mjs`, `tests/doc_material_tokens.mjs`, `tests/ticker_material.mjs`, `tests/tables.mjs`, `tests/workflow.mjs` |
+| Rute dan bahan chat | `tests/worker.mjs`, `tests/accuracy.mjs`, `tests/reading_budget.mjs`, `tests/doc_material_tokens.mjs`, `tests/document_material.mjs`, `tests/ticker_material.mjs`, `tests/tables.mjs`, `tests/workflow.mjs`, `tests/normal_optimization.mjs`, `tests/thematic_batches.mjs` |
+| Cakupan sumber dan tanggal | `tests/retrieval_scope.mjs`, `tests/bei_scope.mjs`, `tests/stockbit_scope.mjs` |
+| Alat bench token | `tests/bench_tokens.mjs` |
 | Keamanan chat, cache, indeks sumber | `tests/security.mjs`, `tests/cache.mjs`, `tests/source-store.mjs` |
 | Mode agen, sinyal | `tests/agent.mjs`, `tests/agent_optimization.mjs`, `tests/signals_validity.mjs`, `tests/test_ksei_signals.py` |
 | Bridge, kunci mesin, CLI lokal | `tests/local_server.mjs`, `tests/server_startup.mjs` (dilewati di luar zona Indonesia) |
@@ -303,7 +308,7 @@ menjalankan `python3 -B -m unittest discover -s tests -p 'test_*.py'`, `node --t
 | Sinkron desk end to end | `tests/test_sync_e2e.py`, `tests/test_stockbit_sync.py`, `tests/test_bei_sync.py`, `tests/test_sync_security.py` |
 | Publish/rollback, kontrak desk | `tests/test_desk_roundtrip.py`, `tests/test_stockbit_publish.py`, `tests/test_bei_publish.py`, `tests/test_desk_files.py` |
 | Kepemilikan | `tests/test_ownership_sync.py`, `tests/test_ownership_corpus.py`, `tests/test_sync_prices.py` |
-| Dokumen ini | `tests/test_agents_doc.py` (setiap path dan perintah di AGENTS.md ada) |
+| Dokumen ini | `tests/test_agents_doc.py` (setiap path dan perintah di AGENTS.md ada; setiap berkas tes tercantum di tabel ini) |
 
 Golden: setelah perubahan yang disengaja pada `build.py`/`app.css`/`app.js`/`chat.js`/`report-*.js` atau aset chat, jalankan
 `UPDATE_GOLDEN=1 python3 -B -m unittest discover -s tests -p 'test_*_golden.py'` dan periksa diff-nya.

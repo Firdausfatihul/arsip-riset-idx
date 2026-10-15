@@ -27,8 +27,9 @@ node local/server.mjs --build           # berikutnya, setelah ada dokumen baru
 
 ## Menambah dan menerbitkan
 
-- Data desk (Stockbit, BEI, kepemilikan) tidak disalin manual: `python3 tools/sync_idx.py`.
-  Harga penutupan: `python3 tools/sync_prices.py`.
+- Data desk tidak disalin manual. Kepemilikan: `python3 tools/sync_idx.py`. Stockbit/BEI:
+  `python3 tools/sync_idx.py --stockbit-only --with-bei` (biasanya dijalankan publish dari desk). Harga penutupan:
+  `python3 tools/sync_prices.py`.
 - Ringkasan Stockbit/BEI terbit dari IDX Signal Desk (tombol publish), yang menjalankan `tools/publish_stockbit.py`;
   batalkan dengan `tools/rollback_stockbit.py`.
 - Perubahan lain (kode, dokumen manual): commit, lalu `node local/vps.mjs push` untuk memperbarui situs live.
@@ -47,7 +48,7 @@ Statistik pertanyaan dan biaya: `python3 tools/chat_metrics.py --days 7 --html r
 ## Tes
 
 ```bash
-sh tools/test.sh                        # semua tes Python, Node dan DOM (±4 menit, tanpa jaringan)
+sh tools/test.sh                        # semua tes Python, Node dan DOM (±4 menit, tanpa jaringan kecuali instalasi pustaka uji pertama kali)
 ```
 
 ## Troubleshooting

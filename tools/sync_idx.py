@@ -1659,7 +1659,7 @@ def main():
     ap.add_argument("--stockbit-only", action="store_true",
                     help="hanya ringkasan Stockbit (sb*.md + stockbit-index.json); tanpa profil, digest, atau kepemilikan")
     ap.add_argument("--with-stockbit", action="store_true", help="setelah sinkron biasa, jalankan juga sinkron Stockbit")
-    ap.add_argument("--allow-provisional", action="store_true", help="Stockbit: ikutkan hari 'sementara' (default hanya final)")
+    ap.add_argument("--allow-provisional", action="store_true", help="Stockbit/BEI: ikutkan hari 'sementara' (default hanya final)")
     ap.add_argument("--stockbit-since", default=STOCKBIT_SINCE, metavar="YYYY-MM-DD",
                     help=f"Stockbit: abaikan hari sebelum tanggal ini (default {STOCKBIT_SINCE})")
     ap.add_argument("--bei-only", action="store_true",

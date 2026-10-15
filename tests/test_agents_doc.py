@@ -55,6 +55,11 @@ class AgentsDoc(unittest.TestCase):
                 self.assertRegex(dispatch.group(0), rf"\b{sub}\b", command)
         self.assertGreater(checked, 8)
 
+    def test_every_test_file_is_mapped(self):
+        section = DOC.split("## 13.")[1].split("\n## ")[0]
+        files = sorted(str(p.relative_to(ROOT)) for pattern in ("test_*.py", "*.mjs", "*.cjs") for p in (ROOT / "tests").glob(pattern))
+        self.assertEqual([f for f in files if f"`{f}`" not in section], [])
+
 
 if __name__ == "__main__":
     unittest.main()

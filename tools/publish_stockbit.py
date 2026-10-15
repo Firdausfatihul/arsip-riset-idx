@@ -239,8 +239,8 @@ def dirty_kind(path):
     return "other"
 
 
-def stockbit_changes(runner):
-    """Berkas Stockbit dan BEI yang berubah (nama lama dipertahankan untuk rollback_stockbit.py)."""
+def desk_changes(runner):
+    """Berkas Stockbit dan BEI (publish_owned) yang berubah terhadap HEAD."""
     return sorted(path for _, path in changed_paths(runner) if publish_owned(path))
 
 
@@ -369,7 +369,7 @@ def worktree_withheld():
     return out
 
 
-def check_no_deleted_sb(runner, code):
+def check_no_deleted_desk_files(runner, code):
     """sb*/bei* hanya boleh terhapus kalau harinya ditahan desk (withheld_by=desk); penghapusan lain menghentikan publish."""
     withheld = worktree_withheld()
     deleted = [path for status, path in changed_paths(runner)
@@ -426,7 +426,7 @@ def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_
     allowed = ", ".join(f"{fam.prefix}*.md, " + ", ".join(fam.names) for fam in desk.FAMILIES)
     require_clean_main(runner, f"ada perubahan yang tidak boleh ikut publish Stockbit (hanya {allowed}, docs/; commit atau "
                                "kembalikan dulu)")
-    check_no_deleted_sb(runner, 2)
+    check_no_deleted_desk_files(runner, 2)
     git_ok(runner, "fetch", "origin", "main", timeout=T_NET)
     sync_origin(runner, dry_run)
     free = disk_usage(ROOT).free
@@ -434,7 +434,7 @@ def preflight(runner, dry_run=False, which=shutil.which, disk_usage=shutil.disk_
         raise Failure(2, f"ruang disk tinggal {free / 1e9:.2f} GB; perlu minimal {MIN_FREE_BYTES / 1e9:.1f} GB.")
 
 
-def check_build(stdout, sb_names):
+def check_build(stdout, names):
     """Baris build.py → tabel (nama, kategori, tanggal). Gagal kalau ada sb*/bei* yang salah kategori/tanggal atau hilang."""
     rows, problems, seen = [], [], {}
     for line in stdout.splitlines():
@@ -451,7 +451,7 @@ def check_build(stdout, sb_names):
             problems.append(f"{name}: kategori '{category}', seharusnya '{found.category}'")
         if start != found.start:
             problems.append(f"{name}: tanggal {start}, seharusnya {found.start}")
-    for name in sorted(sb_names):
+    for name in sorted(names):
         if seen.get(name) != 1:
             problems.append(f"{name}: {'tidak muncul' if name not in seen else 'muncul ganda'} di output build.py")
     if problems:
@@ -619,7 +619,7 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         skipped = [line.strip() for line in output(result).splitlines() if "BEI dilewati" in line]
         if skipped:
             summary["bei_skipped"] = skipped[0][:500]
-        check_no_deleted_sb(runner, 7)
+        check_no_deleted_desk_files(runner, 7)
         # Dicatat sebelum push VPS: rollback_stockbit.py menolak membatalkan publish yang mencabut hari yang ditahan desk.
         holds = worktree_withheld()
         for fam in desk.FAMILIES:
@@ -628,7 +628,7 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
                 record["withheld" + fam.suffix] = summary["withheld" + fam.suffix] = withheld
         # Dibanding HEAD, bukan keluaran sinkron: berkas dari putaran yang gagal sebelumnya (VPS gagal, commit gagal)
         # masih kotor dan ikut diterbitkan putaran ini.
-        changes = stockbit_changes(runner)
+        changes = desk_changes(runner)
         record["files"] = sorted(p.rsplit("/", 1)[-1] for p in changes)
         if not changes:
             # Tanpa ini setiap klik membangun dan mengirim ulang situs ke VPS dan meng-commit docs/ dengan BUILD_ID baru.
@@ -651,7 +651,7 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         build_docs(runner)
         # build.py --out docs bisa menghapus salinan sb*/bei* yang tidak dihasilkan lagi; periksa sebelum VPS, bukan baru di index.
         try:
-            check_no_deleted_sb(runner, 7)
+            check_no_deleted_desk_files(runner, 7)
         except Failure as e:
             try:
                 discard_derived(raw, 7)  # docs/ dikembalikan supaya preflight berikutnya tidak tertahan
@@ -668,7 +668,7 @@ def publish(args, runner=run_command, which=shutil.which, disk_usage=shutil.disk
         record["vps"] = summary["vps"] = True
         del record["status"]
         say("5/6 commit")
-        paths = [*stockbit_changes(runner), *DERIVED_PATHS]
+        paths = [*desk_changes(runner), *DERIVED_PATHS]
         staged = paths  # sebelum add: add yang terputus pun bisa meninggalkan entri di index
         git_ok(runner, "add", "--", *paths, code=6, what="git add")
         removed = [n for n in git_ok(runner, "diff", "--cached", "--diff-filter=D", "--name-only", code=6).splitlines() if desk.parse(n)]

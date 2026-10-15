@@ -285,9 +285,6 @@ def write_hold(days, key, fam):
     return True
 
 
-discard_derived = pub.discard_derived
-
-
 def restore_tree(runner):
     """Kembalikan berkas Stockbit/BEI yang kotor ke HEAD (berkas baru dihapus), kecuali berkas tahanan."""
     tracked = []
@@ -300,7 +297,7 @@ def restore_tree(runner):
             tracked.append(path)
     if tracked:
         pub.git_ok(runner, "checkout", "HEAD", "--", *tracked, code=3, what="git checkout HEAD -- <berkas Stockbit/BEI>")
-    discard_derived(runner, 3)
+    pub.discard_derived(runner, 3)
 
 
 def abort_revert(raw):
@@ -317,7 +314,7 @@ def git_step(runner, target, plan, mode, record, raw=None):
         if days or fam == desk.STOCKBIT:  # held (Stockbit) selalu dicatat, held_bei hanya kalau ada hari BEI
             record["held" + fam.suffix] = days
     if mode == "revert":
-        discard_derived(runner, 3)
+        pub.discard_derived(runner, 3)
         try:
             result = pub.git(runner, "revert", "--no-commit", plan["revert"], timeout=pub.T_GIT)
             if result.returncode:
@@ -340,7 +337,7 @@ def git_step(runner, target, plan, mode, record, raw=None):
             record["git_push_failed"] = True
         record["revert_sha"] = pub.git_ok(runner, "rev-parse", "HEAD", code=4)  # pull --rebase bisa menggantinya
     elif mode == "reset":
-        discard_derived(runner, 3)
+        pub.discard_derived(runner, 3)
         pub.git_ok(runner, "reset", "--keep", target["pre_sha"], code=3, what="git reset --keep")
         record["reset_to"] = target["pre_sha"]
     else:
@@ -446,7 +443,7 @@ def rollback(args, runner=pub.run_command, which=shutil.which, log=None, budget=
         if plan["git_done"]:
             # Putaran ulang: hanya berkas tahanan yang boleh kotor (berkas Stockbit/BEI lain = sinkron sesudahnya, belum terbit).
             check_vps_tree(runner, rerun=True)
-            discard_derived(runner, 3)  # docs/ sisa publish/build sesudahnya tidak ikut ke VPS
+            pub.discard_derived(runner, 3)  # docs/ sisa publish/build sesudahnya tidak ikut ke VPS
             record["git_done"] = True
             if plan["push_pending"]:
                 finish_revert_push(runner, plan["push_pending"], record)
