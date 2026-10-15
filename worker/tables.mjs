@@ -5,7 +5,7 @@
 //   entityMaterial / handleMaterial / rareRumorMaterial: single-call routes (core.mjs tableRoute)
 //   claimTail      short code-written list of rumors the answer did not discuss (table routes only)
 import {modelText} from './retrieval.mjs';
-import {BULAN, clip, escapeRegExp, utf8Bytes} from './text.mjs';
+import {BULAN, clip, editDistance, escapeRegExp, utf8Bytes} from './text.mjs';
 
 export const TABLE_RULES = '\nSetiap klaim Stockbit dirujuk dengan F-id; keterbukaan dengan [D..]. Status di baris CEK tidak boleh dinaikkan. '
   + 'Pisahkan: fakta resmi, data KSEI, rumor/klaim pengguna. Bila menyatakan sesuatu tidak ada, sebut cakupan tanggal sumbernya.';
@@ -100,17 +100,6 @@ export function entityIndex(entities) {
   indexCache.set(entities, value);
   return value;
 }
-function within1(a, b) {
-  if (a === b) return true;
-  if (Math.abs(a.length - b.length) > 1) return false;
-  let i = 0, j = 0, edits = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) { i++; j++; continue; }
-    if (++edits > 1) return false;
-    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
-  }
-  return edits + (a.length - i) + (b.length - j) <= 1;
-}
 const QUESTION_WORDS = new Set(('analisa analisis analisakan bagaimana gimana masuk apakah siapa kenapa mengapa tolong dong sih dengan semua dokumen saham emiten '
   + 'grup group keluarga family punya milik pemilik nama sama hubungan kaitan terkait apa aja saja yang ini itu ada tidak belum sudah akan mau jadi '
   + 'arsip postingan stockbit rumor info berita terbaru terakhir pernah tentang soal bahas dibahas banyak ngomongin cerita').split(' '));
@@ -138,7 +127,7 @@ export function entityLookup(question, entities, index) {
     if (!ix.issuerWords.has(w)) {
       if (exact && docs(w) <= 60 && exact.length <= 60 && nameish(w)) { matched.push({word:original.get(w), token:w, names:exact}); continue; }
       if (!exact && w.length >= 5 && !Object.hasOwn(postings, w)) {
-        const token = [...ix.tokens.keys()].find(t => t[0] === w[0] && t.length >= 5 && within1(t, w) && ix.tokens.get(t).length <= 60 && ix.namelike.has(t));
+        const token = [...ix.tokens.keys()].find(t => t[0] === w[0] && t.length >= 5 && editDistance(t, w, 1) <= 1 && ix.tokens.get(t).length <= 60 && ix.namelike.has(t));
         if (token) { matched.push({word:original.get(w), token, names:ix.tokens.get(token)}); fuzzy[w] = token; continue; }
       }
     }

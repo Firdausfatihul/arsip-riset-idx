@@ -1,25 +1,15 @@
-import {escapeRegExp, MONTHS, MONTH_WORDS} from './text.mjs';
+import {editDistance, escapeRegExp, MONTHS, MONTH_WORDS} from './text.mjs';
 // "22 Septembet - 5 Oct": a word next to a day number, one edit away from a full month name with the same first three
 // letters, is that month. Without this the range silently shrank to "5 Oct". Only clear misspellings count: the word
 // and the month both have six or more letters (so "market" ~ maret and "marsh" ~ march stay words), and a few real
 // words one edit away from a month are listed (NOT_MONTHS; a scan of an English word list finds no other).
 const FULL_MONTHS = Object.keys(MONTHS).filter(m => m.length >= 6);
 const NOT_MONTHS = new Set(['market', 'markets', 'marah', 'marsh', 'marco', 'marek', 'augusta', 'augusti', 'augustus']);
-function oneEdit(a, b) {
-  if (Math.abs(a.length - b.length) > 1) return false;
-  let i = 0, j = 0, edits = 0;
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) { i++; j++; continue; }
-    if (++edits > 1) return false;
-    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
-  }
-  return edits + (a.length - i) + (b.length - j) <= 1;
-}
 const monthFix = word => {
   const w = word.toLowerCase();
   if (Object.hasOwn(MONTHS, w) || NOT_MONTHS.has(w)) return word;
   return FULL_MONTHS.find(m => m.slice(0,3) === w.slice(0,3) &&
-    Math.min(w.length, m.length) >= 6 && oneEdit(w, m)) || word;
+    Math.min(w.length, m.length) >= 6 && editDistance(w, m, 1) <= 1) || word;
 };
 export const fixMonths = text => String(text)
   .replace(/(\b\d{1,2}\s+)([A-Za-z]{5,})\b/g, (m, day, word) => day + monthFix(word))

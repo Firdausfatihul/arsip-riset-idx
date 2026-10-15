@@ -5,11 +5,11 @@ import {cacheOnce, hash} from './cache.mjs';
 import {citations} from './citations.mjs';
 import {documentUnits, deskDigest, digestUnits, kiHead, DESK_CATS, DIGEST_BUDGET} from './document-material.mjs';
 import {dateQuery, selectRecords, filterRecords, crossMarketQuery, documentRequest, requestScope, scopeDocuments, dedupeDocuments, pattern, modelRows, modelText, headingTicker, plainContext} from './retrieval.mjs';
-import {questionTypes, screeningGroups, screeningCounts, screeningMaterial, screeningTable, overviewTable, documentFacts, unverifiedNumbers, wrongNames, nameNotice, sourceLabel} from './screening.mjs';
+import {questionTypes, screeningGroups, screeningCounts, screeningMaterial, screeningTable, overviewTable, documentFacts, archiveNames, checkAnswer, sourceLabel} from './screening.mjs';
 import {STOCKBIT_TICKER_BUDGET, BEI_TICKER_BUDGET, LEGACY_TICKER_BUDGET, familyBudget, docBudget, stockbitListing, beiListing, legacyListing, stockbitHandles, stockbitHandleBlock, stockbitHandleDocs, stockbitPenilaianTail} from './stockbit.mjs';
 import {TABLE_RULES, RELATION, RARE, loadTables, mentionsBlock, relationBlock, entityMaterial, rareRumorMaterial, handleMaterial, claimTail, DocRefs} from './tables.mjs';
 import {loadSignals} from './signals.mjs';
-import {jsonBytes, MONTH_WORDS} from './text.mjs';
+import {editDistance, jsonBytes, MONTH_WORDS} from './text.mjs';
 export {CacheStore,hash} from './cache.mjs';
 export class ChatError extends Error {}
 
@@ -204,16 +204,6 @@ export async function modelQuery(question, history, model, {previousTerms, faile
 
 // A misspelled name ("Zeinfahrozi" for @zeinihzafahrozi) finds nothing in exact search. The nearest
 // archive word is used only when it differs by missing/extra letters or a single typo; no model call.
-function editDistance(a, b, limit) {
-  let prev = Array.from({length:b.length + 1}, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    const row = [i];
-    for (let j = 1; j <= b.length; j++) row[j] = Math.min(prev[j] + 1, row[j-1] + 1, prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1));
-    if (Math.min(...row) > limit) return limit + 1;
-    prev = row;
-  }
-  return prev[b.length];
-}
 const subsequence = (short, long) => { let i = 0; for (const c of long) if (c === short[i]) i++; return i === short.length; };
 export function nearestWord(term, index, candidates = Object.keys(index.postings)) {
   const w = term.toLowerCase().replace(/^@/, '').replace(/\s+/g, '');
@@ -633,9 +623,6 @@ function sourceUnits(doc, records) {
   return units;
 }
 
-const numberNotice = list => 'Pemeriksaan angka otomatis: ' + list.join(', ')
-  + ' tidak ditemukan persis di bahan sumber (bisa hasil hitung, pembulatan, atau salah salin). Cek dokumen sumber sebelum dipakai.';
-
 // Screening questions ("siapa aja yang mau rights issue") from the corporate-action table.
 // Code builds the full issuer list and the counts; the model writes a short summary only.
 async function screeningAnswer({index, table, types, scope, selected, question, history, model, emit, stats}) {
@@ -664,10 +651,7 @@ async function screeningAnswer({index, table, types, scope, selected, question, 
     await emit({type:'delta', text:summary});
   }
   const notices = [];
-  const unchecked = unverifiedNumbers(summary, facts + '\n' + (material || ''), question);
-  if (unchecked.length) { stats.unverified_numbers = unchecked; notices.push(numberNotice(unchecked)); }
-  const misnamed = wrongNames(summary, table.names || {}, table.aliases || {}, table.plainWords || []);
-  if (misnamed.length) { stats.wrong_names = misnamed; notices.push(nameNotice(misnamed)); }
+  checkAnswer(summary, table, {source:facts + '\n' + (material || ''), question}, stats, notices);
   if (model.truncated) { stats.incomplete = true; notices.push('Ringkasan terpotong karena mencapai batas panjang.'); }
   const allowed = new Set(sources.map(s => s.source_id));
   const invalid = [...new Set(citations(summary).filter(id => !allowed.has(id)))];
@@ -725,8 +709,7 @@ async function loadSourceEvidence(archive, index, doc, terms, tickers, wholeDocu
 // ---- Table routes (worker/tables.mjs): one answer call over code-built material ----------------------------------
 const TABLE_ANSWER_TOKENS = 4500;
 async function tableAnswer(material, {archive, index, tables, model, emit, question, history, stats, instruction = '', tail = ''}) {
-  let names = {}, aliases = {}, plainWords = [];
-  try { ({names = {}, aliases = {}, plainWords = []} = (await archive.events?.()) || {}); } catch { /* names are optional */ }
+  const known = await archiveNames(archive);
   const sources = material.refs.sources();
   stats.terms = material.terms; stats.documents_checked = sources.length;
   stats.selected_source_bytes = jsonBytes(material.text); stats.evidence_mode = 'archive-tables';
@@ -743,10 +726,7 @@ async function tableAnswer(material, {archive, index, tables, model, emit, quest
   const notices = [], allowed = new Set(sources.map(s => s.source_id));
   const invalid = [...new Set(citations(answer))].filter(id => !allowed.has(id));
   if (invalid.length) { stats.invalid_citations = invalid; notices.push('Rujukan ' + invalid.join(', ') + ' tidak termasuk sumber yang diperiksa untuk jawaban ini; abaikan rujukan tersebut.'); }
-  const unchecked = unverifiedNumbers(answer, material.text + '\n' + tail, question);
-  if (unchecked.length) { stats.unverified_numbers = unchecked; notices.push(numberNotice(unchecked)); }
-  const misnamed = wrongNames(answer, names, aliases, plainWords);
-  if (misnamed.length) { stats.wrong_names = misnamed; notices.push(nameNotice(misnamed)); }
+  checkAnswer(answer, known, {source:material.text + '\n' + tail, question}, stats, notices);
   if (model.truncated) { stats.incomplete = true; notices.push('Jawaban terpotong karena mencapai batas panjang. Rincian lainnya tetap tersedia pada dokumen sumber.'); }
   const after = [notices.length ? '*' + notices.join(' ') + '*' : '', claimTail(answer, material.claims, tables), tail].filter(Boolean).join('\n\n');
   if (after) { answer += '\n\n' + after; await emit({type:'delta', text:'\n\n' + after}); }
@@ -796,6 +776,9 @@ async function tableRoute({archive, index, model, question, history, emit, stats
   return tableAnswer(material, base);
 }
 
+// The archive chat (one question). Its steps are marked "── step: … ──" in order; a route step carries the name of its
+// row in the route table of AGENTS.md §5. One function on purpose: the steps share the scope, the selected documents,
+// the units and the stats; tools/bench_tokens.mjs pins the bytes each route sends.
 export async function converse(archive, model, question, history, emit, signal, options = {}) {
   const index = await archive.manifest();
   const stats = options.metrics || {};
@@ -808,11 +791,13 @@ export async function converse(archive, model, question, history, emit, signal, 
   let turnContext;
   stats.date_scope = scope;
   stats.source_scope = request;
+  // ── step: Klarifikasi (incomplete or reversed date) ──
   if (scope.clarification) {
     await emit({type:'sources',sources:[],terms:[],batches:0});
     await emit({type:'delta',text:scope.clarification});
     return {answer:scope.clarification,documents:0,batches:0,model:MODEL,clarification:true};
   }
+  // ── step: Cache jawaban ──
   const systemHash = await hash(index.system);
   // Contextual answers are scoped to their client. Source notes never include user history.
   const answerKey = await hash([PIPELINE,ANSWER_RULES,THEMATIC_RULES,THEMATIC_ANSWER_RULES,index.version,index.retrieval_version,index.asset_hashes?.['events.json'] || '',
@@ -844,6 +829,7 @@ export async function converse(archive, model, question, history, emit, signal, 
     if(latestIds)matches=matches.filter(d=>latestIds.has(d.document_id || d.path));
     return dedupeDocuments(matches);
   };
+  // ── step: Dokumen per tanggal/sumber (documentRequest) ──
   // A request for a whole document ("ringkas keterbukaan 22 September") reads that document entirely.
   let documents = follow?.document_ids?.length ? dedupeDocuments(scopeDocuments(
     request.all || explicitRequest.dates.length || explicitRequest.latest ? index.docs : index.docs.filter(d => follow.document_ids.includes(d.document_id || d.path)), request,
@@ -857,11 +843,13 @@ export async function converse(archive, model, question, history, emit, signal, 
     await emit({type:'delta',text:documents.clarification});
     return {answer:documents.clarification,documents:0,batches:0,model:MODEL,clarification:true};
   }
+  // ── step: Rute tabel (tableRoute) ──
   // Names, Stockbit handles and rare-rumor discovery: one answer call over material built from the archive tables.
   if (!thematic && !documents && !explicitTickers.length) {
     const routed = await tableRoute({archive, index, model, question, history, emit, stats, scope, request, follow});
     if (routed) { turnContext = {scope:request, date_scope:scope, intent:'search'}; return routed; }
   }
+  // ── step: Ticker/topik: search terms (code first, one JSON call without a ticker) and the document search ──
   let fromModel = !thematic && !documents && !explicitTickers.length;
   const query = thematic || documents ? null : follow && previous?.terms?.length
     ? {intent:follow.intent || 'search',terms:previous.terms} : await searchQuery(question,history,index,model,explicitTickers);
@@ -971,6 +959,7 @@ export async function converse(archive, model, question, history, emit, signal, 
   if (!selected.length && !handleText) throw new ChatError('Belum ditemukan dokumen untuk “' + terms.join(', ') + '”.');
   stats.documents_checked = selected.length;
   stats.baseline_source_bytes = selected.reduce((n,d)=>n+d.sizes.reduce((a,b)=>a+b,0),0);
+  // ── step: Bahan per dokumen (source evidence rows → units) ──
   const units=[], thematicGroups=[], docRows=[];
   for (const doc of selected) {
     stats.stage='source_index'; stats.current_document=doc.source_id;
@@ -986,6 +975,7 @@ export async function converse(archive, model, question, history, emit, signal, 
     docRows.push({doc,rows:filtered.rows,model:documents || thematic ? filtered.rows : modelRows(doc,filtered.rows,terms,tickers)});
     if(thematic)thematicGroups.push({doc,rows:filtered.rows});
   }
+  // ── step: Anggaran ticker Stockbit/BEI/legacy and the document digests ──
   // Budgets count the bytes actually sent. Stockbit summaries (all searches) and, for ticker questions, BEI daily
   // files and legacy raw Stockbit/KI: newest days are read whole up to a byte budget; older days get one
   // code-built line each instead of being sent to the model.
@@ -1090,6 +1080,7 @@ export async function converse(archive, model, question, history, emit, signal, 
       ...['issuers','full','partial','listed'].reduce((a,k) => ({...a, [k]:digested.reduce((n,d) => n + d.stats[k], 0)}), {})};
   }
   const listing = listings.length ? {material:listings.map(l => l.material).join('\n\n'), tail:listings.map(l => l.tail).join('\n\n')} : null;
+  // ── step: Lintas bursa (thematic selection) ──
   if(thematic) {
     stats.stage='candidate_selection';
     let groups;
@@ -1102,6 +1093,7 @@ export async function converse(archive, model, question, history, emit, signal, 
   if (!selected.length && !handleText) throw new ChatError('Arsip hanya menyebut “' + terms.join(', ') + '” dalam kalimat penyangkalan (misalnya “tidak ada …”).');
   stats.stage='source_limits';
   stats.selected_source_bytes = units.reduce((n,u)=>n+jsonBytes(u.parts),0);
+  // ── step: Topik terlalu luas (screening table or issuer list) ──
   // Topics too broad to read: corporate-action questions are answered from the action table;
   // other topics get an issuer list built by code instead of an error or a flaky note pass.
   if (!thematic && !documents && !explicitTickers.length && stats.selected_source_bytes > RAW_LIMIT) {
@@ -1127,6 +1119,7 @@ export async function converse(archive, model, question, history, emit, signal, 
     }
   }
   if (stats.selected_source_bytes > LIMITS.archive) throw new ChatError('Topik terlalu luas untuk satu analisis. Pilih kode saham atau topik yang lebih spesifik.');
+  // ── step: [A2]/[H] blocks, sources ──
   // Ticker questions: other issuers' announcements naming the ticker in lowercase or by name ([A2]), and for relation
   // wording with 2+ tickers the exact names they share ([H]). Code-built, added to the same material.
   const extra = [], extraRefs = new DocRefs();
@@ -1148,6 +1141,7 @@ export async function converse(archive, model, question, history, emit, signal, 
     .map(({source_id,title,path,label})=>({source_id,title,path,label}));
   await emit({type:'sources',sources,terms,batches:units.length});
   if (documents) await emit({type:'status',text:'Cakupan: '+documents.map(d=>d.title+' ('+d.label+')').join('; ')+'.'});
+  // ── step: Original text or notes (RAW_LIMIT), the note readers ──
   // Exact-detail requests use raw passages whenever they fit a single model request.
   // Full-document summaries keep original evidence when it fits the verified
   // model context (1M tokens). This server-only byte cap leaves room for metadata;
@@ -1284,6 +1278,7 @@ export async function converse(archive, model, question, history, emit, signal, 
       if(!(error instanceof ChatError))throw error;
     }
   }
+  // ── step: Jawaban (one answer call; an optional reread of noted documents) ──
   const instructions = ANSWER_RULES
     +(thematic ? THEMATIC_ANSWER_RULES : '')
     +(canExpand ? 'Jika catatan ringkas tidak cukup untuk pertanyaan, minta pemeriksaan dokumen lengkap dengan menjawab HANYA [[SUMBER:D12]] '
@@ -1296,8 +1291,7 @@ export async function converse(archive, model, question, history, emit, signal, 
     return '(' + codes.slice(0, 40).join(', ') + `, … dan ${codes.length - 40} kode lain)`;
   });
   // Official names for the codes in the material; otherwise the model supplies names from memory.
-  let names = {}, aliases = {}, plainWords = [];
-  try { ({names = {}, aliases = {}, plainWords = []} = (await archive.events?.()) || {}); } catch { /* names are optional */ }
+  const known = await archiveNames(archive), {names, aliases} = known;
   // Only the question's codes and codes with their own issuer section in the sent material, in material order (max 40):
   // co-mentioned tickers in lists are not worth the tokens, and wrongNames() still checks every name afterwards.
   const codes = [...new Set([...explicitTickers, ...terms.filter(t => tickers.has(t)),
@@ -1365,6 +1359,7 @@ export async function converse(archive, model, question, history, emit, signal, 
     if(answer.trim().startsWith('[[SUMBER:'))throw new ChatError('Permintaan pemeriksaan sumber belum valid. Silakan coba lagi.');
     await emit({type:'delta',text:answer});
   }
+  // ── step: Pemeriksa setelah jawaban (citations, numbers, names, code-built tails) ──
   // Citations outside the checked sources are reported, not fatal: the text is already on screen.
   const allowed=new Set((thematic ? units.map(u=>u.doc) : sources).map(s=>s.source_id));
   const cited = new Set(citations(answer));
@@ -1375,10 +1370,7 @@ export async function converse(archive, model, question, history, emit, signal, 
   let checked = units.map(u=>u.checked ?? u.parts.map(p=>p.text).join('\n')).join('\n')+'\n'+facts+'\n'+handleText+'\n'+extraText+(listing?.material || '');
   if (stats.original_document_reads) for (const d of selected.filter(d=>cited.has(d.source_id)))
     checked += '\n'+(await archive.read(d.asset)).parts.map(p=>p.text).join('');
-  const unchecked = unverifiedNumbers(answer, checked, question);
-  if(unchecked.length){stats.unverified_numbers=unchecked;notices.push(numberNotice(unchecked));}
-  const misnamed = wrongNames(answer, names, aliases, plainWords);
-  if(misnamed.length){stats.wrong_names=misnamed;notices.push(nameNotice(misnamed));}
+  checkAnswer(answer, known, {source:checked, question}, stats, notices);
   const incomplete=!!model.truncated || context.some(c=>c.incomplete);
   if(incomplete)stats.incomplete=true;
   if(model.truncated)notices.push('Jawaban terpotong karena mencapai batas panjang. Rincian lainnya tetap tersedia pada dokumen sumber.');

@@ -7,7 +7,7 @@ import {escapeRegExp, jsonBytes, MONTH_WORDS} from './text.mjs';
 import {citations} from './citations.mjs';
 export {citations} from './citations.mjs';
 import {dateQuery, documentRequest, selectRecords} from './retrieval.mjs';
-import {wrongNames, nameNotice} from './screening.mjs';
+import {archiveNames, checkAnswer} from './screening.mjs';
 import {ExternalBudget, answerChecks, datacatSlot, typedMinutes, worded} from './facts.mjs';
 import {SCREENING, coverage, dataVersion, hopParties, knownPart, loadSignals, mustCover, perVersion, screeningView, signalView} from './signals.mjs';
 
@@ -829,8 +829,7 @@ async function runAgent({archive, model, question, history, emit, signal, cache,
   if (!evidence.length) throw new ChatError('Mode agen belum menemukan bukti. Sebutkan kode saham, nama pihak, atau topik yang lebih spesifik.');
   await emit({type:'status', phase:'answer', text:`Menulis jawaban dari ${evidence.length} hasil penelusuran…`});
   // Official names from the archive: datacat issuer records carry only the ticker, and the model fills gaps from memory.
-  let names = {}, aliases = {}, plainWords = [];
-  try { ({names = {}, aliases = {}, plainWords = []} = (await archive.events?.()) || {}); } catch { /* optional */ }
+  const known = await archiveNames(archive), {names, aliases} = known;
   const text = messages.filter(m => m.role === 'tool').map(m => m.content).join('\n');
   const codes = [...new Set(text.match(/\b[A-Z]{4}\b/g) || [])].filter(c => names[c]).slice(0, 80);
   const nameList = codes.length ? '\nNAMA EMITEN MENURUT ARSIP: ' + codes.map(c => c + ' = ' + (aliases[c] || [names[c]]).join(' / ')).join('; ') : '';
@@ -853,8 +852,8 @@ async function runAgent({archive, model, question, history, emit, signal, cache,
   const allowed = new Set([...used.keys(), ...refs.list().map(r => r.source_id)]), notices = [];
   const invalid = [...new Set(citations(answer).filter(id => !allowed.has(id)))];
   if (invalid.length) { stats.invalid_citations = invalid; notices.push('Rujukan ' + invalid.join(', ') + ' tidak ada dalam bukti yang diperiksa; abaikan rujukan tersebut.'); }
-  const misnamed = wrongNames(answer, names, aliases, plainWords);
-  if (misnamed.length) { stats.wrong_names = misnamed; notices.push(nameNotice(misnamed)); }
+  // Names only: datacat numbers are not in a source text the check could read.
+  checkAnswer(answer, known, {}, stats, notices);
   if (/\b(tidak (ada |memiliki |terdapat )?(hubungan|keterkaitan|afiliasi)|tidak terkait|bukan bagian|tidak tercatat sebagai bagian)\b/i.test(answer)) {
     stats.absence_claim = true;
     notices.push('Catatan: tidak ditemukannya bukti dalam data yang diperiksa (arsip, datacat, KSEI) bukan bukti tidak ada hubungan; cakupan data belum lengkap.');

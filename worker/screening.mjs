@@ -206,5 +206,23 @@ export function wrongNames(answer, names, aliases = {}, plainWords = []) {
   for (const m of answer.matchAll(/\**\b([A-Z0-9]{4})\b\**\s*\(([^()\n]{3,70})\)/g)) check(m[1], m[2]);
   return [...found.values()].slice(0, 8);
 }
-export const nameNotice = list => 'Pemeriksaan nama otomatis: ' + list.map(n => `${n.code} ditulis “${n.written}”, di arsip ${n.official}`).join('; ')
+const nameNotice = list => 'Pemeriksaan nama otomatis: ' + list.map(n => `${n.code} ditulis “${n.written}”, di arsip ${n.official}`).join('; ')
   + '. Pakai nama menurut arsip.';
+const numberNotice = list => 'Pemeriksaan angka otomatis: ' + list.join(', ')
+  + ' tidak ditemukan persis di bahan sumber (bisa hasil hitung, pembulatan, atau salah salin). Cek dokumen sumber sebelum dipakai.';
+
+// Official issuer names from the archive ("PT … Tbk (KODE)" in events.json); empty when the table is missing.
+export async function archiveNames(archive) {
+  let table = {};
+  try { table = (await archive.events?.()) || {}; } catch { /* names are optional */ }
+  const {names = {}, aliases = {}, plainWords = []} = table;
+  return {names, aliases, plainWords};
+}
+// The post-answer checks by code, the same on every route: numbers missing from `source` (skipped when it is null)
+// and issuer names that differ from the archive's (`known`: archiveNames() or the events table). Adds stats and notices.
+export function checkAnswer(answer, known, {source = null, question = ''}, stats, notices) {
+  const unchecked = source === null ? [] : unverifiedNumbers(answer, source, question);
+  if (unchecked.length) { stats.unverified_numbers = unchecked; notices.push(numberNotice(unchecked)); }
+  const misnamed = wrongNames(answer, known.names || {}, known.aliases || {}, known.plainWords || []);
+  if (misnamed.length) { stats.wrong_names = misnamed; notices.push(nameNotice(misnamed)); }
+}
