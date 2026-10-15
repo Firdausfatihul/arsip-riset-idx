@@ -38,7 +38,7 @@ class BeiPublishTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        self.dest = self.root / pub.DEST_REL; self.dest.mkdir(parents=True)
+        self.dest = self.root / pub.desk.FOLDER; self.dest.mkdir(parents=True)
         for n in SB + BEI:
             (self.dest / n).write_text("x")
         (self.root / ".local").mkdir(); (self.root / pub.VPS_CONFIG_REL).write_text("{}")
@@ -211,10 +211,9 @@ class BeiPublishTests(unittest.TestCase):
         self.assertEqual((rec["status"], rec["withheld_bei"]), ("published", ["2026-10-03"]))
         self.assertNotIn("withheld", rec)
         # The Stockbit hold file is not read for a BEI-only deletion.
-        self.assertFalse([c for c in runner.calls if c == f"git show :{pub.HOLD_REL}"])
+        self.assertFalse([c for c in runner.calls if c == f"git show :{pub.rel(pub.desk.STOCKBIT.hold)}"])
         # A Stockbit hold does not cover a BEI deletion, and vice versa; docs/ copies follow their family.
         self.assertFalse(pub.withheld_deletion(DEST + deleted[0], {"stockbit": {"2026-10-03"}, "bei": set()}))
-        self.assertFalse(pub.withheld_deletion(DEST + deleted[0], {"2026-10-03"}))
         self.assertFalse(pub.withheld_deletion(DEST + "sbringkas_2026-10-03_2026-10-03.md", {"bei": {"2026-10-03"}}))
         self.assertTrue(pub.withheld_deletion("docs/files/bei-pekan/2026-09-28/" + deleted[2], {"bei": {"2026-10-03"}}))
         # Another BEI day disappearing, or a hold without withheld_by=desk: refused in preflight, VPS untouched.
@@ -324,7 +323,7 @@ class BeiRollbackTests(unittest.TestCase):
             with self.subTest(label):
                 self.write([{"type": "publish", "started_at": "s-" + label, "pre_sha": None, "post_sha": None,
                              "files": [BEI[0]], **fields}])
-                dest = self.root / pub.DEST_REL; dest.mkdir(parents=True, exist_ok=True)
+                dest = self.root / pub.desk.FOLDER; dest.mkdir(parents=True, exist_ok=True)
                 (dest / BEI[0]).write_text("new day")
                 (dest / ".sync-bei.json").write_text(json.dumps({"format": 1, "days": {"2026-10-05": {"fp": "beiY|d|t|final"}}}))
                 st = f" M docs/index.html\0?? {DEST}{BEI[0]}\0 M {DEST}bei-index.json\0 M {DEST}.sync-bei.json\0"

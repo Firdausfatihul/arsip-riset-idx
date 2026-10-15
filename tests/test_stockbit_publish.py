@@ -96,7 +96,7 @@ class PublishTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        self.dest = self.root / pub.DEST_REL; self.dest.mkdir(parents=True)
+        self.dest = self.root / pub.desk.FOLDER; self.dest.mkdir(parents=True)
         for n in SB:
             (self.dest / n).write_text("x")
         self.log = self.root / ".stockbit-publish/log.jsonl"
@@ -291,8 +291,8 @@ class PublishTests(unittest.TestCase):
         self.assertEqual(self.publish(runner)[0], 7)
         self.assertFalse([c for c in runner.calls if c.startswith(("git commit", "git push"))])
         self.assertIn(other, self.output)
-        self.assertFalse(pub.withheld_deletion("notes/sbringkas_2026-10-03_2026-10-03.md", {"2026-10-03"}))
-        self.assertTrue(pub.withheld_deletion(copies[2], {"2026-10-03"}))
+        self.assertFalse(pub.withheld_deletion("notes/sbringkas_2026-10-03_2026-10-03.md", {"stockbit": {"2026-10-03"}}))
+        self.assertTrue(pub.withheld_deletion(copies[2], {"stockbit": {"2026-10-03"}}))
 
     def test_other_sb_deletions_still_refused(self):
         cases = {
@@ -336,7 +336,7 @@ class PublishTests(unittest.TestCase):
                                                 ' "2026-13-01": {"withheld_by": "desk"}, "x": {"withheld_by": "desk"}}}'),
                          {"2026-10-03"})
         self.assertEqual(pub.desk_withheld_days("not json"), set())
-        self.assertFalse(pub.withheld_deletion("elsewhere/sbringkas_2026-10-03_2026-10-03.md", {"2026-10-03"}))
+        self.assertFalse(pub.withheld_deletion("elsewhere/sbringkas_2026-10-03_2026-10-03.md", {"stockbit": {"2026-10-03"}}))
 
     def test_digest_or_ownership_changes_refused_dot_files_ignored(self):
         for dirty in (" M needtobeindexed/idx-signal-desk/digest_2026-10-01_2026-10-02.md\0",
@@ -843,7 +843,7 @@ class RollbackTests(unittest.TestCase):
             with self.subTest(label):
                 self.write([{"type": "publish", "started_at": "s-" + label, "pre_sha": None, "post_sha": None,
                              "files": [SB[0]], **fields}])
-                dest = self.root / pub.DEST_REL; dest.mkdir(parents=True, exist_ok=True)
+                dest = self.root / pub.desk.FOLDER; dest.mkdir(parents=True, exist_ok=True)
                 (dest / SB[0]).write_text("new day")
                 (dest / ".sync-stockbit.json").write_text(json.dumps({"format": 1, "days": {"2026-10-05": {"fp": "shaZ|t|final"}}}))
                 status = (f" M docs/index.html\0?? needtobeindexed/idx-signal-desk/{SB[0]}\0"
@@ -926,7 +926,7 @@ class RollbackTests(unittest.TestCase):
     def restore_case(self, status_extra="", rows=None):
         self.write(rows or [{"type": "publish", "status": "vps_not_committed", "target": "vps", "vps": True, "started_at": "s1",
                              "pre_sha": None, "post_sha": None, "files": [SB[0]]}])
-        dest = self.root / pub.DEST_REL; dest.mkdir(parents=True, exist_ok=True)
+        dest = self.root / pub.desk.FOLDER; dest.mkdir(parents=True, exist_ok=True)
         (dest / SB[0]).write_text("new day")
         status = f" M docs/index.html\0?? needtobeindexed/idx-signal-desk/{SB[0]}\0" + status_extra
         return dest, self.runner(**{"git status": lambda r, l: r.result(0, status)})

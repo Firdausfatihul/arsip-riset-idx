@@ -65,6 +65,7 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import desk_files as desk  # noqa: E402
 import publish_stockbit as pub  # noqa: E402  (git/VPS helper dan konstanta yang sama)
 
 
@@ -163,7 +164,7 @@ def check_vps_tree(runner, rerun=False):
         raise pub.Failure(2, "push VPS akan ikut mengirim perubahan di luar berkas Stockbit/BEI/docs (commit atau kembalikan "
                              "dulu): " + ", ".join(outside[:15]))
     stale = [path for _, path in changes
-             if rerun and pub.publish_owned(path) and path not in (pub.HOLD_REL, pub.BEI_HOLD_REL)]
+             if rerun and pub.publish_owned(path) and path not in pub.HOLDS]
     if stale:
         raise pub.Failure(2, "berkas Stockbit/BEI berubah sesudah langkah git rollback ini (sinkron/publish berikutnya yang belum "
                              "terbit); push VPS akan menerbitkannya tanpa cek build. Kembalikan dulu (`git checkout HEAD -- "
@@ -206,7 +207,7 @@ def preflight(runner, target, plan):
     # mengirim berkas baru dari disk: tanpa ini berkas itu ikut live lewat rollback. Tidak dihapus otomatis (cara restore
     # menghapusnya karena memang sisa publish yang dibatalkan).
     unpublished = [path for status, path in changes
-                   if status == "??" and pub.publish_owned(path) and path not in (pub.HOLD_REL, pub.BEI_HOLD_REL)]
+                   if status == "??" and pub.publish_owned(path) and path not in pub.HOLDS]
     if unpublished:
         raise pub.Failure(2, "ada berkas Stockbit/BEI baru yang belum terbit (sinkron/publish sesudahnya yang belum lolos cek "
                              "build); push VPS akan menerbitkannya tanpa cek build. Hapus dulu lalu ulangi rollback: "
@@ -247,11 +248,7 @@ def preflight(runner, target, plan):
     return mode
 
 
-# Per keluarga: kunci day_shas di catatan publish (sha yang dikirim ke VPS).
-DAY_SHAS_KEY = {"stockbit": "day_shas", "bei": "day_shas_bei"}
-
-
-def held_days(runner, target, mode, family="stockbit"):
+def held_days(runner, target, mode, fam):
     """{tgl: sha256 ekspor desk} untuk hari harian keluarga itu (sb*/bei*) yang dibawa publish ini; "*" kalau sha tidak
     diketahui.
 
@@ -266,39 +263,37 @@ def held_days(runner, target, mode, family="stockbit"):
         removed = {p.rsplit("/", 1)[-1] for status, p in changes if "D" in status and pub.publish_owned(p)}
         # sha yang dikirim ke VPS oleh publish ini (day_shas/day_shas_bei, dicatat sebelum push VPS). Berkas status sinkron
         # di pohon kerja bisa sudah ditulis ulang sinkron sesudahnya (hari difinalkan ulang); catatan lama tanpa: "*".
-        recorded = target.get(DAY_SHAS_KEY[family])
+        recorded = target.get("day_shas" + fam.suffix)
         recorded = recorded if isinstance(recorded, dict) else {}
-        out = pub.state_day_shas(names - removed, "", family)
+        out = pub.state_day_shas(names - removed, "", fam)
         return {day: sha if (sha := str(recorded.get(day) or "")) not in ("", "None") else "*" for day in out}
     diff = pub.git(runner, "diff", "--name-only", target["pre_sha"], target["post_sha"]).stdout or ""
     names |= {p.rsplit("/", 1)[-1] for p in diff.splitlines()}
     gone = pub.git(runner, "diff", "--diff-filter=D", "--name-only", target["pre_sha"], target["post_sha"]).stdout or ""
     removed = {p.rsplit("/", 1)[-1] for p in gone.splitlines()}
-    if family != "stockbit" and not pub.state_day_shas(names - removed, "", family):
+    if fam != desk.STOCKBIT and not pub.state_day_shas(names - removed, "", fam):
         return {}  # publish tanpa hari BEI: .sync-bei.json tidak perlu dibaca (Stockbit tetap persis seperti sebelumnya)
-    state_text = pub.git(runner, "show", f"{target['post_sha']}:{pub.STATES[family]}").stdout or ""
-    return pub.state_day_shas(names - removed, state_text, family)
+    state_text = pub.git(runner, "show", f"{target['post_sha']}:{pub.rel(fam.state)}").stdout or ""
+    return pub.state_day_shas(names - removed, state_text, fam)
 
 
-def write_hold(days, key, rel=None):
-    """Gabungkan ke berkas tahanan (default .stockbit-hold.json; BEI: .bei-hold.json); kembalikan True kalau ditulis.
+def write_hold(days, key, fam):
+    """Gabungkan ke berkas tahanan keluarga itu; kembalikan True kalau ditulis.
 
     Entri yang sudah ada dipertahankan; untuk hari yang sama kolom lain (mis. withheld_by=desk dari sinkron) tetap ada.
     """
     if not days:
         return False
-    path = pub.ROOT / (rel or pub.HOLD_REL)
+    path = pub.ROOT / pub.rel(fam.hold)
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        hold = desk.parse_hold(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        data = {}
-    hold = data.get("days") if isinstance(data, dict) and isinstance(data.get("days"), dict) else {}
+        hold = {}
     for day, sha in days.items():
         prev = hold.get(day)
         hold[day] = {**(prev if isinstance(prev, dict) else {}), "sha256": sha, "rollback_of": key}
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"format": 1, "days": dict(sorted(hold.items()))}, ensure_ascii=False, indent=1) + "\n",
-                    encoding="utf-8")
+    path.write_text(desk.hold_text(hold), encoding="utf-8")
     return True
 
 
@@ -309,7 +304,7 @@ def restore_tree(runner):
     """Kembalikan berkas Stockbit/BEI yang kotor ke HEAD (berkas baru dihapus), kecuali berkas tahanan."""
     tracked = []
     for status, path in pub.changed_paths(runner):
-        if not pub.publish_owned(path) or path in (pub.HOLD_REL, pub.BEI_HOLD_REL):
+        if not pub.publish_owned(path) or path in pub.HOLDS:
             continue
         if status == "??":
             (pub.ROOT / path).unlink(missing_ok=True)
@@ -329,11 +324,10 @@ def abort_revert(raw):
 def git_step(runner, target, plan, mode, record, raw=None):
     """`raw`: runner tanpa anggaran total, hanya untuk membatalkan revert setelah batas waktu."""
     key = plan["target"]
-    days = held_days(runner, target, mode)
-    bei_days = held_days(runner, target, mode, "bei")
-    record["held"] = days
-    if bei_days:
-        record["held_bei"] = bei_days
+    held = {fam: held_days(runner, target, mode, fam) for fam in desk.FAMILIES}
+    for fam, days in held.items():
+        if days or fam == desk.STOCKBIT:  # held (Stockbit) selalu dicatat, held_bei hanya kalau ada hari BEI
+            record["held" + fam.suffix] = days
     if mode == "revert":
         discard_derived(runner, 3)
         try:
@@ -341,10 +335,9 @@ def git_step(runner, target, plan, mode, record, raw=None):
             if result.returncode:
                 pub.git(runner, "revert", "--abort")
                 raise pub.Failure(3, f"git revert gagal: {pub.output(result).strip()[-400:]}")
-            if write_hold(days, key):
-                pub.git_ok(runner, "add", "--", pub.HOLD_REL, code=3)
-            if write_hold(bei_days, key, pub.BEI_HOLD_REL):
-                pub.git_ok(runner, "add", "--", pub.BEI_HOLD_REL, code=3)
+            for fam, days in held.items():
+                if write_hold(days, key, fam):
+                    pub.git_ok(runner, "add", "--", pub.rel(fam.hold), code=3)
             result = pub.git(runner, "commit", "-q", "-m", f"Rollback Stockbit {key}", timeout=pub.T_GIT)
             if result.returncode:
                 pub.git(runner, "revert", "--abort")
@@ -362,15 +355,12 @@ def git_step(runner, target, plan, mode, record, raw=None):
         discard_derived(runner, 3)
         pub.git_ok(runner, "reset", "--keep", target["pre_sha"], code=3, what="git reset --keep")
         record["reset_to"] = target["pre_sha"]
-        write_hold(days, key)
-        write_hold(bei_days, key, pub.BEI_HOLD_REL)
     else:
         restore_tree(runner)
-        write_hold(days, key)
-        write_hold(bei_days, key, pub.BEI_HOLD_REL)
-    if mode != "revert" and (days or bei_days):
-        written = [rel for rel, d in ((pub.HOLD_REL, days), (pub.BEI_HOLD_REL, bei_days)) if d]
-        pub.say(f"  tahanan ditulis ke {', '.join(written)} (belum di-commit; ikut publish berikutnya)")
+    if mode != "revert":
+        written = [pub.rel(fam.hold) for fam, days in held.items() if write_hold(days, key, fam)]
+        if written:
+            pub.say(f"  tahanan ditulis ke {', '.join(written)} (belum di-commit; ikut publish berikutnya)")
     record["git_done"] = True
 
 
@@ -417,6 +407,14 @@ def vps_step(runner, record, timeout=pub.T_VPS):
     return 0 if ok else 5
 
 
+def held_summary(record):
+    """Hari yang ditahan, untuk ringkasan JSON: held selalu, held_bei hanya kalau ada hari BEI."""
+    out = {"held": sorted(record.get("held") or {})}
+    if record.get("held_bei"):
+        out["held_bei"] = sorted(record["held_bei"])
+    return out
+
+
 def rollback(args, runner=pub.run_command, which=shutil.which, log=None, budget=None):
     log = log or pub.LOG
     budget = budget or pub.Budget(pub.ROLLBACK_BUDGET)
@@ -448,7 +446,8 @@ def rollback(args, runner=pub.run_command, which=shutil.which, log=None, budget=
             pub.say(f"  git: {plan['revert']} (reset lokal kalau commit belum pernah dipush, selain itu revert + push)")
         else:
             pub.say(f"  git: revert {plan['revert']} + push")
-        pub.say(f"  hari yang dibawa publish ini ditahan di {pub.HOLD_REL} (BEI: {pub.BEI_HOLD_REL}) sampai desk memfinalkannya ulang")
+        pub.say(f"  hari yang dibawa publish ini ditahan di {pub.rel(desk.STOCKBIT.hold)} (BEI: {pub.rel(desk.BEI.hold)}) "
+                "sampai desk memfinalkannya ulang")
         pub.say("  lalu node local/vps.mjs push (situs mengikuti pohon yang dikembalikan)")
         if plan["legacy_worker"]:
             pub.say("  catatan: publish ini dari masa Worker Cloudflare; Worker lama tidak dipakai lagi dan dibiarkan")
@@ -481,17 +480,12 @@ def rollback(args, runner=pub.run_command, which=shutil.which, log=None, budget=
             record["status"] = "push_failed"
             pub.say("  push git revert gagal; commit revert ada di lokal (push manual: git push origin HEAD:main)")
             summary.update(status="gagal", error="push revert gagal; commit revert ada di lokal",
-                           revert_sha=record.get("revert_sha"), held=sorted(record.get("held") or {}), vps=record["vps"])
-            if record.get("held_bei"):
-                summary["held_bei"] = sorted(record["held_bei"])
+                           revert_sha=record.get("revert_sha"), vps=record["vps"], **held_summary(record))
             return 4, summary
         record["status"] = "rolled_back" if code == 0 else "partial"
         if code:
             pub.say("  rollback belum lengkap; jalankan skrip ini lagi setelah memperbaikinya (langkah git tidak diulang)")
-        summary.update(status=record["status"], revert_sha=record.get("revert_sha"), held=sorted(record.get("held") or {}),
-                       vps=record["vps"])
-        if record.get("held_bei"):
-            summary["held_bei"] = sorted(record["held_bei"])
+        summary.update(status=record["status"], revert_sha=record.get("revert_sha"), vps=record["vps"], **held_summary(record))
         return code, summary
     except pub.Failure as e:
         summary.update(status="gagal", error=str(e))
