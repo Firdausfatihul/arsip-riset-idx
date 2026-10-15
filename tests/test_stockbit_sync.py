@@ -13,7 +13,6 @@ from urllib.error import HTTPError
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "tools")); sys.path.insert(0, str(ROOT / "tests" / "helpers"))
-import build  # noqa: E402
 import sync_idx as sync  # noqa: E402
 from fake_desk import StockbitDesk, sha  # noqa: E402
 
@@ -26,9 +25,7 @@ class StockbitSyncTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.dest = self.root / "needtobeindexed/idx-signal-desk"; self.dest.mkdir(parents=True)
         p = patch.multiple(sync, ROOT=self.root, DEST=self.dest, STATE=self.dest / ".sync.json",
-                           OWNERSHIP_JSON=self.dest / "kepemilikan.json",
-                           STOCKBIT_STATE=self.dest / ".sync-stockbit.json", STOCKBIT_INDEX=self.dest / "stockbit-index.json",
-                           STOCKBIT_HOLD=self.dest / ".stockbit-hold.json")
+                           OWNERSHIP_JSON=self.dest / "kepemilikan.json")
         p.start(); self.addCleanup(p.stop)
 
     def snapshot(self):
@@ -69,13 +66,13 @@ class StockbitSyncTests(unittest.TestCase):
         self.assertFalse([c for c in desk.calls if "/export/day/" in c])
 
     def test_globals_restored_after_success_and_failure(self):
-        originals = (sync.DEST, sync.STOCKBIT_STATE, sync.STOCKBIT_INDEX)
+        originals = (sync.DEST, sync.STATE)
         self.sync(StockbitDesk(["2026-10-05"]))
-        self.assertEqual((sync.DEST, sync.STOCKBIT_STATE, sync.STOCKBIT_INDEX), originals)
+        self.assertEqual((sync.DEST, sync.STATE), originals)
         bad = StockbitDesk(["2026-10-06"]); bad.overrides[("2026-10-06", "ringkas")] = {"sha256": "0" * 64}
         with self.assertRaises(sync.StockbitRefused):
             self.sync(bad)
-        self.assertEqual((sync.DEST, sync.STOCKBIT_STATE, sync.STOCKBIT_INDEX), originals)
+        self.assertEqual((sync.DEST, sync.STATE), originals)
 
     def test_validation_failures_abort_without_writing(self):
         self.sync(StockbitDesk(["2026-10-05"]))  # existing published state must survive each refusal untouched
@@ -462,9 +459,6 @@ class StockbitSyncTests(unittest.TestCase):
         with patch.object(sync, "sync_once", side_effect=sync.StockbitRefused("x")), redirect_stderr(io.StringIO()):
             self.assertEqual(sync.run(argparse.Namespace(**{**base, "stockbit_only": True})), 1)
 
-    def test_real_build_categories_match(self):
-        for prefix, cat in sync.STOCKBIT_CATEGORY.items():
-            self.assertEqual(build.categorize(f"{prefix}_2026-10-05_2026-10-05"), cat)
 
 
 if __name__ == "__main__":

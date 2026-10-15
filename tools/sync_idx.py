@@ -49,6 +49,7 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from build import categorize, date_label  # noqa: E402  (satu sumber format tanggal dan kategori)
+import desk_files as desk  # noqa: E402  (nama berkas, kategori, dan berkas tahanan Stockbit/BEI)
 
 DEST = ROOT / "needtobeindexed" / "idx-signal-desk"
 STATE = DEST / ".sync.json"
@@ -57,33 +58,11 @@ OWNED = re.compile(r"^(digest|kepemilikan)_[\w\-]+\.md$")
 OWNERSHIP_JSON = DEST / "kepemilikan.json"
 FILINGS_JSON = DEST / "kepemilikan-perubahan.json"
 REPORTS_JSON = DEST / "kepemilikan-laporan.json"
-# Ringkasan Stockbit Ideas (hanya --stockbit-only / --with-stockbit). Berkas sb* tidak pernah di-prune(): arsip ini
-# append-only. Hanya hari yang ditahan desk dari web (export/withheld) dan rollback_stockbit.py yang menghapus sb*;
-# pola ini dipakai managed() untuk staging (tulis dan hapus), tidak untuk prune().
-STOCKBIT_STATE = DEST / ".sync-stockbit.json"
-STOCKBIT_INDEX = DEST / "stockbit-index.json"
-# Ditulis tools/rollback_stockbit.py (ikut di-commit bersama revert): {"format":1,"days":{tgl:{"sha256":sha|"*",...}}}.
-# Hari yang ditahan tidak diterbitkan lagi sampai sha ekspor desk berubah (difinalkan ulang) atau entrinya dihapus.
-# Sinkron menambahkan {"sha256":"*","withheld_by":"desk"} untuk hari terbit yang ditahan desk dari web (berkasnya dicabut),
-# dan membuang hanya entri desk itu saat desk melepasnya; entri rollback tidak pernah dihapus sinkron.
-STOCKBIT_HOLD = DEST / ".stockbit-hold.json"
-STOCKBIT_FILE = re.compile(r"^(sbringkas|sbdetail|sbpekan)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.md$")
-STOCKBIT_CATEGORY = {"sbringkas": "stockbit-ringkasan", "sbdetail": "stockbit-detail", "sbpekan": "stockbit-pekan"}
-STOCKBIT_KIND = {"ringkas": "sbringkas", "detail": "sbdetail"}
-# Keputusan pemilik: backfill dimulai 1 Oktober 2026; hari sebelumnya tidak diterbitkan.
+# Ringkasan Stockbit (--stockbit-only / --with-stockbit) dan keterbukaan BEI (--bei-only / --with-bei): lihat sync_family.
+# Keputusan pemilik: backfill Stockbit dimulai 1 Oktober 2026; hari sebelumnya tidak diterbitkan.
 STOCKBIT_SINCE = "2026-10-01"
-# Ringkasan keterbukaan BEI (hanya --bei-only / --with-bei): klon aturan Stockbit. beiringkas_/beidetail_/beipekan_ tidak
-# pernah di-prune; yang menghapusnya hanya tahanan desk (export/withheld) dan rollback_stockbit.py.
-BEI_STATE = DEST / ".sync-bei.json"
-BEI_INDEX = DEST / "bei-index.json"
-# Format sama dengan .stockbit-hold.json: {"format":1,"days":{tgl:{"sha256":sha|"*", "rollback_of"?, "withheld_by"?}}}.
-BEI_HOLD = DEST / ".bei-hold.json"
-BEI_FILE = re.compile(r"^(beiringkas|beidetail|beipekan)_(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})\.md$")
-BEI_CATEGORY = {"beiringkas": "bei-ringkasan", "beidetail": "bei-detail", "beipekan": "bei-pekan"}
-BEI_KIND = {"ringkas": "beiringkas", "detail": "beidetail"}
 # Kode emiten di bei-index.json (IDX: 4 huruf; sedikit longgar untuk kode lain, tetap tanpa tanda baca).
 BEI_TICKER = re.compile(r"[A-Z][A-Z0-9]{1,7}")
-ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 # Naikkan kalau bentuk kepemilikan.json / kepemilikan-laporan.json berubah, supaya sinkron berikutnya membuatnya ulang.
 OWNERSHIP_FORMAT = 6
 REPORTS_FORMAT = 2
@@ -846,19 +825,37 @@ def sync_ownership(server, state, force, profile, guard):
     return changed, removed
 
 
-# ---------------------------------------------------------------- Stockbit Ideas
+# ---------------------------------------------------------------- ringkasan desk: Stockbit Ideas dan keterbukaan BEI
+# Satu alur untuk kedua keluarga (nama berkas, kategori, dan berkas tahanan: tools/desk_files.py). Berkas sb*/bei* tidak
+# pernah di-prune(): arsip ini append-only. Hanya hari yang ditahan desk dari web (export/withheld) dan
+# rollback_stockbit.py yang menghapusnya.
 
-class StockbitRefused(ValueError):
-    """Ekspor Stockbit tidak lolos pemeriksaan; sinkron dibatalkan tanpa menulis apa pun."""
+class SyncRefused(ValueError):
+    """Ekspor desk tidak lolos pemeriksaan; sinkron dibatalkan tanpa menulis apa pun."""
+    label = "Sinkron"
 
 
-def iso_day(value, what="tanggal"):
-    if not isinstance(value, str) or not ISO_DAY.fullmatch(value):
-        raise StockbitRefused(f"{what} tidak valid: {value!r}")
-    try:
-        return date.fromisoformat(value)
-    except ValueError:
-        raise StockbitRefused(f"{what} tidak valid: {value!r}") from None
+class StockbitRefused(SyncRefused):
+    label = "Stockbit"
+
+
+class BeiRefused(SyncRefused):
+    label = "BEI"
+
+
+REFUSED = {desk.STOCKBIT: StockbitRefused, desk.BEI: BeiRefused}
+DAY_KINDS = ("ringkas", "detail")  # berkas per hari; pekan punya rekap sendiri
+
+
+class ProfileSkip(Exception):
+    """Ekspor dari profil desk lain dari yang tercatat di berkas status: keluarga itu dilewati tanpa menulis apa pun."""
+
+
+def iso_day(value, what, refused=SyncRefused):
+    day = desk.iso_date(value)
+    if day is None:
+        raise refused(f"{what} tidak valid: {value!r}")
+    return day
 
 
 def sha256_text(text):
@@ -885,76 +882,125 @@ def quarantine_hits(text, ids):
     return sorted(ids & set(re.findall(r"(?<!\d)\d{1,20}(?!\d)", text)), key=int) if ids else []
 
 
-def check_stockbit_file(name, expected, text, sha, quarantined):
+def profile_of(response, refused):
+    """profile_id dari respons ekspor, atau None kalau desk tidak menyebutnya (desk lama, atau Stockbit: tidak diketahui)."""
+    pid = response.get("profile_id")
+    if pid is None:
+        return None
+    if not isinstance(pid, str) or not pid.strip() or len(pid) > 200:
+        raise refused(f"profile_id di ekspor tidak valid: {pid!r}")
+    return pid
+
+
+class Export:
+    """Ekspor read-only satu keluarga di desk (GET /api/<keluarga>/export/...). Setiap respons harus objek tanpa panggilan
+    LLM, dan dari profil desk yang sama dengan export/days (`profile`, diisi pemanggil; None = tidak diketahui)."""
+
+    def __init__(self, server, fam, provisional):
+        self.server, self.fam, self.refused = server, fam, REFUSED[fam]
+        self.query = "include_provisional=1" if provisional else ""
+        self.profile = None
+
+    def get(self, path, provisional=False):
+        """`path` setelah export/, mis. "days" atau "day/<tgl>?kind=ringkas"; provisional: ikutkan hari non-final."""
+        url = f"/api/{self.fam.key}/export/{path}"
+        if provisional and self.query:
+            url += ("&" if "?" in url else "?") + self.query
+        what = f"{self.fam.key} export/{path.split('?')[0]}"
+        r = self.server.get(url)
+        if not isinstance(r, dict):
+            raise self.refused(f"respons {what} tidak valid")
+        if r.get("llm_calls", 0) != 0:
+            raise self.refused(f"{what} melaporkan panggilan LLM; ekspor harus read-only")
+        pid = profile_of(r, self.refused)
+        if self.profile is not None and pid is not None and pid != self.profile:
+            raise ProfileSkip(f"{what} dari profil desk '{pid}', bukan '{self.profile}' (profil aktif berganti di tengah sinkron)")
+        return r
+
+
+def check_file(fam, name, expected, text, sha, quarantined=frozenset()):
     """Tolak berkas yang namanya, kategorinya, hash-nya, atau isinya tidak sesuai kontrak ekspor."""
+    refused = REFUSED[fam]
     if name != expected:
-        raise StockbitRefused(f"nama berkas dari server {name!r}, seharusnya {expected!r}")
-    match = STOCKBIT_FILE.fullmatch(name)
-    if not match:
-        raise StockbitRefused(f"nama berkas Stockbit tidak dikenal: {name!r}")
-    category = categorize(Path(name).stem)
-    if category != STOCKBIT_CATEGORY[match[1]]:
-        raise StockbitRefused(f"build.py memasukkan {name} ke kategori '{category}', bukan '{STOCKBIT_CATEGORY[match[1]]}'; "
-                              f"tambahkan kategorinya di CATEGORIES build.py dulu")
+        raise refused(f"nama berkas dari server {name!r}, seharusnya {expected!r}")
+    category, want = categorize(Path(name).stem), desk.parse(name).category
+    if category != want:
+        raise refused(f"build.py memasukkan {name} ke kategori '{category}', bukan '{want}'; "
+                      f"tambahkan kategorinya di CATEGORIES build.py dulu")
     if not isinstance(text, str) or not text.strip():
-        raise StockbitRefused(f"{name} kosong")
+        raise refused(f"{name} kosong")
     if not isinstance(sha, str) or sha.lower() != sha256_text(text):
-        raise StockbitRefused(f"sha256 {name} tidak cocok dengan isinya")
+        raise refused(f"sha256 {name} tidak cocok dengan isinya")
     hits = quarantine_hits(text, quarantined)
     if hits:
-        raise StockbitRefused(f"{name} masih memuat stream_id karantina {', '.join(hits[:5])}")
+        raise refused(f"{name} masih memuat stream_id karantina {', '.join(hits[:5])}")
 
 
-def filter_stockbit_index(index, drop):
-    """Buang hari `drop` (sebelum --stockbit-since, ditahan rollback, atau ditahan desk) dari indeks desk dan petakan ulang dayIdx.
-
-    Ekspor desk mendaftar semua hari final di DB-nya tanpa batas awal; baris tickers/users yang menunjuk hari
-    yang dibuang ikut dibuang, begitu juga kunci yang jadi kosong dan user_notes untuk akun yang tidak tersisa.
-    Catatan akun (penilaian/benang) yang merujuk temuan hari yang dibuang, atau yang based_on.last_day-nya hari yang
-    dibuang, dibuang utuh: teksnya bisa menceritakan hari itu dan tidak bisa dibersihkan.
-    """
+def index_days(fam, index):
+    """Baris hari indeks desk (format 1)."""
     if not isinstance(index, dict) or index.get("format") != 1 or not isinstance(index.get("days"), list):
-        raise StockbitRefused("stockbit-index.json tidak berformat 1")
+        raise REFUSED[fam](f"{fam.index} tidak berformat 1")
+    return index["days"]
+
+
+# Tabel indeks yang barisnya diawali nomor hari: [hariIdx, ...].
+DAY_TABLES = {desk.STOCKBIT: ("tickers", "users"), desk.BEI: ("tickers",)}
+
+
+def filter_index(fam, index, drop):
+    """Buang hari `drop` (sebelum --<keluarga>-since, ditahan rollback atau desk, hari BEI tanpa pengumuman) dari indeks
+    desk dan petakan ulang dayIdx. Desk mendaftar semua hari finalnya tanpa batas awal.
+
+    Baris tabel yang menunjuk hari yang dibuang ikut dibuang, begitu juga kunci yang jadi kosong. Stockbit: catatan akun
+    (penilaian/benang) yang merujuk temuan hari yang dibuang, atau yang based_on.last_day-nya hari yang dibuang, dibuang utuh
+    (teksnya bisa menceritakan hari itu), begitu juga catatan akun yang tidak tersisa. BEI: nama emiten yang tidak tersisa.
+    """
+    days = index_days(fam, index)
     if not drop:
         return index
-    # id temuan -> hari, dari baris users SEBELUM hari dibuang (sesudahnya rujukan ke hari yang dibuang tidak terlihat lagi).
-    dropped_ids = set()
-    users = index.get("users")
-    for rows in (users.values() if isinstance(users, dict) else ()):
-        for row in (rows if isinstance(rows, list) else ()):
-            if isinstance(row, list) and len(row) > 3 and isinstance(row[0], int) and not isinstance(row[0], bool) \
-                    and 0 <= row[0] < len(index["days"]) and isinstance(index["days"][row[0]], dict) \
-                    and index["days"][row[0]].get("d") in drop and isinstance(row[3], list):
-                dropped_ids |= {str(i) for i in row[3] if isinstance(i, (str, int)) and not isinstance(i, bool)}
-    remap, days = {}, []
-    for old, row in enumerate(index["days"]):
-        if isinstance(row, dict) and row.get("d") in drop:
-            continue
-        remap[old] = len(days)
-        days.append(row)
-    out = {**index, "days": days}
-    for key in ("tickers", "users"):
+    refused, remap, kept_days = REFUSED[fam], {}, []
+    for old, row in enumerate(days):
+        if not (isinstance(row, dict) and row.get("d") in drop):
+            remap[old] = len(kept_days)
+            kept_days.append(row)
+    out = {**index, "days": kept_days}
+    for key in DAY_TABLES[fam]:
         table = index.get(key, {})
         if not isinstance(table, dict):
-            continue  # check_stockbit_index menolaknya
+            continue  # check_index menolaknya
         kept = {}
         for name, rows in table.items():
             if not isinstance(rows, list):
-                raise StockbitRefused(f"{key}.{name} di stockbit-index.json harus daftar")
+                raise refused(f"{key}.{name} di {fam.index} harus daftar")
             new = []
             for row in rows:
                 if not isinstance(row, list) or not row or not isinstance(row[0], int) or isinstance(row[0], bool) \
-                        or not 0 <= row[0] < len(index["days"]):
-                    raise StockbitRefused(f"baris {key}.{name} di stockbit-index.json tidak menunjuk hari yang valid")
+                        or not 0 <= row[0] < len(days):
+                    raise refused(f"baris {key}.{name} di {fam.index} tidak menunjuk hari yang valid")
                 if row[0] in remap:
                     new.append([remap[row[0]], *row[1:]])
             if new:
                 kept[name] = new
         out[key] = kept
-    notes = index.get("user_notes")
-    if isinstance(notes, dict):
-        out["user_notes"] = {h: n for h, n in notes.items()
+    if fam == desk.STOCKBIT and isinstance(index.get("user_notes"), dict):
+        dropped_ids = finding_ids(index, lambda day: day in drop)
+        out["user_notes"] = {h: n for h, n in index["user_notes"].items()
                              if h in out.get("users", {}) and not note_touches(n, dropped_ids, drop)}
+    elif fam == desk.BEI and isinstance(out.get("tickers"), dict) and isinstance(index.get("names"), dict):
+        out["names"] = {code: name for code, name in index["names"].items() if code in out["tickers"]}
+    return out
+
+
+def finding_ids(index, on_day=lambda day: True):
+    """id temuan (string) di baris users indeks Stockbit yang harinya memenuhi `on_day` (tanggal)."""
+    days, out = index["days"], set()
+    users = index.get("users")
+    for rows in (users.values() if isinstance(users, dict) else ()):
+        for row in (rows if isinstance(rows, list) else ()):
+            if isinstance(row, list) and len(row) > 3 and isinstance(row[0], int) and not isinstance(row[0], bool) \
+                    and 0 <= row[0] < len(days) and isinstance(days[row[0]], dict) and on_day(days[row[0]].get("d")) \
+                    and isinstance(row[3], list):
+                out |= {str(i) for i in row[3] if isinstance(i, (str, int)) and not isinstance(i, bool)}
     return out
 
 
@@ -974,28 +1020,15 @@ def note_touches(note, dropped_ids, drop):
     return any(i in dropped_ids for i in note_ids(note)) or (isinstance(based, dict) and based.get("last_day") in drop)
 
 
-def check_stockbit_index(index, published, quarantined):
-    """stockbit-index.json hanya boleh menunjuk hari yang terbit, dan penilaian otomatis harus bersumber temuan."""
-    if not isinstance(index, dict) or index.get("format") != 1 or not isinstance(index.get("days"), list):
-        raise StockbitRefused("stockbit-index.json tidak berformat 1")
-    for row in index["days"]:
-        if not isinstance(row, dict):
-            raise StockbitRefused("baris hari di stockbit-index.json tidak valid")
-        day = row.get("d")
-        iso_day(day, "tanggal di stockbit-index.json")
-        if row.get("f") != f"sbringkas_{day}_{day}.md" or day not in published:
-            raise StockbitRefused(f"stockbit-index.json menunjuk hari {day} yang tidak diterbitkan ({row.get('f')!r})")
-        if row.get("detail") not in (None, f"sbdetail_{day}_{day}.md"):
-            raise StockbitRefused(f"berkas detail {row.get('detail')!r} di stockbit-index.json tidak sesuai tanggal {day}")
+def check_stockbit_tables(index):
+    """tickers/users objek; penilaian otomatis dan benang harus bersumber temuan yang terbit."""
     for key in ("tickers", "users"):
         if not isinstance(index.get(key, {}), dict):
             raise StockbitRefused(f"{key} di stockbit-index.json harus objek")
     notes = index.get("user_notes", {})
     if not isinstance(notes, dict):
         raise StockbitRefused("user_notes di stockbit-index.json harus objek")
-    published_ids = {str(i) for rows in index.get("users", {}).values() if isinstance(rows, list)
-                     for row in rows if isinstance(row, list) and len(row) > 3 and isinstance(row[3], list)
-                     for i in row[3] if isinstance(i, (str, int)) and not isinstance(i, bool)}
+    published_ids = finding_ids(index)
     for handle, note in notes.items():
         if not isinstance(note, dict):
             continue
@@ -1017,373 +1050,11 @@ def check_stockbit_index(index, published, quarantined):
             count = based.get("findings") if isinstance(based, dict) else None
             if not isinstance(count, int) or isinstance(count, bool) or count < 0:
                 raise StockbitRefused(f"based_on untuk @{handle} harus berisi findings (bilangan >= 0) dan last_day")
-            iso_day(based.get("last_day"), f"based_on.last_day untuk @{handle}")
+            iso_day(based.get("last_day"), f"based_on.last_day untuk @{handle}", StockbitRefused)
         # Rujukan harus temuan yang ada di baris users yang terbit (bukan hari yang dibuang atau tidak dikenal).
         missing = [i for i in note_ids(note) if i not in published_ids]
         if missing:
             raise StockbitRefused(f"catatan @{handle} merujuk temuan yang tidak ada di indeks yang terbit: {', '.join(missing[:5])}")
-    text = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
-    hits = quarantine_hits(text, quarantined)
-    if hits:
-        raise StockbitRefused(f"stockbit-index.json masih memuat stream_id karantina {', '.join(hits[:5])}")
-    redacted = redact(text)
-    try:
-        json.loads(redacted)
-    except ValueError:
-        raise StockbitRefused("penyamaran merusak stockbit-index.json") from None
-    return redacted
-
-
-def load_stockbit_state():
-    try:
-        state = json.loads(STOCKBIT_STATE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {"format": 1}
-    return state if isinstance(state, dict) and state.get("format") == 1 else {"format": 1}
-
-
-def read_stockbit_hold():
-    """Entri mentah .stockbit-hold.json {tgl: entri}, apa adanya. Berkas tidak ada = tidak ada yang ditahan."""
-    try:
-        data = json.loads(STOCKBIT_HOLD.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    except (OSError, ValueError):
-        raise StockbitRefused(f"{STOCKBIT_HOLD.name} tidak bisa dibaca; perbaiki atau hapus dulu") from None
-    days = data.get("days") if isinstance(data, dict) else None
-    if not isinstance(days, dict):
-        raise StockbitRefused(f"{STOCKBIT_HOLD.name} tidak berisi objek days")
-    for day in days:
-        iso_day(day, f"tanggal di {STOCKBIT_HOLD.name}")
-    return dict(days)
-
-
-def hold_sha(entry):
-    sha = entry.get("sha256") if isinstance(entry, dict) else entry
-    return str(sha or "*").lower()
-
-
-# Entri tahanan yang dibuat sinkron untuk hari terbit yang ditahan desk ("tahan dari web").
-DESK_HOLD = {"sha256": "*", "withheld_by": "desk"}
-
-
-def stockbit_withheld(server):
-    """Hari yang ditahan desk dari web, atau None kalau desk tidak punya endpoint ini (HTTP 404: desk lama/belum di-restart).
-
-    None berarti "tidak diketahui", bukan "tidak ada yang ditahan": pemanggil mempertahankan tahanan desk yang sudah tercatat.
-    """
-    try:
-        r = server.get("/api/stockbit/export/withheld")
-    except HTTPError as e:
-        if e.code == 404:
-            e.close()
-            return None
-        raise
-    days = r.get("days") if isinstance(r, dict) else None
-    if not isinstance(days, list):
-        raise StockbitRefused("respons export/withheld tidak berisi daftar days")
-    if r.get("llm_calls", 0) != 0:
-        raise StockbitRefused("export/withheld melaporkan panggilan LLM; ekspor harus read-only")
-    for day in days:
-        iso_day(day, "tanggal export/withheld")
-    return set(days)
-
-
-def stockbit_file_days(match):
-    """Hari yang dicakup berkas sb*: satu hari untuk sbringkas/sbdetail, tujuh hari untuk sbpekan."""
-    try:
-        start, end = date.fromisoformat(match[2]), date.fromisoformat(match[3])
-    except ValueError:
-        return set()  # nama berpola tanggal tetapi tidak valid: bukan hasil sinkron, dibiarkan
-    if match[1] != "sbpekan":
-        return {match[2]}
-    return {(start + timedelta(days=i)).isoformat() for i in range(min((end - start).days, 6) + 1)}
-
-
-def desk_hold_entries(entries, withheld, withdrawn):
-    """Gabungkan tahanan desk ke entri .stockbit-hold.json; tahanan rollback tidak pernah dihapus.
-
-    Hari yang tidak lagi ditahan desk: entri desk murni dihapus (hari itu terbit lagi), sedangkan entri rollback yang
-    ikut ditandai desk hanya kehilangan withheld_by. Hari terbit yang berkasnya dicabut (`withdrawn`) diberi withheld_by=desk.
-    """
-    out = {}
-    for day, entry in entries.items():
-        if isinstance(entry, dict) and entry.get("withheld_by") == "desk" and day not in withheld:
-            if entry == DESK_HOLD:
-                continue
-            entry = {k: v for k, v in entry.items() if k != "withheld_by"}
-        out[day] = entry
-    for day in withdrawn:
-        prev = out.get(day)
-        if prev is None:
-            out[day] = dict(DESK_HOLD)
-        elif isinstance(prev, dict):
-            out[day] = {**prev, "withheld_by": "desk"}
-        else:  # entri lama berbentuk teks = tahanan rollback; dipertahankan saat desk melepas harinya
-            out[day] = {"sha256": hold_sha(prev), "rollback_of": None, "withheld_by": "desk"}
-    return out
-
-
-def sync_stockbit(server, state, force=False, allow_provisional=False, since=STOCKBIT_SINCE):
-    """Salin hari final Stockbit dari ekspor read-only Signal Desk; kembalikan nama berkas yang berubah.
-
-    Semua respons diperiksa dulu; satu kegagalan menolak seluruh putaran sebelum ada berkas yang ditulis atau dihapus.
-    Berkas sb* hanya dihapus untuk hari yang ditahan desk dari web (export/withheld): berkas harian dan rekap pekan yang
-    memuat hari itu dicabut, statusnya dibuang, dan harinya dicatat di .stockbit-hold.json dengan withheld_by=desk.
-    Penghapusan lain hanya lewat rollback_stockbit.py.
-    """
-    since_day = iso_day(since, "--stockbit-since")
-    withheld = stockbit_withheld(server)
-    if withheld is None:
-        # Tanpa daftar dari desk, tahanan desk terakhir tetap berlaku: hari itu tetap tidak terbit dan tidak masuk indeks.
-        withheld = {day for day, entry in read_stockbit_hold().items()
-                    if isinstance(entry, dict) and entry.get("withheld_by") == "desk"}
-        if withheld:
-            print(f"  peringatan: desk tidak punya export/withheld (HTTP 404); {len(withheld)} hari yang ditahan desk tetap ditahan")
-    listing = server.get("/api/stockbit/export/days" + ("?include_provisional=1" if allow_provisional else ""))
-    days = listing.get("days") if isinstance(listing, dict) else None
-    if not isinstance(days, list):
-        raise StockbitRefused("respons export/days tidak berisi daftar days")
-    allowed = {"final", "sementara"} if allow_provisional else {"final"}
-    provisional = "include_provisional=1" if allow_provisional else ""
-
-    # Berkas terbit yang mencakup hari yang ditahan desk dicabut (sbpekan juga, karena rekapnya memuat hari itu).
-    entries = read_stockbit_hold()
-    withdraw, withdrawn = [], set()
-    for p in sorted(DEST.glob("sb*.md")):
-        m = STOCKBIT_FILE.fullmatch(p.name)
-        hit = stockbit_file_days(m) & withheld if m else set()
-        if hit:
-            withdraw.append(p.name)
-            withdrawn |= hit
-    new_entries = desk_hold_entries(entries, withheld, withdrawn)
-    hold = {day: hold_sha(entry) for day, entry in new_entries.items()}
-
-    # Hari yang sudah terbit tidak pernah "terlalu awal": publish dengan --stockbit-since lebih awal (tanggal 'Dari' di
-    # desk) tetap diperbarui dan dihitung oleh putaran berikutnya yang memakai batas bawaan.
-    already = {m[2] for p in DEST.glob("sbringkas_*.md") if (m := STOCKBIT_FILE.fullmatch(p.name))}
-    eligible, held, early = {}, set(), set()
-    for row in days:
-        if not isinstance(row, dict):
-            raise StockbitRefused("baris export/days tidak valid")
-        day = iso_day(row.get("date"), "tanggal export/days")
-        if row["date"] in withheld:
-            continue  # desk seharusnya sudah tidak mendaftarnya; tetap tidak diterbitkan
-        if day < since_day and row["date"] not in already:
-            early.add(row["date"])
-            continue
-        if row.get("state") not in allowed:
-            continue
-        if row["date"] in hold and hold[row["date"]] in ("*", str(row.get("sha256") or "").lower()):
-            held.add(row["date"])  # di-rollback; tunggu desk memfinalkan ulang (sha baru) atau hapus entri tahanan
-            continue
-        if row["date"] in eligible:
-            raise StockbitRefused(f"tanggal {row['date']} muncul dua kali di export/days")
-        if row.get("ok") is not True:
-            raise StockbitRefused(f"cakupan {row['date']} belum klop (ok bukan true); tinjau di Signal Desk dulu")
-        eligible[row["date"]] = row
-
-    # Hari yang dicabut karena ditahan desk tidak dihitung sebagai terbit (sama seperti hari yang ditahan rollback),
-    # jadi penjaga jumlah di bawah tidak menolaknya.
-    published = {m[2] for p in DEST.glob("sbringkas_*.md") if (m := STOCKBIT_FILE.fullmatch(p.name)) and p.name not in withdraw}
-    for day in sorted(held):
-        print(f"  ditahan rollback: {day} (sha ekspor belum berubah; lihat {STOCKBIT_HOLD.name})")
-    for day in sorted(withheld):
-        print(f"  ditahan desk dari web: {day}" + (" (berkas terbit dicabut)" if day in withdrawn else ""))
-    aged = {d for d in published - eligible.keys() - held if published_provisional(state.get("days"), d)}
-    if len(eligible) + len(held & published) + len(aged) < len(published):
-        raise StockbitRefused(f"server hanya mengekspor {len(eligible)} hari final, padahal {len(published)} hari sudah terbit; "
-                              f"tidak ada yang ditulis")
-    for day in sorted(published - eligible.keys() - held):
-        if day in aged:
-            print(f"  {day} terbit sebagai hari sementara dan tidak lagi diekspor; berkasnya dibiarkan")
-        else:
-            print(f"  peringatan: {day} sudah terbit tetapi tidak lagi diekspor sebagai final; berkasnya dibiarkan")
-
-    day_state, week_state = state.setdefault("days", {}), state.setdefault("weeks", {})
-    pending, new_days, new_weeks, quarantined = {}, {}, {}, {}
-    for day, row in sorted(eligible.items()):
-        fp = f"{row.get('sha256')}|{row.get('updated_at')}|{row.get('state')}"
-        names = {kind: f"{prefix}_{day}_{day}.md" for kind, prefix in STOCKBIT_KIND.items()}
-        prev = day_state.get(day) or {}
-        if not force and prev.get("fp") == fp and all((DEST / n).is_file() for n in names.values()):
-            quarantined[day] = set(prev.get("quarantined") or [])
-            continue
-        responses = {}
-        for kind in names:
-            r = server.get(f"/api/stockbit/export/day/{day}?kind={kind}" + (f"&{provisional}" if provisional else ""))
-            if not isinstance(r, dict):
-                raise StockbitRefused(f"respons export/day {day} {kind} tidak valid")
-            if r.get("state") != row.get("state"):
-                raise StockbitRefused(f"status {day} berubah di tengah sinkron ({row.get('state')} -> {r.get('state')}); ulangi")
-            coverage = r.get("coverage")
-            if isinstance(coverage, dict) and coverage.get("ok") is False:
-                raise StockbitRefused(f"cakupan {day} ({kind}) belum klop")
-            if r.get("llm_calls", 0) != 0:
-                raise StockbitRefused(f"export/day {day} melaporkan panggilan LLM; ekspor harus read-only")
-            responses[kind] = r
-        ids = set().union(*(stockbit_ids(r.get("quarantined_stream_ids")) for r in responses.values()))
-        entry = {"fp": fp, "files": {}, "quarantined": sorted(ids, key=int)}
-        for kind, r in responses.items():
-            check_stockbit_file(r.get("name"), names[kind], r.get("text"), r.get("sha256"), ids)
-            pending[names[kind]] = redact(r["text"])
-            entry["files"][names[kind]] = r["sha256"].lower()
-        quarantined[day], new_days[day] = ids, entry
-
-    mondays = sorted({date.fromisoformat(d) - timedelta(days=date.fromisoformat(d).weekday()) for d in eligible})
-    for monday in mondays:
-        week = [(monday + timedelta(days=i)).isoformat() for i in range(7)]
-        if not all(d in eligible for d in week):
-            continue  # pekan belum lengkap di sisi arsip; jangan terbitkan rekap yang menunjuk hari yang belum terbit
-        name = f"sbpekan_{week[0]}_{week[-1]}.md"
-        fp = "|".join((new_days.get(d) or day_state.get(d) or {}).get("fp", "") for d in week)
-        if not force and (week_state.get(week[0]) or {}).get("fp") == fp and (DEST / name).is_file():
-            continue
-        try:
-            r = server.get(f"/api/stockbit/export/week/{week[0]}")
-        except HTTPError as e:
-            if e.code == 404:  # pekan belum lengkap menurut server
-                e.close()
-                continue
-            raise
-        if not isinstance(r, dict):
-            raise StockbitRefused(f"respons export/week {week[0]} tidak valid")
-        ids = set().union(*(quarantined.get(d, set()) for d in week))
-        check_stockbit_file(r.get("name"), name, r.get("text"), r.get("sha256"), ids)
-        pending[name] = redact(r["text"])
-        new_weeks[week[0]] = {"fp": fp, "file": name, "sha256": r["sha256"].lower()}
-
-    all_ids = set().union(*quarantined.values()) if quarantined else set()
-    # Desk tidak membatasi tanggal awal indeks: buang hari sebelum --stockbit-since (kecuali yang sudah terbit) dan
-    # hari yang ditahan (rollback atau desk); hari lain yang tidak terbit tetap ditolak.
-    index = server.get("/api/stockbit/export/index" + (f"?{provisional}" if provisional else ""))
-    index = filter_stockbit_index(index, (early - published) | held | withheld)
-    index_text = check_stockbit_index(index, published | eligible.keys(), all_ids)
-
-    # Semua lolos: baru menulis dan menghapus (di folder staging sync_once; sinkron yang ditolak tidak menghapus apa pun).
-    changed = [name for name, text in sorted(pending.items()) if write_if_changed(DEST / name, text)]
-    if write_if_changed(STOCKBIT_INDEX, index_text):
-        changed.append(STOCKBIT_INDEX.name)
-    for name in withdraw:
-        path = DEST / name
-        if path.is_symlink() or path.parent.resolve() != DEST.resolve():
-            raise ValueError("Berkas Stockbit yang dicabut bukan berkas biasa dalam folder yang dikelola.")
-        path.unlink()
-        changed.append(name)
-    if new_entries != entries:
-        write_if_changed(STOCKBIT_HOLD, json.dumps({"format": 1, "days": dict(sorted(new_entries.items()))},
-                                                   ensure_ascii=False, indent=1) + "\n")
-        changed.append(STOCKBIT_HOLD.name)
-    day_state.update(new_days)
-    week_state.update(new_weeks)
-    for day in withheld:
-        day_state.pop(day, None)
-    for monday in list(week_state):
-        try:
-            week = {(date.fromisoformat(monday) + timedelta(days=i)).isoformat() for i in range(7)}
-        except (TypeError, ValueError):
-            continue
-        if week & withheld:
-            del week_state[monday]
-    state["format"] = 1
-    # Tanpa cap waktu: status hanya berubah kalau isi berubah, supaya publish tanpa perubahan tidak membuat commit.
-    write_if_changed(STOCKBIT_STATE, json.dumps(state, ensure_ascii=False, indent=1, sort_keys=True))
-    return changed
-
-
-def _sync_stockbit_once(args):
-    """Mode --stockbit-only: tanpa /api/profiles, penjaga profil, digest, atau kepemilikan."""
-    server = Server(args.server)
-    server.get("/api/health", timeout=10)
-    DEST.mkdir(parents=True, exist_ok=True)
-    changed = sync_stockbit(server, load_stockbit_state(), force=getattr(args, "force", False),
-                            allow_provisional=getattr(args, "allow_provisional", False),
-                            since=getattr(args, "stockbit_since", None) or STOCKBIT_SINCE)
-    print(f"[{datetime.now():%H:%M:%S}] Stockbit: {len(changed)} berkas baru/berubah")
-    for name in changed:
-        print(f"  {'+' if (DEST / name).exists() else '-'} {name}")
-    if getattr(args, "with_bei", False):
-        # Staging yang sama (sync_once), tetapi BEI yang ditolak tidak membatalkan Stockbit: semua berkas BEI di staging
-        # dikembalikan persis seperti sebelum putaran ini dan BEI dilaporkan "dilewati" (publish_stockbit -> bei_skipped).
-        changed = changed + _run_bei_or_skip(server, args)
-    return bool(changed)
-
-
-def _bei_managed(path):
-    return path.name in (".sync-bei.json", "bei-index.json", ".bei-hold.json") or bool(BEI_FILE.fullmatch(path.name))
-
-
-def _run_bei_or_skip(server, args):
-    """_run_bei untuk publish gabungan: penolakan atau HTTP error BEI = BEI dilewati tanpa satu pun berkas BEI berubah."""
-    before = {p.name: p.read_bytes() for p in DEST.iterdir() if _bei_managed(p) and p.is_file() and not p.is_symlink()}
-    try:
-        return _run_bei(server, args)
-    except (BeiRefused, HTTPError) as e:
-        if isinstance(e, HTTPError):
-            e.close()
-            reason = f"Signal Desk menjawab HTTP {e.code} untuk {e.url}"
-        else:
-            reason = str(e)
-        for p in DEST.iterdir():
-            if _bei_managed(p) and p.name not in before:
-                p.unlink()
-        for name, data in before.items():
-            if not (DEST / name).is_file() or (DEST / name).read_bytes() != data:
-                (DEST / name).write_bytes(data)
-        print(f"  peringatan: BEI dilewati, tidak ada berkas BEI yang diubah: {reason}. Stockbit tetap diterbitkan; "
-              f"tinjau BEI di Signal Desk lalu publikasikan lagi.")
-        return []
-
-
-# ---------------------------------------------------------------- ringkasan keterbukaan BEI
-
-class BeiRefused(ValueError):
-    """Ekspor BEI tidak lolos pemeriksaan; sinkron dibatalkan tanpa menulis apa pun."""
-
-
-class BeiProfileSkip(Exception):
-    """Ekspor BEI berasal dari profil desk lain dari yang tercatat di .sync-bei.json: BEI dilewati tanpa menulis apa pun."""
-
-
-def bei_profile_of(response):
-    """profile_id dari respons ekspor BEI, atau None kalau desk tidak menyebutnya (desk lama = tidak diketahui)."""
-    pid = response.get("profile_id") if isinstance(response, dict) else None
-    if pid is None:
-        return None
-    if not isinstance(pid, str) or not pid.strip() or len(pid) > 200:
-        raise BeiRefused(f"profile_id di ekspor BEI tidak valid: {pid!r}")
-    return pid
-
-
-def same_bei_profile(response, expected, what):
-    """Respons ekspor BEI berikutnya harus dari profil yang sama dengan export/days; kalau tidak, BEI dilewati."""
-    pid = bei_profile_of(response)
-    if expected is not None and pid is not None and pid != expected:
-        raise BeiProfileSkip(f"{what} dari profil desk '{pid}', bukan '{expected}' (profil aktif berganti di tengah sinkron)")
-
-
-def bei_day(value, what="tanggal"):
-    try:
-        return iso_day(value, what)
-    except StockbitRefused as e:
-        raise BeiRefused(str(e)) from None
-
-
-def check_bei_file(name, expected, text, sha):
-    """Tolak berkas BEI yang namanya, kategorinya, atau hash-nya tidak sesuai kontrak ekspor."""
-    if name != expected:
-        raise BeiRefused(f"nama berkas dari server {name!r}, seharusnya {expected!r}")
-    match = BEI_FILE.fullmatch(name)
-    if not match:
-        raise BeiRefused(f"nama berkas BEI tidak dikenal: {name!r}")
-    category = categorize(Path(name).stem)
-    if category != BEI_CATEGORY[match[1]]:
-        raise BeiRefused(f"build.py memasukkan {name} ke kategori '{category}', bukan '{BEI_CATEGORY[match[1]]}'; "
-                         f"tambahkan kategorinya di CATEGORIES build.py dulu")
-    if not isinstance(text, str) or not text.strip():
-        raise BeiRefused(f"{name} kosong")
-    if not isinstance(sha, str) or sha.lower() != sha256_text(text):
-        raise BeiRefused(f"sha256 {name} tidak cocok dengan isinya")
 
 
 def _count(value):
@@ -1425,61 +1096,8 @@ def check_bei_row(code, row, n_days):
         raise BeiRefused(f"baris tickers.{code} di bei-index.json tidak sesuai format 1")
 
 
-def filter_bei_index(index, drop):
-    """Buang hari `drop` (sebelum --bei-since, ditahan rollback, atau ditahan desk) dari indeks desk dan petakan ulang dayIdx.
-
-    Baris tickers yang menunjuk hari yang dibuang ikut dibuang; kode yang jadi kosong (dan namanya) juga.
-    """
-    if not isinstance(index, dict) or index.get("format") != 1 or not isinstance(index.get("days"), list):
-        raise BeiRefused("bei-index.json tidak berformat 1")
-    if not drop:
-        return index
-    remap, days = {}, []
-    for old, row in enumerate(index["days"]):
-        if isinstance(row, dict) and row.get("d") in drop:
-            continue
-        remap[old] = len(days)
-        days.append(row)
-    out = {**index, "days": days}
-    table = index.get("tickers", {})
-    if isinstance(table, dict):  # selain objek: check_bei_index menolaknya
-        kept = {}
-        for code, rows in table.items():
-            if not isinstance(rows, list):
-                raise BeiRefused(f"tickers.{code} di bei-index.json harus daftar")
-            new = []
-            for row in rows:
-                if not isinstance(row, list) or not row or not isinstance(row[0], int) or isinstance(row[0], bool) \
-                        or not 0 <= row[0] < len(index["days"]):
-                    raise BeiRefused(f"baris tickers.{code} di bei-index.json tidak menunjuk hari yang valid")
-                if row[0] in remap:
-                    new.append([remap[row[0]], *row[1:]])
-            if new:
-                kept[code] = new
-        out["tickers"] = kept
-        names = index.get("names")
-        if isinstance(names, dict):
-            out["names"] = {code: name for code, name in names.items() if code in kept}
-    return out
-
-
-def check_bei_index(index, published):
-    """bei-index.json hanya boleh menunjuk hari yang terbit; bentuk baris diperiksa sebelum ada yang ditulis."""
-    if not isinstance(index, dict) or index.get("format") != 1 or not isinstance(index.get("days"), list):
-        raise BeiRefused("bei-index.json tidak berformat 1")
-    seen = set()
-    for row in index["days"]:
-        if not isinstance(row, dict):
-            raise BeiRefused("baris hari di bei-index.json tidak valid")
-        day = row.get("d")
-        bei_day(day, "tanggal di bei-index.json")
-        if day in seen:
-            raise BeiRefused(f"hari {day} muncul dua kali di bei-index.json")
-        seen.add(day)
-        if row.get("f") != f"beiringkas_{day}_{day}.md" or day not in published:
-            raise BeiRefused(f"bei-index.json menunjuk hari {day} yang tidak diterbitkan ({row.get('f')!r})")
-        if row.get("detail") not in (None, f"beidetail_{day}_{day}.md"):
-            raise BeiRefused(f"berkas detail {row.get('detail')!r} di bei-index.json tidak sesuai tanggal {day}")
+def check_bei_tables(index):
+    """tickers dan names bei-index.json: kode emiten, bentuk baris, dan nama."""
     tickers, names = index.get("tickers", {}), index.get("names", {})
     if not isinstance(tickers, dict):
         raise BeiRefused("tickers di bei-index.json harus objek")
@@ -1493,61 +1111,120 @@ def check_bei_index(index, published):
     for code, name in names.items():
         if not BEI_TICKER.fullmatch(code) or not isinstance(name, str) or len(name) > 300:
             raise BeiRefused(f"nama emiten {code!r} di bei-index.json tidak valid")
+
+
+CHECK_TABLES = {desk.STOCKBIT: check_stockbit_tables, desk.BEI: check_bei_tables}
+
+
+def check_index(fam, index, published, quarantined=frozenset()):
+    """Indeks desk hanya boleh menunjuk hari yang terbit, sekali per hari; tabelnya diperiksa sebelum ada yang ditulis.
+    Kembalikan teks JSON-nya yang sudah disamarkan."""
+    refused, seen = REFUSED[fam], set()
+    for row in index_days(fam, index):
+        if not isinstance(row, dict):
+            raise refused(f"baris hari di {fam.index} tidak valid")
+        day = row.get("d")
+        iso_day(day, f"tanggal di {fam.index}", refused)
+        if day in seen:
+            raise refused(f"hari {day} muncul dua kali di {fam.index}")
+        seen.add(day)
+        if row.get("f") != fam.name("ringkas", day) or day not in published:
+            raise refused(f"{fam.index} menunjuk hari {day} yang tidak diterbitkan ({row.get('f')!r})")
+        if row.get("detail") not in (None, fam.name("detail", day)):
+            raise refused(f"berkas detail {row.get('detail')!r} di {fam.index} tidak sesuai tanggal {day}")
+    CHECK_TABLES[fam](index)
     text = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
+    hits = quarantine_hits(text, quarantined)
+    if hits:
+        raise refused(f"{fam.index} masih memuat stream_id karantina {', '.join(hits[:5])}")
     redacted = redact(text)
     try:
         json.loads(redacted)
     except ValueError:
-        raise BeiRefused("penyamaran merusak bei-index.json") from None
+        raise refused(f"penyamaran merusak {fam.index}") from None
     return redacted
 
 
-def load_bei_state():
+def load_family_state(fam):
     try:
-        state = json.loads(BEI_STATE.read_text(encoding="utf-8"))
+        state = json.loads((DEST / fam.state).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {"format": 1}
     return state if isinstance(state, dict) and state.get("format") == 1 else {"format": 1}
 
 
-def read_bei_hold():
-    """Entri mentah .bei-hold.json {tgl: entri}, apa adanya. Berkas tidak ada = tidak ada yang ditahan."""
+def read_hold(fam):
+    """Entri mentah berkas tahanan keluarga itu {tgl: entri}, apa adanya. Berkas tidak ada = tidak ada yang ditahan."""
+    refused = REFUSED[fam]
     try:
-        data = json.loads(BEI_HOLD.read_text(encoding="utf-8"))
+        entries = desk.parse_hold((DEST / fam.hold).read_text(encoding="utf-8"))
     except FileNotFoundError:
         return {}
     except (OSError, ValueError):
-        raise BeiRefused(f"{BEI_HOLD.name} tidak bisa dibaca; perbaiki atau hapus dulu") from None
-    days = data.get("days") if isinstance(data, dict) else None
-    if not isinstance(days, dict):
-        raise BeiRefused(f"{BEI_HOLD.name} tidak berisi objek days")
-    for day in days:
-        bei_day(day, f"tanggal di {BEI_HOLD.name}")
-    return dict(days)
+        raise refused(f"{fam.hold} tidak bisa dibaca atau tidak berisi objek days; perbaiki atau hapus dulu") from None
+    for day in entries:
+        iso_day(day, f"tanggal di {fam.hold}", refused)
+    return entries
 
 
-def bei_withheld(server, profile=None):
-    """Hari BEI yang ditahan desk dari web, atau None kalau desk tidak punya endpoint ini (HTTP 404 = tidak diketahui)."""
+def hold_sha(entry):
+    sha = entry.get("sha256") if isinstance(entry, dict) else entry
+    return str(sha or "*").lower()
+
+
+# Entri tahanan yang dibuat sinkron untuk hari terbit yang ditahan desk ("tahan dari web").
+DESK_HOLD = {"sha256": "*", "withheld_by": "desk"}
+
+
+def desk_withheld(export):
+    """Hari yang ditahan desk dari web. Desk tanpa export/withheld (HTTP 404: desk lama atau belum di-restart) berarti
+    "tidak diketahui", bukan "tidak ada yang ditahan": tahanan desk yang sudah tercatat tetap berlaku."""
+    fam = export.fam
     try:
-        r = server.get("/api/bei/export/withheld")
+        r = export.get("withheld")
     except HTTPError as e:
-        if e.code == 404:
-            e.close()
-            return None
-        raise
-    days = r.get("days") if isinstance(r, dict) else None
+        if e.code != 404:
+            raise
+        e.close()
+        days = desk.desk_held(read_hold(fam))
+        if days:
+            print(f"  peringatan: desk tidak punya {fam.key} export/withheld (HTTP 404); {len(days)} hari {fam.label} yang "
+                  f"ditahan desk tetap ditahan")
+        return days
+    days = r.get("days")
     if not isinstance(days, list):
-        raise BeiRefused("respons bei export/withheld tidak berisi daftar days")
-    if r.get("llm_calls", 0) != 0:
-        raise BeiRefused("bei export/withheld melaporkan panggilan LLM; ekspor harus read-only")
-    same_bei_profile(r, profile, "bei export/withheld")
+        raise export.refused(f"respons {fam.key} export/withheld tidak berisi daftar days")
     for day in days:
-        bei_day(day, "tanggal bei export/withheld")
+        iso_day(day, f"tanggal {fam.key} export/withheld", export.refused)
     return set(days)
 
 
-def bei_empty_day(row):
-    """Baris export/days untuk hari tercakup tanpa pengumuman (announcements 0, atau files tanpa nama berkas)."""
+def desk_hold_entries(entries, withheld, withdrawn):
+    """Gabungkan tahanan desk ke entri berkas tahanan; tahanan rollback tidak pernah dihapus.
+
+    Hari yang tidak lagi ditahan desk: entri desk murni dihapus (hari itu terbit lagi), sedangkan entri rollback yang
+    ikut ditandai desk hanya kehilangan withheld_by. Hari terbit yang berkasnya dicabut (`withdrawn`) diberi withheld_by=desk.
+    """
+    out = {}
+    for day, entry in entries.items():
+        if isinstance(entry, dict) and entry.get("withheld_by") == "desk" and day not in withheld:
+            if entry == DESK_HOLD:
+                continue
+            entry = {k: v for k, v in entry.items() if k != "withheld_by"}
+        out[day] = entry
+    for day in withdrawn:
+        prev = out.get(day)
+        if prev is None:
+            out[day] = dict(DESK_HOLD)
+        elif isinstance(prev, dict):
+            out[day] = {**prev, "withheld_by": "desk"}
+        else:  # entri lama berbentuk teks = tahanan rollback; dipertahankan saat desk melepas harinya
+            out[day] = {"sha256": hold_sha(prev), "rollback_of": None, "withheld_by": "desk"}
+    return out
+
+
+def empty_day(row):
+    """Baris export/days untuk hari tercakup tanpa pengumuman (BEI: announcements 0, atau files tanpa nama berkas)."""
     files = row.get("files")
     return row.get("announcements") == 0 or (isinstance(files, dict) and not any(files.values()))
 
@@ -1561,233 +1238,260 @@ def published_provisional(state_days, day):
     return isinstance(fp, str) and "|" in fp and not fp.endswith("|final")
 
 
-def bei_fp(row):
-    return f"{row.get('sha256')}|{row.get('detail_sha256')}|{row.get('updated_at')}|{row.get('state')}"
+def fingerprint(fam, row):
+    """Sidik ekspor satu hari di berkas status: sha ringkas | (BEI: sha detail |) updated_at | state. Diawali sha
+    (publish_stockbit.state_day_shas) dan diakhiri state (published_provisional)."""
+    detail = [row.get("detail_sha256")] if fam == desk.BEI else []
+    return "|".join(str(v) for v in [row.get("sha256"), *detail, row.get("updated_at"), row.get("state")])
 
 
-def bei_file_days(match):
-    """Hari yang dicakup berkas bei*: satu hari untuk beiringkas/beidetail, tujuh hari untuk beipekan."""
-    try:
-        start, end = date.fromisoformat(match[2]), date.fromisoformat(match[3])
-    except ValueError:
-        return set()
-    if match[1] != "beipekan":
-        return {match[2]}
-    return {(start + timedelta(days=i)).isoformat() for i in range(min((end - start).days, 6) + 1)}
+def week_of(monday):
+    return [(monday + timedelta(days=i)).isoformat() for i in range(7)]
 
 
-def sync_bei(server, state, force=False, allow_provisional=False, since=None, profile=None):
-    """sync_bei_days, tetapi profil desk yang lain dari yang tercatat = BEI dilewati (None) dengan peringatan.
+def sync_family(fam, server, state, force=False, allow_provisional=False, since=None, profile=None):
+    """Salin hari final satu keluarga dari ekspor read-only Signal Desk; kembalikan nama berkas yang berubah, atau None
+    kalau keluarga itu dilewati tanpa menyentuh berkas apa pun (BEI: desk tanpa /api/bei, atau ekspor dari profil lain).
 
-    .sync-bei.json mencatat profile_id dari ekspor desk pada sinkron BEI pertama yang menyebutnya. Ekspor dari profil
-    lain tidak menulis atau menghapus berkas BEI apa pun (Stockbit di staging yang sama tetap jalan). `profile`
-    (--bei-profile) memilih profil yang diharapkan secara sengaja; setelah sinkron berhasil profil itulah yang tercatat.
-    Desk yang tidak menyebut profile_id = tidak diketahui: perilaku lama, catatan profil tidak diubah.
+    Semua respons diperiksa dulu; satu kegagalan menolak seluruh putaran sebelum ada berkas yang ditulis atau dihapus.
+    Berkas hanya dihapus untuk hari yang ditahan desk dari web (export/withheld): berkas harian dan rekap pekan yang memuat
+    hari itu dicabut, statusnya dibuang, dan harinya dicatat di berkas tahanan dengan withheld_by=desk. Penghapusan lain
+    hanya lewat rollback_stockbit.py.
+
+    Profil: berkas status mencatat profile_id dari ekspor desk pada sinkron pertama yang menyebutnya (desk Stockbit tidak
+    menyebutnya). Ekspor dari profil lain tidak menulis atau menghapus apa pun; `profile` (--bei-profile) memilih profil yang
+    diharapkan secara sengaja, dan setelah sinkron berhasil profil itulah yang tercatat.
     """
     try:
-        return sync_bei_days(server, state, force=force, allow_provisional=allow_provisional, since=since, profile=profile)
-    except BeiProfileSkip as e:
-        print(f"  peringatan: BEI dilewati, tidak ada berkas BEI yang diubah: {e}. Aktifkan profil itu di Signal Desk, "
-              f"atau jalankan dengan --bei-profile <id> kalau memang pindah profil.")
+        return _sync_family(fam, server, state, force, allow_provisional, since, profile)
+    except ProfileSkip as e:
+        print(f"  peringatan: {fam.label} dilewati, tidak ada berkas {fam.label} yang diubah: {e}. Aktifkan profil itu di "
+              f"Signal Desk, atau jalankan dengan --bei-profile <id> kalau memang pindah profil.")
         return None
 
 
-def sync_bei_days(server, state, force=False, allow_provisional=False, since=None, profile=None):
-    """Salin hari final ringkasan keterbukaan BEI dari ekspor read-only Signal Desk; kembalikan nama berkas yang berubah,
-    atau None kalau desk belum punya /api/bei (HTTP 404 pada export/days): BEI dilewati tanpa menyentuh berkas apa pun.
-
-    Klon sync_stockbit: semua respons diperiksa dulu, satu kegagalan menolak seluruh putaran sebelum ada yang ditulis
-    atau dihapus. Berkas bei* hanya dihapus untuk hari yang ditahan desk dari web (export/withheld); tahanan dicatat di
-    .bei-hold.json dengan withheld_by=desk. HTTP 404 pada export/withheld = tahanan desk yang sudah tercatat tetap berlaku.
-    """
-    since_day = bei_day(since, "--bei-since") if since else None
-    provisional = "include_provisional=1" if allow_provisional else ""
+def _sync_family(fam, server, state, force, allow_provisional, since, profile):
+    refused = REFUSED[fam]
+    since_day = iso_day(since, f"--{fam.key}-since", refused) if since else None
+    export = Export(server, fam, allow_provisional)
     try:
-        listing = server.get("/api/bei/export/days" + (f"?{provisional}" if provisional else ""))
+        listing = export.get("days", provisional=True)
     except HTTPError as e:
-        if e.code == 404:
-            e.close()
-            print("  desk belum punya /api/bei (HTTP 404 pada export/days); BEI dilewati, tidak ada berkas BEI yang diubah")
-            return None
-        raise
-    days = listing.get("days") if isinstance(listing, dict) else None
-    if not isinstance(days, list):
-        raise BeiRefused("respons bei export/days tidak berisi daftar days")
-    source = bei_profile_of(listing)
-    recorded = state.get("profile_id")
-    expected = profile or recorded
-    if source is not None and expected is not None and source != expected:
-        how = "diminta --bei-profile" if profile else "tercatat di .sync-bei.json"
-        raise BeiProfileSkip(f"ekspor dari profil desk '{source}', padahal profil BEI yang {how} '{expected}'")
-    withheld = bei_withheld(server, source)
-    if withheld is None:
-        withheld = {day for day, entry in read_bei_hold().items() if isinstance(entry, dict) and entry.get("withheld_by") == "desk"}
-        if withheld:
-            print(f"  peringatan: desk tidak punya bei export/withheld (HTTP 404); {len(withheld)} hari BEI yang ditahan desk tetap ditahan")
-    allowed = {"final", "sementara"} if allow_provisional else {"final"}
+        if e.code != 404 or fam != desk.BEI:
+            raise
+        e.close()
+        print("  desk belum punya /api/bei (HTTP 404 pada export/days); BEI dilewati, tidak ada berkas BEI yang diubah")
+        return None
+    rows = listing.get("days")
+    if not isinstance(rows, list):
+        raise refused(f"respons {fam.key} export/days tidak berisi daftar days")
+    export.profile = profile_of(listing, refused)
+    expected = profile or state.get("profile_id")
+    if export.profile is not None and expected is not None and export.profile != expected:
+        how = "diminta --bei-profile" if profile else f"tercatat di {fam.state}"
+        raise ProfileSkip(f"ekspor dari profil desk '{export.profile}', padahal profil {fam.label} yang {how} '{expected}'")
+    withheld = desk_withheld(export)
 
-    entries = read_bei_hold()
+    # Berkas terbit yang mencakup hari yang ditahan desk dicabut (rekap pekan juga, karena memuat hari itu).
+    entries = read_hold(fam)
     withdraw, withdrawn = [], set()
-    for p in sorted(DEST.glob("bei*.md")):
-        m = BEI_FILE.fullmatch(p.name)
-        hit = bei_file_days(m) & withheld if m else set()
+    for p in sorted(DEST.glob(f"{fam.prefix}*.md")):
+        found = desk.parse(p.name)
+        hit = found.days() & withheld if found else set()
         if hit:
             withdraw.append(p.name)
             withdrawn |= hit
     new_entries = desk_hold_entries(entries, withheld, withdrawn)
     hold = {day: hold_sha(entry) for day, entry in new_entries.items()}
 
+    def published_days(skip=()):
+        return {f.start for p in DEST.glob(f"{fam.prefix}ringkas_*.md") if (f := desk.parse(p.name)) and p.name not in skip}
+
+    # Hari yang sudah terbit tidak pernah "terlalu awal": publish dengan --stockbit-since lebih awal (tanggal 'Dari' di
+    # desk) tetap diperbarui dan dihitung oleh putaran berikutnya yang memakai batas bawaan.
+    already = published_days()
+    allowed = {"final", "sementara"} if allow_provisional else {"final"}
     eligible, held, early, empty = {}, set(), set(), {}
-    for row in days:
+    for row in rows:
         if not isinstance(row, dict):
-            raise BeiRefused("baris bei export/days tidak valid")
-        day = bei_day(row.get("date"), "tanggal bei export/days")
-        if row["date"] in withheld:
-            continue
-        if since_day and day < since_day:
-            early.add(row["date"])
+            raise refused(f"baris {fam.key} export/days tidak valid")
+        when = iso_day(row.get("date"), f"tanggal {fam.key} export/days", refused)
+        day = row["date"]
+        if day in withheld:
+            continue  # desk seharusnya sudah tidak mendaftarnya; tetap tidak diterbitkan
+        if since_day and when < since_day and day not in already:
+            early.add(day)
             continue
         if row.get("state") not in allowed:
             continue
-        if bei_empty_day(row):
-            # Hari tercakup tanpa pengumuman: tidak punya berkas, hanya melengkapi pekan (beipekan) menurut desk.
-            if row.get("ok", True) is True and row["date"] not in eligible:
-                empty[row["date"]] = row
+        if empty_day(row):
+            # BEI: hari tercakup tanpa pengumuman tidak punya berkas, hanya melengkapi pekan menurut desk.
+            if row.get("ok", True) is True and day not in eligible:
+                empty[day] = row
             continue
-        if row["date"] in hold and hold[row["date"]] in ("*", str(row.get("sha256") or "").lower()):
-            held.add(row["date"])
+        if day in hold and hold[day] in ("*", str(row.get("sha256") or "").lower()):
+            held.add(day)  # di-rollback; tunggu desk memfinalkan ulang (sha baru) atau hapus entri tahanan
             continue
-        if row["date"] in eligible:
-            raise BeiRefused(f"tanggal {row['date']} muncul dua kali di bei export/days")
+        if day in eligible:
+            raise refused(f"tanggal {day} muncul dua kali di {fam.key} export/days")
         if row.get("ok") is not True:
-            raise BeiRefused(f"hari BEI {row['date']} belum klop (ok bukan true); tinjau di Signal Desk dulu")
-        files = row.get("files")
-        expected = {kind: f"{prefix}_{row['date']}_{row['date']}.md" for kind, prefix in BEI_KIND.items()}
-        if files is not None and (not isinstance(files, dict) or any(files.get(k) not in (None, n) for k, n in expected.items())):
-            raise BeiRefused(f"nama berkas di bei export/days {row['date']} tidak sesuai kontrak: {files!r}")
-        eligible[row["date"]] = row
+            raise refused(f"hari {fam.label} {day} belum klop (ok bukan true); tinjau di Signal Desk dulu")
+        files, names = row.get("files"), {kind: fam.name(kind, day) for kind in DAY_KINDS}
+        if files is not None and (not isinstance(files, dict) or any(files.get(k) not in (None, n) for k, n in names.items())):
+            raise refused(f"nama berkas di {fam.key} export/days {day} tidak sesuai kontrak: {files!r}")
+        eligible[day] = row
 
-    published = {m[2] for p in DEST.glob("beiringkas_*.md") if (m := BEI_FILE.fullmatch(p.name)) and p.name not in withdraw}
+    # Hari yang dicabut karena ditahan desk tidak dihitung sebagai terbit (sama seperti hari yang ditahan rollback),
+    # jadi penjaga jumlah di bawah tidak menolaknya.
+    published = published_days(skip=withdraw)
     for day in sorted(held):
-        print(f"  BEI ditahan rollback: {day} (sha ekspor belum berubah; lihat {BEI_HOLD.name})")
+        print(f"  {fam.label} ditahan rollback: {day} (sha ekspor belum berubah; lihat {fam.hold})")
     for day in sorted(withheld):
-        print(f"  BEI ditahan desk dari web: {day}" + (" (berkas terbit dicabut)" if day in withdrawn else ""))
+        print(f"  {fam.label} ditahan desk dari web: {day}" + (" (berkas terbit dicabut)" if day in withdrawn else ""))
     aged = {d for d in published - eligible.keys() - held if published_provisional(state.get("days"), d)}
     if len(eligible) + len(held & published) + len(aged) < len(published):
-        raise BeiRefused(f"server hanya mengekspor {len(eligible)} hari BEI final, padahal {len(published)} hari sudah terbit; "
-                         f"tidak ada yang ditulis")
+        raise refused(f"server hanya mengekspor {len(eligible)} hari {fam.label} final, padahal {len(published)} hari sudah "
+                      f"terbit; tidak ada yang ditulis")
     for day in sorted(published - eligible.keys() - held):
         if day in aged:
-            print(f"  BEI {day} terbit sebagai hari sementara dan tidak lagi diekspor; berkasnya dibiarkan")
+            print(f"  {fam.label} {day} terbit sebagai hari sementara dan tidak lagi diekspor; berkasnya dibiarkan")
         else:
-            print(f"  peringatan: BEI {day} sudah terbit tetapi tidak lagi diekspor sebagai final; berkasnya dibiarkan")
+            print(f"  peringatan: {fam.label} {day} sudah terbit tetapi tidak lagi diekspor sebagai final; berkasnya dibiarkan")
 
     day_state, week_state = state.setdefault("days", {}), state.setdefault("weeks", {})
-    pending, new_days, new_weeks = {}, {}, {}
-    day_fp = {day: bei_fp(row) for day, row in (empty | eligible).items()}
+    pending, new_days, new_weeks, quarantined = {}, {}, {}, {}
+    day_fp = {day: fingerprint(fam, row) for day, row in (empty | eligible).items()}
     for day, row in sorted(eligible.items()):
-        fp = day_fp[day]
-        names = {kind: f"{prefix}_{day}_{day}.md" for kind, prefix in BEI_KIND.items()}
+        names = {kind: fam.name(kind, day) for kind in DAY_KINDS}
         prev = day_state.get(day) or {}
-        if not force and prev.get("fp") == fp and all((DEST / n).is_file() for n in names.values()):
+        if not force and prev.get("fp") == day_fp[day] and all((DEST / n).is_file() for n in names.values()):
+            quarantined[day] = set(prev.get("quarantined") or [])
             continue
-        entry = {"fp": fp, "files": {}}
-        for kind, name in names.items():
-            r = server.get(f"/api/bei/export/day/{day}?kind={kind}" + (f"&{provisional}" if provisional else ""))
-            if not isinstance(r, dict):
-                raise BeiRefused(f"respons bei export/day {day} {kind} tidak valid")
-            same_bei_profile(r, source, f"bei export/day {day}")
+        responses = {}
+        for kind in names:
+            r = export.get(f"day/{day}?kind={kind}", provisional=True)
             if r.get("state") != row.get("state"):
-                raise BeiRefused(f"status BEI {day} berubah di tengah sinkron ({row.get('state')} -> {r.get('state')}); ulangi")
-            if r.get("llm_calls", 0) != 0:
-                raise BeiRefused(f"bei export/day {day} melaporkan panggilan LLM; ekspor harus read-only")
-            check_bei_file(r.get("name"), name, r.get("text"), r.get("sha256"))
-            pending[name] = redact(r["text"])
-            entry["files"][name] = r["sha256"].lower()
-        new_days[day] = entry
+                raise refused(f"status {fam.label} {day} berubah di tengah sinkron ({row.get('state')} -> {r.get('state')}); ulangi")
+            coverage = r.get("coverage")
+            if isinstance(coverage, dict) and coverage.get("ok") is False:
+                raise refused(f"cakupan {fam.label} {day} ({kind}) belum klop")
+            responses[kind] = r
+        entry, ids = {"fp": day_fp[day], "files": {}}, set()
+        if fam == desk.STOCKBIT:  # karantina stream_id hanya ada di ekspor Stockbit
+            ids = set().union(*(stockbit_ids(r.get("quarantined_stream_ids")) for r in responses.values()))
+            entry["quarantined"] = sorted(ids, key=int)
+        for kind, r in responses.items():
+            check_file(fam, r.get("name"), names[kind], r.get("text"), r.get("sha256"), ids)
+            pending[names[kind]] = redact(r["text"])
+            entry["files"][names[kind]] = r["sha256"].lower()
+        quarantined[day], new_days[day] = ids, entry
 
-    mondays = sorted({date.fromisoformat(d) - timedelta(days=date.fromisoformat(d).weekday()) for d in eligible})
-    for monday in mondays:
-        week = [(monday + timedelta(days=i)).isoformat() for i in range(7)]
+    for monday in sorted({date.fromisoformat(d) - timedelta(days=date.fromisoformat(d).weekday()) for d in eligible}):
+        week = week_of(monday)
         if not all(d in day_fp for d in week):
-            continue
-        name = f"beipekan_{week[0]}_{week[-1]}.md"
+            continue  # pekan belum lengkap di sisi arsip; jangan terbitkan rekap yang menunjuk hari yang belum terbit
+        name = fam.name("pekan", week[0], week[-1])
         fp = "|".join(day_fp[d] for d in week)
         if not force and (week_state.get(week[0]) or {}).get("fp") == fp and (DEST / name).is_file():
             continue
         try:
-            r = server.get(f"/api/bei/export/week/{week[0]}")
+            r = export.get(f"week/{week[0]}")
         except HTTPError as e:
-            if e.code == 404:  # pekan belum lengkap atau ada hari yang ditahan menurut server
-                e.close()
-                continue
-            raise
-        if not isinstance(r, dict):
-            raise BeiRefused(f"respons bei export/week {week[0]} tidak valid")
-        same_bei_profile(r, source, f"bei export/week {week[0]}")
-        if r.get("llm_calls", 0) != 0:
-            raise BeiRefused(f"bei export/week {week[0]} melaporkan panggilan LLM; ekspor harus read-only")
-        check_bei_file(r.get("name"), name, r.get("text"), r.get("sha256"))
+            if e.code != 404:  # 404: pekan belum lengkap, atau ada hari yang ditahan, menurut server
+                raise
+            e.close()
+            continue
+        check_file(fam, r.get("name"), name, r.get("text"), r.get("sha256"), set().union(*(quarantined.get(d, set()) for d in week)))
         pending[name] = redact(r["text"])
         new_weeks[week[0]] = {"fp": fp, "file": name, "sha256": r["sha256"].lower()}
 
-    index = server.get("/api/bei/export/index" + (f"?{provisional}" if provisional else ""))
-    same_bei_profile(index, source, "bei export/index")
-    if isinstance(index, dict) and "profile_id" in index:
-        index = {k: v for k, v in index.items() if k != "profile_id"}  # urusan desk, tidak ikut ke web
-    index = filter_bei_index(index, (early - published) | held | withheld | (empty.keys() - published))
-    index_text = check_bei_index(index, published | eligible.keys())
+    # Desk tidak membatasi tanggal awal indeks: buang hari sebelum --<keluarga>-since (kecuali yang sudah terbit), hari yang
+    # ditahan (rollback atau desk), dan hari tanpa pengumuman yang belum terbit; hari lain yang tidak terbit tetap ditolak.
+    index = {k: v for k, v in export.get("index", provisional=True).items() if k != "profile_id"}  # profil: urusan desk
+    index = filter_index(fam, index, (early - published) | held | withheld | (empty.keys() - published))
+    index_text = check_index(fam, index, published | eligible.keys(), set().union(*quarantined.values()))
 
-    # Semua lolos: baru menulis dan menghapus (di folder staging sync_once).
+    # Semua lolos: baru menulis dan menghapus (di folder staging sync_once; sinkron yang ditolak tidak menghapus apa pun).
     changed = [name for name, text in sorted(pending.items()) if write_if_changed(DEST / name, text)]
-    if write_if_changed(BEI_INDEX, index_text):
-        changed.append(BEI_INDEX.name)
+    if write_if_changed(DEST / fam.index, index_text):
+        changed.append(fam.index)
     for name in withdraw:
         path = DEST / name
         if path.is_symlink() or path.parent.resolve() != DEST.resolve():
-            raise ValueError("Berkas BEI yang dicabut bukan berkas biasa dalam folder yang dikelola.")
+            raise ValueError(f"Berkas {fam.label} yang dicabut bukan berkas biasa dalam folder yang dikelola.")
         path.unlink()
         changed.append(name)
     if new_entries != entries:
-        write_if_changed(BEI_HOLD, json.dumps({"format": 1, "days": dict(sorted(new_entries.items()))},
-                                              ensure_ascii=False, indent=1) + "\n")
-        changed.append(BEI_HOLD.name)
+        write_if_changed(DEST / fam.hold, desk.hold_text(new_entries))
+        changed.append(fam.hold)
     day_state.update(new_days)
     week_state.update(new_weeks)
     for day in withheld:
         day_state.pop(day, None)
     for monday in list(week_state):
-        try:
-            week = {(date.fromisoformat(monday) + timedelta(days=i)).isoformat() for i in range(7)}
-        except (TypeError, ValueError):
-            continue
-        if week & withheld:
+        start = desk.iso_date(monday)
+        if start and set(week_of(start)) & withheld:
             del week_state[monday]
     state["format"] = 1
-    if source is not None:
-        state["profile_id"] = source
-    write_if_changed(BEI_STATE, json.dumps(state, ensure_ascii=False, indent=1, sort_keys=True))
+    if export.profile is not None:
+        state["profile_id"] = export.profile
+    # Tanpa cap waktu: status hanya berubah kalau isi berubah, supaya publish tanpa perubahan tidak membuat commit.
+    write_if_changed(DEST / fam.state, json.dumps(state, ensure_ascii=False, indent=1, sort_keys=True))
     return changed
 
 
-def _run_bei(server, args):
-    changed = sync_bei(server, load_bei_state(), force=getattr(args, "force", False),
-                       allow_provisional=getattr(args, "allow_provisional", False), since=getattr(args, "bei_since", None),
-                       profile=getattr(args, "bei_profile", None))
+def run_family(fam, server, args):
+    """sync_family dengan opsi CLI keluarga itu; cetak berkas yang berubah. Kembalikan daftarnya ([] kalau dilewati)."""
+    stockbit = fam == desk.STOCKBIT
+    since = (getattr(args, "stockbit_since", None) or STOCKBIT_SINCE) if stockbit else getattr(args, "bei_since", None)
+    changed = sync_family(fam, server, load_family_state(fam), force=getattr(args, "force", False),
+                          allow_provisional=getattr(args, "allow_provisional", False), since=since,
+                          profile=None if stockbit else getattr(args, "bei_profile", None))
     if changed is None:
         return []
-    print(f"[{datetime.now():%H:%M:%S}] BEI: {len(changed)} berkas baru/berubah")
+    print(f"[{datetime.now():%H:%M:%S}] {fam.label}: {len(changed)} berkas baru/berubah")
     for name in changed:
         print(f"  {'+' if (DEST / name).exists() else '-'} {name}")
     return changed
 
 
-def _sync_bei_once(args):
-    """Mode --bei-only: tanpa /api/profiles, penjaga profil, digest, kepemilikan, atau Stockbit."""
+def run_bei_or_skip(server, args):
+    """BEI dalam staging Stockbit (publish gabungan): penolakan atau HTTP error BEI = BEI dilewati, dan semua berkas BEI di
+    staging dikembalikan persis seperti sebelum putaran ini (publish_stockbit -> bei_skipped). Stockbit tetap terbit."""
+    def bei_files():
+        return {p.name: p.read_bytes() for p in DEST.iterdir() if desk.family_of(p.name) == desk.BEI and p.is_file()
+                and not p.is_symlink()}
+    before = bei_files()
+    try:
+        return run_family(desk.BEI, server, args)
+    except (BeiRefused, HTTPError) as e:
+        if isinstance(e, HTTPError):
+            e.close()
+            reason = f"Signal Desk menjawab HTTP {e.code} untuk {e.url}"
+        else:
+            reason = str(e)
+        for p in DEST.iterdir():
+            if desk.family_of(p.name) == desk.BEI and p.name not in before:
+                p.unlink()
+        for name, data in before.items():
+            if not (DEST / name).is_file() or (DEST / name).read_bytes() != data:
+                (DEST / name).write_bytes(data)
+        print(f"  peringatan: BEI dilewati, tidak ada berkas BEI yang diubah: {reason}. Stockbit tetap diterbitkan; "
+              f"tinjau BEI di Signal Desk lalu publikasikan lagi.")
+        return []
+
+
+def _sync_desk_once(args):
+    """--stockbit-only (opsional --with-bei) atau --bei-only: tanpa /api/profiles, penjaga profil, digest, atau kepemilikan."""
     server = Server(args.server)
     server.get("/api/health", timeout=10)
     DEST.mkdir(parents=True, exist_ok=True)
-    return bool(_run_bei(server, args))
+    if getattr(args, "bei_only", False):
+        return bool(run_family(desk.BEI, server, args))
+    changed = run_family(desk.STOCKBIT, server, args)
+    if getattr(args, "with_bei", False):
+        changed = changed + run_bei_or_skip(server, args)
+    return bool(changed)
 
 
 # ---------------------------------------------------------------- inti
@@ -1850,19 +1554,14 @@ def _sync_once(args):
 
 
 def sync_once(args):
-    global DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON, STOCKBIT_STATE, STOCKBIT_INDEX, STOCKBIT_HOLD
-    global BEI_STATE, BEI_INDEX, BEI_HOLD
+    global DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON
     original, old_state, old_ownership, old_filings, old_reports = DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON
-    old_sb_state, old_sb_index, old_sb_hold = STOCKBIT_STATE, STOCKBIT_INDEX, STOCKBIT_HOLD
-    old_bei_state, old_bei_index, old_bei_hold = BEI_STATE, BEI_INDEX, BEI_HOLD
     if original.is_symlink() or not original.resolve().is_relative_to((ROOT / "needtobeindexed").resolve()):
         raise ValueError("Folder sinkron menunjuk keluar arsip.")
     original.mkdir(parents=True, exist_ok=True)
     def managed(path):
-        return path.name in (".sync.json", "kepemilikan.json", "kepemilikan-perubahan.json", "kepemilikan-laporan.json",
-                             ".sync-stockbit.json", "stockbit-index.json", ".stockbit-hold.json",
-                             ".sync-bei.json", "bei-index.json", ".bei-hold.json") \
-            or bool(OWNED.fullmatch(path.name)) or bool(STOCKBIT_FILE.fullmatch(path.name)) or bool(BEI_FILE.fullmatch(path.name))
+        return path.name in (".sync.json", "kepemilikan.json", "kepemilikan-perubahan.json", "kepemilikan-laporan.json") \
+            or bool(OWNED.fullmatch(path.name)) or desk.family_of(path.name) is not None
     originals = {}
     for path in original.iterdir():
         if managed(path):
@@ -1876,20 +1575,13 @@ def sync_once(args):
         try:
             DEST, STATE, OWNERSHIP_JSON = stage, stage / ".sync.json", stage / "kepemilikan.json"
             FILINGS_JSON, REPORTS_JSON = stage / "kepemilikan-perubahan.json", stage / "kepemilikan-laporan.json"
-            STOCKBIT_STATE, STOCKBIT_INDEX = stage / ".sync-stockbit.json", stage / "stockbit-index.json"
-            STOCKBIT_HOLD = stage / ".stockbit-hold.json"
-            BEI_STATE, BEI_INDEX, BEI_HOLD = stage / ".sync-bei.json", stage / "bei-index.json", stage / ".bei-hold.json"
             # --stockbit-only/--bei-only diputuskan di sini, sebelum _sync_once: tidak menyentuh /api/profiles, guard(), atau kepemilikan.
-            if getattr(args, "bei_only", False):
-                changed = _sync_bei_once(args)
-            elif getattr(args, "stockbit_only", False):
-                changed = _sync_stockbit_once(args)
+            if getattr(args, "bei_only", False) or getattr(args, "stockbit_only", False):
+                changed = _sync_desk_once(args)
             else:
                 changed = _sync_once(args)
         finally:
             DEST, STATE, OWNERSHIP_JSON, FILINGS_JSON, REPORTS_JSON = original, old_state, old_ownership, old_filings, old_reports
-            STOCKBIT_STATE, STOCKBIT_INDEX, STOCKBIT_HOLD = old_sb_state, old_sb_index, old_sb_hold
-            BEI_STATE, BEI_INDEX, BEI_HOLD = old_bei_state, old_bei_index, old_bei_hold
         staged = {p.name: p.read_bytes() for p in stage.iterdir() if managed(p)}
         # Refuse concurrent edits instead of silently overwriting them.
         current = {p.name: p.read_bytes() for p in original.iterdir() if managed(p) and p.is_file() and not p.is_symlink()}
@@ -1929,11 +1621,8 @@ def run(args):
             changed = sync_once(argparse.Namespace(**{**vars(args), "stockbit_only": True})) or changed
         elif getattr(args, "with_bei", False) and not single:
             changed = sync_once(argparse.Namespace(**{**vars(args), "bei_only": True, "with_bei": False})) or changed
-    except StockbitRefused as e:
-        print(f"Stockbit ditolak, tidak ada berkas yang ditulis: {e}", file=sys.stderr)
-        return 1
-    except BeiRefused as e:
-        print(f"BEI ditolak, tidak ada berkas yang ditulis: {e}", file=sys.stderr)
+    except SyncRefused as e:
+        print(f"{e.label} ditolak, tidak ada berkas yang ditulis: {e}", file=sys.stderr)
         return 1
     except HTTPError as e:
         print(f"Signal Desk menjawab HTTP {e.code} untuk {e.url}", file=sys.stderr)

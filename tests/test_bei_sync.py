@@ -13,7 +13,6 @@ from urllib.error import HTTPError
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(ROOT / "tools")); sys.path.insert(0, str(ROOT / "tests" / "helpers"))
-import build  # noqa: E402
 import sync_idx as sync  # noqa: E402
 from fake_desk import BeiDesk, StockbitDesk, sha  # noqa: E402
 
@@ -26,11 +25,7 @@ class BeiSyncTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.dest = self.root / "needtobeindexed/idx-signal-desk"; self.dest.mkdir(parents=True)
         p = patch.multiple(sync, ROOT=self.root, DEST=self.dest, STATE=self.dest / ".sync.json",
-                           OWNERSHIP_JSON=self.dest / "kepemilikan.json",
-                           STOCKBIT_STATE=self.dest / ".sync-stockbit.json", STOCKBIT_INDEX=self.dest / "stockbit-index.json",
-                           STOCKBIT_HOLD=self.dest / ".stockbit-hold.json",
-                           BEI_STATE=self.dest / ".sync-bei.json", BEI_INDEX=self.dest / "bei-index.json",
-                           BEI_HOLD=self.dest / ".bei-hold.json")
+                           OWNERSHIP_JSON=self.dest / "kepemilikan.json")
         p.start(); self.addCleanup(p.stop)
 
     def snapshot(self):
@@ -60,8 +55,7 @@ class BeiSyncTests(unittest.TestCase):
 
     def test_bei_only_writes_days_index_state_without_profile_or_stockbit_calls(self):
         desk = BeiDesk(["2026-10-05", "2026-10-06"])
-        with patch.object(sync, "_sync_once", side_effect=AssertionError("profile path must not run")), \
-                patch.object(sync, "sync_stockbit", side_effect=AssertionError("Stockbit must not run")):
+        with patch.object(sync, "_sync_once", side_effect=AssertionError("profile path must not run")):
             self.assertTrue(self.sync(desk))
         names = set(self.snapshot())
         self.assertLessEqual({"beiringkas_2026-10-05_2026-10-05.md", "beidetail_2026-10-05_2026-10-05.md",
@@ -78,13 +72,13 @@ class BeiSyncTests(unittest.TestCase):
         self.assertFalse([c for c in desk.calls if "/export/day/" in c])
 
     def test_globals_restored_after_success_and_failure(self):
-        originals = (sync.DEST, sync.BEI_STATE, sync.BEI_INDEX, sync.BEI_HOLD)
+        originals = (sync.DEST, sync.STATE)
         self.sync(BeiDesk(["2026-10-05"]))
-        self.assertEqual((sync.DEST, sync.BEI_STATE, sync.BEI_INDEX, sync.BEI_HOLD), originals)
+        self.assertEqual((sync.DEST, sync.STATE), originals)
         bad = BeiDesk(["2026-10-06"]); bad.overrides[("2026-10-06", "ringkas")] = {"sha256": "0" * 64}
         with self.assertRaises(sync.BeiRefused):
             self.sync(bad)
-        self.assertEqual((sync.DEST, sync.BEI_STATE, sync.BEI_INDEX, sync.BEI_HOLD), originals)
+        self.assertEqual((sync.DEST, sync.STATE), originals)
 
     def test_desk_without_bei_router_is_skipped_untouched(self):
         self.sync(BeiDesk(["2026-10-05"]))
@@ -255,6 +249,10 @@ class BeiSyncTests(unittest.TestCase):
         # Tanpa --bei-since: semua hari final desk.
         self.sync(BeiDesk(["2026-09-30", "2026-10-05", "2026-10-06"]))
         self.assertIn("beiringkas_2026-09-30_2026-09-30.md", set(self.snapshot()))
+        # A day already published is never "too early" (as for Stockbit): a later --bei-since keeps it in the index.
+        self.sync(BeiDesk(["2026-09-30", "2026-10-05", "2026-10-06", "2026-10-07"]), bei_since="2026-10-06")
+        self.assertIn("beiringkas_2026-10-07_2026-10-07.md", set(self.snapshot()))
+        self.assertEqual([d["d"] for d in self.index()["days"]], ["2026-09-30", "2026-10-05", "2026-10-06", "2026-10-07"])
 
     def test_published_provisional_day_may_age_out_of_the_export(self):
         # A 'sementara' day that went live stays as published when the desk stops listing it (its provisional window
@@ -375,9 +373,6 @@ class BeiSyncTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 sync.prune(prefix, set(), allow_empty=True)
 
-    def test_real_build_categories_match(self):
-        for prefix, cat in sync.BEI_CATEGORY.items():
-            self.assertEqual(build.categorize(f"{prefix}_2026-10-05_2026-10-05"), cat)
 
 
 class CombinedSyncTests(unittest.TestCase):
