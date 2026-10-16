@@ -368,6 +368,19 @@ class BeiSyncTests(unittest.TestCase):
                 desk.overrides["index"] = {"tickers": {"BBCA": [[0, 2, 1, "baru", "", "", {}, [], bad]]}}
                 self.refused(desk, "format 1")
 
+    def test_index_rows_may_carry_the_shortened_flag(self):
+        for flag in (0, 1):
+            with self.subTest(flag=flag):
+                desk = BeiDesk(["2026-10-05"])
+                desk.overrides["index"] = {"tickers": {"BBCA": [[0, 2, 1, "baru", "", "", {}, [], "bbca", flag]]}}
+                self.sync(desk)
+                self.assertEqual(self.index()["tickers"]["BBCA"][0][9], flag)
+        for bad in (True, 2, "1", None):
+            with self.subTest(bad=bad):
+                desk = BeiDesk(["2026-10-05"])
+                desk.overrides["index"] = {"tickers": {"BBCA": [[0, 2, 1, "baru", "", "", {}, [], "bbca", bad]]}}
+                self.refused(desk, "format 1")
+
     def test_never_pruned(self):
         for prefix in ("beiringkas_", "beidetail_", "beipekan_"):
             with self.assertRaises(ValueError):

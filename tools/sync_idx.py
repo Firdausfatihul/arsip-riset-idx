@@ -1080,8 +1080,8 @@ def bei_anchor_hint(value):
 
 def check_bei_row(code, row, n_days):
     """Baris tickers bei-index.json: [hariIdx, n_pengumuman, n_nonrutin, status, tahap, delta, {kategori: n}, [id2...],
-    petunjuk_bagian?]."""
-    ok = (isinstance(row, list) and 6 <= len(row) <= 9 and isinstance(row[0], int) and not isinstance(row[0], bool)
+    petunjuk_bagian?, dipendekkan?] (dipendekkan: 1 bila desk memotong sel delta di batas kalimat)."""
+    ok = (isinstance(row, list) and 6 <= len(row) <= 10 and isinstance(row[0], int) and not isinstance(row[0], bool)
           and 0 <= row[0] < n_days and _count(row[1]) and _count(row[2]) and row[2] <= row[1]
           and all(isinstance(v, str) and len(v) <= 2000 for v in row[3:6]))
     if ok and len(row) > 6:
@@ -1092,6 +1092,8 @@ def check_bei_row(code, row, n_days):
             (isinstance(i, str) and 0 < len(i) <= 100) or (isinstance(i, int) and not isinstance(i, bool)) for i in row[7])
     if ok and len(row) > 8:
         ok = bei_anchor_hint(row[8])
+    if ok and len(row) > 9:
+        ok = row[9] in (0, 1) and not isinstance(row[9], bool)
     if not ok:
         raise BeiRefused(f"baris tickers.{code} di bei-index.json tidak sesuai format 1")
 
