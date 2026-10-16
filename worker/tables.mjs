@@ -280,14 +280,14 @@ export async function entityMaterial(question, ctx) {
 }
 
 // ---- rare rumors ---------------------------------------------------------------------------------------------------
-// Corporate-action rumors/quoted disclosures of issuers whose such rumors come from ≤maxAccounts accounts on ≤maxDays days,
+// Corporate-action rumors/jokes-with-a-code/quoted disclosures of issuers whose such rumors come from ≤maxAccounts accounts on ≤maxDays days,
 // plus the desk's own "Jarang disebut tapi material" lists.
 export async function rareRumorMaterial(ctx, {maxAccounts = 3, maxDays = 2, limit = 60, deskBudget = 12000} = {}) {
   const {index, tables, archive} = ctx, lookup = docLookup(index), refs = new DocRefs();
   const topics = tables.claims?.topics || [], ca = CA_TOPICS.reduce((m, t) => topics.includes(t) ? m | (1 << topics.indexOf(t)) : m, 0);
   const found = [], issuers = new Set();
   for (const [code, rows] of Object.entries(tables.claims?.by_ticker || {})) {
-    const hits = rows.filter(r => 'RM'.includes(r[2]) && (r[8] & ca));
+    const hits = rows.filter(r => 'RMG'.includes(r[2]) && (r[8] & ca));
     if (!hits.length) continue;
     const accounts = new Set(hits.map(r => r[4])).size + hits.reduce((n, r) => n + Math.max(0, r[5] - 1), 0), days = new Set(hits.map(r => r[1])).size;
     if (accounts > maxAccounts || days > maxDays) continue;
@@ -317,7 +317,7 @@ export async function rareRumorMaterial(ctx, {maxAccounts = 3, maxDays = 2, limi
       }
   }
   const text = `=== RUMOR AKSI KORPORASI YANG JARANG DIBAHAS (disusun sistem dari indeks temuan Stockbit ${cov.stockbit?.[0]}..${cov.stockbit?.[1]}) ===\n`
-    + `Kriteria: temuan Rumor atau Mengutip keterbukaan bertopik aksi korporasi (rights issue, private placement, tender offer, akuisisi/pengendali, merger, buyback, stock split, go private, pailit) `
+    + `Kriteria: temuan Rumor, Guyon/kode atau Mengutip keterbukaan bertopik aksi korporasi (rights issue, private placement, tender offer, akuisisi/pengendali, merger, buyback, stock split, go private, pailit) `
     + `pada emiten yang rumor sejenisnya hanya dari ≤${maxAccounts} akun dan ≤${maxDays} hari. ${found.length} temuan dari ${issuers.size} emiten memenuhi, ${chosen.length} dicantumkan (satu per emiten dulu). `
     + `CEK membandingkan dengan keterbukaan BEI emiten itu sendiri (${cov.bei?.[0]}..${cov.bei?.[1]}) dan KSEI s.d. ${monthName(cov.ksei?.[1])}; ini bukan screening seluruh pasar.\n` + lines.join('\n')
     + (desk.length ? '\n\nDAFTAR DESK "JARANG DISEBUT TAPI MATERIAL" (ringkasan harian Stockbit, terbaru dulu; klaim pengguna):\n' + desk.join('\n') : '');

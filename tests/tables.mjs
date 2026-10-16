@@ -20,6 +20,7 @@ const fixture = () => ({
     HELI:[row('F1', '2026-10-01', 'K', 'Pemegang saham 8% HELI sedang menjual', 'zein', 1, bit('kepemilikan'), 10),
       row('F2', '2026-10-07', 'R', 'HELI didukung oleh Tanoko melalui Alta', 'mif')],
     MERI:[row('F5', '2026-10-05', 'R', 'Ada pihak di balik MERI yang berpotensi mengakuisisi emiten', 'laz', 1, bit('akuisisi_pengendali'))],
+    PMUI:[row('F7', '2026-10-06', 'G', 'Guyon Papi PP mau caplok PMUI lewat backdoor', 'kode', 1, bit('akuisisi_pengendali'))],
     FORU:[...Array.from({length:6}, (_, i) => row('F9' + i, '2026-10-0' + (i + 1), 'R', 'FORU akan diakuisisi ' + i, 'u' + i, 1, bit('akuisisi_pengendali')))]}},
   links:{links:{HELI:{F1:[['tercatat','2026-08','KSEI s.d. Agustus 2026 mencatat PT. AVIA NUSANTARA KHATULISTIWA 8,43%; belum ada data KSEI untuk Oktober 2026'], ['lain','2026-08-29','ada keterbukaan lain …']],
     F2:[['tercatat','2026-08','pihak tercatat di KSEI (Agustus 2026, 16,00%): PT. ALTA INTERNASIONAL INDONESIA']]},
@@ -121,8 +122,9 @@ test('claim tail: only undiscussed rumors, at most 8 one-line rows with the chec
 test('rare rumors: corporate-action rumors of thinly discussed issuers, one per issuer first', async () => {
   const t = fixture(), m = await rareRumorMaterial({index, tables:t, archive:{read:async () => ({records:[]})}});
   assert.match(m.text, /MERI · \[Rumor\] Ada pihak di balik MERI/);
+  assert.match(m.text, /PMUI · \[Guyon\/kode\] Guyon Papi PP/); // a coded joke counts like a rumor
   assert.doesNotMatch(m.text, /FORU akan diakuisisi/); // six accounts on six days: not rare
-  assert.equal(m.stats.issuers, 1);
+  assert.equal(m.stats.issuers, 2);
 });
 
 // ---- integration on the built assets ------------------------------------------------------------------------------
